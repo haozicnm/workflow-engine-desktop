@@ -1,0 +1,22 @@
+# Rust
+src-tauri/target/
+
+# Node
+node_modules/
+src/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri
+src-tauri/gen/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
