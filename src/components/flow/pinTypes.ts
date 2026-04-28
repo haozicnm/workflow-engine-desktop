@@ -52,7 +52,7 @@ export interface NodeDefinition {
   label: string
   icon: string
   color: string
-  category: 'source' | 'process' | 'output'
+  category: 'source' | 'process' | 'output' | 'ai'
   description?: string
   inputs: PinDefinition[]
   outputs: PinDefinition[]
@@ -234,9 +234,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
   },
   // ─── P3 AI 节点 ───
   {
+    type: 'ai',
     label: 'AI 调用',
     icon: '🤖',
     color: '#7c3aed',
+    category: 'ai',
     description: '调用 LLM 执行翻译/摘要/分类/情感分析/实体提取',
     inputs: [
       { id: 'text', label: 'text', type: 'string' },
@@ -247,9 +249,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { action: 'call_llm', model: 'gpt-3.5-turbo', prompt: '', temperature: 0.7, max_tokens: 1024 },
   },
   {
+    type: 'ai_translate',
     label: 'AI 翻译',
     icon: '🌍',
     color: '#10b981',
+    category: 'ai',
     description: '使用 AI 翻译文本',
     inputs: [
       { id: 'text', label: 'text', type: 'string', required: true },
@@ -260,9 +264,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { action: 'translate', source_lang: 'auto', target_lang: 'en', model: 'gpt-3.5-turbo' },
   },
   {
+    type: 'ai_summarize',
     label: 'AI 摘要',
     icon: '📝',
     color: '#f59e0b',
+    category: 'ai',
     description: '使用 AI 生成文本摘要',
     inputs: [
       { id: 'text', label: 'text', type: 'string', required: true },
@@ -273,9 +279,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { action: 'summarize', max_length: 200, model: 'gpt-3.5-turbo' },
   },
   {
+    type: 'ai_classify',
     label: 'AI 分类',
     icon: '🏷️',
     color: '#ef4444',
+    category: 'ai',
     description: '使用 AI 对文本进行分类',
     inputs: [
       { id: 'text', label: 'text', type: 'string', required: true },
@@ -288,9 +296,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { action: 'classify', labels: [] },
   },
   {
+    type: 'ai_sentiment',
     label: 'AI 情感分析',
     icon: '💬',
     color: '#ec4899',
+    category: 'ai',
     description: '分析文本的情感倾向（正面/负面/中性）',
     inputs: [
       { id: 'text', label: 'text', type: 'string', required: true },
@@ -302,9 +312,11 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { action: 'sentiment' },
   },
   {
+    type: 'ai_entities',
     label: 'AI 实体提取',
     icon: '🔍',
     color: '#06b6d4',
+    category: 'ai',
     description: '使用 AI 提取文本中的命名实体',
     inputs: [
       { id: 'text', label: 'text', type: 'string', required: true },

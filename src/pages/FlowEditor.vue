@@ -425,8 +425,11 @@ onMounted(() => {
   undoManager.init()
   // 启动自动保存
   autoSave.start()
-  // 尝试恢复上次未保存的工作流
-  if (id === 'new' && store.nodes.length === 0) {
+  // 模板数据已通过 Dashboard 预加载，跳过自动恢复
+  if (store.nodes.length > 0) {
+    addLog(`📋 已加载模板「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
+  } else if (id === 'new') {
+    // 自动恢复上次未保存的工作流
     const restored = autoSave.loadAutoSave()
     if (restored) {
       addLog('📂 已恢复上次未保存的工作流', 'info')

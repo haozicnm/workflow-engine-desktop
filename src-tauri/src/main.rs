@@ -76,6 +76,7 @@ fn main() {
             // Templates
             workflow_engine::commands::template::template_list,
             workflow_engine::commands::template::template_get_yaml,
+            workflow_engine::commands::template::template_get_json,
             workflow_engine::commands::template::list_templates,
             workflow_engine::commands::template::load_template,
             // Schedules

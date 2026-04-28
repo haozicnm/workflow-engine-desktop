@@ -14,6 +14,7 @@ export const useFlowStore = defineStore('flow', () => {
   const workflowName = ref('未命名工作流')
   const workflowId = ref<string | null>(null)
   const dirty = ref(false)
+  const templateSource = ref<string | null>(null)
 
   // ─── 计数器用于生成唯一 ID ───
   let counter = 0
@@ -164,6 +165,7 @@ export const useFlowStore = defineStore('flow', () => {
     workflowName,
     workflowId,
     dirty,
+    templateSource,
     // 计算属性
     nodeCount,
     edgeCount,

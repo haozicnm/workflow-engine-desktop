@@ -1,0 +1,48 @@
+{
+  "name": "JSON数据提取",
+  "description": "读取JSON文件 → 用JSONPath提取字段 → 数组排序 → 保存",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file",
+      "label": "读取JSON",
+      "position": { "x": 60, "y": 150 },
+      "config": { "path": "./data/products.json", "encoding": "utf-8" }
+    },
+    {
+      "id": "n2",
+      "type": "json_parse",
+      "label": "提取产品列表",
+      "position": { "x": 380, "y": 150 },
+      "config": { "expression": "$.products[*]", "target_field": "" }
+    },
+    {
+      "id": "n3",
+      "type": "array",
+      "label": "按价格排序",
+      "position": { "x": 700, "y": 60 },
+      "config": { "action": "filter", "expression": "item.price > 0", "limit": 100 }
+    },
+    {
+      "id": "n4",
+      "type": "convert",
+      "label": "转CSV格式",
+      "position": { "x": 700, "y": 240 },
+      "config": { "from": "json", "to": "string" }
+    },
+    {
+      "id": "n5",
+      "type": "file_save",
+      "label": "保存提取结果",
+      "position": { "x": 1020, "y": 150 },
+      "config": { "path": "./output/products_filtered.json", "format": "json" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "input" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e3", "source": "n2", "target": "n4", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e4", "source": "n3", "target": "n5", "sourceHandle": "result", "targetHandle": "content" },
+    { "id": "e5", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "content" }
+  ]
+}

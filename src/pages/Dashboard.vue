@@ -124,13 +124,20 @@ function openEditor(id?: string) {
 async function createFromTemplate(tpl: TemplateItem) {
   creatingFromTemplate.value = tpl.id
   try {
-    const yaml = await invoke<string | null>('template_get_yaml', { id: tpl.id })
-    if (!yaml) { toast.error('模板内容为空'); return }
-    const id = await invoke<string>('workflow_create', { name: tpl.name, description: tpl.description })
-    await invoke('workflow_save_yaml', { id, yaml })
+    const jsonStr = await invoke<string | null>('template_get_json', { id: tpl.id })
+    if (!jsonStr) { toast.error('模板数据为空'); return }
+    const data = JSON.parse(jsonStr)
+    // 通过 flowStore 预加载模板数据，编辑器 mount 时读取
+    const { useFlowStore } = await import('../stores/flowStore')
+    const flowStore = useFlowStore()
+    flowStore.load({
+      name: data.name || tpl.name,
+      nodes: data.nodes || [],
+      edges: data.edges || [],
+    })
+    flowStore.templateSource = tpl.id
     toast.success(`已从模板创建「${tpl.name}」`)
-    await loadList()
-    openEditor(id)
+    openEditor('new')
   } catch (e: unknown) {
     toast.error('创建失败: ' + ((e as Error).message || e))
   } finally {

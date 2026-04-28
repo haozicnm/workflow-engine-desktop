@@ -1,0 +1,31 @@
+{
+  "name": "AI翻译工作流",
+  "description": "读取文本文件 → AI 翻译为英文 → 保存翻译结果",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file",
+      "label": "读取原文",
+      "position": { "x": 60, "y": 150 },
+      "config": { "path": "./data/chinese.txt", "encoding": "utf-8" }
+    },
+    {
+      "id": "n2",
+      "type": "ai_translate",
+      "label": "AI 中译英",
+      "position": { "x": 420, "y": 150 },
+      "config": { "action": "translate", "source_lang": "auto", "target_lang": "en", "model": "gpt-3.5-turbo" }
+    },
+    {
+      "id": "n3",
+      "type": "file_save",
+      "label": "保存英文版",
+      "position": { "x": 780, "y": 150 },
+      "config": { "path": "./output/translated_en.txt", "format": "text", "encoding": "utf-8" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "text" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "translated", "targetHandle": "content" }
+  ]
+}

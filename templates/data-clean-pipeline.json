@@ -1,0 +1,48 @@
+{
+  "name": "数据清洗流水线",
+  "description": "读取文件 → JSON解析 → 数组过滤转换 → 保存",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file",
+      "label": "读取源数据",
+      "position": { "x": 60, "y": 200 },
+      "config": { "path": "./data/raw.json", "encoding": "utf-8" }
+    },
+    {
+      "id": "n2",
+      "type": "json_parse",
+      "label": "解析JSON",
+      "position": { "x": 360, "y": 200 },
+      "config": { "expression": "$.items[*]", "target_field": "" }
+    },
+    {
+      "id": "n3",
+      "type": "array",
+      "label": "过滤无效数据",
+      "position": { "x": 660, "y": 80 },
+      "config": { "action": "filter", "expression": "item.status == 'active'", "limit": 1000 }
+    },
+    {
+      "id": "n4",
+      "type": "convert",
+      "label": "格式化输出",
+      "position": { "x": 660, "y": 300 },
+      "config": { "from": "auto", "to": "json", "encoding": "utf-8" }
+    },
+    {
+      "id": "n5",
+      "type": "file_save",
+      "label": "保存清洗结果",
+      "position": { "x": 980, "y": 190 },
+      "config": { "path": "./output/clean_data.json", "format": "json" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "input" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e3", "source": "n3", "target": "n5", "sourceHandle": "result", "targetHandle": "content" },
+    { "id": "e4", "source": "n2", "target": "n4", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e5", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "content" }
+  ]
+}

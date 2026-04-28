@@ -9,58 +9,67 @@ pub struct BuiltinTemplate {
     pub name: &'static str,
     pub description: &'static str,
     pub yaml: &'static str,
+    pub json_data: Option<&'static str>,
 }
 
 /// 所有内置模板（编译期嵌入）
 fn all_templates() -> Vec<BuiltinTemplate> {
     vec![
         BuiltinTemplate {
-            id: "excel-browser-word",
-            name: "Excel查询+浏览器+Word输出",
-            description: "读取Excel A列 → 浏览器查询 → 结果保存Excel → 审批后输出Word",
-            yaml: include_str!("../../../templates/excel-browser-word.yaml"),
-        },
-        BuiltinTemplate {
-            id: "web-scrape-excel",
-            name: "网页抓取→Excel",
-            description: "声明式抓取网页列表数据 → 整理格式 → 写入 Excel 文件",
-            yaml: include_str!("../../../templates/web-scrape-excel.yaml"),
-        },
-        BuiltinTemplate {
             id: "api-data-excel",
             name: "API数据采集",
-            description: "调用 HTTP API → 提取 JSON 数据 → 写入 Excel",
-            yaml: include_str!("../../../templates/api-data-excel.yaml"),
+            description: "调用 HTTP API → 解析 JSON → 保存到本地文件",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/api-data-excel.json")),
         },
         BuiltinTemplate {
             id: "api-monitor",
             name: "API健康监控",
-            description: "定时检查多个 API 是否正常 → 异常时通知告警",
-            yaml: include_str!("../../../templates/api-monitor.yaml"),
+            description: "定时检查多个 API 健康状态 → 汇总输出",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/api-monitor.json")),
         },
         BuiltinTemplate {
-            id: "multi-page-scrape",
-            name: "多页翻页抓取",
-            description: "自动翻页抓取多页列表数据 → 合并去重 → 写入 Excel",
-            yaml: include_str!("../../../templates/multi-page-scrape.yaml"),
+            id: "web-content-fetch",
+            name: "网页内容获取",
+            description: "获取网页 → 提取正文 → 保存为文件",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/web-content-fetch.json")),
         },
         BuiltinTemplate {
-            id: "browser-form-fill",
-            name: "浏览器批量填表",
-            description: "从 Excel 读取数据 → 浏览器自动填写网页表单 → 截图存档",
-            yaml: include_str!("../../../templates/browser-form-fill.yaml"),
+            id: "data-clean-pipeline",
+            name: "数据清洗流水线",
+            description: "读取文件 → JSON解析 → 数组过滤转换 → 保存",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/data-clean-pipeline.json")),
         },
         BuiltinTemplate {
-            id: "excel-data-clean",
-            name: "Excel数据清洗",
-            description: "读取 Excel → 脚本清洗过滤 → 生成汇总 → 写入新文件",
-            yaml: include_str!("../../../templates/excel-data-clean.yaml"),
+            id: "text-process",
+            name: "文本批量处理",
+            description: "读取文本 → 正则提取关键信息 → 格式化 → 保存",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/text-process.json")),
         },
         BuiltinTemplate {
-            id: "while-excel-browser",
-            name: "While循环-逐行读取→浏览器填写",
-            description: "Excel A列 → while 循环逐行读取 → 填入浏览器 → 无数据自动停止",
-            yaml: include_str!("../../../templates/while-excel-browser.yaml"),
+            id: "json-extract",
+            name: "JSON数据提取",
+            description: "读取JSON文件 → JSONPath提取 → 数组排序 → 保存",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/json-extract.json")),
+        },
+        BuiltinTemplate {
+            id: "ai-translate",
+            name: "AI翻译工作流",
+            description: "读取文本文件 → AI 翻译为英文 → 保存翻译结果",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/ai-translate.json")),
+        },
+        BuiltinTemplate {
+            id: "ai-summarize",
+            name: "AI文本摘要",
+            description: "读取长文本 → AI 生成摘要 → 打印输出",
+            yaml: "",
+            json_data: Some(include_str!("../../../templates/ai-summarize.json")),
         },
     ]
 }
@@ -95,6 +104,16 @@ pub async fn template_get_yaml(id: String) -> Result<Option<String>, String> {
         .iter()
         .find(|t| t.id == id)
         .map(|t| t.yaml.to_string()))
+}
+
+/// 获取单个内置模板的 v2.0 JSON 数据（nodes + edges）
+#[tauri::command]
+pub async fn template_get_json(id: String) -> Result<Option<String>, String> {
+    Ok(all_templates()
+        .iter()
+        .find(|t| t.id == id)
+        .and_then(|t| t.json_data)
+        .map(|s| s.to_string()))
 }
 
 // ═══════════════════════════════════════════════════════════

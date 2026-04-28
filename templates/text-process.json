@@ -1,0 +1,48 @@
+{
+  "name": "文本批量处理",
+  "description": "读取文本文件 → 正则提取关键信息 → 格式化 → 保存",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file",
+      "label": "读取文本",
+      "position": { "x": 60, "y": 150 },
+      "config": { "path": "./data/input.txt", "encoding": "utf-8" }
+    },
+    {
+      "id": "n2",
+      "type": "regex",
+      "label": "提取邮箱/电话",
+      "position": { "x": 380, "y": 60 },
+      "config": { "pattern": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "action": "extract", "flags": "g" }
+    },
+    {
+      "id": "n3",
+      "type": "regex",
+      "label": "提取日期",
+      "position": { "x": 380, "y": 240 },
+      "config": { "pattern": "\\d{4}-\\d{2}-\\d{2}", "action": "extract", "flags": "g" }
+    },
+    {
+      "id": "n4",
+      "type": "text_template",
+      "label": "汇总提取结果",
+      "position": { "x": 700, "y": 150 },
+      "config": { "template": "提取到的邮箱: {{emails}}\n提取到的日期: {{dates}}" }
+    },
+    {
+      "id": "n5",
+      "type": "file_save",
+      "label": "保存结果",
+      "position": { "x": 1020, "y": 150 },
+      "config": { "path": "./output/extracted.txt", "format": "text" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "input" },
+    { "id": "e2", "source": "n1", "target": "n3", "sourceHandle": "content", "targetHandle": "input" },
+    { "id": "e3", "source": "n2", "target": "n4", "sourceHandle": "matches", "targetHandle": "data" },
+    { "id": "e4", "source": "n3", "target": "n4", "sourceHandle": "matches", "targetHandle": "data" },
+    { "id": "e5", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "content" }
+  ]
+}
