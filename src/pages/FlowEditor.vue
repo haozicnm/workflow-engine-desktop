@@ -50,11 +50,7 @@
       <NodePalette @drag-start="onDragStart" />
 
       <!-- 中央：画布 -->
-      <div
-        class="canvas-wrapper"
-        @drop="onDrop"
-        @dragover.prevent
-      >
+      <div class="canvas-wrapper">
         <!-- 空状态提示 -->
         <div v-if="store.nodes.length === 0" class="empty-canvas">
           <div class="empty-icon">🎨</div>
@@ -71,6 +67,8 @@
           :snap-to-grid="true"
           :snap-grid="[20, 20]"
           fit-view-on-init
+          @drop="onDrop"
+          @dragover.prevent
           @node-click="onNodeClick"
           @node-drag-stop="onNodeDragStop"
           @pane-click="onPaneClick"
@@ -224,18 +222,18 @@ function onDrop(event: DragEvent) {
   const def = getNodeDef(type)
   if (!def) return
 
-  // 计算画布坐标
-  const canvas = event.currentTarget as HTMLElement
-  const bounds = canvas.getBoundingClientRect()
-  const x = event.clientX - bounds.left - 120
-  const y = event.clientY - bounds.top - 30
+  // 用 VueFlow 坐标转换，正确处理缩放/平移
+  const position = vueFlowRef.value?.screenToFlowCoordinate({
+    x: event.clientX,
+    y: event.clientY,
+  }) || { x: event.clientX - 120, y: event.clientY - 30 }
 
   const id = store.generateId()
   store.addNode({
     id,
     type: def.type,
     label: def.label,
-    position: { x, y },
+    position,
     config: { ...def.defaultConfig },
   })
 
