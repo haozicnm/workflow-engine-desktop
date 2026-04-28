@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════
+# 工作流模板：API 数据采集
+# ═══════════════════════════════════════════════════════
+#
+# 流程：
+#   1. 调用 HTTP API 获取 JSON 数据
+#   2. 提取需要的字段
+#   3. 写入 Excel
+#   4. 通知
+#
+# 适用场景：定期采集 API 数据、监控数据备份
+
+name: API数据采集
+description: 调用 HTTP API → 提取数据 → 写入 Excel
+version: "1.1"
+
+variables:
+  api_url: https://jsonplaceholder.typicode.com/users
+  output_path: ./output/api_data.xlsx
+
+steps:
+  - id: fetch_api
+    name: 调用API
+    type: http
+    config:
+      action: GET
+      url: "{{api_url}}"
+
+  - id: format_data
+    name: 格式化数据
+    type: script
+    config:
+      script: |
+        let headers = [["ID", "姓名", "邮箱", "城市", "公司"]];
+        let rows = [];
+        for user in step_fetch_api.body {
+          rows.push([
+            user.id,
+            user.name,
+            user.email,
+            user.address.city,
+            user.company.name
+          ]);
+        }
+        headers + rows
+
+  - id: write_excel
+    name: 写入Excel
+    type: excel
+    config:
+      action: write
+      path: "{{output_path}}"
+      sheet: "API数据"
+      data: "{{step_format_data}}"
+
+  - id: notify
+    name: 完成通知
+    type: notify
+    config:
+      notify_type: system
+      title: API采集完成
+      body: "共采集 {{step_fetch_api.body.length}} 条数据，已保存到 {{output_path}}"

@@ -1,16 +1,14 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicoverbruggen/tauri-settings/main/schema.json",
   "productName": "Workflow Engine",
-  "version": "0.1.0",
+  "version": "1.2.0-beta",
   "identifier": "com.workflow-engine.desktop",
   "build": {
     "frontendDist": "../src/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm --prefix ./src run dev",
+    "beforeBuildCommand": "npm --prefix ../src run build"
   },
   "app": {
-    "title": "Workflow Engine",
     "windows": [
       {
         "title": "Workflow Engine",
@@ -28,14 +26,18 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "sidecars/*": "sidecars/",
+      "python-runtime/embed/**/*": "embed/"
+    }
   },
   "plugins": {}
 }

@@ -1,0 +1,87 @@
+name: Excel自动化查询管道
+description: "读取Excel A列 → 处理数据 → 写回B列 → 生成Word报告"
+version: "1.0"
+
+variables:
+  excel_path: "./examples/test_data.xlsx"
+  template_path: "./examples/report_template.docx"
+  output_path: "./examples/report_output.docx"
+
+steps:
+  # 步骤1：读取 Excel 全部数据
+  - id: read_excel
+    name: 读取Excel数据
+    type: excel
+    config:
+      action: read
+      file_path: "${excel_path}"
+      sheet: "数据"
+
+  # 步骤2：处理数据（rhai 脚本遍历 + 分类）
+  - id: process_data
+    name: 处理查询结果
+    type: script
+    config:
+      script: |
+        let data = ${read_excel};
+        let rows = data["data"];
+        let results = [];
+        for row in rows {
+          let keyword = row[0];
+          let category = if keyword.contains("Python") { "编程语言" }
+            else if keyword.contains("Rust") { "系统编程" }
+            else if keyword.contains("Vue") { "前端框架" }
+            else if keyword.contains("Tauri") { "桌面应用" }
+            else if keyword.contains("自动化") { "自动化工具" }
+            else { "其他" };
+          let result = "#{category} | #{keyword.len()}字符";
+          results.push(result);
+        }
+        results
+
+  # 步骤3：写回 Excel B列
+  - id: write_excel
+    name: 写入结果到Excel
+    type: excel
+    config:
+      action: update
+      file_path: "${excel_path}"
+      sheet: "数据"
+      updates:
+        - cell: "B2"
+          value: "${process_data[0]}"
+        - cell: "B3"
+          value: "${process_data[1]}"
+        - cell: "B4"
+          value: "${process_data[2]}"
+        - cell: "B5"
+          value: "${process_data[3]}"
+        - cell: "B6"
+          value: "${process_data[4]}"
+
+  # 步骤4：生成 Word 报告
+  - id: generate_report
+    name: 生成Word报告
+    type: word
+    config:
+      action: replace
+      file_path: "${template_path}"
+      output: "${output_path}"
+      replacements:
+        "{{DATE}}": "2026-04-22"
+        "{{TOTAL}}": "5"
+        "{{ROW1_NUM}}": "1"
+        "{{ROW1_KEYWORD}}": "Python编程"
+        "{{ROW1_RESULT}}": "${process_data[0]}"
+        "{{ROW2_NUM}}": "2"
+        "{{ROW2_KEYWORD}}": "Rust语言入门"
+        "{{ROW2_RESULT}}": "${process_data[1]}"
+        "{{ROW3_NUM}}": "3"
+        "{{ROW3_KEYWORD}}": "Vue.js框架"
+        "{{ROW3_RESULT}}": "${process_data[2]}"
+        "{{ROW4_NUM}}": "4"
+        "{{ROW4_KEYWORD}}": "Tauri桌面应用"
+        "{{ROW4_RESULT}}": "${process_data[3]}"
+        "{{ROW5_NUM}}": "5"
+        "{{ROW5_KEYWORD}}": "工作流自动化"
+        "{{ROW5_RESULT}}": "${process_data[4]}"

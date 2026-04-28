@@ -1,9 +1,22 @@
 // nodes/mod.rs — 节点系统
 pub mod traits;
+pub mod registry;
 pub mod http;
 pub mod data;
 pub mod script;
 pub mod condition;
 pub mod loop_node;
-
-// 预留: browser, excel, word, notify, approval, parallel
+pub mod excel;
+pub mod word;
+pub mod browser;
+pub mod notify;
+pub mod approval;
+pub mod parallel;
+pub mod map;
+pub mod web_scrape;
+pub mod while_node;
+pub mod mouse_keyboard;
+pub mod window;
+pub mod sub_workflow;
+pub mod ocr;
+pub mod recording;

@@ -1,0 +1,99 @@
+# ═══════════════════════════════════════════════════════
+# 工作流模板：浏览器自动填表
+# ═══════════════════════════════════════════════════════
+#
+# 流程：
+#   1. 读取 Excel 中的表单数据
+#   2. 循环打开网页并填写表单
+#   3. 截图保存证据
+#   4. 记录提交结果
+#
+# 适用场景：批量报名、批量提交、数据录入等
+
+name: 浏览器批量填表
+description: 从 Excel 读取数据 → 浏览器自动填写网页表单 → 截图存档
+version: "1.1"
+
+variables:
+  form_url: https://example.com/form
+  excel_path: ./data/form_data.xlsx
+  screenshot_dir: ./output/screenshots
+
+steps:
+  - id: read_data
+    name: 读取表单数据
+    type: excel
+    config:
+      action: read
+      path: "{{excel_path}}"
+      sheet: Sheet1
+
+  - id: loop_fill
+    name: 逐条填写
+    type: while
+    config:
+      items: "step_read_data.rows"
+      condition:
+        op: not_empty
+        check: "__current[0]"
+      body:
+        - id: open_form
+          name: 打开表单页
+          type: browser
+          config:
+            action: navigate
+            url: "{{form_url}}"
+
+        - id: wait_form
+          name: 等待表单加载
+          type: browser
+          config:
+            action: wait
+            selector: "form"
+
+        - id: fill_name
+          name: 填写姓名
+          type: browser
+          config:
+            action: fill
+            selector: "#name"
+            value: "{{__item[0]}}"
+
+        - id: fill_email
+          name: 填写邮箱
+          type: browser
+          config:
+            action: fill
+            selector: "#email"
+            value: "{{__item[1]}}"
+
+        - id: fill_phone
+          name: 填写电话
+          type: browser
+          config:
+            action: fill
+            selector: "#phone"
+            value: "{{__item[2]}}"
+
+        - id: submit_form
+          name: 提交表单
+          type: browser
+          config:
+            action: click
+            selector: "#submit-btn"
+            wait_ms: 2000
+
+        - id: screenshot
+          name: 截图存档
+          type: browser
+          config:
+            action: screenshot
+            path: "{{screenshot_dir}}/result_{{__index}}.png"
+
+  - id: notify
+    name: 完成通知
+    type: notify
+    config:
+      notify_type: system
+      title: 批量填表完成
+      body: "共处理 {{step_read_data.row_count}} 条数据"

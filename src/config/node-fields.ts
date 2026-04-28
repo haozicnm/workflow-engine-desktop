@@ -1,0 +1,281 @@
+import type { WorkflowStep } from '../types/workflow'
+
+export interface Field {
+  key: string
+  label: string
+  type: 'text' | 'select' | 'textarea' | 'number' | 'json' | 'checkbox'
+  options?: { value: string; label: string }[]
+  placeholder?: string
+  show?: (cfg: Record<string, unknown>) => boolean
+}
+
+export function getNodeFields(allSteps?: WorkflowStep[]): Record<string, Field[]> {
+  const conditionStepOptions = (allSteps || [])
+    .filter((s, _i, arr) => true)
+    .map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
+
+  const fields: Record<string, Field[]> = {
+    http: [
+      { key: 'action', label: '请求方法', type: 'select', options: [
+        { value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' },
+        { value: 'PUT', label: 'PUT' }, { value: 'DELETE', label: 'DELETE' },
+        { value: 'PATCH', label: 'PATCH' }, { value: 'HEAD', label: 'HEAD' },
+      ]},
+      { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com/api' },
+      { key: 'headers', label: '请求头 (JSON)', type: 'json', placeholder: '{"Content-Type": "application/json"}' },
+      { key: 'body', label: '请求体 (JSON)', type: 'json', placeholder: '{"key": "value"}' },
+    ],
+    data: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'set', label: '设置变量' }, { value: 'get', label: '读取变量' },
+        { value: 'transform', label: '转换' }, { value: 'merge', label: '合并' },
+        { value: 'filter', label: '过滤' },
+        { value: 'length', label: '获取长度' },
+        { value: 'default', label: '设置默认值' },
+      ]},
+      { key: 'source', label: '数据来源', type: 'text', placeholder: 'output.step_id.data 或变量名',
+        show: c => (c as Record<string, unknown>).action === 'length' },
+      { key: 'key', label: '保存到变量', type: 'text', placeholder: 'count（可选）',
+        show: c => (c as Record<string, unknown>).action === 'length' },
+      { key: 'key', label: '变量名', type: 'text', placeholder: 'myVar',
+        show: c => ['set', 'get', 'default'].includes((c as Record<string, unknown>).action as string) },
+      { key: 'value', label: '值', type: 'json', placeholder: '"hello" 或 {"a": 1}',
+        show: c => (c as Record<string, unknown>).action === 'set' || (c as Record<string, unknown>).action === 'default' },
+    ],
+    script: [
+      { key: 'script', label: 'Rhai 脚本', type: 'textarea', placeholder: 'let x = 1;\nx + 1' },
+    ],
+    condition: [
+      { key: 'left', label: '左值', type: 'text', placeholder: '{{step_xxx.result}} 或 100' },
+      { key: 'op', label: '操作符', type: 'select', options: [
+        { value: '==', label: '等于 (==)' },
+        { value: '!=', label: '不等于 (!=)' },
+        { value: '>', label: '大于 (>)' },
+        { value: '<', label: '小于 (<)' },
+        { value: '>=', label: '大于等于 (>=)' },
+        { value: '<=', label: '小于等于 (<=)' },
+        { value: 'contains', label: '包含' },
+        { value: 'starts_with', label: '开头是' },
+        { value: 'ends_with', label: '结尾是' },
+        { value: 'empty', label: '为空' },
+        { value: 'not_empty', label: '不为空' },
+        { value: 'in', label: '在列表中' },
+        { value: 'not_in', label: '不在列表中' },
+      ]},
+      { key: 'right', label: '右值', type: 'text', placeholder: '0 或 {{step_xxx.count}}',
+        show: c => !['empty', 'not_empty'].includes((c as Record<string, unknown>).op as string) },
+      { key: 'true_next', label: '条件为真 → 步骤', type: 'select', options: conditionStepOptions, placeholder: '下一步' },
+      { key: 'false_next', label: '条件为假 → 步骤', type: 'select', options: conditionStepOptions, placeholder: '结束' },
+    ],
+    loop: [
+      { key: 'items', label: '遍历项', type: 'textarea', placeholder: '["a", "b", "c"] 或 step_xxx（引用步骤输出数组）' },
+      { key: 'body', label: '循环体 (JSON 步骤数组)', type: 'textarea', placeholder: '[{"id":"sub_1","name":"子步骤","type":"http","config":{}}]' },
+      { key: 'collect', label: 'Collect 汇集 (JSON)', type: 'textarea', placeholder: '{"name": "__item.name", "price": "step_fetch.body.price"}\n从每轮迭代提取字段，汇集为数组' },
+      { key: 'table', label: 'Table 表格 (JSON)', type: 'textarea', placeholder: '[{"header":"姓名","field":"__item.name"},{"header":"价格","field":"step_fetch.body.price"}]\n自动生成 headers+rows+data，可直接喂给 Excel 写入' },
+    ],
+    while: [
+      { key: 'items', label: '数据源 (数组)', type: 'textarea', placeholder: '["a","b","c",""] 或 step_read_excel（数组变量或步骤引用）' },
+      { key: 'condition', label: '停止条件 (JSON)', type: 'textarea', placeholder: '{"op":"not_empty"}\nop: not_empty / empty / eq / ne / gt / gte / lt / lte' },
+      { key: 'body', label: '循环体 (JSON 步骤数组)', type: 'textarea', placeholder: '[{"id":"sub_1","name":"子步骤","type":"http","config":{}}]' },
+      { key: 'max_iterations', label: '最大轮次 (安全上限)', type: 'text', placeholder: '10000' },
+    ],
+    browser: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'navigate', label: '导航到URL' }, { value: 'click', label: '点击元素' },
+        { value: 'fill', label: '填写输入框' }, { value: 'text', label: '获取文本' },
+        { value: 'screenshot', label: '截图' }, { value: 'evaluate', label: '执行JS' },
+        { value: 'select', label: '下拉选择' }, { value: 'check', label: '勾选/取消勾选' },
+        { value: 'wait', label: '等待元素' },
+        { value: 'extract_text', label: '批量提取文本' },
+        { value: 'extract_html', label: '批量提取HTML' },
+        { value: 'extract_table', label: '提取表格' },
+        { value: 'extract_links', label: '提取所有链接' },
+        { value: 'extract_attribute', label: '批量提取属性' },
+        { value: 'scroll_to', label: '滚动页面' },
+        { value: 'pdf', label: '生成PDF' },
+        { value: 'cookies', label: 'Cookie管理' },
+        { value: 'set_headers', label: '设置HTTP头' },
+        { value: 'new_page', label: '新建标签页' },
+        { value: 'switch_page', label: '切换标签页' },
+        { value: 'back', label: '后退' },
+        { value: 'forward', label: '前进' },
+        { value: 'reload', label: '刷新页面' },
+      ]},
+      { key: 'url', label: 'URL', type: 'text', placeholder: 'https://...', show: c => (c as Record<string, unknown>).action === 'navigate' },
+      { key: 'wait_until', label: '等待条件', type: 'select', show: c => (c as Record<string, unknown>).action === 'navigate', options: [
+        { value: 'load', label: '页面加载' }, { value: 'domcontentloaded', label: 'DOM加载' },
+        { value: 'networkidle', label: '网络空闲' },
+      ]},
+      { key: 'selector', label: 'CSS 选择器', type: 'text', placeholder: '#myId 或 .my-class',
+        show: c => ['click','fill','text','select','check','wait','extract_text','extract_html','extract_attribute'].includes((c as Record<string, unknown>).action as string) },
+      { key: 'value', label: '填写值', type: 'text', placeholder: '要输入的文本',
+        show: c => (c as Record<string, unknown>).action === 'fill' || (c as Record<string, unknown>).action === 'select' },
+      { key: 'checked', label: '勾选状态', type: 'checkbox',
+        show: c => (c as Record<string, unknown>).action === 'check' },
+      { key: 'script', label: 'JavaScript 代码', type: 'textarea', placeholder: 'document.title',
+        show: c => (c as Record<string, unknown>).action === 'evaluate' },
+      { key: 'path', label: '保存路径', type: 'text', placeholder: './screenshot.png',
+        show: c => (c as Record<string, unknown>).action === 'screenshot' || (c as Record<string, unknown>).action === 'pdf' },
+      { key: 'full_page', label: '全页截图', type: 'checkbox',
+        show: c => (c as Record<string, unknown>).action === 'screenshot' },
+      { key: 'timeout', label: '超时(ms)', type: 'number', placeholder: '5000',
+        show: c => (c as Record<string, unknown>).action === 'wait' },
+      { key: 'attribute', label: '属性名', type: 'text', placeholder: 'href, src, data-id...',
+        show: c => (c as Record<string, unknown>).action === 'extract_attribute' || (c as Record<string, unknown>).action === 'attr' },
+      { key: 'to', label: '滚动到', type: 'select', show: c => (c as Record<string, unknown>).action === 'scroll_to', options: [
+        { value: 'bottom', label: '页面底部' }, { value: 'top', label: '页面顶部' },
+      ]},
+      { key: 'times', label: '滚动次数', type: 'number', placeholder: '3',
+        show: c => (c as Record<string, unknown>).action === 'scroll_to' },
+      { key: 'delay_ms', label: '滚动间隔(ms)', type: 'number', placeholder: '1000',
+        show: c => (c as Record<string, unknown>).action === 'scroll_to' },
+      { key: 'cookie_action', label: 'Cookie操作', type: 'select', show: c => (c as Record<string, unknown>).action === 'cookies', options: [
+        { value: 'get', label: '获取Cookie' }, { value: 'set', label: '设置Cookie' },
+        { value: 'clear', label: '清除Cookie' },
+      ]},
+      { key: 'headers', label: 'HTTP头 (JSON)', type: 'json', placeholder: '{"X-Token": "abc"}',
+        show: c => (c as Record<string, unknown>).action === 'set_headers' },
+    ],
+    notify: [
+      { key: 'notify_type', label: '通知方式', type: 'select', options: [
+        { value: 'system', label: '系统通知' }, { value: 'webhook', label: 'Webhook' },
+      ]},
+      { key: 'title', label: '标题', type: 'text', placeholder: '通知标题' },
+      { key: 'body', label: '内容', type: 'text', placeholder: '通知内容' },
+      { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.example.com/...',
+        show: c => (c as Record<string, unknown>).notify_type === 'webhook' },
+    ],
+    approval: [
+      { key: 'message', label: '审批消息', type: 'text', placeholder: '请审批此操作' },
+      { key: 'timeout', label: '超时 (秒)', type: 'number', placeholder: '300' },
+    ],
+    excel: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'read', label: '读取' }, { value: 'write', label: '写入' },
+        { value: 'append', label: '追加' }, { value: 'update', label: '更新单元格' },
+        { value: 'sheets', label: '获取工作表列表' },
+        { value: 'extract_column', label: '提取列' },
+      ]},
+      { key: 'path', label: '文件路径', type: 'text', placeholder: './input.xlsx' },
+      { key: 'sheet', label: '工作表名', type: 'text', placeholder: 'Sheet1（默认）',
+        show: c => (c as Record<string, unknown>).action !== 'sheets' },
+      { key: 'column', label: '列', type: 'text', placeholder: 'A 或 0',
+        show: c => (c as Record<string, unknown>).action === 'extract_column' },
+      { key: 'data', label: '数据 (二维数组)', type: 'textarea',
+        placeholder: '[["姓名","年龄"],["张三",25],["李四",30]]',
+        show: c => (c as Record<string, unknown>).action === 'write' || (c as Record<string, unknown>).action === 'append' },
+      { key: 'updates', label: '更新内容 (JSON)', type: 'textarea',
+        placeholder: '[{"cell":"A1","value":"新值"},{"cell":"B2","value":42}]',
+        show: c => (c as Record<string, unknown>).action === 'update' },
+    ],
+    word: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'read', label: '读取文本' }, { value: 'write', label: '创建文档' },
+        { value: 'append', label: '追加段落' }, { value: 'replace', label: '替换占位符' },
+      ]},
+      { key: 'path', label: '文件路径', type: 'text', placeholder: './input.docx' },
+      { key: 'paragraphs', label: '段落内容 (JSON数组)', type: 'textarea',
+        placeholder: '["第一段文字","第二段文字"]',
+        show: c => (c as Record<string, unknown>).action === 'write' || (c as Record<string, unknown>).action === 'append' },
+      { key: 'output', label: '输出路径', type: 'text', placeholder: './output.docx（默认自动生成）',
+        show: c => (c as Record<string, unknown>).action === 'replace' },
+      { key: 'replacements', label: '替换规则 (JSON)', type: 'textarea',
+        placeholder: '{"{{姓名}}":"张三","{{日期}}":"2026-04-23"}',
+        show: c => (c as Record<string, unknown>).action === 'replace' },
+    ],
+    map: [
+      { key: 'source', label: '数据来源', type: 'text', placeholder: 'output.step_loop.results' },
+      { key: 'template', label: '映射模板 (JSON)', type: 'textarea',
+        placeholder: '{"cell": "C{{__index1}}", "value": "{{__item.result}}"}' },
+    ],
+    parallel: [
+      { key: 'branches', label: '并行分支 (JSON)', type: 'textarea',
+        placeholder: '[[{"id":"s1","name":"分支A步骤1","type":"http","config":{}}], ...]' },
+    ],
+    web_scrape: [
+      { key: 'url', label: '目标URL', type: 'text', placeholder: 'https://example.com/products' },
+      { key: 'wait_for', label: '等待选择器', type: 'text', placeholder: '.product-list（默认 body）' },
+      { key: 'headless', label: '无头模式', type: 'checkbox' },
+      { key: 'scroll', label: '无限滚动加载', type: 'checkbox' },
+      { key: 'scroll_times', label: '滚动次数', type: 'number', placeholder: '3',
+        show: c => (c as Record<string, unknown>).scroll as boolean },
+      { key: 'delay_ms', label: '请求间隔(ms)', type: 'number', placeholder: '1000' },
+      { key: 'user_agent', label: '自定义UA', type: 'text', placeholder: '留空则随机生成',
+        show: () => false },
+      { key: 'proxy', label: '代理', type: 'text', placeholder: 'http://proxy:8080（可选）' },
+      { key: 'extract', label: '提取规则 (JSON)', type: 'textarea',
+        placeholder: '[{"selector":".item","fields":{"name":".title","price":".price"}}]' },
+      { key: 'next_selector', label: '翻页按钮选择器', type: 'text', placeholder: '.next-page（可选）' },
+      { key: 'max_pages', label: '最大翻页数', type: 'number', placeholder: '3',
+        show: c => !!(c as Record<string, unknown>).next_selector },
+    ],
+    mouse_keyboard: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'click', label: '鼠标点击' }, { value: 'move', label: '移动鼠标' },
+        { value: 'type', label: '键盘输入' }, { value: 'hotkey', label: '快捷键' },
+        { value: 'scroll', label: '鼠标滚轮' },
+      ]},
+      { key: 'x', label: 'X 坐标', type: 'number', placeholder: '0',
+        show: c => ['click','move'].includes((c as Record<string, unknown>).action as string) },
+      { key: 'y', label: 'Y 坐标', type: 'number', placeholder: '0',
+        show: c => ['click','move'].includes((c as Record<string, unknown>).action as string) },
+      { key: 'button', label: '鼠标按键', type: 'select',
+        show: c => (c as Record<string, unknown>).action === 'click', options: [
+          { value: 'left', label: '左键' }, { value: 'right', label: '右键' }, { value: 'middle', label: '中键' },
+      ]},
+      { key: 'clicks', label: '点击次数', type: 'number', placeholder: '1',
+        show: c => (c as Record<string, unknown>).action === 'click' },
+      { key: 'text', label: '输入文本', type: 'text', placeholder: '要输入的文字',
+        show: c => (c as Record<string, unknown>).action === 'type' },
+      { key: 'delay_ms', label: '字符间隔(ms)', type: 'number', placeholder: '50',
+        show: c => (c as Record<string, unknown>).action === 'type' },
+      { key: 'keys', label: '快捷键', type: 'text', placeholder: '^c (Ctrl+C) / %{F4} (Alt+F4) / {ENTER}',
+        show: c => (c as Record<string, unknown>).action === 'hotkey' },
+      { key: 'amount', label: '滚动量', type: 'number', placeholder: '3（正=上，负=下）',
+        show: c => (c as Record<string, unknown>).action === 'scroll' },
+    ],
+    window: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'find', label: '查找窗口' }, { value: 'activate', label: '激活窗口' },
+        { value: 'maximize', label: '最大化' }, { value: 'minimize', label: '最小化' },
+        { value: 'restore', label: '还原' }, { value: 'close', label: '关闭窗口' },
+        { value: 'resize', label: '调整大小' }, { value: 'wait', label: '等待窗口出现' },
+        { value: 'list', label: '列出所有窗口' },
+      ]},
+      { key: 'title', label: '窗口标题（支持模糊匹配）', type: 'text', placeholder: '记事本 / Chrome / 部分标题',
+        show: c => (c as Record<string, unknown>).action !== 'list' },
+      { key: 'width', label: '宽度', type: 'number', placeholder: '800',
+        show: c => (c as Record<string, unknown>).action === 'resize' },
+      { key: 'height', label: '高度', type: 'number', placeholder: '600',
+        show: c => (c as Record<string, unknown>).action === 'resize' },
+      { key: 'timeout_s', label: '超时(秒)', type: 'number', placeholder: '30',
+        show: c => (c as Record<string, unknown>).action === 'wait' },
+    ],
+    sub_workflow: [
+      { key: 'workflow_yaml', label: '子流程 YAML', type: 'textarea', placeholder: '直接粘贴子流程的 YAML 定义' },
+      { key: 'vars_mapping', label: '变量映射 (JSON)', type: 'textarea',
+        placeholder: '{"sub_var": "parent_var"}\n将当前上下文变量映射到子流程' },
+      { key: 'output_key', label: '输出键名', type: 'text', placeholder: 'result（默认）' },
+    ],
+    ocr: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'read', label: '识别屏幕文字' }, { value: 'find_text', label: '查找文字位置' },
+      ]},
+      { key: 'lang', label: '语言', type: 'text', placeholder: 'chi_sim+eng（中文+英文）',
+        show: c => (c as Record<string, unknown>).action === 'read' },
+      { key: 'text', label: '查找文字', type: 'text', placeholder: '要搜索的文字',
+        show: c => (c as Record<string, unknown>).action === 'find_text' },
+      { key: 'region', label: '区域 (JSON)', type: 'textarea', placeholder: '{"x":0,"y":0,"width":800,"height":600}\n留空=全屏',
+        show: c => (c as Record<string, unknown>).action === 'read' },
+    ],
+    recording: [
+      { key: 'action', label: '操作', type: 'select', options: [
+        { value: 'start', label: '开始录制' }, { value: 'stop', label: '停止录制' },
+      ]},
+      { key: 'headless', label: '无头模式', type: 'checkbox',
+        show: c => (c as Record<string, unknown>).action === 'start' },
+    ],
+  }
+
+  return fields
+}

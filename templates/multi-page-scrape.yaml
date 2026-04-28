@@ -1,0 +1,76 @@
+# ═══════════════════════════════════════════════════════
+# 工作流模板：多页翻页抓取
+# ═══════════════════════════════════════════════════════
+#
+# 流程：
+#   1. 自动翻页抓取多页数据
+#   2. 合并所有页数据
+#   3. 去重 + 清洗
+#   4. 写入 Excel
+#
+# 适用场景：抓取分页列表（商品、文章、论坛帖子等）
+
+name: 多页翻页抓取
+description: 自动翻页抓取多页列表数据 → 合并去重 → 写入 Excel
+version: "1.1"
+
+variables:
+  target_url: https://example.com/list
+  max_pages: 5
+  output_path: ./output/multi_page_data.xlsx
+
+steps:
+  - id: scrape_pages
+    name: 翻页抓取
+    type: web_scrape
+    config:
+      url: "{{target_url}}"
+      wait_for: ".list-item"
+      extract:
+        - selector: ".list-item"
+          fields:
+            title: ".item-title"
+            description: ".item-desc"
+            price: ".item-price"
+            link: "a[href]"
+            image: "img[src]"
+      pagination:
+        next: ".pagination .next-page"
+        max_pages: "{{max_pages}}"
+      delay_ms: 2000
+      headless: true
+
+  - id: assemble
+    name: 组装表格
+    type: script
+    config:
+      script: |
+        let headers = [["标题", "描述", "价格", "链接", "图片"]];
+        let rows = [];
+        for item in step_scrape_pages.items {
+          rows.push([
+            item.title,
+            item.description,
+            item.price,
+            item.link,
+            item.image
+          ]);
+        }
+        headers + rows
+
+  - id: write_excel
+    name: 写入Excel
+    type: excel
+    config:
+      action: write
+      path: "{{output_path}}"
+      sheet: "抓取结果"
+      data: "{{step_assemble}}"
+
+  - id: notify
+    name: 完成通知
+    type: notify
+    config:
+      notify_type: system
+      title: 多页抓取完成
+      body: "共抓取 {{step_scrape_pages.pages_scraped}} 页、{{step_scrape_pages.total_items}} 条数据"

@@ -1,0 +1,172 @@
+# ═══════════════════════════════════════════════════════
+# 工作流模板：Excel 查询 → 浏览器查询 → 结果回写 → Word 输出
+# ═══════════════════════════════════════════════════════
+#
+# 流程：
+#   1. 读取 Excel 数据 + 提取 A 列（extract_column）
+#   2. 循环浏览器查询（loop）
+#   3. 用 map 节点组装写入数据（声明式，无脚本）
+#   4. 结果写回 Excel C 列
+#   5. 审批后生成 Word 文档
+#
+# ✅ 无 script 节点 — 全部用声明式节点完成
+#
+# 前置条件：
+#   - Python 3.8+ + playwright（浏览器节点自动预检）
+#   - Excel 文件存在
+#   - Word 模板文件存在
+# ═══════════════════════════════════════════════════════
+
+name: Excel查询+结果回写+Word输出
+description: 读取Excel A列 → 浏览器查询 → 结果保存Excel → 审批后输出Word
+version: "1.1"
+
+variables:
+  excel_path: ./data/input.xlsx
+  word_template: ./templates/模板.docx
+  search_url: https://example.com/search
+
+steps:
+  # ─────────────────────────────────
+  # 步骤 1：读取 Excel 全部数据
+  # ─────────────────────────────────
+  - id: step_read_excel
+    name: 读取Excel数据
+    type: excel
+    config:
+      action: read
+      path: "{{excel_path}}"
+      sheet: Sheet1
+
+  # ─────────────────────────────────
+  # 步骤 2：提取 A 列为查询列表
+  # ✅ 用 extract_column 替代 script 节点
+  # 输出: ["查询词1", "查询词2", ...]
+  # ─────────────────────────────────
+  - id: step_extract_queries
+    name: 提取A列数据
+    type: excel
+    config:
+      action: extract_column
+      path: "{{excel_path}}"
+      sheet: Sheet1
+      column: A
+
+  # ─────────────────────────────────
+  # 步骤 3：逐条浏览器查询（循环）
+  # {{__item}} = 当前查询词
+  # ─────────────────────────────────
+  - id: step_browser_loop
+    name: 逐条浏览器查询
+    type: while
+    config:
+      items: step_extract_queries
+      condition:
+        op: not_empty
+      collect:
+        query_result: "step_get_text.result"
+      body:
+        - id: step_navigate
+          name: 打开查询页
+          type: browser
+          config:
+            action: navigate
+            url: "{{search_url}}"
+
+        - id: step_fill
+          name: 输入查询内容
+          type: browser
+          config:
+            action: fill
+            selector: "#search-input"
+            value: "{{__item}}"
+
+        - id: step_click
+          name: 点击查询
+          type: browser
+          config:
+            action: click
+            selector: "#search-btn"
+
+        - id: step_wait
+          name: 等待结果
+          type: browser
+          config:
+            action: wait
+            selector: "#search-result"
+            timeout: 10000
+
+        - id: step_get_text
+          name: 获取结果文本
+          type: browser
+          config:
+            action: text
+            selector: "#search-result"
+
+  # ─────────────────────────────────
+  # 步骤 4：组装 Excel 写入数据
+  # ✅ 使用 collect 汇集结果，无需 script 节点
+  # 循环自动输出 collected.query_result = [结果1, 结果2, ...]
+  # ─────────────────────────────────
+  - id: step_assemble
+    name: 组装写入数据
+    type: map
+    config:
+      source: output.step_browser_loop.collected.query_result
+      template:
+        cell: "C{{__index1}}"
+        value: "{{__item}}"
+
+  # ─────────────────────────────────
+  # 步骤 5：更新 Excel C 列
+  # ─────────────────────────────────
+  - id: step_write_excel
+    name: 结果写入Excel
+    type: excel
+    config:
+      action: update
+      path: "{{excel_path}}"
+      sheet: Sheet1
+      updates: output.step_assemble
+
+  # ─────────────────────────────────
+  # 步骤 6：询问是否生成 Word
+  # ─────────────────────────────────
+  - id: step_ask_word
+    name: 是否生成Word文档？
+    type: approval
+    config:
+      message: "查询完成，结果已保存到Excel。是否生成Word文档？"
+      timeout: 600
+
+  # ─────────────────────────────────
+  # 步骤 7：循环生成 Word 文档
+  # 用 A、B 列数据替换模板占位符
+  # ─────────────────────────────────
+  - id: step_word_loop
+    name: 生成Word文档
+    type: loop
+    config:
+      items: output.step_read_excel.data
+      body:
+        - id: step_replace_word
+          name: 替换Word模板
+          type: word
+          config:
+            action: replace
+            path: "{{word_template}}"
+            output: ./output/output_{{__index}}.docx
+            replacements:
+              "{{姓名}}": "{{__item[0]}}"
+              "{{查询结果}}": "{{__item[1]}}"
+
+  # ─────────────────────────────────
+  # 步骤 8：完成通知
+  # ─────────────────────────────────
+  - id: step_done
+    name: 完成通知
+    type: notify
+    config:
+      notify_type: system
+      title: 工作流完成
+      body: "Excel查询完成，Word文档已生成。"

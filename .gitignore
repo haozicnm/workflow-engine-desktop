@@ -20,3 +20,9 @@ src-tauri/gen/
 __pycache__/
 *.pyc
 .venv/
+
+# Build outputs
+dist/
+
+# Internal docs
+docs/

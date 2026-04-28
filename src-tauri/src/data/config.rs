@@ -4,12 +4,18 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub theme: String,
     pub language: String,
     pub auto_start: bool,
     pub log_level: String,
     pub python_path: Option<String>,
+    /// 浏览器通道: auto / msedge / chrome / chromium
+    pub browser_channel: String,
+    /// 临时存储（断点等运行时数据，不持久化）
+    #[serde(skip)]
+    pub temp: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl Default for AppConfig {
@@ -20,15 +26,15 @@ impl Default for AppConfig {
             auto_start: false,
             log_level: "info".to_string(),
             python_path: None,
+            browser_channel: "auto".to_string(),
+            temp: std::collections::HashMap::new(),
         }
     }
 }
 
 impl AppConfig {
     fn config_path() -> Result<PathBuf> {
-        let dir = dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("workflow-engine");
+        let dir = crate::data::paths::resolve_data_dir();
         std::fs::create_dir_all(&dir)?;
         Ok(dir.join("config.json"))
     }
@@ -49,5 +55,15 @@ impl AppConfig {
         let content = serde_json::to_string_pretty(self)?;
         std::fs::write(path, content)?;
         Ok(())
+    }
+
+    /// 获取临时值（运行时数据，不持久化）
+    pub fn get_temp(&self, key: &str) -> Option<&serde_json::Value> {
+        self.temp.get(key)
+    }
+
+    /// 设置临时值（运行时数据，不持久化）
+    pub fn set_temp(&mut self, key: &str, value: serde_json::Value) {
+        self.temp.insert(key.to_string(), value);
     }
 }

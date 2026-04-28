@@ -1,0 +1,85 @@
+# ═══════════════════════════════════════════════════════
+# 工作流模板：API 健康监控
+# ═══════════════════════════════════════════════════════
+#
+# 流程：
+#   1. 调用多个 API 检查状态
+#   2. 并行请求提高效率
+#   3. 检查响应状态码
+#   4. 异常时通知
+#
+# 适用场景：定时监控 API 可用性
+
+name: API健康监控
+description: 定时检查多个 API 是否正常 → 异常时通知告警
+version: "1.1"
+
+variables:
+  check_interval: 300
+
+steps:
+  - id: check_api_1
+    name: 检查主站API
+    type: http
+    config:
+      action: GET
+      url: "https://httpbin.org/status/200"
+      timeout: 10
+
+  - id: check_api_2
+    name: 检查数据API
+    type: http
+    config:
+      action: GET
+      url: "https://jsonplaceholder.typicode.com/posts/1"
+      timeout: 10
+
+  - id: check_results
+    name: 检查结果
+    type: script
+    config:
+      script: |
+        let results = [];
+        let has_error = false;
+
+        // 检查 API 1
+        if step_check_api_1.status != 200 {
+          results.push("主站API异常: HTTP " + step_check_api_1.status);
+          has_error = true;
+        } else {
+          results.push("主站API正常");
+        }
+
+        // 检查 API 2
+        if step_check_api_2.status != 200 {
+          results.push("数据API异常: HTTP " + step_check_api_2.status);
+          has_error = true;
+        } else {
+          results.push("数据API正常");
+        }
+
+        #{
+          "all_ok": !has_error,
+          "report": results.join("\n"),
+          "timestamp": timestamp
+        }
+
+  - id: notify_alert
+    name: 异常告警
+    type: notify
+    config:
+      notify_type: system
+      title: "⚠️ API 告警"
+      body: "{{step_check_results.report}}"
+
+  - id: write_log
+    name: 写入监控日志
+    type: excel
+    config:
+      action: append
+      path: ./output/api_monitor.xlsx
+      sheet: "监控日志"
+      data:
+        - - "{{step_check_results.timestamp}}"
+          - "{{step_check_results.all_ok}}"
+          - "{{step_check_results.report}}"

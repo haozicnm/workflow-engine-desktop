@@ -1,12 +1,41 @@
 // engine/workflow.rs — 工作流数据结构
 use serde::{Deserialize, Serialize};
 
+/// 步骤失败时的处理策略
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorStrategy {
+    /// 终止工作流（默认）
+    Fail,
+    /// 忽略错误，继续执行下一个步骤
+    Ignore,
+    /// 跳转到指定步骤继续执行
+    Branch { step_id: String },
+}
+
+impl Default for ErrorStrategy {
+    fn default() -> Self {
+        ErrorStrategy::Fail
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
     pub name: String,
     pub description: Option<String>,
     pub steps: Vec<Step>,
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
+}
+
+impl Default for Workflow {
+    fn default() -> Self {
+        Workflow {
+            name: String::new(),
+            description: None,
+            steps: Vec::new(),
+            variables: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,6 +48,18 @@ pub struct Step {
     pub next: Option<String>,
     pub retry: Option<RetryConfig>,
     pub timeout: Option<u64>,
+    /// 循环节点的子步骤
+    #[serde(default)]
+    pub body_steps: Option<Vec<Step>>,
+    /// 断点标记
+    #[serde(default)]
+    pub breakpoint: bool,
+    /// 步骤延迟（毫秒），执行前等待
+    #[serde(default)]
+    pub delay: Option<u64>,
+    /// 错误处理策略（默认 fail）
+    #[serde(default)]
+    pub on_error: Option<ErrorStrategy>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
