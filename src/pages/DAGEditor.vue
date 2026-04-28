@@ -93,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -104,6 +104,8 @@ import type { DAGNode } from '../types/dag-node'
 import ComfyNode from '../components/dag/ComfyNode.vue'
 import NodeLibrary from '../components/dag/NodeLibrary.vue'
 import PropertiesPanel from '../components/dag/PropertiesPanel.vue'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -117,6 +119,60 @@ const workflowName = ref('未命名工作流')
 const selectedNode = ref<DAGNode | null>(null)
 const isRunning = ref(false)
 const logs = ref<{ id: string; time: string; text: string; level: string }[]>([])
+let unlisteners: UnlistenFn[] = []
+
+// ─── Tauri 事件监听 ───
+onMounted(() => {
+  setupEventListeners()
+})
+
+onUnmounted(() => {
+  unlisteners.forEach(fn => fn())
+})
+
+async function setupEventListeners() {
+  // 监听节点状态更新
+  const un1 = await listen<{
+    run_id: string; node_id: string; status: string;
+    label: string; type: string; output?: unknown; duration?: number
+  }>('node-status', (event) => {
+    const { node_id, status, duration } = event.payload
+    store.setNodeStatus(node_id, status as any)
+
+    // 更新节点的 duration
+    const node = store.nodes.find(n => n.id === node_id)
+    if (node && duration !== undefined) {
+      node.duration = duration
+    }
+  })
+  unlisteners.push(un1)
+
+  // 监听工作流启动
+  const un2 = await listen<{
+    run_id: string; workflow_name: string; node_count: number; edge_count: number
+  }>('dag-run-start', (event) => {
+    const { node_count, edge_count } = event.payload
+    isRunning.value = true
+    addLog(`🚀 工作流启动: ${node_count} 节点, ${edge_count} 连线`, 'info')
+  })
+  unlisteners.push(un2)
+
+  // 监听工作流完成
+  const un3 = await listen<{
+    run_id: string; workflow_name: string; status: string; error?: string
+  }>('dag-run-complete', (event) => {
+    const { status, error } = event.payload
+    isRunning.value = false
+    if (status === 'completed') {
+      addLog('✅ 工作流执行完成', 'info')
+    } else if (status === 'cancelled') {
+      addLog('⏹ 工作流已取消', 'warn')
+    } else {
+      addLog(`❌ 工作流执行失败: ${error || '未知错误'}`, 'error')
+    }
+  })
+  unlisteners.push(un3)
+}
 
 // ─── Vue Flow 元素 ───
 const elements = computed(() => [
@@ -246,14 +302,32 @@ function onEdgeClick({ edge }: any) {
 }
 
 // ─── 工具栏 ───
-function runAll() {
+async function runAll() {
+  if (store.nodes.length === 0) {
+    addLog('⚠ 画布为空，先添加节点', 'warn')
+    return
+  }
   isRunning.value = true
   store.resetAllStatuses()
-  addLog('▶ 开始执行工作流...', 'info')
-  // TODO: Phase 2 — invoke Tauri command
+
+  const dagJson = {
+    name: workflowName.value,
+    nodes: store.nodes,
+    edges: store.edges,
+    variables: {},
+  }
+
+  try {
+    addLog('▶ 发送执行请求...', 'info')
+    await invoke('dag_run_start', { workflowJson: dagJson })
+  } catch (e) {
+    isRunning.value = false
+    addLog(`❌ 启动失败: ${e}`, 'error')
+  }
 }
 
-function stopAll() {
+async function stopAll() {
+  // TODO: 需要 run_id 来取消
   isRunning.value = false
   addLog('■ 已停止', 'warn')
 }

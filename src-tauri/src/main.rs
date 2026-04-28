@@ -79,6 +79,9 @@ fn main() {
             workflow_engine::commands::schedule::schedule_create,
             workflow_engine::commands::schedule::schedule_update,
             workflow_engine::commands::schedule::schedule_delete,
+            // DAG execution
+            workflow_engine::commands::dag_run::dag_run_start,
+            workflow_engine::commands::dag_run::dag_run_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
