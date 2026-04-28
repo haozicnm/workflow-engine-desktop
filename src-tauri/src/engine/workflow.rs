@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 /// 步骤失败时的处理策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ErrorStrategy {
     /// 终止工作流（默认）
+    #[default]
     Fail,
     /// 忽略错误，继续执行下一个步骤
     Ignore,
@@ -13,13 +15,9 @@ pub enum ErrorStrategy {
     Branch { step_id: String },
 }
 
-impl Default for ErrorStrategy {
-    fn default() -> Self {
-        ErrorStrategy::Fail
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Workflow {
     pub name: String,
     pub description: Option<String>,
@@ -27,16 +25,6 @@ pub struct Workflow {
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
-impl Default for Workflow {
-    fn default() -> Self {
-        Workflow {
-            name: String::new(),
-            description: None,
-            steps: Vec::new(),
-            variables: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Step {

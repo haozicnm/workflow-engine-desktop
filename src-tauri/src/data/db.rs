@@ -247,7 +247,7 @@ impl Database {
         let conn = self.conn()?;
         let mut stmt = conn.prepare("SELECT yaml_content FROM workflows WHERE id = ?1")?;
         let mut rows = stmt.query_map(params![id], |row| {
-            Ok(row.get::<_, String>(0)?)
+            row.get::<_, String>(0)
         })?;
         match rows.next() {
             Some(row) => Ok(Some(row?)),

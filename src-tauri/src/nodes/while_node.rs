@@ -132,8 +132,7 @@ impl NodeExecutor for WhileNode {
 
         // 逐轮执行：先检查条件，再执行 body
         let mut results = Vec::new();
-        for i in 0..total {
-            let current = &items[i];
+        for (i, current) in items.iter().enumerate().take(total) {
 
             // 构建条件检查上下文
             let mut cond_ctx = serde_json::Map::new();

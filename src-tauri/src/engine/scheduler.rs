@@ -11,6 +11,16 @@ use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+/// 运行控制标志（打包避免参数过多）
+pub struct RunControl {
+    pub cancel_flag: Arc<AtomicBool>,
+    pub cancel_token: CancellationToken,
+    pub pause_flag: Arc<AtomicBool>,
+    pub breakpoint_flag: Arc<AtomicBool>,
+    pub step_mode_flag: Arc<AtomicBool>,
+    pub debug_snapshots: Arc<tokio::sync::RwLock<std::collections::HashMap<String, serde_json::Value>>>,
+}
+
 /// 执行工作流（入口函数，由 commands/run.rs 调用）
 ///
 /// 竞态安全：
@@ -24,12 +34,7 @@ pub async fn run_workflow(
     app_handle: &tauri::AppHandle,
     db: &Arc<Database>,
     browser_channel: &str,
-    cancel_flag: Arc<AtomicBool>,
-    cancel_token: CancellationToken,
-    pause_flag: Arc<AtomicBool>,
-    breakpoint_flag: Arc<AtomicBool>,
-    step_mode_flag: Arc<AtomicBool>,
-    debug_snapshots: Arc<tokio::sync::RwLock<std::collections::HashMap<String, serde_json::Value>>>,
+    ctrl: &RunControl,
 ) -> Result<RunState> {
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.browser_channel = browser_channel.to_string();
@@ -53,7 +58,7 @@ pub async fn run_workflow(
     // 步骤执行循环
     loop {
         // 检查取消（AtomicBool + CancellationToken 双重机制）
-        if cancel_flag.load(Ordering::Relaxed) || cancel_token.is_cancelled() {
+        if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
             state.mark_failed();
             let _ = db.update_run_status(run_id, "cancelled", None);
@@ -62,9 +67,9 @@ pub async fn run_workflow(
         }
 
         // 检查暂停（等待恢复，同时响应取消令牌）
-        while pause_flag.load(Ordering::Relaxed) {
+        while ctrl.pause_flag.load(Ordering::Relaxed) {
             tokio::select! {
-                _ = cancel_token.cancelled() => {
+                _ = ctrl.cancel_token.cancelled() => {
                     state.mark_failed();
                     let _ = db.update_run_status(run_id, "cancelled", None);
                     emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
@@ -75,7 +80,7 @@ pub async fn run_workflow(
                 }
             }
             // 暂停期间也检查取消
-            if cancel_flag.load(Ordering::Relaxed) {
+            if ctrl.cancel_flag.load(Ordering::Relaxed) {
                 state.mark_failed();
                 let _ = db.update_run_status(run_id, "cancelled", None);
                 emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
@@ -101,9 +106,9 @@ pub async fn run_workflow(
         emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "running", None);
 
         // ─── 断点 / 单步 检查 ───
-        if step.breakpoint || step_mode_flag.load(Ordering::Relaxed) {
+        if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
             // 更新调试快照
-            update_debug_snapshot(&debug_snapshots, run_id, &ctx).await;
+            update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
             // 通知前端：断点命中
             let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
@@ -115,10 +120,10 @@ pub async fn run_workflow(
             }));
 
             // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
-            breakpoint_flag.store(true, Ordering::Relaxed);
-            while breakpoint_flag.load(Ordering::Relaxed) {
+            ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
+            while ctrl.breakpoint_flag.load(Ordering::Relaxed) {
                 tokio::select! {
-                    _ = cancel_token.cancelled() => {
+                    _ = ctrl.cancel_token.cancelled() => {
                         state.mark_failed();
                         let _ = db.update_run_status(run_id, "cancelled", None);
                         emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
@@ -129,7 +134,7 @@ pub async fn run_workflow(
                     }
                 }
                 // 暂停期间也检查取消（AtomicBool 快速路径）
-                if cancel_flag.load(Ordering::Relaxed) {
+                if ctrl.cancel_flag.load(Ordering::Relaxed) {
                     state.mark_failed();
                     let _ = db.update_run_status(run_id, "cancelled", None);
                     emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
@@ -147,11 +152,11 @@ pub async fn run_workflow(
 
         // 审批节点：先 emit 事件通知前端弹窗
         if step.step_type == "approval" {
-            emit_approval_required(app_handle, run_id, &step);
+            emit_approval_required(app_handle, run_id, step);
         }
 
         // 执行步骤（带重试 + 超时）
-        let result = execute_with_retry(&executor, &step, &mut ctx).await;
+        let result = execute_with_retry(&executor, step, &mut ctx).await;
 
         match result {
             Ok(output) => {
@@ -161,14 +166,14 @@ pub async fn run_workflow(
                 emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
 
                 // 更新调试快照
-                update_debug_snapshot(&debug_snapshots, run_id, &ctx).await;
+                update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
                 // 推送变量快照（实时监视）
                 emit_variable_snapshot(app_handle, run_id, &ctx);
 
                 // 单步模式：执行完暂停
-                if step_mode_flag.load(Ordering::Relaxed) {
-                    breakpoint_flag.store(true, Ordering::Relaxed);
+                if ctrl.step_mode_flag.load(Ordering::Relaxed) {
+                    ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
                     let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
                         "run_id": run_id,
                         "step_id": current_id,
@@ -187,7 +192,7 @@ pub async fn run_workflow(
                 emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
 
                 // 更新调试快照（含错误信息）
-                update_debug_snapshot(&debug_snapshots, run_id, &ctx).await;
+                update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
                 // ─── 错误恢复策略 ───
                 let strategy = step.on_error.clone().unwrap_or_default();
@@ -203,7 +208,7 @@ pub async fn run_workflow(
                         // 记录错误到上下文，输出 null
                         ctx.set_output(&current_id, serde_json::Value::Null);
                         state.mark_step_completed(&current_id);
-                        let _ = emit_step_update_ignored(app_handle, run_id, &current_id, &step.name, total_steps, &err_msg);
+                        emit_step_update_ignored(app_handle, run_id, &current_id, &step.name, total_steps, &err_msg);
                         // 推送变量快照
                         emit_variable_snapshot(app_handle, run_id, &ctx);
                         // 继续到下一步
@@ -228,7 +233,7 @@ pub async fn run_workflow(
         }
 
         // 确定下一个步骤
-        current_id = match determine_next_step(&step, workflow, &ctx) {
+        current_id = match determine_next_step(step, workflow, &ctx) {
             Some(next_id) => next_id,
             None => {
                 // 没有下一步，工作流完成
@@ -253,7 +258,7 @@ async fn execute_with_retry(
 
     for attempt in 0..=max_retries {
         let result = if let Some(timeout) = step.timeout {
-            let timeout_dur = std::time::Duration::from_secs(timeout as u64);
+            let timeout_dur = std::time::Duration::from_secs(timeout);
             match tokio::time::timeout(timeout_dur, executor.execute(step, ctx)).await {
                 Ok(r) => r,
                 Err(_) => Err(anyhow::anyhow!("步骤 '{}' 超时 ({}秒)", step.name, timeout)),

@@ -1,31 +1,27 @@
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useWorkflowStore } from '../stores/workflowStore'
-import { useEditorStore } from '../stores/editorStore'
+// ─── FlowEditor AutoSave — 定时保存到 localStorage ───
+import { onUnmounted } from 'vue'
+import { useFlowStore } from '../stores/flowStore'
 
-export function useAutoSave(intervalMs = 60000) {
-  const workflowStore = useWorkflowStore()
-  const editor = useEditorStore()
-  const lastSaved = ref<number>(Date.now())
+const STORAGE_KEY = 'flow-editor-autosave'
+
+export function useAutoSave(intervalMs = 30000) {
+  const store = useFlowStore()
   let timer: ReturnType<typeof setInterval> | null = null
-  let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null
+
+  function save() {
+    if (!store.dirty) return
+    try {
+      const data = store.toJSON()
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+      store.dirty = false
+    } catch {
+      // localStorage may be full or unavailable
+    }
+  }
 
   function start() {
     if (timer) return
-    timer = setInterval(async () => {
-      // Only save if yaml has changed since last save
-      if (workflowStore.currentId) {
-        await workflowStore.saveWorkflow()
-        lastSaved.value = Date.now()
-      }
-    }, intervalMs)
-
-    beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-      if (editor.yamlText) {
-        e.preventDefault()
-        e.returnValue = '' // Chrome requires this
-      }
-    }
-    window.addEventListener('beforeunload', beforeUnloadHandler)
+    timer = setInterval(save, intervalMs)
   }
 
   function stop() {
@@ -33,13 +29,28 @@ export function useAutoSave(intervalMs = 60000) {
       clearInterval(timer)
       timer = null
     }
-    if (beforeUnloadHandler) {
-      window.removeEventListener('beforeunload', beforeUnloadHandler)
-      beforeUnloadHandler = null
+  }
+
+  function loadAutoSave(): boolean {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (!raw) return false
+      const data = JSON.parse(raw)
+      if (data.nodes && data.edges) {
+        store.load({ name: data.name || '恢复的工作流', nodes: data.nodes, edges: data.edges })
+        return true
+      }
+    } catch {
+      // corrupted data
     }
+    return false
+  }
+
+  function clearAutoSave() {
+    localStorage.removeItem(STORAGE_KEY)
   }
 
   onUnmounted(stop)
 
-  return { start, stop, lastSaved }
+  return { start, stop, save, loadAutoSave, clearAutoSave }
 }

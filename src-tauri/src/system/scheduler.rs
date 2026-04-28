@@ -115,12 +115,20 @@ async fn start_scheduled_run(
     let handle_clone = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let cancel_token = tokio_util::sync::CancellationToken::new(); // 定时任务不使用取消令牌
+        let cancel_token = tokio_util::sync::CancellationToken::new();
         let pause_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let breakpoint_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let step_mode_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let debug_snapshots = std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
-        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, &handle_clone, &db_clone, &browser_channel, cancel_flag, cancel_token, pause_flag, breakpoint_flag, step_mode_flag, debug_snapshots).await {
+        let ctrl = crate::engine::scheduler::RunControl {
+            cancel_flag,
+            cancel_token,
+            pause_flag,
+            breakpoint_flag,
+            step_mode_flag,
+            debug_snapshots,
+        };
+        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, &handle_clone, &db_clone, &browser_channel, &ctrl).await {
             Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 error!("定时工作流执行失败: {} - {}", run_id_clone, e);

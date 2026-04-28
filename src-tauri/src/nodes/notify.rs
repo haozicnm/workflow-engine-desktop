@@ -124,7 +124,7 @@ async fn send_webhook(config: &serde_json::Value) -> Result<serde_json::Value> {
     let text = resp.text().await.unwrap_or_default();
 
     let resp_body = serde_json::from_str::<serde_json::Value>(&text)
-        .unwrap_or_else(|_| serde_json::Value::String(text));
+        .unwrap_or(serde_json::Value::String(text));
 
     Ok(serde_json::json!({
         "type": "webhook",

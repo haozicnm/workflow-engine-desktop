@@ -48,6 +48,7 @@ import asyncio
 import shutil
 import traceback
 import random
+import base64
 
 try:
     from playwright.async_api import async_playwright
@@ -181,6 +182,11 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _recording_start(params)
             case "recording_stop":
                 return await _recording_stop()
+            # v1.3 预览模式
+            case "preview":
+                return await _preview(params)
+            case "click_at_position":
+                return await _click_at_position(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -826,6 +832,200 @@ async def _get_title() -> dict:
     if page is None:
         return {"success": False, "error": "浏览器未启动"}
     return {"success": True, "data": {"title": await page.title()}}
+
+
+# ═══════════════════════════════════════════
+# v1.3 网页预览（点页面自动填选择器）
+# ═══════════════════════════════════════════
+
+# 预览截图的缩放比例（前端图片实际渲染宽度 / 原始截图宽度）
+_preview_scale = 1.0
+# 预览截图原始宽度
+_preview_orig_width = 0
+
+
+async def _preview(params: dict) -> dict:
+    """预览页面：打开 URL → 截图 → 获取所有可见元素
+
+    params:
+        url: 目标 URL
+        wait_until: 等待条件 (默认 networkidle)
+        headless: 无头模式 (默认 true)
+        viewport: 视口大小 (默认 {"width": 1280, "height": 720})
+    """
+    global _preview_scale, _preview_orig_width
+
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    url = params.get("url")
+    if not url:
+        return {"success": False, "error": "preview 缺少 url 参数"}
+
+    wait_until = params.get("wait_until", "networkidle")
+
+    try:
+        await page.goto(url, wait_until=wait_until, timeout=30000)
+    except Exception as e:
+        return {"success": False, "error": f"页面加载失败: {str(e)}"}
+
+    # 等待页面稳定
+    await asyncio.sleep(1.5)
+
+    # 截图
+    screenshot_bytes = await page.screenshot(full_page=False)
+    screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
+
+    # 获取页面信息
+    title = await page.title()
+    current_url = page.url
+
+    # 获取视口尺寸
+    viewport = await page.evaluate("""
+        () => ({ width: window.innerWidth, height: window.innerHeight })
+    """)
+    _preview_orig_width = viewport["width"]
+
+    # 获取所有可见元素的信息
+    elements = await page.evaluate("""
+        () => {
+            function buildSelector(el) {
+                // 优先级：id > data-* 属性 > 唯一 class 组合 > nth-child 路径
+                if (el.id) {
+                    return '#' + CSS.escape(el.id);
+                }
+
+                // data- 属性选择器（如 data-testid, data-id）
+                for (const attr of ['data-testid', 'data-id', 'data-key', 'data-name', 'data-field']) {
+                    const val = el.getAttribute(attr);
+                    if (val && val.length < 60) {
+                        return el.tagName.toLowerCase() + '[' + attr + '="' + val + '"]';
+                    }
+                }
+
+                const tag = el.tagName.toLowerCase();
+
+                // 尝试用 class 选择器
+                if (el.classList && el.classList.length > 0) {
+                    const classes = Array.from(el.classList)
+                        .filter(c => c && !c.match(/^\\d/) && c.length < 40)
+                        .slice(0, 3);
+                    if (classes.length > 0) {
+                        return tag + '.' + classes.map(c => CSS.escape(c)).join('.');
+                    }
+                }
+
+                // 回退：构建路径选择器
+                const path = [];
+                let current = el;
+                while (current && current !== document.body && current !== document.documentElement && path.length < 5) {
+                    let segment = current.tagName.toLowerCase();
+                    if (current.id) {
+                        segment = '#' + CSS.escape(current.id);
+                        path.unshift(segment);
+                        break;
+                    }
+                    const parent = current.parentElement;
+                    if (parent) {
+                        const siblings = Array.from(parent.children).filter(
+                            c => c.tagName === current.tagName
+                        );
+                        if (siblings.length > 1) {
+                            const idx = siblings.indexOf(current) + 1;
+                            segment += ':nth-child(' + siblings.indexOf(current) + 1 + ')';
+                        }
+                    }
+                    path.unshift(segment);
+                    current = current.parentElement;
+                }
+                return path.join(' > ');
+            }
+
+            function isInteractive(el) {
+                const interactiveTags = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL', 'SUMMARY', 'DETAILS'];
+                const tag = el.tagName;
+                if (interactiveTags.includes(tag)) return true;
+                if (el.hasAttribute('onclick') || el.getAttribute('role') === 'button') return true;
+                if (getComputedStyle(el).cursor === 'pointer') return true;
+                return false;
+            }
+
+            function isContainer(el) {
+                const children = el.children.length;
+                if (children >= 2) return true;
+                // UL/OL 即使子元素少也可能是容器
+                if (['UL', 'OL', 'TBODY', 'TABLE'].includes(el.tagName)) return true;
+                return false;
+            }
+
+            const results = [];
+            const seen = new Set();
+
+            document.querySelectorAll('*').forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return;
+                if (rect.x < 0 || rect.y < 0) return;
+                if (rect.x >= window.innerWidth || rect.y >= window.innerHeight) return;
+                if (el.tagName === 'HTML' || el.tagName === 'BODY') return;
+
+                const selector = buildSelector(el);
+                // 去重
+                if (seen.has(selector)) return;
+                seen.add(selector);
+
+                const text = (el.textContent || '').trim().substring(0, 200);
+                const elemType = isInteractive(el) ? 'interactive' : (isContainer(el) ? 'container' : 'text');
+
+                results.push({
+                    tag: el.tagName.toLowerCase(),
+                    text: text,
+                    selector: selector,
+                    bbox: {
+                        x: Math.round(rect.x),
+                        y: Math.round(rect.y),
+                        w: Math.round(rect.width),
+                        h: Math.round(rect.height),
+                    },
+                    type: elemType,
+                    child_count: el.children.length,
+                });
+            });
+
+            // 按面积降序排列（大元素优先，方便选择容器）
+            results.sort((a, b) => (b.bbox.w * b.bbox.h) - (a.bbox.w * a.bbox.h));
+
+            return results;
+        }
+    """)
+
+    return {
+        "success": True,
+        "data": {
+            "screenshot": screenshot_b64,
+            "url": current_url,
+            "title": title,
+            "viewport": viewport,
+            "elements": elements,
+            "element_count": len(elements),
+        }
+    }
+
+
+async def _click_at_position(params: dict) -> dict:
+    """根据视口坐标点击元素，用于后端精确点击"""
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    x = params.get("x")
+    y = params.get("y")
+    if x is None or y is None:
+        return {"success": False, "error": "click_at_position 缺少 x/y 参数"}
+
+    await page.mouse.click(x, y)
+    await asyncio.sleep(0.3)
+    return {"success": True, "data": {"x": x, "y": y}}
 
 
 # ═══════════════════════════════════════════

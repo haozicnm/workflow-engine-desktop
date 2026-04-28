@@ -234,5 +234,68 @@ pub fn all_nodes() -> Vec<NodeManifest> {
                 "output": "",
             }),
         },
+
+        // ── v2 通用节点 ──
+        NodeManifest {
+            node_type: "file",
+            label: "文件操作",
+            description: "读写、列出、删除、检查文件或目录",
+            icon: "file",
+            default_config: serde_json::json!({
+                "action": "read",
+                "path": "",
+            }),
+        },
+        NodeManifest {
+            node_type: "clipboard",
+            label: "剪贴板",
+            description: "读写系统剪贴板文本内容",
+            icon: "clipboard",
+            default_config: serde_json::json!({
+                "action": "read",
+            }),
+        },
+        NodeManifest {
+            node_type: "regex",
+            label: "正则处理",
+            description: "正则表达式匹配、提取、替换文本",
+            icon: "regex",
+            default_config: serde_json::json!({
+                "action": "extract",
+                "pattern": "",
+                "input": "",
+            }),
+        },
+        NodeManifest {
+            node_type: "array",
+            label: "数组操作",
+            description: "数组过滤、排序、去重、分页、映射、聚合",
+            icon: "list",
+            default_config: serde_json::json!({
+                "action": "filter",
+                "source": [],
+                "condition": {"field": "", "op": "==", "value": ""},
+            }),
+        },
+        NodeManifest {
+            node_type: "convert",
+            label: "类型转换",
+            description: "文本、数字、JSON、CSV、HTML、Base64 互转",
+            icon: "refresh-cw",
+            default_config: serde_json::json!({
+                "action": "to_text",
+                "input": "",
+            }),
+        },
+        NodeManifest {
+            node_type: "print",
+            label: "控制台打印",
+            description: "打印信息到后端日志和前端控制台",
+            icon: "terminal",
+            default_config: serde_json::json!({
+                "message": "",
+                "level": "info",
+            }),
+        },
     ]
 }

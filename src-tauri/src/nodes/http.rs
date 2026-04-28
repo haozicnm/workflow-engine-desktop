@@ -25,7 +25,10 @@ impl NodeExecutor for HttpNode {
 
         info!("HTTP 请求: {} {}", method, url);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .build()
+            .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
         let mut req = match method.to_uppercase().as_str() {
             "GET" => client.get(url),
             "POST" => client.post(url),
@@ -65,7 +68,7 @@ impl NodeExecutor for HttpNode {
 
         // 尝试解析 JSON
         let body = serde_json::from_str::<serde_json::Value>(&text)
-            .unwrap_or_else(|_| serde_json::Value::String(text));
+            .unwrap_or(serde_json::Value::String(text));
 
         Ok(serde_json::json!({
             "status": status,

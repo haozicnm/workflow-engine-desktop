@@ -42,6 +42,12 @@ once_cell = "1"
 # 跨平台输入（键鼠模拟 + 录制监听）
 enigo = "0.3"
 rdev = "0.5"
+scraper = "0.26.0"
+
+# 新增节点依赖
+arboard = "3"
+regex = "1"
+base64 = "0.22"
 
 [features]
 default = ["custom-protocol"]

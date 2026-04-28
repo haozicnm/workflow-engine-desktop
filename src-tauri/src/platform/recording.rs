@@ -63,6 +63,12 @@ pub struct LinuxRecordingBackend {
 }
 
 #[cfg(target_os = "linux")]
+impl Default for LinuxRecordingBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinuxRecordingBackend {
     pub fn new() -> Self {
         LinuxRecordingBackend { handle: Mutex::new(None) }
@@ -93,10 +99,9 @@ impl RecordingBackend for LinuxRecordingBackend {
                         match key {
                             Key::ShiftLeft | Key::ShiftRight |
                             Key::ControlLeft | Key::ControlRight |
-                            Key::Alt | Key::AltGr | Key::MetaLeft | Key::MetaRight => return,
+                            Key::Alt | Key::AltGr | Key::MetaLeft | Key::MetaRight => (),
                             Key::Return => {
                                 flush_text();
-                                return;
                             }
                             Key::Tab => {
                                 flush_text();
@@ -104,11 +109,9 @@ impl RecordingBackend for LinuxRecordingBackend {
                                     "type": "hotkey", "source": "desktop",
                                     "keys": "Tab", "timestamp": now,
                                 }));
-                                return;
                             }
                             Key::Backspace => {
                                 TEXT_BUFFER.lock().unwrap().pop();
-                                return;
                             }
                             _ => {
                                 if let Some(ch) = key_to_char(&key) {

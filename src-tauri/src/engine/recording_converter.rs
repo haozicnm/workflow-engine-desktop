@@ -144,7 +144,7 @@ fn action_to_template(action: &RecordedAction, index: usize) -> StepTemplate {
             let url = action.url.clone().unwrap_or_default();
             StepTemplate {
                 id: id.clone(),
-                name: format!("打开页面"),
+                name: "打开页面".to_string(),
                 step_type: "browser".to_string(),
                 config: serde_json::json!({
                     "action": "navigate",
@@ -590,8 +590,8 @@ fn step_description(step_type: &str, config: &Value) -> String {
                 _ => format!("桌面操作: {}", action),
             }
         }
-        "data" => format!("数据处理"),
-        _ => format!("{}", step_type),
+        "data" => "数据处理".to_string(),
+        _ => step_type.to_string(),
     }
 }
 

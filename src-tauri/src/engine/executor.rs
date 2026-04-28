@@ -56,12 +56,22 @@ impl StepExecutor {
         // v1.1 声明式网页抓取节点
         register!(executors, "web_scrape", crate::nodes::web_scrape::WebScrapeNode);
 
+        // v2.0 AI 节点
+
         // v1.2 新节点
         register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
         register!(executors, "window", crate::nodes::window::WindowNode);
         register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
+
+        // v2 通用节点
+        register!(executors, "file", crate::nodes::file::FileNode);
+        register!(executors, "clipboard", crate::nodes::clipboard::ClipboardNode);
+        register!(executors, "regex", crate::nodes::regex::RegexNode);
+        register!(executors, "array", crate::nodes::array::ArrayNode);
+        register!(executors, "convert", crate::nodes::convert::ConvertNode);
+        register!(executors, "print", crate::nodes::print::PrintNode);
 
         // 记录已注册的节点类型
         for type_name in executors.keys() {

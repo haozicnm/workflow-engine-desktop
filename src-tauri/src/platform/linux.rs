@@ -12,6 +12,12 @@ pub struct LinuxBackend {
     enigo: std::sync::Mutex<enigo::Enigo>,
 }
 
+impl Default for LinuxBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinuxBackend {
     pub fn new() -> Self {
         let settings = enigo::Settings::default();
@@ -163,7 +169,7 @@ impl InputBackend for LinuxBackend {
     fn scroll(&self, amount: i32) -> Result<()> {
         let mut e = self.enigo_lock()?;
         // enigo 0.3 scroll 方向: 正数向下, 负数向上
-        e.scroll(-amount as i32, enigo::Axis::Vertical)
+        e.scroll(-amount, enigo::Axis::Vertical)
             .map_err(|err| anyhow!("滚动失败: {}", err))?;
         Ok(())
     }

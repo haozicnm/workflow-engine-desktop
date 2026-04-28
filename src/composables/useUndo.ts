@@ -1,20 +1,44 @@
-import { ref } from 'vue'
-import { useEditorStore } from '../stores/editorStore'
+// ─── FlowEditor Undo/Redo — 快照 nodes + edges 状态 ───
+import { ref, watch } from 'vue'
+import { useFlowStore } from '../stores/flowStore'
+import type { FlowNode, FlowEdge } from '../components/flow/pinTypes'
+
+interface Snapshot {
+  nodes: FlowNode[]
+  edges: FlowEdge[]
+  workflowName: string
+}
 
 export function useUndo(maxSteps = 50) {
-  const editor = useEditorStore()
-  const history = ref<string[]>([])
+  const store = useFlowStore()
+  const history = ref<Snapshot[]>([])
   const historyIndex = ref(-1)
   const isUndoRedo = ref(false)
 
+  function takeSnapshot(): Snapshot {
+    return {
+      nodes: JSON.parse(JSON.stringify(store.nodes)),
+      edges: JSON.parse(JSON.stringify(store.edges)),
+      workflowName: store.workflowName,
+    }
+  }
+
+  function restoreSnapshot(snap: Snapshot) {
+    isUndoRedo.value = true
+    store.load({
+      name: snap.workflowName,
+      nodes: snap.nodes,
+      edges: snap.edges,
+    })
+    isUndoRedo.value = false
+  }
+
   function pushState() {
     if (isUndoRedo.value) return
-    // Remove future states if we're in the middle
     if (historyIndex.value < history.value.length - 1) {
       history.value = history.value.slice(0, historyIndex.value + 1)
     }
-    history.value.push(editor.yamlText)
-    // Trim if exceeding max
+    history.value.push(takeSnapshot())
     if (history.value.length > maxSteps) {
       history.value.shift()
     } else {
@@ -22,28 +46,24 @@ export function useUndo(maxSteps = 50) {
     }
   }
 
-  function undo() {
+  function undo(): boolean {
     if (historyIndex.value <= 0) return false
     historyIndex.value--
-    isUndoRedo.value = true
-    editor.parseYaml(history.value[historyIndex.value])
-    isUndoRedo.value = false
+    restoreSnapshot(history.value[historyIndex.value])
     return true
   }
 
-  function redo() {
+  function redo(): boolean {
     if (historyIndex.value >= history.value.length - 1) return false
     historyIndex.value++
-    isUndoRedo.value = true
-    editor.parseYaml(history.value[historyIndex.value])
-    isUndoRedo.value = false
+    restoreSnapshot(history.value[historyIndex.value])
     return true
   }
 
-  function reset() {
-    history.value = [editor.yamlText]
+  function init() {
+    history.value = [takeSnapshot()]
     historyIndex.value = 0
   }
 
-  return { pushState, undo, redo, reset, history, historyIndex }
+  return { pushState, undo, redo, init, history, historyIndex }
 }

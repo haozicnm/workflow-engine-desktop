@@ -51,6 +51,11 @@ impl NodeExecutor for WebScrapeNode {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("web_scrape 节点缺少 url 参数"))?;
 
+        // 离线模式：支持 file:// 读取本地 HTML
+        if url.starts_with("file://") {
+            return scrape_local_file(url, config);
+        }
+
         let wait_for = config.get("wait_for")
             .and_then(|v| v.as_str())
             .unwrap_or("body");
@@ -271,4 +276,67 @@ fn extract_attr_from_selector(sel: &str) -> Option<&str> {
         }
     }
     None
+}
+
+/// 离线模式：读取本地 HTML 文件并用 scrapper crate 提取内容
+fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+    let path = url.strip_prefix("file://").unwrap_or(url);
+    let html = std::fs::read_to_string(path)
+        .map_err(|e| anyhow!("无法读取本地文件 {}: {}", path, e))?;
+
+    let extract_rules = config.get("extract")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("web_scrape 节点缺少 extract 参数"))?;
+
+    let document = scraper::Html::parse_document(&html);
+    let mut items: Vec<serde_json::Value> = Vec::new();
+
+    for rule in extract_rules {
+        let selector_str = rule.get("selector")
+            .and_then(|v| v.as_str())
+            .unwrap_or("body");
+        let fields = rule.get("fields")
+            .and_then(|v| v.as_object());
+
+        let selector = match scraper::Selector::parse(selector_str) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("无效选择器 '{}': {:?}", selector_str, e);
+                continue;
+            }
+        };
+
+        for element in document.select(&selector) {
+            if let Some(fields) = fields {
+                let mut item = serde_json::Map::new();
+                for (name, field_sel) in fields {
+                    let field_str = field_sel.as_str().unwrap_or("");
+                    let value = if field_str.is_empty() {
+                        element.text().collect::<Vec<_>>().join(" ").trim().to_string()
+                    } else if let Ok(sub_sel) = scraper::Selector::parse(field_str) {
+                        element.select(&sub_sel)
+                            .flat_map(|e| e.text())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                            .trim()
+                            .to_string()
+                    } else {
+                        String::new()
+                    };
+                    item.insert(name.clone(), serde_json::Value::String(value));
+                }
+                items.push(serde_json::Value::Object(item));
+            } else {
+                let text = element.text().collect::<Vec<_>>().join(" ").trim().to_string();
+                items.push(serde_json::Value::String(text));
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "source": "local_file",
+        "path": path,
+        "total_items": items.len(),
+        "items": items,
+    }))
 }

@@ -16,6 +16,12 @@ pub struct ApprovalManager {
     pending: tokio::sync::Mutex<HashMap<String, oneshot::Sender<bool>>>,
 }
 
+impl Default for ApprovalManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ApprovalManager {
     pub fn new() -> Self {
         ApprovalManager {

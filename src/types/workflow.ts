@@ -48,6 +48,8 @@ export const STEP_TYPES: StepTypeInfo[] = [
   { type: 'sub_workflow', label: '子流程', icon: '📦', color: '#d946ef' },
   { type: 'ocr', label: 'OCR识别', icon: '🔍', color: '#f43f5e' },
   { type: 'recording', label: '操作录制', icon: '🎬', color: '#8b5cf6' },
+  // v2.0 AI 节点
+  { type: 'ai', label: 'AI 调用', icon: '🤖', color: '#7c3aed' },
 ]
 
 export const STEP_COLORS: Record<string, string> = Object.fromEntries(
@@ -119,6 +121,7 @@ export function defaultStep(type: string): WorkflowStep {
     sub_workflow: { inline_steps: [] },
     ocr: { action: 'read' },
     recording: { action: 'start', headless: false },
+    ai: { action: 'call_llm', model: 'gpt-3.5-turbo', prompt: '', temperature: 0.7, max_tokens: 1024 },
   }
   return {
     id: generateId(),

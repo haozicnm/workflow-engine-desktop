@@ -45,6 +45,8 @@ fn main() {
             workflow_engine::commands::workflow::workflow_create_from_recording,
             workflow_engine::commands::workflow::recording_status,
             workflow_engine::commands::workflow::step_test,
+            // Web scrape preview
+            workflow_engine::commands::run::web_scrape_preview,
             // Run control
             workflow_engine::commands::run::run_start,
             workflow_engine::commands::run::run_pause,
@@ -74,12 +76,19 @@ fn main() {
             // Templates
             workflow_engine::commands::template::template_list,
             workflow_engine::commands::template::template_get_yaml,
+            workflow_engine::commands::template::list_templates,
+            workflow_engine::commands::template::load_template,
             // Schedules
             workflow_engine::commands::schedule::schedule_list,
             workflow_engine::commands::schedule::schedule_create,
             workflow_engine::commands::schedule::schedule_update,
             workflow_engine::commands::schedule::schedule_delete,
-            // DAG execution
+            // Workflow import/export (P4)
+            workflow_engine::commands::workflow::export_workflow,
+            workflow_engine::commands::workflow::import_workflow,
+            // DAG execution (flow editor → direct node/edge input)
+            workflow_engine::commands::run::run_dag_start,
+            // DAG execution (JSON workflow format)
             workflow_engine::commands::dag_run::dag_run_start,
             workflow_engine::commands::dag_run::dag_run_cancel,
         ])

@@ -54,7 +54,7 @@ pub async fn run_start(
     let permit = match semaphore.clone().try_acquire_owned() {
         Ok(p) => p,
         Err(_) => {
-            return Err(format!("已达到最大并发工作流数限制，请等待其他工作流完成后再试"));
+            return Err("已达到最大并发工作流数限制，请等待其他工作流完成后再试".to_string());
         }
     };
     app.cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
@@ -88,9 +88,16 @@ pub async fn run_start(
     tauri::async_runtime::spawn(async move {
         // permit 在此持有，任务结束时自动释放
         let _permit = permit;
+        let ctrl = crate::engine::scheduler::RunControl {
+            cancel_flag,
+            cancel_token,
+            pause_flag,
+            breakpoint_flag,
+            step_mode_flag,
+            debug_snapshots,
+        };
         let result = crate::engine::scheduler::run_workflow(
-            &workflow, &run_id_clone, &app_handle, &db, &browser_channel,
-            cancel_flag, cancel_token, pause_flag, breakpoint_flag, step_mode_flag, debug_snapshots,
+            &workflow, &run_id_clone, &app_handle, &db, &browser_channel, &ctrl,
         ).await;
 
         // 清理标志和令牌
@@ -379,4 +386,181 @@ pub async fn debug_vars(
         "variables": {},
         "step_outputs": {},
     })))
+}
+
+// ═══════════════════════════════════════════
+// DAG 画布执行命令（P2）
+// ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// Web Scrape Preview — 点页面自动填选择器
+// ═══════════════════════════════════════════
+
+/// 打开网页预览：返回截图 + 所有可见元素的 CSS 选择器 + 边界框
+///
+/// 前端在截图上点击元素 → 自动分析选择器 → 填充到 extract 规则
+#[tauri::command]
+pub async fn web_scrape_preview(
+    url: String,
+    headless: Option<bool>,
+    viewport_width: Option<u32>,
+    viewport_height: Option<u32>,
+) -> Result<serde_json::Value, String> {
+    use crate::nodes::browser;
+
+    let headless = headless.unwrap_or(true);
+
+    // 启动浏览器 sidecar（复用全局实例）
+    let mut launch_params = serde_json::json!({
+        "headless": headless,
+        "channel": "auto",
+    });
+    if let (Some(w), Some(h)) = (viewport_width, viewport_height) {
+        launch_params["viewport"] = serde_json::json!({"width": w, "height": h});
+    }
+
+    let _launch = browser::send_sidecar_action("launch", &launch_params).await
+        .map_err(|e| format!("启动浏览器失败: {}. 预览需要浏览器环境", e))?;
+
+    // 导航到页面并获取预览数据
+    let preview_params = serde_json::json!({
+        "url": url,
+        "wait_until": "networkidle",
+    });
+
+    let result = browser::send_sidecar_action("preview", &preview_params).await
+        .map_err(|e| format!("页面预览失败: {}", e))?;
+
+    Ok(result)
+}
+
+// ═══════════════════════════════════════════
+// DAG 执行命令
+// ═══════════════════════════════════════════
+
+/// DAG 执行入口：接收前端画布节点和连线，构建 DAG 执行计划并后台执行
+///
+/// 接收 FlowEditor 画布上的全部节点和连线：
+///   - nodes: Vec<FlowNode>  — 画布节点列表
+///   - edges: Vec<FlowEdge>  — 连线列表
+///   - workflow_name: String — 工作流名称
+///
+/// 返回 run_id，前端通过监听 step-update / run-update 事件追踪执行进度
+#[tauri::command]
+pub async fn run_dag_start(
+    app: State<'_, App>,
+    app_handle: AppHandle,
+    nodes: Vec<crate::engine::dag::FlowNode>,
+    edges: Vec<crate::engine::dag::FlowEdge>,
+    workflow_name: String,
+) -> Result<String, String> {
+    use crate::engine::dag::build_dag;
+
+    // 1. 构建 DAG 执行计划（验证 + 拓扑排序）
+    let plan = build_dag(&nodes, &edges)
+        .map_err(|e| format!("DAG 构建失败: {}", e))?;
+
+    info!("DAG 执行计划构建完成: {} 节点, {} 连线, {} 并行组",
+        plan.ordered_steps.len(), edges.len(), plan.parallel_groups.len());
+
+    // 2. 创建 run 记录
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let workflow_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    app.db.create_run(&run_id, &workflow_id, &now)
+        .map_err(|e| e.to_string())?;
+
+    // 3. 读取浏览器通道设置
+    let browser_channel = app.config.read().await.browser_channel.clone();
+
+    // 4. 创建控制标志
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    let cancel_token = tokio_util::sync::CancellationToken::new();
+    let pause_flag = Arc::new(AtomicBool::new(false));
+    let breakpoint_flag = Arc::new(AtomicBool::new(false));
+    let step_mode_flag = Arc::new(AtomicBool::new(false));
+
+    // 5. 并发控制
+    let semaphore = app.run_semaphore.clone();
+    let permit = match semaphore.clone().try_acquire_owned() {
+        Ok(p) => p,
+        Err(_) => {
+            return Err("已达到最大并发工作流数限制，请等待其他工作流完成后再试".to_string());
+        }
+    };
+    app.cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
+    app.cancel_tokens.write().await.insert(run_id.clone(), cancel_token.clone());
+    app.pause_flags.write().await.insert(run_id.clone(), pause_flag.clone());
+    app.breakpoint_flags.write().await.insert(run_id.clone(), breakpoint_flag.clone());
+    app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
+
+    // 6. 发射开始事件
+    let _ = app_handle.emit("dag-run-start", serde_json::json!({
+        "run_id": run_id,
+        "workflow_name": workflow_name,
+        "node_count": plan.ordered_steps.len(),
+        "edge_count": edges.len(),
+    }));
+
+    // 7. 后台异步执行
+    let db = app.db.clone();
+    let run_id_clone = run_id.clone();
+    let wf_name = workflow_name.clone();
+    let cancel_flags = app.cancel_flags.clone();
+    let cancel_tokens = app.cancel_tokens.clone();
+    let pause_flags = app.pause_flags.clone();
+    let breakpoint_flags = app.breakpoint_flags.clone();
+    let step_mode_flags = app.step_mode_flags.clone();
+    let debug_snapshots = app.debug_snapshots.clone();
+    let debug_snapshots_cleanup = debug_snapshots.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let _permit = permit;
+
+        let ctrl = crate::engine::scheduler::RunControl {
+            cancel_flag,
+            cancel_token,
+            pause_flag,
+            breakpoint_flag,
+            step_mode_flag,
+            debug_snapshots,
+        };
+
+        let result = crate::engine::dag_scheduler::run_dag(
+            &plan,
+            &run_id_clone,
+            &app_handle,
+            &db,
+            &browser_channel,
+            &wf_name,
+            &ctrl,
+        ).await;
+
+        // 清理
+        cancel_flags.write().await.remove(&run_id_clone);
+        cancel_tokens.write().await.remove(&run_id_clone);
+        pause_flags.write().await.remove(&run_id_clone);
+        breakpoint_flags.write().await.remove(&run_id_clone);
+        step_mode_flags.write().await.remove(&run_id_clone);
+        debug_snapshots_cleanup.write().await.remove(&run_id_clone);
+
+        match result {
+            Ok(_state) => {
+                info!("[DAG] 执行完成: {}", run_id_clone);
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
+                error!("[DAG] 工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
+                let _ = app_handle.emit("run-update", serde_json::json!({
+                    "run_id": run_id_clone,
+                    "workflow_name": wf_name,
+                    "status": status,
+                    "error": err_msg,
+                }));
+            }
+        }
+    });
+
+    Ok(run_id)
 }

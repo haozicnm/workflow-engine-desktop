@@ -84,6 +84,7 @@ pub fn window() -> &'static (dyn WindowBackend + Send + Sync) {
     }).as_ref()
 }
 
+#[allow(dead_code)]
 struct UnsupportedWindowBackend;
 
 impl WindowBackend for UnsupportedWindowBackend {

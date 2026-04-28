@@ -11,6 +11,12 @@ use std::process::Command;
 
 pub struct LinuxWindowBackend;
 
+impl Default for LinuxWindowBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinuxWindowBackend {
     pub fn new() -> Self {
         LinuxWindowBackend
