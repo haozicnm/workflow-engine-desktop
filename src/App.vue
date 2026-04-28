@@ -13,7 +13,7 @@ const { toasts, remove } = useToast()
     <header class="app-header">
       <RouterLink to="/" class="app-brand">
         <span class="brand-icon">⚡</span>
-        <span class="brand-text">Workflow Engine</span>
+        <span class="brand-text">Workflow Engine 2.0</span>
       </RouterLink>
       <nav class="app-nav">
         <RouterLink to="/" :class="{ active: route.path === '/' }">📋 工作流</RouterLink>

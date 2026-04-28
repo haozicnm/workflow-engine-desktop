@@ -42,7 +42,7 @@ export const STEP_TYPES: StepTypeInfo[] = [
   { type: 'word', label: 'Word', icon: '📘', color: '#3b82f6' },
   { type: 'map', label: '数据映射', icon: '🔀', color: '#a855f7' },
   { type: 'parallel', label: '并行', icon: '⚡', color: '#f97316' },
-  // v1.2 新节点
+  // 新增节点
   { type: 'mouse_keyboard', label: '鼠标/键盘', icon: '🖱️', color: '#6366f1' },
   { type: 'window', label: '窗口管理', icon: '🪟', color: '#0ea5e9' },
   { type: 'sub_workflow', label: '子流程', icon: '📦', color: '#d946ef' },

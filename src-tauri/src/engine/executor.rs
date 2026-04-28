@@ -58,7 +58,7 @@ impl StepExecutor {
 
         // v2.0 AI 节点
 
-        // v1.2 新节点
+        // DAG 执行引擎节点
         register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
         register!(executors, "window", crate::nodes::window::WindowNode);
         register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);

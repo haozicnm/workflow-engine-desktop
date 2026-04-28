@@ -34,10 +34,10 @@ const APP_VERSION = pkg.version
 const milestones = [
   { id: 'P0', label: '项目骨架', desc: 'Tauri 窗口 + 数据层 + 空白前端 + 4 个页面', done: true },
   { id: 'P1', label: '引擎核心', desc: '解析器 / 调度器 / 状态机 / HTTP·数据·脚本·条件·循环节点 / 重试·超时 / DB 持久化 / 事件推送', done: true },
-  { id: 'P2', label: '文件节点', desc: 'Excel (calamine + rust_xlsxwriter) / Word (zip + xml)', done: true },
-  { id: 'P2.5', label: '浏览器 + 通知 + 审批 + 并行', desc: 'Playwright sidecar（内置 Python）/ 系统 toast + webhook / 前端审批弹窗 / 并行分支', done: true },
-  { id: 'P3', label: '前端画布', desc: '拖拽编辑器 + YAML 双向编辑 + 流程连线 + 分支可视化 + 运行历史', done: true },
-  { id: 'P4', label: '桌面集成', desc: '系统托盘 + 定时调度 + 浏览器选择设置 + 内置 Python + Playwright', done: true },
+  { id: 'P2', label: '文件节点 + 桌面录制', desc: 'Excel / Word / 操作录制→工作流转换', done: true },
+  { id: 'P3', label: '前端画布 v1', desc: '拖拽编辑器 + YAML 双向编辑 + 流程连线 + 运行历史', done: true },
+  { id: 'P4', label: '桌面集成', desc: '系统托盘 + 定时调度 + 内置 Python + Playwright', done: true },
+  { id: 'v2.0', label: 'ComfyUI DAG 编辑器', desc: 'Vue Flow 画布 + 节点拖拽 + 属性面板 + 撤销/重做 + 自动保存', done: true },
   { id: '1.0β', label: '正式 Beta', desc: '全面代码审查 + Bug 修复 + 可正式使用', done: true },
   { id: '1.1β', label: '网页抓取增强', desc: 'web_scrape 声明式节点 / 浏览器 +16 动作 / Cookie·代理·多标签页 / 步骤耗时显示', done: true },
 ]

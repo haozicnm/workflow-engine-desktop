@@ -182,7 +182,7 @@ pub fn all_nodes() -> Vec<NodeManifest> {
             }),
         },
 
-        // ── v1.2 新节点 ──
+        // ── 桌面交互节点 ──
         NodeManifest {
             node_type: "mouse_keyboard",
             label: "键鼠操作",

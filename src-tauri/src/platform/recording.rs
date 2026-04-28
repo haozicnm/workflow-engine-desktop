@@ -69,6 +69,7 @@ impl Default for LinuxRecordingBackend {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl LinuxRecordingBackend {
     pub fn new() -> Self {
         LinuxRecordingBackend { handle: Mutex::new(None) }
