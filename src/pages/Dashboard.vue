@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
-import { useWorkflowStore } from '../stores/workflow'
+import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from '../composables/useToast'
 import WorkflowGrid from '../components/WorkflowGrid.vue'
 import TemplateSection from '../components/TemplateSection.vue'
