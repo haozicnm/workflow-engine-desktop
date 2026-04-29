@@ -29,13 +29,10 @@ impl ExecutionContext {
         thread_local! {
             static RHAI_ENGINE: rhai::Engine = {
                 let mut engine = rhai::Engine::new();
-                // 沙箱限制：防止死循环和资源滥用
-                engine.set_max_operations(100_000);       // 防止死循环
-                engine.set_max_string_size(1024 * 1024);  // 限制字符串 1MB
-                engine.set_max_array_size(10_000);        // 限制数组大小
-                engine.set_max_map_size(10_000);          // 限制 map 大小
-                // 不注册任何 I/O 包，仅纯计算
-                // doc comments are disabled by default in rhai >= 1.16
+                engine.set_max_operations(100_000);
+                engine.set_max_string_size(1024 * 1024);
+                engine.set_max_array_size(10_000);
+                engine.set_max_map_size(10_000);
                 engine
             };
         }
@@ -75,17 +72,6 @@ impl ExecutionContext {
 
     // ─── 配置变量替换 ───
 
-    /// 递归替换 config JSON 中的 {{变量}} 占位符
-    ///
-    /// 支持：
-    ///   {{key}}       → ctx.variables[key]
-    ///   {{step_xxx}}  → ctx.step_outputs[xxx]
-    ///   {{__item}}    → 当前循环项
-    ///   {{__index}}   → 当前循环索引
-    ///   {{a.b.c}}     → 对象嵌套访问
-    ///
-    /// 如果整个值是单个 {{key}}，保留原始 JSON 类型；
-    /// 如果 {{key}} 嵌在文本中，转为字符串拼接。
     pub fn resolve_config(&self, config: &serde_json::Value) -> serde_json::Value {
         match config {
             serde_json::Value::String(s) => self.resolve_string(s),
@@ -106,33 +92,34 @@ impl ExecutionContext {
         }
     }
 
-    /// 解析字符串中的变量引用
     fn resolve_string(&self, s: &str) -> serde_json::Value {
         let trimmed = s.trim();
-        // 整个字符串是单个 {{key}} → 保留原始类型
         if trimmed.starts_with("{{") && trimmed.ends_with("}}") && trimmed.len() > 4 {
             let inner = trimmed[2..trimmed.len()-2].trim();
             if !inner.contains("{{") {
                 if let Some(val) = self.resolve_var(inner) {
                     return val.clone();
                 }
-                // 简单变量找不到 → 尝试表达式求值（如 {{__item * 2}}）
                 if let Some(result) = self.eval_simple_expr(inner) {
                     return result;
                 }
             }
         }
-        // 否则：字符串插值
         serde_json::Value::String(self.interpolate(s))
     }
 
-    /// 简单表达式求值：替换变量为数值后计算 + - * /
+    /// 简单表达式求值：支持 算术 +-*/ | 比较 > < >= <= == != | 逻辑 && || !
     fn eval_simple_expr(&self, expr: &str) -> Option<serde_json::Value> {
-        // 只有包含算术运算符才尝试
-        if !expr.contains('+') && !expr.contains('-') && !expr.contains('*') && !expr.contains('/') {
+        let has_arith = expr.contains('+') || expr.contains('-')
+            || expr.contains('*') || expr.contains('/');
+        let has_logic = expr.contains('>') || expr.contains('<')
+            || expr.contains('!') || expr.contains('=')
+            || expr.contains("&&") || expr.contains("||");
+        if !has_arith && !has_logic {
             return None;
         }
-        // 替换变量为数值
+
+        // 替换变量为字面量
         let mut resolved = expr.to_string();
         let var_patterns: Vec<String> = {
             let mut vars = Vec::new();
@@ -141,67 +128,188 @@ impl ExecutionContext {
             while i < chars.len() {
                 if chars[i].is_alphabetic() || chars[i] == '_' {
                     let start = i;
-                    while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.') {
+                    while i < chars.len()
+                        && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
+                    {
                         i += 1;
                     }
-                    vars.push(expr[start..i].to_string());
+                    let name = &expr[start..i];
+                    if name != "true" && name != "false" {
+                        vars.push(name.to_string());
+                    }
                 } else {
                     i += 1;
                 }
             }
             vars
         };
-        // 从长到短替换，避免 __item 误匹配 __item1
+
         let mut sorted_vars = var_patterns;
         sorted_vars.sort_by(|a, b| b.len().cmp(&a.len()));
         sorted_vars.dedup();
         for var in &sorted_vars {
             if let Some(val) = self.resolve_var(var) {
-                let num = match val {
+                let literal = match val {
                     serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0).to_string(),
-                    serde_json::Value::String(s) => s.parse::<f64>().ok().map(|f| f.to_string()).unwrap_or_else(|| format!("{:?}", s)),
+                    serde_json::Value::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+                    serde_json::Value::Bool(true) => "true".to_string(),
+                    serde_json::Value::Bool(false) => "false".to_string(),
                     _ => continue,
                 };
-                resolved = resolved.replace(var.as_str(), &num);
+                resolved = resolved.replace(var.as_str(), &literal);
             }
         }
-        // 安全求值：只允许数字、空格、+-*/. 和括号
-        if resolved.chars().any(|c| !"0123456789+-*/.() eE".contains(c)) {
+
+        // 安全校验
+        let allowed = "0123456789+-*/.<>=!&|() \"truefalse";
+        if resolved.chars().any(|c| !allowed.contains(c)) {
             return None;
         }
-        // 简单表达式计算（乘除优先，加减其次）
-        Self::compute(&resolved).map(|n| {
-            // 整数结果返回整数类型
+
+        Self::evaluate(&resolved)
+    }
+
+    /// 表达式求值：多级运算符优先级，返回 JSON Value
+    fn evaluate(expr: &str) -> Option<serde_json::Value> {
+        let expr = expr.trim();
+        if expr.is_empty() {
+            return None;
+        }
+
+        // 一元 !
+        if let Some(rest) = expr.strip_prefix('!') {
+            let val = Self::evaluate(rest)?;
+            return Some(serde_json::Value::Bool(!is_truthy(&val)));
+        }
+
+        // 去掉全包裹括号
+        if let Some(inner) = strip_outer_parens(expr) {
+            return Self::evaluate(inner);
+        }
+
+        // 1. || (最低)
+        if let Some(pos) = Self::find_op(expr, "||") {
+            let left = Self::evaluate(&expr[..pos])?;
+            let right = Self::evaluate(&expr[pos + 2..])?;
+            return Some(serde_json::Value::Bool(is_truthy(&left) || is_truthy(&right)));
+        }
+
+        // 2. &&
+        if let Some(pos) = Self::find_op(expr, "&&") {
+            let left = Self::evaluate(&expr[..pos])?;
+            let right = Self::evaluate(&expr[pos + 2..])?;
+            return Some(serde_json::Value::Bool(is_truthy(&left) && is_truthy(&right)));
+        }
+
+        // 3. 比较 == != >= <= > <
+        let comp_ops: [(&str, usize); 6] = [
+            ("==", 2), ("!=", 2), (">=", 2), ("<=", 2), (">", 1), ("<", 1),
+        ];
+        for (op, len) in &comp_ops {
+            if let Some(pos) = Self::find_op(expr, op) {
+                let lv = Self::evaluate(&expr[..pos])?;
+                let rv = Self::evaluate(&expr[pos + len..])?;
+                let result = match *op {
+                    "==" => json_eq(&lv, &rv),
+                    "!=" => !json_eq(&lv, &rv),
+                    ">" => json_cmp(&lv, &rv) == Some(std::cmp::Ordering::Greater),
+                    "<" => json_cmp(&lv, &rv) == Some(std::cmp::Ordering::Less),
+                    ">=" => matches!(
+                        json_cmp(&lv, &rv),
+                        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+                    ),
+                    "<=" => matches!(
+                        json_cmp(&lv, &rv),
+                        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+                    ),
+                    _ => false,
+                };
+                return Some(serde_json::Value::Bool(result));
+            }
+        }
+
+        // 4. 算术 + - * /
+        Self::compute_arithmetic(expr).map(|n| {
             if (n - n.round()).abs() < 1e-10 {
                 serde_json::json!(n as i64)
             } else {
                 serde_json::json!(n)
             }
+        }).or_else(|| {
+            // 纯字面量
+            let cleaned = expr.trim();
+            if cleaned == "true" { return Some(serde_json::Value::Bool(true)); }
+            if cleaned == "false" { return Some(serde_json::Value::Bool(false)); }
+            if let Ok(n) = cleaned.parse::<f64>() {
+                return if (n - n.round()).abs() < 1e-10 {
+                    Some(serde_json::json!(n as i64))
+                } else {
+                    Some(serde_json::json!(n))
+                };
+            }
+            if cleaned.starts_with('"') && cleaned.ends_with('"') && cleaned.len() >= 2 {
+                return Some(serde_json::Value::String(
+                    cleaned[1..cleaned.len() - 1].to_string(),
+                ));
+            }
+            None
         })
     }
 
-    /// 四则运算求值，处理 + - * /
-    fn compute(expr: &str) -> Option<f64> {
+    /// 在表达式顶层（非括号/非引号内）找运算符位置
+    fn find_op(expr: &str, op: &str) -> Option<usize> {
+        let mut depth: i32 = 0;
+        let chars: Vec<char> = expr.chars().collect();
+        let op_len = op.chars().count();
+        let mut i = 0;
+        while i < chars.len() {
+            match chars[i] {
+                '(' => depth += 1,
+                ')' => depth -= 1,
+                '"' => {
+                    i += 1;
+                    while i < chars.len() && chars[i] != '"' {
+                        if chars[i] == '\\' { i += 1; }
+                        i += 1;
+                    }
+                }
+                _ if depth == 0 && i + op_len <= chars.len() => {
+                    let slice: String = chars[i..i + op_len].iter().collect();
+                    if slice == op {
+                        // 防止单个 = 匹配到 == 的第一个字符
+                        if op == "=" && i + 1 < chars.len() && chars[i + 1] == '=' {
+                            i += 2;
+                            continue;
+                        }
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// 四则运算
+    fn compute_arithmetic(expr: &str) -> Option<f64> {
         let expr = expr.trim();
-        // 递归找最外层最低优先级运算符，注意处理负号
-        let mut depth = 0i32;
+        if expr.is_empty() { return None; }
+
+        let mut depth: i32 = 0;
         let mut op_pos: Option<(usize, char)> = None;
         let chars: Vec<char> = expr.chars().collect();
+
         for i in 0..chars.len() {
             match chars[i] {
                 '(' => depth += 1,
                 ')' => depth -= 1,
                 '+' | '-' if depth == 0 => {
-                    // 负号不能当成运算符：前面不是数字或 ) 就是负号
-                    if i > 0 && (chars[i-1].is_ascii_digit() || chars[i-1] == ')' || chars[i-1] == ' ') {
-                        if chars[i] == '-' {
-                            // 确认前面是数字或 )，这是减号
-                        }
+                    if i > 0 && (chars[i - 1].is_ascii_digit() || chars[i - 1] == ')' || chars[i - 1] == ' ') {
                         op_pos = Some((i, chars[i]));
                     } else if chars[i] == '-' && i == 0 {
-                        continue; // 表达式开头的负号
+                        continue;
                     } else {
-                        // 也可能是减号（前面是空格+数字之类），保守处理
                         op_pos = Some((i, chars[i]));
                     }
                 }
@@ -213,9 +321,10 @@ impl ExecutionContext {
                 _ => {}
             }
         }
+
         if let Some((pos, op)) = op_pos {
-            let left = Self::compute(&expr[..pos])?;
-            let right = Self::compute(&expr[pos+1..])?;
+            let left = Self::compute_arithmetic(&expr[..pos])?;
+            let right = Self::compute_arithmetic(&expr[pos + 1..])?;
             return match op {
                 '+' => Some(left + right),
                 '-' => Some(left - right),
@@ -224,22 +333,17 @@ impl ExecutionContext {
                 _ => None,
             };
         }
-        // 无运算符 → 直接解析数字（去掉空格和括号）
-        let cleaned: String = expr.chars().filter(|c| !c.is_whitespace() && *c != '(' && *c != ')').collect();
+
+        let cleaned: String = expr.chars()
+            .filter(|c| !c.is_whitespace() && *c != '(' && *c != ')')
+            .collect();
         cleaned.parse::<f64>().ok()
     }
 
-    /// 从上下文中解析变量
-    /// 支持：
-    ///   key       → variables[key]
-    ///   step_xxx  → step_outputs[xxx]
-    ///   a.b.c     → 嵌套对象访问
     pub fn resolve_var(&self, key: &str) -> Option<&serde_json::Value> {
-        // 分割嵌套路径
         let parts: Vec<&str> = key.split('.').collect();
         let root_key = parts[0];
 
-        // 查找根值
         let root = if let Some(step_id) = root_key.strip_prefix("step_") {
             self.step_outputs.get(step_id)
         } else {
@@ -247,44 +351,98 @@ impl ExecutionContext {
         };
 
         let mut current = root?;
-
-        // 遍历嵌套路径
         for part in &parts[1..] {
             current = current.get(*part)?;
         }
-
         Some(current)
     }
 
-    /// 字符串插值：将 {{key}} 替换为解析后的值
     fn interpolate(&self, s: &str) -> String {
         let mut result = String::new();
         let mut remaining = s;
 
         while let Some(start) = remaining.find("{{") {
             result.push_str(&remaining[..start]);
-            if let Some(end) = remaining[start+2..].find("}}") {
-                let key = remaining[start+2..start+2+end].trim();
+            if let Some(end) = remaining[start + 2..].find("}}") {
+                let key = remaining[start + 2..start + 2 + end].trim();
                 if let Some(val) = self.resolve_var(key) {
                     match val {
                         serde_json::Value::String(sv) => result.push_str(sv),
                         other => result.push_str(&other.to_string()),
                     }
                 } else {
-                    // 变量未找到，保留原始占位符
                     result.push_str("{{");
                     result.push_str(key);
                     result.push_str("}}");
                 }
-                remaining = &remaining[start+2+end+2..];
+                remaining = &remaining[start + 2 + end + 2..];
             } else {
-                // 没有闭合的 }}，保留剩余部分
                 result.push_str(remaining);
                 return result;
             }
         }
         result.push_str(remaining);
         result
+    }
+}
+
+// ─── 辅助函数 ───
+
+fn is_truthy(val: &serde_json::Value) -> bool {
+    match val {
+        serde_json::Value::Null => false,
+        serde_json::Value::Bool(b) => *b,
+        serde_json::Value::Number(n) => n.as_f64().map(|f| f != 0.0).unwrap_or(false),
+        serde_json::Value::String(s) => !s.is_empty(),
+        serde_json::Value::Array(a) => !a.is_empty(),
+        serde_json::Value::Object(o) => !o.is_empty(),
+    }
+}
+
+fn json_eq(a: &serde_json::Value, b: &serde_json::Value) -> bool {
+    match (a, b) {
+        (serde_json::Value::Number(na), serde_json::Value::Number(nb)) => {
+            (na.as_f64().unwrap_or(0.0) - nb.as_f64().unwrap_or(0.0)).abs() < 1e-10
+        }
+        (serde_json::Value::Bool(ba), serde_json::Value::Bool(bb)) => ba == bb,
+        (serde_json::Value::Null, serde_json::Value::Null) => true,
+        _ => a.to_string() == b.to_string(),
+    }
+}
+
+fn json_cmp(a: &serde_json::Value, b: &serde_json::Value) -> Option<std::cmp::Ordering> {
+    if let (serde_json::Value::Number(na), serde_json::Value::Number(nb)) = (a, b) {
+        let fa = na.as_f64().unwrap_or(0.0);
+        let fb = nb.as_f64().unwrap_or(0.0);
+        Some(if fa < fb {
+            std::cmp::Ordering::Less
+        } else if fa > fb {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        })
+    } else {
+        None
+    }
+}
+
+fn strip_outer_parens(expr: &str) -> Option<&str> {
+    if !expr.starts_with('(') || !expr.ends_with(')') {
+        return None;
+    }
+    let mut depth: i32 = 0;
+    let chars: Vec<char> = expr.chars().collect();
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '(' { depth += 1; }
+        if c == ')' { depth -= 1; }
+        if depth == 0 && i < chars.len() - 1 {
+            return None; // 括号不配对全包裹
+        }
+    }
+    if depth == 0 {
+        Some(&expr[1..expr.len() - 1])
+    } else {
+        None
     }
 }
 

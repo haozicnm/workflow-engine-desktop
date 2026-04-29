@@ -504,3 +504,50 @@ async fn test_map_node() {
     assert_eq!(data[2]["doubled"].as_i64(), Some(6));
     println!("✅ Map node OK: {} items", data.len());
 }
+
+#[tokio::test]
+async fn test_map_node_logic_operators() {
+    let executor = StepExecutor::new();
+    let mut ctx = ExecutionContext::new("test-map-logic", &Default::default());
+
+    let step = make_step("map_logic", "逻辑运算测试", "map", json!({
+        "source": [1, 2, 3, 5],
+        "template": {
+            "gt_1":     "{{__item > 1}}",
+            "lt_3":     "{{__item < 3}}",
+            "eq_2":     "{{__item == 2}}",
+            "ne_2":     "{{__item != 2}}",
+            "gte_3":    "{{__item >= 3}}",
+            "lte_2":    "{{__item <= 2}}",
+            "between":  "{{__item > 1 && __item < 5}}",
+            "extreme":  "{{__item < 2 || __item > 4}}",
+            "not_3":    "{{! (__item == 3)}}",
+            "combo":    "{{__item > 1 && __item <= 5 && __item != 3}}"
+        }
+    }));
+
+    let result = executor.execute(&step, &mut ctx).await.unwrap();
+    let data = result.as_array().unwrap();
+    assert_eq!(data.len(), 4);
+
+    // [1]: gt_1=false, lt_3=true, extreme=true, not_3=true
+    assert_eq!(data[0]["gt_1"].as_bool(), Some(false));
+    assert_eq!(data[0]["lt_3"].as_bool(), Some(true));
+    assert_eq!(data[0]["extreme"].as_bool(), Some(true));
+    assert_eq!(data[0]["not_3"].as_bool(), Some(true));
+
+    // [3]: gte_3=true, between=true, extreme=false, not_3=false
+    assert_eq!(data[2]["gte_3"].as_bool(), Some(true));
+    assert_eq!(data[2]["between"].as_bool(), Some(true));
+    assert_eq!(data[2]["extreme"].as_bool(), Some(false));
+    assert_eq!(data[2]["not_3"].as_bool(), Some(false));
+
+    // [5]: gt_1=true, lt_3=false, between=false, extreme=true, combo=true
+    assert_eq!(data[3]["gt_1"].as_bool(), Some(true));
+    assert_eq!(data[3]["lt_3"].as_bool(), Some(false));
+    assert_eq!(data[3]["between"].as_bool(), Some(false));
+    assert_eq!(data[3]["extreme"].as_bool(), Some(true));
+    assert_eq!(data[3]["combo"].as_bool(), Some(true));
+
+    println!("✅ Map logic operators OK: {} items", data.len());
+}
