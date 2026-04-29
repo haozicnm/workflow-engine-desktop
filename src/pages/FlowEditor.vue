@@ -137,6 +137,8 @@ import { VueFlow, type VueFlowInstance } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useFlowStore } from '../stores/flowStore'
 import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'
@@ -330,9 +332,8 @@ function runAll() {
   if (store.nodes.length === 0) return
   isRunning.value = true
   store.resetAllStatuses()
-  addLog('▶ 全量运行开始...', 'info')
-  // TODO: P2 集成 Tauri 后端执行引擎
-  simulateRun()
+  addLog('▶ DAG 执行开始...', 'info')
+  runDagFlow()
 }
 
 function runSingle() {
@@ -340,30 +341,99 @@ function runSingle() {
   addLog('⏯ 单步调试模式（待实现）', 'info')
 }
 
-function stopRun() {
-  isRunning.value = false
-  addLog('■ 运行已停止', 'warn')
-}
-
-// 模拟运行（P1 占位）
-async function simulateRun() {
-  const nodeIds = store.nodes.map(n => n.id)
-  for (const id of nodeIds) {
-    store.setNodeStatus(id, 'running')
-    addLog(`⏳ 执行节点: ${store.getNode(id)?.label || id}`)
-    await new Promise(r => setTimeout(r, 600 + Math.random() * 800))
-
-    store.setNodeStatus(id, 'success')
-    const node = store.getNode(id)
-    if (node) {
-      node.output = { status: 'ok', simulated: true }
-      node.duration = Math.round(600 + Math.random() * 800)
-      node.error = undefined
+async function stopRun() {
+  if (currentRunId.value) {
+    try {
+      await invoke('dag_run_cancel', { runId: currentRunId.value })
+      addLog('■ 已发送取消指令', 'warn')
+    } catch (e) {
+      addLog(`■ 取消失败: ${e}`, 'error')
     }
-    addLog(`✅ 完成: ${store.getNode(id)?.label || id} (${node?.duration}ms)`)
   }
   isRunning.value = false
-  addLog('✅ 工作流执行完成', 'info')
+  currentRunId.value = null
+}
+
+// ─── 真实 DAG 执行 ───
+const currentRunId = ref<string | null>(null)
+let dagEventUnlisteners: UnlistenFn[] = []
+
+async function runDagFlow() {
+  const workflowJson = {
+    name: store.workflowName || '未命名',
+    description: '',
+    nodes: store.nodes.map(n => ({
+      id: n.id,
+      type: n.type,
+      label: n.label,
+      position: n.position,
+      config: n.config,
+    })),
+    edges: store.edges.map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
+    })),
+    variables: {},
+  }
+
+  try {
+    await setupDagListeners()
+    const runId = await invoke<string>('dag_run_start', { workflowJson })
+    currentRunId.value = runId
+    addLog(`🚀 DAG 运行已启动: ${runId.slice(0, 8)}...`, 'info')
+  } catch (e) {
+    addLog(`❌ DAG 启动失败: ${e}`, 'error')
+    isRunning.value = false
+    cleanupDagListeners()
+  }
+}
+
+async function setupDagListeners() {
+  cleanupDagListeners()
+
+  const u1 = await listen<{ step_id: string; step_name: string; status: string; current_step: number; total_steps: number }>(
+    'step-status-update',
+    (event) => {
+      const { step_id, step_name, status, current_step, total_steps } = event.payload
+      store.setNodeStatus(step_id, status as NodeStatus)
+      if (status === 'running') addLog(`⏳ [${current_step}/${total_steps}] ${step_name}`)
+      else if (status === 'success') addLog(`✅ [${current_step}/${total_steps}] ${step_name}`)
+    }
+  )
+  dagEventUnlisteners.push(u1)
+
+  const u2 = await listen<{ run_id: string; status: string }>(
+    'run-update',
+    (event) => {
+      if (event.payload.status === 'completed') {
+        addLog('✅ DAG 工作流执行完成', 'info')
+      } else if (event.payload.status === 'cancelled') {
+        addLog('■ DAG 工作流已取消', 'warn')
+      }
+      isRunning.value = false
+      currentRunId.value = null
+      cleanupDagListeners()
+    }
+  )
+  dagEventUnlisteners.push(u2)
+
+  const u3 = await listen<{ step_id: string; step_name: string }>(
+    'breakpoint-hit',
+    (event) => {
+      const { step_id, step_name } = event.payload
+      addLog(`🔴 断点: ${step_name}`, 'warn')
+      store.setNodeStatus(step_id, 'paused')
+    }
+  )
+  dagEventUnlisteners.push(u3)
+}
+
+function cleanupDagListeners() {
+  for (const unlisten of dagEventUnlisteners) unlisten()
+  dagEventUnlisteners = []
 }
 
 function fitView() {
