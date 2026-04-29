@@ -53,6 +53,9 @@ jobs:
         working-directory: src
         run: npm run build
 
+      - name: Create python-runtime placeholder
+        run: New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed; Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
+
       - name: Build Tauri (Windows)
         run: npx --prefix src tauri build
         env:
