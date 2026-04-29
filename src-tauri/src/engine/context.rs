@@ -116,10 +116,117 @@ impl ExecutionContext {
                 if let Some(val) = self.resolve_var(inner) {
                     return val.clone();
                 }
+                // 简单变量找不到 → 尝试表达式求值（如 {{__item * 2}}）
+                if let Some(result) = self.eval_simple_expr(inner) {
+                    return result;
+                }
             }
         }
         // 否则：字符串插值
         serde_json::Value::String(self.interpolate(s))
+    }
+
+    /// 简单表达式求值：替换变量为数值后计算 + - * /
+    fn eval_simple_expr(&self, expr: &str) -> Option<serde_json::Value> {
+        // 只有包含算术运算符才尝试
+        if !expr.contains('+') && !expr.contains('-') && !expr.contains('*') && !expr.contains('/') {
+            return None;
+        }
+        // 替换变量为数值
+        let mut resolved = expr.to_string();
+        let var_patterns: Vec<String> = {
+            let mut vars = Vec::new();
+            let mut i = 0;
+            let chars: Vec<char> = expr.chars().collect();
+            while i < chars.len() {
+                if chars[i].is_alphabetic() || chars[i] == '_' {
+                    let start = i;
+                    while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.') {
+                        i += 1;
+                    }
+                    vars.push(expr[start..i].to_string());
+                } else {
+                    i += 1;
+                }
+            }
+            vars
+        };
+        // 从长到短替换，避免 __item 误匹配 __item1
+        let mut sorted_vars = var_patterns;
+        sorted_vars.sort_by(|a, b| b.len().cmp(&a.len()));
+        sorted_vars.dedup();
+        for var in &sorted_vars {
+            if let Some(val) = self.resolve_var(var) {
+                let num = match val {
+                    serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0).to_string(),
+                    serde_json::Value::String(s) => s.parse::<f64>().ok().map(|f| f.to_string()).unwrap_or_else(|| format!("{:?}", s)),
+                    _ => continue,
+                };
+                resolved = resolved.replace(var.as_str(), &num);
+            }
+        }
+        // 安全求值：只允许数字、空格、+-*/. 和括号
+        if resolved.chars().any(|c| !"0123456789+-*/.() eE".contains(c)) {
+            return None;
+        }
+        // 简单表达式计算（乘除优先，加减其次）
+        Self::compute(&resolved).map(|n| {
+            // 整数结果返回整数类型
+            if (n - n.round()).abs() < 1e-10 {
+                serde_json::json!(n as i64)
+            } else {
+                serde_json::json!(n)
+            }
+        })
+    }
+
+    /// 四则运算求值，处理 + - * /
+    fn compute(expr: &str) -> Option<f64> {
+        let expr = expr.trim();
+        // 递归找最外层最低优先级运算符，注意处理负号
+        let mut depth = 0i32;
+        let mut op_pos: Option<(usize, char)> = None;
+        let chars: Vec<char> = expr.chars().collect();
+        for i in 0..chars.len() {
+            match chars[i] {
+                '(' => depth += 1,
+                ')' => depth -= 1,
+                '+' | '-' if depth == 0 => {
+                    // 负号不能当成运算符：前面不是数字或 ) 就是负号
+                    if i > 0 && (chars[i-1].is_ascii_digit() || chars[i-1] == ')' || chars[i-1] == ' ') {
+                        if chars[i] == '-' {
+                            // 确认前面是数字或 )，这是减号
+                        }
+                        op_pos = Some((i, chars[i]));
+                    } else if chars[i] == '-' && i == 0 {
+                        continue; // 表达式开头的负号
+                    } else {
+                        // 也可能是减号（前面是空格+数字之类），保守处理
+                        op_pos = Some((i, chars[i]));
+                    }
+                }
+                '*' | '/' if depth == 0 => {
+                    if op_pos.is_none() {
+                        op_pos = Some((i, chars[i]));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some((pos, op)) = op_pos {
+            let left = Self::compute(&expr[..pos])?;
+            let right = Self::compute(&expr[pos+1..])?;
+            return match op {
+                '+' => Some(left + right),
+                '-' => Some(left - right),
+                '*' => Some(left * right),
+                '/' => if right == 0.0 { None } else { Some(left / right) },
+                _ => None,
+            };
+        }
+        // 无运算符 → 直接解析数字（去掉空格和括号）
+        let cleaned: String = expr.chars().filter(|c| !c.is_whitespace() && *c != '(' && *c != ')').collect();
+        cleaned.parse::<f64>().ok()
     }
 
     /// 从上下文中解析变量
