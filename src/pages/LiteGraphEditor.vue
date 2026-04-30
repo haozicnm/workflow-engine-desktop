@@ -128,6 +128,12 @@ const selectedNode = ref<FlowNode | null>(null)
 const isRunning = ref(false)
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
+// ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
+/** 通过 store 的 string ID 查找 LiteGraph 节点 */
+function findLgNode(storeId: string): LGraphNode | undefined {
+  return graph._nodes?.find((n: LGraphNode) => String(n.id) === storeId)
+}
+
 // ─── 标记：是否正在从 store 同步到 graph（避免循环更新） ───
 let syncingFromStore = false
 
@@ -366,6 +372,9 @@ function loadFromStore() {
   syncingFromStore = true
   graph.clear()
 
+  // 旧 store ID → 新 LiteGraph 节点的映射（LiteGraph 会分配新整数 ID）
+  const oldToNew = new Map<string, LGraphNode>()
+
   // 添加节点
   for (const sn of store.nodes) {
     const node = LiteGraph.createNode(sn.type)
@@ -373,7 +382,7 @@ function loadFromStore() {
       addLog(`⚠ 未知节点类型: ${sn.type}`, 'warn')
       continue
     }
-    node.id = parseInt(sn.id.replace(/\D/g, ''), 10) || Date.now()
+    oldToNew.set(sn.id, node)
     node.pos = [sn.position.x, sn.position.y]
     node.title = sn.label
     // 设置 widget 值
@@ -387,10 +396,10 @@ function loadFromStore() {
     graph.add(node)
   }
 
-  // 添加连线
+  // 添加连线（使用 ID 映射）
   for (const edge of store.edges) {
-    const sourceNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === edge.source)
-    const targetNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === edge.target)
+    const sourceNode = oldToNew.get(edge.source)
+    const targetNode = oldToNew.get(edge.target)
     if (!sourceNode || !targetNode) continue
 
     const sourceSlot = sourceNode.outputs?.findIndex((o: any) => o.name === edge.sourceHandle)
@@ -401,7 +410,10 @@ function loadFromStore() {
     }
   }
 
+  // 不再需要 oldToNew 映射 — syncGraphToStore 会统一用 LiteGraph 整数 ID 重写 store
   syncingFromStore = false
+  // 重新同步 store，将 LiteGraph 生成的整数 ID 写回
+  syncGraphToStore()
   store.dirty = false
 }
 
@@ -446,7 +458,7 @@ function onDrop(event: DragEvent) {
     return
   }
 
-  node.pos = [canvasCoords[0], canvasCoords[1]]
+  node.pos = [canvasCoords.x, canvasCoords.y]
   node.title = def.label
 
   // 设置默认 config 到 widgets
@@ -459,13 +471,14 @@ function onDrop(event: DragEvent) {
   }
 
   graph.add(node)
+  // LiteGraph 已分配整数 ID，syncGraphToStore 会生成 store ID 并建立映射
   addLog(`➕ 添加节点: ${def.label}`)
   undoManager.pushState()
 }
 
 // ─── 属性面板回调 ───
 function onUpdateLabel(id: string, label: string) {
-  const lgNode = graph.getNodeById(parseInt(id, 10))
+  const lgNode = findLgNode(id)
   if (lgNode) {
     lgNode.title = label
   }
@@ -473,7 +486,7 @@ function onUpdateLabel(id: string, label: string) {
 }
 
 function onUpdateConfig(id: string, config: Record<string, unknown>) {
-  const lgNode = graph.getNodeById(parseInt(id, 10))
+  const lgNode = findLgNode(id)
   if (lgNode && lgNode.widgets) {
     for (const w of lgNode.widgets) {
       if (config[w.name] !== undefined) {
@@ -489,7 +502,7 @@ function onUpdateConfig(id: string, config: Record<string, unknown>) {
 }
 
 function onDeleteNode(id: string) {
-  const lgNode = graph.getNodeById(parseInt(id, 10))
+  const lgNode = findLgNode(id)
   if (lgNode) {
     graph.remove(lgNode)
   } else {
