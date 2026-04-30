@@ -51,6 +51,7 @@
 
       <!-- 中央：画布 -->
       <div
+        ref="wrapperRef"
         class="canvas-wrapper"
         @drop="onDrop"
         @dragover.prevent
@@ -95,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
@@ -120,8 +121,10 @@ const autoSave = useAutoSave(30000) // 30 秒自动保存
 
 // ─── LiteGraph 引用 ───
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const wrapperRef = ref<HTMLDivElement | null>(null)
 let graph: LGraph
 let canvas: LGraphCanvas
+let resizeObserver: ResizeObserver | null = null
 
 // ─── 本地状态 ───
 const selectedNode = ref<FlowNode | null>(null)
@@ -216,21 +219,38 @@ onMounted(() => {
   document.addEventListener('keydown', onKeyDown)
 
   // 监听窗口 resize
-  window.addEventListener('resize', onResize)
+  // 使用 ResizeObserver 适配 wrapper 尺寸
+  nextTick(() => {
+    if (canvasRef.value && wrapperRef.value) {
+      const w = wrapperRef.value.clientWidth
+      const h = wrapperRef.value.clientHeight
+      canvasRef.value.width = w
+      canvasRef.value.height = h
+      canvas.resize(w, h)
+    }
+    // ResizeObserver 动态跟踪
+    if (wrapperRef.value) {
+      resizeObserver = new ResizeObserver(() => {
+        if (canvasRef.value && wrapperRef.value) {
+          const w2 = wrapperRef.value.clientWidth
+          const h2 = wrapperRef.value.clientHeight
+          if (canvasRef.value.width !== w2 || canvasRef.value.height !== h2) {
+            canvasRef.value.width = w2
+            canvasRef.value.height = h2
+            canvas.resize(w2, h2)
+          }
+        }
+      })
+      resizeObserver.observe(wrapperRef.value)
+    }
+  })
 })
 
 onUnmounted(() => {
+  resizeObserver?.disconnect()
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('resize', onResize)
 })
-
-// ─── Canvas resize ───
-function onResize() {
-  if (canvas) {
-    canvas.resize()
-  }
-}
 
 // ─── LiteGraph 节点 → FlowNode 转换 ───
 function liteGraphNodeToFlowNode(node: LGraphNode): FlowNode {
@@ -845,8 +865,6 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 .litegraph-canvas {
-  width: 100%;
-  height: 100%;
   display: block;
 }
 
