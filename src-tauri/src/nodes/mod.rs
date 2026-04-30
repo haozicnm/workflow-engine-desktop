@@ -20,6 +20,7 @@ pub mod window;
 pub mod sub_workflow;
 pub mod ocr;
 pub mod recording;
+pub mod delay;
 pub mod file;
 pub mod clipboard;
 pub mod regex;

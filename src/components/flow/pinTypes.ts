@@ -348,6 +348,106 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       output_key: 'result',
     },
   },
+  // ─── M2 控制流节点 ───
+  {
+    type: 'loop',
+    label: '循环',
+    icon: '🔁',
+    color: '#f97316',
+    category: 'process',
+    description: '遍历数组，对每个元素执行子步骤',
+    inputs: [
+      { id: 'items', label: 'items', type: 'array', required: true },
+    ],
+    outputs: [
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'count', label: 'count', type: 'number' },
+    ],
+    defaultConfig: {
+      items: '',
+      body: [],
+      max_iterations: 1000,
+      on_error: 'fail',
+    },
+  },
+  {
+    type: 'while',
+    label: 'While 循环',
+    icon: '🔄',
+    color: '#ea580c',
+    category: 'process',
+    description: '条件循环，满足条件时重复执行子步骤',
+    inputs: [
+      { id: 'items', label: 'items', type: 'array' },
+    ],
+    outputs: [
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'count', label: 'count', type: 'number' },
+      { id: 'stopped_at', label: 'stopped_at', type: 'number' },
+    ],
+    defaultConfig: {
+      items: '',
+      condition: { check: '__current', op: 'not_empty' },
+      body: [],
+      max_iterations: 1000,
+    },
+  },
+  {
+    type: 'condition',
+    label: '条件判断',
+    icon: '🔀',
+    color: '#a78bfa',
+    category: 'process',
+    description: '根据条件表达式选择执行分支',
+    inputs: [
+      { id: 'left', label: 'left', type: 'any' },
+      { id: 'right', label: 'right', type: 'any' },
+    ],
+    outputs: [
+      { id: 'result', label: 'result', type: 'boolean' },
+      { id: 'branch', label: 'branch', type: 'string' },
+    ],
+    defaultConfig: {
+      left: '',
+      op: '>',
+      right: '0',
+    },
+  },
+  {
+    type: 'data',
+    label: '变量操作',
+    icon: '📊',
+    color: '#06b6d4',
+    category: 'process',
+    description: '变量设置/读取/合并/默认值/长度计算',
+    inputs: [
+      { id: 'value', label: 'value', type: 'any' },
+    ],
+    outputs: [
+      { id: 'result', label: 'result', type: 'any' },
+    ],
+    defaultConfig: {
+      action: 'set',
+      key: '',
+      value: '',
+    },
+  },
+  {
+    type: 'delay',
+    label: '延时',
+    icon: '⏱️',
+    color: '#9ca3af',
+    category: 'process',
+    description: '暂停执行指定时长（毫秒）',
+    inputs: [],
+    outputs: [
+      { id: 'duration_ms', label: 'duration_ms', type: 'number' },
+    ],
+    defaultConfig: {
+      duration_ms: 1000,
+      max_duration_ms: 300000,
+    },
+  },
 ]
 
 // ─── 辅助函数 ───

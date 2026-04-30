@@ -62,6 +62,7 @@ impl StepExecutor {
         register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
         register!(executors, "window", crate::nodes::window::WindowNode);
         register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);
+        register!(executors, "delay", crate::nodes::delay::DelayNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
 

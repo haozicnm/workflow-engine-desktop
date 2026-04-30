@@ -182,6 +182,17 @@ pub fn all_nodes() -> Vec<NodeManifest> {
             }),
         },
 
+        NodeManifest {
+            node_type: "delay",
+            label: "延时",
+            description: "暂停执行指定时长（支持毫秒级精度）",
+            icon: "clock",
+            default_config: serde_json::json!({
+                "duration_ms": 1000,
+                "max_duration_ms": 300000,
+            }),
+        },
+
         // ── 桌面交互节点 ──
         NodeManifest {
             node_type: "mouse_keyboard",
