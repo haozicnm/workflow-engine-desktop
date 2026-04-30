@@ -85,7 +85,9 @@ pub async fn run_dag(
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("[DAG] 工作流取消: {} (run_id: {})", workflow_name, run_id);
             state.mark_failed();
-            let _ = db.update_run_status(run_id, "cancelled", None);
+            if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
             emit_run_update(app_handle, run_id, workflow_name, "cancelled");
             return Err(anyhow::anyhow!("cancelled"));
         }
@@ -95,7 +97,9 @@ pub async fn run_dag(
             tokio::select! {
                 _ = ctrl.cancel_token.cancelled() => {
                     state.mark_failed();
-                    let _ = db.update_run_status(run_id, "cancelled", None);
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
                     emit_run_update(app_handle, run_id, workflow_name, "cancelled");
                     return Err(anyhow::anyhow!("cancelled"));
                 }
@@ -103,7 +107,9 @@ pub async fn run_dag(
             }
             if ctrl.cancel_flag.load(Ordering::Relaxed) {
                 state.mark_failed();
-                let _ = db.update_run_status(run_id, "cancelled", None);
+                if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
                 emit_run_update(app_handle, run_id, workflow_name, "cancelled");
                 return Err(anyhow::anyhow!("cancelled"));
             }
@@ -169,13 +175,15 @@ pub async fn run_dag(
             // 单步模式：并行组执行完后暂停
             if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                 ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-                let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
+                if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
                     "run_id": run_id,
                     "step_id": "dag_parallel_group",
                     "reason": "step_mode",
                     "variables": ctx.variables,
                     "step_outputs": ctx.step_outputs,
-                }));
+                })) {
+                    warn!("[DAG] 发送 breakpoint-hit 事件失败: {}", e);
+                }
             }
             continue;
         }
@@ -188,20 +196,24 @@ pub async fn run_dag(
         if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
             update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
-            let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
+            if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
                 "run_id": run_id,
                 "step_id": step.id,
                 "step_name": step.name,
                 "variables": ctx.variables,
                 "step_outputs": ctx.step_outputs,
-            }));
+            })) {
+                warn!("[DAG] 发送 breakpoint-hit 事件失败: {}", e);
+            }
 
             ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
             while ctrl.breakpoint_flag.load(Ordering::Relaxed) {
                 tokio::select! {
                     _ = ctrl.cancel_token.cancelled() => {
                         state.mark_failed();
-                        let _ = db.update_run_status(run_id, "cancelled", None);
+                        if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
                         emit_run_update(app_handle, run_id, workflow_name, "cancelled");
                         return Err(anyhow::anyhow!("cancelled"));
                     }
@@ -209,7 +221,9 @@ pub async fn run_dag(
                 }
                 if ctrl.cancel_flag.load(Ordering::Relaxed) {
                     state.mark_failed();
-                    let _ = db.update_run_status(run_id, "cancelled", None);
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
                     emit_run_update(app_handle, run_id, workflow_name, "cancelled");
                     return Err(anyhow::anyhow!("cancelled"));
                 }
@@ -250,14 +264,16 @@ pub async fn run_dag(
 
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-                    let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
+                    if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
                         "run_id": run_id,
                         "step_id": step.id,
                         "step_name": step.name,
                         "reason": "step_mode",
                         "variables": ctx.variables,
                         "step_outputs": ctx.step_outputs,
-                    }));
+                    })) {
+                        warn!("[DAG] 发送 breakpoint-hit 事件失败: {}", e);
+                    }
                 }
             }
             Err(e) => {
@@ -559,7 +575,9 @@ fn emit_step_update(
         "output": output,
         "error": null,
     });
-    let _ = app.emit("step-update", event);
+    if let Err(e) = app.emit("step-update", event) {
+        warn!("[DAG] 发送 step-update 事件失败: {}", e);
+    }
 }
 
 fn emit_step_update_with_error(
@@ -577,7 +595,9 @@ fn emit_step_update_with_error(
         "output": null,
         "error": error,
     });
-    let _ = app.emit("step-update", event);
+    if let Err(e) = app.emit("step-update", event) {
+        warn!("[DAG] 发送 step-update 事件失败: {}", e);
+    }
 }
 
 fn emit_run_update(
@@ -591,7 +611,9 @@ fn emit_run_update(
         "workflow_name": workflow_name,
         "status": status,
     });
-    let _ = app.emit("run-update", event);
+    if let Err(e) = app.emit("run-update", event) {
+        warn!("[DAG] 发送 run-update 事件失败: {}", e);
+    }
 }
 
 fn emit_approval_required(app: &tauri::AppHandle, run_id: &str, step: &Step) {
@@ -602,7 +624,9 @@ fn emit_approval_required(app: &tauri::AppHandle, run_id: &str, step: &Step) {
         "message": step.config.get("message").and_then(|v| v.as_str()).unwrap_or("请审批此操作"),
         "options": step.config.get("options").cloned().unwrap_or_else(|| serde_json::json!(["approve", "reject"])),
     });
-    let _ = app.emit("approval-required", event);
+    if let Err(e) = app.emit("approval-required", event) {
+        warn!("[DAG] 发送 approval-required 事件失败: {}", e);
+    }
 }
 
 fn emit_variable_snapshot(app: &tauri::AppHandle, run_id: &str, ctx: &ExecutionContext) {
@@ -611,7 +635,9 @@ fn emit_variable_snapshot(app: &tauri::AppHandle, run_id: &str, ctx: &ExecutionC
         "variables": ctx.variables,
         "step_outputs": ctx.step_outputs,
     });
-    let _ = app.emit("variable-update", event);
+    if let Err(e) = app.emit("variable-update", event) {
+        warn!("[DAG] 发送 variable-update 事件失败: {}", e);
+    }
 }
 
 async fn update_debug_snapshot(
@@ -641,5 +667,7 @@ fn emit_dag_complete(
     if let Some(e) = error {
         payload["error"] = serde_json::json!(e);
     }
-    let _ = app_handle.emit("dag-run-complete", payload);
+    if let Err(e) = app_handle.emit("dag-run-complete", payload) {
+        warn!("[DAG] 发送 dag-run-complete 事件失败: {}", e);
+    }
 }

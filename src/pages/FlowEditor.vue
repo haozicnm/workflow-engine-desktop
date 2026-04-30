@@ -60,7 +60,8 @@
 
         <VueFlow
           ref="vueFlowRef"
-          v-model="vueFlowElements"
+          :nodes="flowNodes"
+          :edges="flowEdges"
           :default-viewport="{ x: 0, y: 0, zoom: 0.8 }"
           :min-zoom="0.1"
           :max-zoom="4"
@@ -172,9 +173,12 @@ const selectedNode = ref<FlowNode | null>(null)
 const isRunning = ref(false)
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
-// ─── Vue Flow 元素（计算属性） ───
-const vueFlowElements = computed(() => [
-  ...store.nodes.map(n => {
+// ─── Vue Flow 元素（ref + watch，避免 computed 全量重建导致 D3 事件丢失） ───
+const flowNodes = ref<any[]>([])
+const flowEdges = ref<any[]>([])
+
+function syncFlowElements() {
+  flowNodes.value = store.nodes.map(n => {
     const def = getNodeDef(n.type)
     return {
       id: n.id,
@@ -192,8 +196,8 @@ const vueFlowElements = computed(() => [
         error: n.error,
       },
     }
-  }),
-  ...store.edges.map(e => ({
+  })
+  flowEdges.value = store.edges.map(e => ({
     id: e.id,
     source: e.source,
     target: e.target,
@@ -201,8 +205,18 @@ const vueFlowElements = computed(() => [
     targetHandle: e.targetHandle,
     style: { stroke: '#30363d', strokeWidth: 2 },
     animated: false,
-  })),
-])
+  }))
+}
+
+// 初始化同步
+syncFlowElements()
+
+// 监听 store 变化 → 增量同步（VueFlow 按 id diff，不会重建 DOM）
+watch(
+  [() => store.nodes, () => store.edges, () => store.nodeStatuses],
+  () => syncFlowElements(),
+  { deep: true }
+)
 
 // ─── 日志 ───
 function addLog(text: string, level = 'info') {
