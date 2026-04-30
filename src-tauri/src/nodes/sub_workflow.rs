@@ -205,7 +205,8 @@ fn parse_inline_steps(value: &serde_json::Value) -> Result<Vec<Step>> {
         // 兼容 DAG FlowNode 格式：
         // FlowNode { id, type, label, position, config } → Step { id, name, step_type, config }
         if item.is_object() {
-            let obj = item.as_object().unwrap();
+            let obj = item.as_object()
+                .expect("item 应在 is_object 检查后为 Object");
             let id = obj
                 .get("id")
                 .and_then(|v| v.as_str())

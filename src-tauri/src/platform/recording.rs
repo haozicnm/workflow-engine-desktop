@@ -40,12 +40,12 @@ fn now_ms() -> u128 {
 
 #[cfg(target_os = "linux")]
 fn push_action(action: serde_json::Value) {
-    RECORDED_ACTIONS.lock().unwrap().push(action);
+    RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").push(action);
 }
 
 #[cfg(target_os = "linux")]
 fn flush_text() {
-    let mut buf = TEXT_BUFFER.lock().unwrap();
+    let mut buf = TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）");
     if !buf.is_empty() {
         push_action(serde_json::json!({
             "type": "type", "source": "desktop",
@@ -82,10 +82,10 @@ impl RecordingBackend for LinuxRecordingBackend {
         if RECORDING_ACTIVE.load(Ordering::SeqCst) {
             return Err(anyhow!("已在录制中"));
         }
-        RECORDED_ACTIONS.lock().unwrap().clear();
-        *TEXT_BUFFER.lock().unwrap() = String::new();
-        *LAST_KEY_TIME.lock().unwrap() = 0;
-        *LAST_MOUSE_TIME.lock().unwrap() = 0;
+        RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clear();
+        *TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）") = String::new();
+        *LAST_KEY_TIME.lock().expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）") = 0;
+        *LAST_MOUSE_TIME.lock().expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）") = 0;
         RECORDING_ACTIVE.store(true, Ordering::SeqCst);
 
         let handle = std::thread::spawn(move || {
@@ -112,11 +112,11 @@ impl RecordingBackend for LinuxRecordingBackend {
                                 }));
                             }
                             Key::Backspace => {
-                                TEXT_BUFFER.lock().unwrap().pop();
+                                TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）").pop();
                             }
                             _ => {
                                 if let Some(ch) = key_to_char(&key) {
-                                    let mut last = LAST_KEY_TIME.lock().unwrap();
+                                    let mut last = LAST_KEY_TIME.lock().expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）");
                                     if now.saturating_sub(*last) > 1000 {
                                         drop(last);
                                         flush_text();
@@ -124,13 +124,13 @@ impl RecordingBackend for LinuxRecordingBackend {
                                         *last = now;
                                         drop(last);
                                     }
-                                    TEXT_BUFFER.lock().unwrap().push_str(&ch);
+                                    TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）").push_str(&ch);
                                 }
                             }
                         }
                     }
                     EventType::ButtonPress(button) => {
-                        let mut last_mouse = LAST_MOUSE_TIME.lock().unwrap();
+                        let mut last_mouse = LAST_MOUSE_TIME.lock().expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）");
                         if now.saturating_sub(*last_mouse) > 100 {
                             *last_mouse = now;
                             drop(last_mouse);
@@ -157,23 +157,23 @@ impl RecordingBackend for LinuxRecordingBackend {
             };
 
             if let Err(e) = listen(callback) {
-                eprintln!("rdev listen 错误: {:?}", e);
+tracing::error!("rdev listen 错误: {:?}", e);
             }
             flush_text();
         });
 
-        *self.handle.lock().unwrap() = Some(handle);
+        *self.handle.lock().expect("获取录制句柄锁失败（Mutex 中毒）") = Some(handle);
         Ok(())
     }
 
     fn stop(&self) -> Result<Vec<serde_json::Value>> {
         RECORDING_ACTIVE.store(false, Ordering::SeqCst);
         std::thread::sleep(std::time::Duration::from_millis(300));
-        if let Some(h) = self.handle.lock().unwrap().take() {
+        if let Some(h) = self.handle.lock().expect("获取录制句柄锁失败（Mutex 中毒）").take() {
             let _ = h.join();
         }
-        let actions = RECORDED_ACTIONS.lock().unwrap().clone();
-        RECORDED_ACTIONS.lock().unwrap().clear();
+        let actions = RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clone();
+        RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clear();
         Ok(actions)
     }
 

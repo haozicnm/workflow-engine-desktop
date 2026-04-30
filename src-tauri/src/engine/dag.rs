@@ -218,7 +218,8 @@ pub fn build_dag(
     let mut ordered_steps: Vec<ExecStep> = Vec::new();
 
     for node_id in &order {
-        let node = node_map.get(node_id.as_str()).unwrap();
+        let node = node_map.get(node_id.as_str())
+            .expect("DAG node_id 应在 node_map 中存在");
 
         // 收集依赖
         let deps: Vec<String> = predecessors
@@ -399,7 +400,8 @@ impl DAGWorkflow {
         let ordered_steps: Vec<ExecStep> = order
             .iter()
             .map(|node_id| {
-                let node = node_map.get(node_id.as_str()).unwrap();
+                let node = node_map.get(node_id.as_str())
+                    .expect("DAG node_id 应在 node_map 中存在");
                 let deps = predecessors.get(node_id).cloned().unwrap_or_default();
                 ExecStep {
                     node_id: node_id.clone(),

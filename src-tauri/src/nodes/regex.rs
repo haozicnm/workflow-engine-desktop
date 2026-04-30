@@ -187,7 +187,8 @@ fn expand_replacement(template: &str, caps: &regex::Captures) -> String {
             if let Some(&next) = chars.peek() {
                 if next.is_ascii_digit() {
                     chars.next();
-                    let index = next.to_digit(10).unwrap() as usize;
+                    let index = next.to_digit(10)
+                        .expect("ASCII数字无法转换为digit") as usize;
                     if let Some(m) = caps.get(index) {
                         result.push_str(m.as_str());
                     }

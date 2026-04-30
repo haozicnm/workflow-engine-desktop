@@ -164,7 +164,7 @@ fn get_linux_recorder() -> std::sync::MutexGuard<'static, Option<crate::platform
     INIT.call_once(|| {
         // 初始化占位
     });
-    LINUX_RECORDER.lock().unwrap()
+    LINUX_RECORDER.lock().expect("获取 LINUX_RECORDER 锁失败（Mutex 中毒）")
 }
 
 #[allow(dead_code)]
@@ -246,7 +246,9 @@ impl NodeExecutor for RecordingNode {
                     {
                         let mut guard = get_linux_recorder();
                         *guard = Some(crate::platform::recording::LinuxRecordingBackend::new());
-                        guard.as_ref().unwrap().start()?;
+                        guard.as_ref()
+                            .expect("LinuxRecordingBackend 应在 Some 中")
+                            .start()?;
                     }
                     DESKTOP_RECORDING.store(true, Ordering::SeqCst);
                     RECORDING_ACTIVE.store(true, Ordering::SeqCst);
@@ -322,7 +324,9 @@ impl NodeExecutor for RecordingNode {
                             let started = {
                                 let mut guard = get_linux_recorder();
                                 *guard = Some(crate::platform::recording::LinuxRecordingBackend::new());
-                                guard.as_ref().unwrap().start()
+                                guard.as_ref()
+                                    .expect("LinuxRecordingBackend 应在 Some 中")
+                                    .start()
                             };
                             match started {
                                 Ok(()) => {

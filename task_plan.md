@@ -41,11 +41,21 @@ P0→P4 全部交付，含 19 种节点类型、录制生成引擎、Playwright 
 |------|------|------|
 | Rust | `cargo check` | ✅ 0 errors |
 | 前端 | `npm run build` | ✅ 0 errors |
+| Rust 单测 | `cargo test` | ✅ 21/21 pass |
+| 前端单测 | `npm test` | ✅ 32/32 pass |
+| Windows CI | `.github/workflows/build-windows.yml` | 🔧 已修复，待验证 |
+
+## 当前进展（截至 2026-04-30）
+
+| 角色 | 完成项 | 进行中 |
+|------|--------|--------|
+| 若溪 | Store 统一 + DAG 接入 + 表达式引擎 + 32 单测 | M2 前端节点 |
+| 若海 | CI 修复 ×3 + DAG 调度 | M1 Windows 构建验证 |
 
 ## 当前阻塞
 
-- Windows 打包需在物理机运行 `cargo tauri build`（WSL 不支持 user32.dll）
-- GitHub Actions CI workflow 已配置（`.github/workflows/build-windows.yml`），待推送仓库
+- Windows CI 构建结果待确认（已 push，等 GitHub Actions 跑完）
+- Windows 真机冒烟测试待伟哥执行
 
 ## 技术债务
 

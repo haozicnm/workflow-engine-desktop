@@ -119,7 +119,8 @@ impl InputBackend for LinuxBackend {
                 "PAGEDOWN" => main_key = Some(enigo::Key::PageDown),
                 single if single.len() == 1 => {
                     // 单字母 → 先按修饰键再模拟字符
-                    let ch = single.chars().next().unwrap();
+                    let ch = single.chars().next()
+                        .expect("单字符字符串应有至少一个字符");
                     let key = match ch {
                         'A'..='Z' => enigo::Key::Unicode(ch),
                         '0'..='9' => enigo::Key::Unicode(ch),

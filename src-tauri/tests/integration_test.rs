@@ -551,3 +551,40 @@ async fn test_map_node_logic_operators() {
 
     println!("✅ Map logic operators OK: {} items", data.len());
 }
+
+// ═══════════════════════════════════════════════════
+// 延时节点测试
+// ═══════════════════════════════════════════════════
+
+#[tokio::test]
+async fn test_delay_node() {
+    let executor = StepExecutor::new();
+    let mut ctx = ExecutionContext::new("test-delay", &Default::default());
+
+    let step = make_step("delay1", "延时100ms", "delay", json!({
+        "duration_ms": 100,
+    }));
+
+    let start = std::time::Instant::now();
+    let result = executor.execute(&step, &mut ctx).await.unwrap();
+    let elapsed = start.elapsed();
+
+    assert_eq!(result["duration_ms"].as_u64(), Some(100));
+    assert!(elapsed.as_millis() >= 80, "延时至少 80ms，实际 {}ms", elapsed.as_millis());
+    println!("✅ Delay node OK: {}ms (real: {}ms)", result["duration_ms"], elapsed.as_millis());
+}
+
+#[tokio::test]
+async fn test_delay_node_max_limit() {
+    let executor = StepExecutor::new();
+    let mut ctx = ExecutionContext::new("test-delay-max", &Default::default());
+
+    let step = make_step("delay2", "延时超限", "delay", json!({
+        "duration_ms": 500_000,
+        "max_duration_ms": 1000,
+    }));
+
+    let result = executor.execute(&step, &mut ctx).await;
+    assert!(result.is_err(), "超过 max_duration_ms 应返回错误");
+    println!("✅ Delay max limit OK: {}", result.unwrap_err());
+}

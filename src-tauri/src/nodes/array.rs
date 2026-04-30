@@ -435,9 +435,12 @@ fn apply_map_template(
     result = result.replace("{{__index}}", &index.to_string());
 
     // 替换 {{__item.xxx}} 引用
-    let re = regex::Regex::new(r"\{\{__item\.(\w+(?:\.\w+)*)\}\}").unwrap();
+    let re = regex::Regex::new(r"\{\{__item\.(\w+(?:\.\w+)*)\}\}")
+        .expect("正则表达式 {{__item.xxx}} 编译失败");
     result = re.replace_all(&result, |caps: &regex::Captures| {
-        let path = caps.get(1).unwrap().as_str();
+        let path = caps.get(1)
+            .expect("捕获组1应在正则匹配中存在")
+            .as_str();
         let val = extract_field(item, Some(path));
         match val {
             serde_json::Value::String(s) => s.clone(),

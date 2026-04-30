@@ -1,6 +1,7 @@
 // engine/context.rs — 执行上下文
 use crate::engine::workflow::Workflow;
 use std::collections::HashMap;
+use std::cmp::Reverse;
 use anyhow::Result;
 
 /// 执行上下文
@@ -145,7 +146,7 @@ impl ExecutionContext {
         };
 
         let mut sorted_vars = var_patterns;
-        sorted_vars.sort_by(|a, b| b.len().cmp(&a.len()));
+        sorted_vars.sort_by_key(|b| Reverse(b.len()));
         sorted_vars.dedup();
         for var in &sorted_vars {
             if let Some(val) = self.resolve_var(var) {
@@ -313,11 +314,10 @@ impl ExecutionContext {
                         op_pos = Some((i, chars[i]));
                     }
                 }
-                '*' | '/' if depth == 0 => {
-                    if op_pos.is_none() {
+                '*' | '/' if depth == 0
+                    && op_pos.is_none() => {
                         op_pos = Some((i, chars[i]));
                     }
-                }
                 _ => {}
             }
         }
@@ -406,7 +406,7 @@ fn json_eq(a: &serde_json::Value, b: &serde_json::Value) -> bool {
         }
         (serde_json::Value::Bool(ba), serde_json::Value::Bool(bb)) => ba == bb,
         (serde_json::Value::Null, serde_json::Value::Null) => true,
-        _ => a.to_string() == b.to_string(),
+        _ => *a == *b,
     }
 }
 
