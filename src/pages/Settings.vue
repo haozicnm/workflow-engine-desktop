@@ -33,18 +33,19 @@ const logLevelOptions = [
 ]
 
 onMounted(async () => {
+  loading.value = true
   try {
-    const [s, info] = await Promise.all([
-      invoke('settings_get'),
-      invoke('system_check_browser'),
-    ])
-    settings.value = { ...settings.value, ...(s as any) }
-    sysInfo.value = info
+    const s = await invoke<any>('settings_get').catch(() => ({}))
+    settings.value = { ...settings.value, ...(s || {}) }
   } catch (e: any) {
-    toast.error('加载设置失败: ' + e)
-  } finally {
-    loading.value = false
+    console.warn('加载设置失败，使用默认值:', e)
   }
+  try {
+    sysInfo.value = await invoke('system_check_browser')
+  } catch (e: any) {
+    console.warn('获取系统信息失败:', e)
+  }
+  loading.value = false
 })
 
 async function save() {

@@ -109,9 +109,14 @@ async function loadList() {
 
 async function loadTemplates() {
   try {
-    templates.value = await invoke<TemplateItem[]>('template_list')
+    const result = await invoke<TemplateItem[]>('template_list')
+    templates.value = result
+    if (!result || result.length === 0) {
+      toast.error('未找到内置模板')
+    }
   } catch (e) {
-    console.warn('加载内置模板失败:', e)
+    console.error('加载内置模板失败:', e)
+    toast.error('加载模板失败: ' + ((e as Error).message || String(e)))
   }
 }
 

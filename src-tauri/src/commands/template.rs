@@ -81,6 +81,7 @@ fn all_templates() -> Vec<BuiltinTemplate> {
 /// 获取内置模板列表（不含 yaml 内容，仅元数据）
 #[tauri::command]
 pub async fn template_list() -> Result<Vec<serde_json::Value>, String> {
+    tracing::info!("template_list 被调用");
     let builtins: Vec<serde_json::Value> = all_templates()
         .iter()
         .map(|t| {

@@ -66,6 +66,9 @@
           :max-zoom="4"
           :snap-to-grid="true"
           :snap-grid="[20, 20]"
+          :nodes-draggable="true"
+          :nodes-connectable="true"
+          :elements-selectable="true"
           fit-view-on-init
           @drop="onDrop"
           @dragover.prevent
