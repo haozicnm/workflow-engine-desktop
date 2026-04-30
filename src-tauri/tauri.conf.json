@@ -41,7 +41,8 @@
     ],
     "resources": {
       "sidecars/*": "sidecars/",
-      "python-runtime/embed/**/*": "embed/"
+      "python-runtime/embed/**/*": "embed/",
+      "python-runtime/playwright-browsers/**/*": "playwright-browsers/"
     }
   },
   "plugins": {}

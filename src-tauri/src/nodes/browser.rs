@@ -32,8 +32,21 @@ impl BrowserSidecar {
         // 查找 sidecar 脚本
         let script_path = find_sidecar_script()?;
 
-        let mut child = tokio::process::Command::new(&python)
-            .arg(&script_path)
+        // 设置 Playwright 浏览器路径（指向打包的 playwright-browsers）
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        let mut cmd = tokio::process::Command::new(&python);
+        cmd.arg(&script_path);
+        if let Some(ref dir) = exe_dir {
+            let browsers_path = dir.join("playwright-browsers");
+            if browsers_path.exists() {
+                cmd.env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
+                info!("Playwright 浏览器路径: {:?}", browsers_path);
+            }
+        }
+
+        let mut child = cmd
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

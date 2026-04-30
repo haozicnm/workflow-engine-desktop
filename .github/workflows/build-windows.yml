@@ -64,6 +64,19 @@ jobs:
           # Create Lib/site-packages directory
           New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed/Lib/site-packages
 
+      - name: Setup Python for Playwright
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright browsers
+        run: |
+          pip install playwright
+          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
+          python -m playwright install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers
+
       - name: Build Tauri (Windows)
         run: npx --prefix src tauri build
         env:
