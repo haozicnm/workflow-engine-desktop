@@ -38,53 +38,142 @@
       <div class="panel-section">
         <label class="section-label">⚙ 参数</label>
 
-        <div v-for="(value, key) in params" :key="key" class="param-row">
-          <label class="param-key">{{ formatLabel(key) }}</label>
+        <!-- ── data 节点 ── -->
+        <template v-if="node.type === 'data'">
+          <div class="param-row">
+            <label class="param-key">操作</label>
+            <select :value="params.action" class="field-select" @change="onParamChange('action', ($event.target as HTMLSelectElement).value)">
+              <option v-for="opt in selectOptions('action')" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+          </div>
+          <div class="param-row">
+            <label class="param-key">变量名</label>
+            <input :value="params.key" type="text" class="field-input" :placeholder="getPlaceholder('key')" @change="onParamChange('key', ($event.target as HTMLInputElement).value)" />
+          </div>
+          <div class="param-row">
+            <label class="param-key">值</label>
+            <input :value="params.value" type="text" class="field-input" :placeholder="getPlaceholder('value')" @change="onParamChange('value', ($event.target as HTMLInputElement).value)" />
+          </div>
+          <div class="param-help">
+            💡 set=赋值 get=读取 merge=合并 default=默认值 length=长度
+          </div>
+        </template>
 
-          <!-- 下拉选择 -->
-          <select
-            v-if="isSelectField(key)"
-            :value="value"
-            class="field-select"
-            @change="onParamChange(key, ($event.target as HTMLSelectElement).value)"
-          >
-            <option
-              v-for="opt in selectOptions(key)"
-              :key="opt"
-              :value="opt"
+        <!-- ── delay 节点 ── -->
+        <template v-else-if="node.type === 'delay'">
+          <div class="param-row">
+            <label class="param-key">延时</label>
+            <input :value="params.duration_ms" type="number" class="field-input" min="0" step="100" @change="onParamChange('duration_ms', Number(($event.target as HTMLInputElement).value))" />
+            <span class="param-unit">ms</span>
+          </div>
+          <div v-if="Number(params.duration_ms) >= 1000" class="param-help">
+            ⏱ ≈ {{ (Number(params.duration_ms) / 1000).toFixed(1) }} 秒
+          </div>
+        </template>
+
+        <!-- ── condition 节点 ── -->
+        <template v-else-if="node.type === 'condition'">
+          <div class="param-row">
+            <label class="param-key">左值</label>
+            <input :value="params.left" type="text" class="field-input" :placeholder="getPlaceholder('left')" @change="onParamChange('left', ($event.target as HTMLInputElement).value)" />
+          </div>
+          <div class="param-row">
+            <label class="param-key">运算符</label>
+            <select :value="params.op" class="field-select" @change="onParamChange('op', ($event.target as HTMLSelectElement).value)">
+              <option v-for="opt in selectOptions('op')" :key="opt" :value="opt">{{ opt }}</option>
+            </select>
+          </div>
+          <div class="param-row">
+            <label class="param-key">右值</label>
+            <input :value="params.right" type="text" class="field-input" :placeholder="getPlaceholder('right')" @change="onParamChange('right', ($event.target as HTMLInputElement).value)" />
+          </div>
+        </template>
+
+        <!-- ── while 节点 ── -->
+        <template v-else-if="node.type === 'while'">
+          <div class="param-row">
+            <label class="param-key">入参来源</label>
+            <input :value="params.items" type="text" class="field-input" :placeholder="getPlaceholder('items')" @change="onParamChange('items', ($event.target as HTMLInputElement).value)" />
+          </div>
+          <div class="param-subsection">
+            <label class="param-subsection-label">条件</label>
+            <div class="param-row">
+              <label class="param-key param-key-sm">检查变量</label>
+              <input :value="getNestedParam('check')" type="text" class="field-input" :placeholder="getPlaceholder('check')" @change="onNestedParamChange('condition', 'check', ($event.target as HTMLInputElement).value)" />
+            </div>
+            <div class="param-row">
+              <label class="param-key param-key-sm">运算符</label>
+              <select :value="getNestedParam('op')" class="field-select" @change="onNestedParamChange('condition', 'op', ($event.target as HTMLSelectElement).value)">
+                <option v-for="opt in selectOptions('condition_op')" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="param-row">
+            <label class="param-key">最大迭代</label>
+            <input :value="params.max_iterations" type="number" class="field-input" min="1" step="100" @change="onParamChange('max_iterations', Number(($event.target as HTMLInputElement).value))" />
+          </div>
+          <div class="param-help body-hint">📎 在画布中双击 While 节点进入子图编辑循环体</div>
+        </template>
+
+        <!-- ── loop 节点 ── -->
+        <template v-else-if="node.type === 'loop'">
+          <div class="param-row">
+            <label class="param-key">遍历来源</label>
+            <input :value="params.items" type="text" class="field-input" :placeholder="getPlaceholder('items')" @change="onParamChange('items', ($event.target as HTMLInputElement).value)" />
+          </div>
+          <div class="param-help body-hint">📎 在画布中双击 Loop 节点进入子图编辑循环体</div>
+        </template>
+
+        <!-- ── 通用参数（其他节点） ── -->
+        <template v-else>
+          <div v-for="(value, key) in params" :key="key" class="param-row">
+            <label class="param-key">{{ formatLabel(key) }}</label>
+
+            <!-- 下拉选择 -->
+            <select
+              v-if="isSelectField(key)"
+              :value="value"
+              class="field-select"
+              @change="onParamChange(key, ($event.target as HTMLSelectElement).value)"
             >
-              {{ opt }}
-            </option>
-          </select>
+              <option
+                v-for="opt in selectOptions(key)"
+                :key="opt"
+                :value="opt"
+              >
+                {{ opt }}
+              </option>
+            </select>
 
-          <!-- 数字输入 -->
-          <input
-            v-else-if="typeof value === 'number'"
-            type="number"
-            :value="value"
-            class="field-input"
-            @change="onParamChange(key, Number(($event.target as HTMLInputElement).value))"
-          />
+            <!-- 数字输入 -->
+            <input
+              v-else-if="typeof value === 'number'"
+              type="number"
+              :value="value"
+              class="field-input"
+              @change="onParamChange(key, Number(($event.target as HTMLInputElement).value))"
+            />
 
-          <!-- 布尔 -->
-          <input
-            v-else-if="typeof value === 'boolean'"
-            type="checkbox"
-            :checked="value"
-            class="field-checkbox"
-            @change="onParamChange(key, ($event.target as HTMLInputElement).checked)"
-          />
+            <!-- 布尔 -->
+            <input
+              v-else-if="typeof value === 'boolean'"
+              type="checkbox"
+              :checked="value"
+              class="field-checkbox"
+              @change="onParamChange(key, ($event.target as HTMLInputElement).checked)"
+            />
 
-          <!-- 文本 -->
-          <input
-            v-else
-            type="text"
-            :value="value"
-            class="field-input"
-            :placeholder="getPlaceholder(key)"
-            @change="onParamChange(key, ($event.target as HTMLInputElement).value)"
-          />
-        </div>
+            <!-- 文本 -->
+            <input
+              v-else
+              type="text"
+              :value="value"
+              class="field-input"
+              :placeholder="getPlaceholder(key)"
+              @change="onParamChange(key, ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </template>
       </div>
 
       <!-- 针脚信息 -->
@@ -189,6 +278,9 @@ const SELECT_FIELDS: Record<string, string[]> = {
   method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'],
   format: ['json', 'yaml', 'csv', 'txt', 'xml'],
   encoding: ['utf-8', 'gbk', 'ascii', 'base64'],
+  action: ['set', 'get', 'merge', 'default', 'length'],
+  op: ['==', '!=', '>', '<', '>=', '<=', 'not_empty', 'contains', 'regex'],
+  condition_op: ['not_empty', '==', '!=', '>', '<', '>=', '<=', 'contains', 'regex'],
 }
 
 const PLACEHOLDER_MAP: Record<string, string> = {
@@ -198,6 +290,14 @@ const PLACEHOLDER_MAP: Record<string, string> = {
   path: './output/data.json',
   output_key: 'result',
   target_field: '$',
+  key: 'variable_name',
+  value: 'value or expression',
+  left: '{{variable}} or literal',
+  right: '{{variable}} or literal',
+  items: '{{previous.output}} or [1,2,3]',
+  duration_ms: '1000',
+  max_iterations: '1000',
+  check: 'variable or {{__current}}',
 }
 
 function isSelectField(key: string): boolean {
@@ -223,6 +323,21 @@ function formatOutput(data: unknown): string {
   } catch {
     return String(data)
   }
+}
+
+// ─── 嵌套参数处理（如 condition.check）───
+function getNestedParam(key: string): unknown {
+  if (!props.node) return ''
+  const cond = props.node.config.condition as Record<string, unknown> | undefined
+  return cond?.[key] ?? ''
+}
+
+function onNestedParamChange(parentKey: string, childKey: string, value: unknown) {
+  if (!props.node) return
+  const currentParent = (props.node.config[parentKey] as Record<string, unknown>) || {}
+  emit('update-config', props.node.id, {
+    [parentKey]: { ...currentParent, [childKey]: value },
+  })
 }
 
 // ─── 事件处理 ───
@@ -530,5 +645,50 @@ function getDataSize(data: unknown): string {
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+}
+
+/* ─── M2: 节点专用参数 ─── */
+.param-help {
+  font-size: 11px;
+  color: #8b949e;
+  padding: 4px 0 0 0;
+  line-height: 1.5;
+}
+
+.param-unit {
+  font-size: 11px;
+  color: #8b949e;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.param-subsection {
+  margin-top: 6px;
+  padding: 6px;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+}
+
+.param-subsection-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #58a6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.param-key-sm {
+  font-size: 11px !important;
+  width: 65px;
+  flex-shrink: 0;
+}
+
+.body-hint {
+  color: #58a6ff;
+  font-size: 11px;
+  font-style: italic;
 }
 </style>
