@@ -3,4 +3,4 @@ export const pinia = createPinia()
 
 export { useWorkflowStore } from './workflowStore'
 export { useEditorStore } from './editorStore'
-export { useExecutionStore } from './executionStore'
+export { useFlowStore } from './flowStore'
