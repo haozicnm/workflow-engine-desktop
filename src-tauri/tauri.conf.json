@@ -29,7 +29,7 @@
     "targets": ["nsis"],
     "windows": {
       "webviewInstallMode": {
-        "type": "offlineInstaller"
+        "type": "embedBootstrapper"
       }
     },
     "icon": [
@@ -41,8 +41,7 @@
     ],
     "resources": {
       "sidecars/*": "sidecars/",
-      "python-runtime/embed/**/*": "embed/",
-      "python-runtime/playwright-browsers/**/*": "playwright-browsers/"
+      "python-runtime/embed/**/*": "embed/"
     }
   },
   "plugins": {}

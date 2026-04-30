@@ -16,7 +16,7 @@ env:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -53,29 +53,8 @@ jobs:
         working-directory: src
         run: npm run build
 
-      - name: Download Python 3.12 embeddable
-        run: |
-          curl -L -o python-embed.zip https://www.python.org/ftp/python/3.12.8/python-3.12.8-embed-amd64.zip
-          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed
-          Expand-Archive -Path python-embed.zip -DestinationPath src-tauri/python-runtime/embed
-          # Enable pip/site-packages in embedded Python
-          $pth = "src-tauri/python-runtime/embed/python312._pth"
-          (Get-Content $pth) -replace '#import site', 'import site' | Set-Content $pth
-          # Create Lib/site-packages directory
-          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed/Lib/site-packages
-
-      - name: Setup Python for Playwright
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Playwright browsers
-        run: |
-          pip install playwright
-          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
-          python -m playwright install chromium
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers
+      - name: Create python-runtime placeholder
+        run: New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed; Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
 
       - name: Build Tauri (Windows)
         run: npx --prefix src tauri build
