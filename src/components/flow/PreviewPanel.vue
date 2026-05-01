@@ -167,8 +167,8 @@ function setWidgetValue(name: string, value: string) {
 function detectType(node: LGraphNode): 'browser' | 'excel' | 'word' | null {
   const t = node.type
   if (!t) return null
-  const browserTypes = ['navigate', 'screenshot', 'extract', 'click', 'fill', 'evaluate', 'scroll', 'wait', 'pdf', 'browser']
-  if (browserTypes.includes(t)) return 'browser'
+  // 浏览器类型：browser 开头 或 web_scrape
+  if (t === 'browser' || t.startsWith('browser_') || t === 'web_scrape') return 'browser'
   if (t === 'excel') return 'excel'
   if (t === 'word') return 'word'
   return null
