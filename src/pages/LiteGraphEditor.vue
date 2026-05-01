@@ -88,7 +88,10 @@
           @delete="onDeleteNode"
         />
         <div class="panel-divider"></div>
-        <PreviewPanel :lg-node="selectedLgNode" />
+        <PreviewPanel
+          :lg-node="selectedLgNode"
+          @update-widget="onUpdateWidget"
+        />
       </div>
     </div>
 
