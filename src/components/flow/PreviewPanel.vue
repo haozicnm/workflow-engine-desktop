@@ -399,7 +399,8 @@ watch(() => props.lgNode, () => {
 .preview-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 200px;
+  max-height: 50%;
   background: #161b22;
   overflow: hidden;
 }
