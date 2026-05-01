@@ -246,10 +246,6 @@ onMounted(() => {
 
     // 创建 canvas
     canvas = new LGraphCanvas(canvasRef.value!, graph)
-    canvas.autoresize = false  // 手动控制 resize，避免内部自动缩放冲突
-
-    // 显式 resize 确保内部坐标系与元素属性一致
-    canvas.resize(w, h)
 
     // 配置 canvas 外观（暗色主题）
     canvas.background_image = ''
