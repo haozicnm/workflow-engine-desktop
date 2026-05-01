@@ -459,7 +459,3 @@ export function getNodeDef(type: string): NodeDefinition | undefined {
 export function pinColor(type: string): string {
   return (PIN_COLORS as Record<string, string>)[type] || '#8b949e'
 }
-
-export function pinBadge(type: string): string {
-  return (PIN_BADGES as Record<string, string>)[type] || '?'
-}

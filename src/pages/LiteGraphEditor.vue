@@ -68,9 +68,12 @@
 
       <!-- 右侧：属性面板 -->
       <PropertyPanel
-        :node="selectedNode"
+        :lg-node="selectedLgNode"
+        :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
+        :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
+        :duration="undefined"
         @update-label="onUpdateLabel"
-        @update-config="onUpdateConfig"
+        @update-widget="onUpdateWidget"
         @delete="onDeleteNode"
       />
     </div>
@@ -127,7 +130,7 @@ let canvas: LGraphCanvas
 let resizeObserver: ResizeObserver | null = null
 
 // ─── 本地状态 ───
-const selectedNode = ref<FlowNode | null>(null)
+const selectedLgNode = ref<LGraphNode | null>(null)
 const isRunning = ref(false)
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
@@ -173,14 +176,9 @@ onMounted(() => {
   }
 
   // 监听选中变化 → 更新属性面板
-  // LiteGraph uses onSelectionChange on the canvas
   canvas.onSelectionChange = (selectedDict: Record<string, LGraphNode>) => {
     const selected = Object.values(selectedDict)[0]
-    if (selected instanceof LGraphNode) {
-      selectedNode.value = liteGraphNodeToFlowNode(selected)
-    } else {
-      selectedNode.value = null
-    }
+    selectedLgNode.value = selected instanceof LGraphNode ? selected : null
   }
 
   // 监听连线变化
@@ -497,41 +495,28 @@ function onDrop(event: DragEvent) {
 }
 
 // ─── 属性面板回调 ───
-function onUpdateLabel(id: string, label: string) {
-  const lgNode = findLgNode(id)
-  if (lgNode) {
-    lgNode.title = label
-  }
-  store.updateNodeLabel(id, label)
+function onUpdateLabel(node: LGraphNode, label: string) {
+  node.title = label
+  graph.setDirtyCanvas(true)
+  store.updateNodeLabel(String(node.id), label)
 }
 
-function onUpdateConfig(id: string, config: Record<string, unknown>) {
-  const lgNode = findLgNode(id)
-  if (lgNode && lgNode.widgets) {
-    for (const w of lgNode.widgets) {
-      if (config[w.name] !== undefined) {
-        w.value = config[w.name]
-      }
-    }
+function onUpdateWidget(node: LGraphNode, widgetName: string, value: unknown) {
+  const widget = node.widgets?.find(w => w.name === widgetName)
+  if (widget) {
+    widget.value = value
+    graph.setDirtyCanvas(true)
   }
-  store.updateNodeConfig(id, config)
-  // 同步回 selectedNode
-  if (selectedNode.value && selectedNode.value.id === id) {
-    selectedNode.value.config = { ...selectedNode.value.config, ...config }
-  }
+  store.updateNodeConfig(String(node.id), { [widgetName]: value })
 }
 
-function onDeleteNode(id: string) {
-  const lgNode = findLgNode(id)
-  if (lgNode) {
-    graph.remove(lgNode)
-  } else {
-    store.removeNode(id)
+function onDeleteNode(node: LGraphNode) {
+  graph.remove(node)
+  if (selectedLgNode.value === node) {
+    selectedLgNode.value = null
   }
-  if (selectedNode.value?.id === id) {
-    selectedNode.value = null
-  }
-  addLog(`🗑 删除节点: ${id}`)
+  store.removeNode(String(node.id))
+  addLog(`🗑 删除节点: ${node.title || node.type}`)
   undoManager.pushState()
 }
 
@@ -697,7 +682,7 @@ function clearCanvas() {
   if (store.nodes.length > 0 && !confirm('确定清空画布上所有节点和连线？')) return
   graph.clear()
   store.clear()
-  selectedNode.value = null
+  selectedLgNode.value = null
   addLog('🗑 画布已清空')
   undoManager.pushState()
 }
@@ -741,17 +726,17 @@ function onKeyDown(e: KeyboardEvent) {
     return
   }
   // Delete / Backspace — 删除选中节点
-  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNode.value) {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLgNode.value) {
     // 排除输入框内的按键
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
     e.preventDefault()
-    onDeleteNode(selectedNode.value.id)
+    onDeleteNode(selectedLgNode.value)
     return
   }
   // Escape — 取消选择
   if (e.key === 'Escape') {
     canvas.deselectAllNodes()
-    selectedNode.value = null
+    selectedLgNode.value = null
     return
   }
 }

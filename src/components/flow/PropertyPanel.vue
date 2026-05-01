@@ -1,7 +1,7 @@
 <template>
   <aside class="property-panel">
     <!-- 未选中节点 -->
-    <div v-if="!node" class="panel-empty">
+    <div v-if="!lgNode" class="panel-empty">
       <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" class="empty-icon">
         <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4zm10 1H4v7h8V5z"/>
       </svg>
@@ -19,7 +19,7 @@
       <div class="panel-section">
         <div class="node-info">
           <span class="node-info-icon">{{ nodeDef?.icon || '📦' }}</span>
-          <span class="node-info-type">{{ nodeDef?.label || node.type }}</span>
+          <span class="node-info-type">{{ nodeDef?.label || lgNode.type }}</span>
         </div>
       </div>
 
@@ -27,219 +27,139 @@
       <div class="panel-section">
         <label class="section-label">名称</label>
         <input
-          :value="node.label"
+          :value="lgNode.title"
           class="field-input"
           type="text"
           @change="onLabelChange"
         />
       </div>
 
-      <!-- 参数编辑 -->
-      <div class="panel-section">
+      <!-- 参数 — 由 LiteGraph widgets 驱动 -->
+      <div v-if="widgets.length > 0" class="panel-section">
         <label class="section-label">⚙ 参数</label>
 
-        <!-- ── data 节点 ── -->
-        <template v-if="node.type === 'data'">
-          <div class="param-row">
-            <label class="param-key">操作</label>
-            <select :value="params.action" class="field-select" @change="onParamChange('action', ($event.target as HTMLSelectElement).value)">
-              <option v-for="opt in selectOptions('action')" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-          </div>
-          <div class="param-row">
-            <label class="param-key">变量名</label>
-            <input :value="params.key" type="text" class="field-input" :placeholder="getPlaceholder('key')" @change="onParamChange('key', ($event.target as HTMLInputElement).value)" />
-          </div>
-          <div class="param-row">
-            <label class="param-key">值</label>
-            <input :value="params.value" type="text" class="field-input" :placeholder="getPlaceholder('value')" @change="onParamChange('value', ($event.target as HTMLInputElement).value)" />
-          </div>
-          <div class="param-help">
-            💡 set=赋值 get=读取 merge=合并 default=默认值 length=长度
-          </div>
-        </template>
+        <div v-for="w in widgets" :key="w.name" class="param-row">
+          <label class="param-key">{{ w.label || formatKey(w.name) }}</label>
 
-        <!-- ── delay 节点 ── -->
-        <template v-else-if="node.type === 'delay'">
-          <div class="param-row">
-            <label class="param-key">延时</label>
-            <input :value="params.duration_ms" type="number" class="field-input" min="0" step="100" @change="onParamChange('duration_ms', Number(($event.target as HTMLInputElement).value))" />
-            <span class="param-unit">ms</span>
-          </div>
-          <div v-if="Number(params.duration_ms) >= 1000" class="param-help">
-            ⏱ ≈ {{ (Number(params.duration_ms) / 1000).toFixed(1) }} 秒
-          </div>
-        </template>
+          <!-- combo → 下拉 -->
+          <select
+            v-if="w.type === 'combo'"
+            :value="w.value"
+            class="field-select"
+            @change="onWidgetChange(w, ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="opt in comboOptions(w)"
+              :key="opt"
+              :value="opt"
+            >{{ opt }}</option>
+          </select>
 
-        <!-- ── condition 节点 ── -->
-        <template v-else-if="node.type === 'condition'">
-          <div class="param-row">
-            <label class="param-key">左值</label>
-            <input :value="params.left" type="text" class="field-input" :placeholder="getPlaceholder('left')" @change="onParamChange('left', ($event.target as HTMLInputElement).value)" />
-          </div>
-          <div class="param-row">
-            <label class="param-key">运算符</label>
-            <select :value="params.op" class="field-select" @change="onParamChange('op', ($event.target as HTMLSelectElement).value)">
-              <option v-for="opt in selectOptions('op')" :key="opt" :value="opt">{{ opt }}</option>
-            </select>
-          </div>
-          <div class="param-row">
-            <label class="param-key">右值</label>
-            <input :value="params.right" type="text" class="field-input" :placeholder="getPlaceholder('right')" @change="onParamChange('right', ($event.target as HTMLInputElement).value)" />
-          </div>
-        </template>
+          <!-- toggle → 复选框 -->
+          <input
+            v-else-if="w.type === 'toggle'"
+            type="checkbox"
+            :checked="w.value"
+            class="field-checkbox"
+            @change="onWidgetChange(w, ($event.target as HTMLInputElement).checked)"
+          />
 
-        <!-- ── while 节点 ── -->
-        <template v-else-if="node.type === 'while'">
-          <div class="param-row">
-            <label class="param-key">入参来源</label>
-            <input :value="params.items" type="text" class="field-input" :placeholder="getPlaceholder('items')" @change="onParamChange('items', ($event.target as HTMLInputElement).value)" />
-          </div>
-          <div class="param-subsection">
-            <label class="param-subsection-label">条件</label>
-            <div class="param-row">
-              <label class="param-key param-key-sm">检查变量</label>
-              <input :value="getNestedParam('check')" type="text" class="field-input" :placeholder="getPlaceholder('check')" @change="onNestedParamChange('condition', 'check', ($event.target as HTMLInputElement).value)" />
-            </div>
-            <div class="param-row">
-              <label class="param-key param-key-sm">运算符</label>
-              <select :value="getNestedParam('op')" class="field-select" @change="onNestedParamChange('condition', 'op', ($event.target as HTMLSelectElement).value)">
-                <option v-for="opt in selectOptions('condition_op')" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="param-row">
-            <label class="param-key">最大迭代</label>
-            <input :value="params.max_iterations" type="number" class="field-input" min="1" step="100" @change="onParamChange('max_iterations', Number(($event.target as HTMLInputElement).value))" />
-          </div>
-          <div class="param-help body-hint">📎 在画布中双击 While 节点进入子图编辑循环体</div>
-        </template>
+          <!-- number → 数字输入 -->
+          <input
+            v-else-if="w.type === 'number' || w.type === 'slider'"
+            type="number"
+            :value="w.value"
+            :min="w.options?.min"
+            :max="w.options?.max"
+            :step="w.options?.step2 ?? w.options?.step ?? 1"
+            class="field-input"
+            @change="onWidgetChange(w, Number(($event.target as HTMLInputElement).value))"
+          />
 
-        <!-- ── loop 节点 ── -->
-        <template v-else-if="node.type === 'loop'">
-          <div class="param-row">
-            <label class="param-key">遍历来源</label>
-            <input :value="params.items" type="text" class="field-input" :placeholder="getPlaceholder('items')" @change="onParamChange('items', ($event.target as HTMLInputElement).value)" />
-          </div>
-          <div class="param-help body-hint">📎 在画布中双击 Loop 节点进入子图编辑循环体</div>
-        </template>
+          <!-- text → 多行文本 -->
+          <textarea
+            v-else-if="w.type === 'text'"
+            :value="w.value"
+            class="field-textarea"
+            rows="3"
+            @change="onWidgetChange(w, ($event.target as HTMLTextAreaElement).value)"
+          />
 
-        <!-- ── 通用参数（其他节点） ── -->
-        <template v-else>
-          <div v-for="(value, key) in params" :key="key" class="param-row">
-            <label class="param-key">{{ formatLabel(key) }}</label>
-
-            <!-- 下拉选择 -->
-            <select
-              v-if="isSelectField(key)"
-              :value="value"
-              class="field-select"
-              @change="onParamChange(key, ($event.target as HTMLSelectElement).value)"
-            >
-              <option
-                v-for="opt in selectOptions(key)"
-                :key="opt"
-                :value="opt"
-              >
-                {{ opt }}
-              </option>
-            </select>
-
-            <!-- 数字输入 -->
-            <input
-              v-else-if="typeof value === 'number'"
-              type="number"
-              :value="value"
-              class="field-input"
-              @change="onParamChange(key, Number(($event.target as HTMLInputElement).value))"
-            />
-
-            <!-- 布尔 -->
-            <input
-              v-else-if="typeof value === 'boolean'"
-              type="checkbox"
-              :checked="value"
-              class="field-checkbox"
-              @change="onParamChange(key, ($event.target as HTMLInputElement).checked)"
-            />
-
-            <!-- 文本 -->
-            <input
-              v-else
-              type="text"
-              :value="value"
-              class="field-input"
-              :placeholder="getPlaceholder(key)"
-              @change="onParamChange(key, ($event.target as HTMLInputElement).value)"
-            />
-          </div>
-        </template>
+          <!-- string / 默认 → 单行输入 -->
+          <input
+            v-else
+            type="text"
+            :value="w.value"
+            class="field-input"
+            :placeholder="widgetPlaceholder(w)"
+            @change="onWidgetChange(w, ($event.target as HTMLInputElement).value)"
+          />
+        </div>
       </div>
 
       <!-- 针脚信息 -->
       <div class="panel-section">
         <label class="section-label">📥 输入</label>
         <div
-          v-for="pin in nodeDef?.inputs"
-          :key="pin.id"
+          v-for="(pin, idx) in lgNode.inputs || []"
+          :key="idx"
           class="pin-info-row"
         >
-          <span class="pin-dot" :style="{ background: getPinColor(pin.type) }"></span>
-          <span class="pin-info-label">{{ pin.label }}</span>
-          <span class="pin-info-type">{{ pinBadge(pin.type) }}</span>
+          <span class="pin-dot" :style="{ background: getPinColor(pin.type || pin.label || 'default') }"></span>
+          <span class="pin-info-label">{{ pin.name || pin.label }}</span>
+          <span class="pin-info-type">{{ pin.type || 'any' }}</span>
         </div>
-        <span v-if="!nodeDef?.inputs.length" class="no-pins">无输入针脚</span>
+        <span v-if="!(lgNode.inputs?.length)" class="no-pins">无输入针脚</span>
       </div>
 
       <div class="panel-section">
         <label class="section-label">📤 输出</label>
         <div
-          v-for="pin in nodeDef?.outputs"
-          :key="pin.id"
+          v-for="(pin, idx) in (lgNode.outputs || [])"
+          :key="idx"
           class="pin-info-row"
         >
-          <span class="pin-dot" :style="{ background: getPinColor(pin.type) }"></span>
-          <span class="pin-info-label">{{ pin.label }}</span>
-          <span class="pin-info-type">{{ pinBadge(pin.type) }}</span>
+          <span class="pin-dot" :style="{ background: getPinColor(pin.type || pin.label || 'default') }"></span>
+          <span class="pin-info-label">{{ pin.name || pin.label }}</span>
+          <span class="pin-info-type">{{ pin.type || 'any' }}</span>
         </div>
-        <span v-if="!nodeDef?.outputs.length" class="no-pins">无输出针脚</span>
+        <span v-if="!(lgNode.outputs?.length)" class="no-pins">无输出针脚</span>
       </div>
 
       <!-- 输出数据预览 -->
-      <div v-if="node.output !== undefined" class="panel-section">
+      <div v-if="nodeOutput !== undefined" class="panel-section">
         <label class="section-label">📤 输出预览</label>
-        <pre class="data-preview">{{ formatOutput(node.output) }}</pre>
+        <pre class="data-preview">{{ formatOutput(nodeOutput) }}</pre>
         <div class="data-actions">
-          <button class="data-action-btn" @click="copyData(node.output)">📋 复制</button>
+          <button class="data-action-btn" @click="copyData(nodeOutput)">📋 复制</button>
           <button class="data-action-btn" @click="expandData = !expandData">
             {{ expandData ? '📉 收起' : '📊 展开' }}
           </button>
         </div>
-        <!-- 展开的完整视图 -->
-        <pre v-if="expandData" class="data-preview data-preview-full">{{ formatOutput(node.output) }}</pre>
+        <pre v-if="expandData" class="data-preview data-preview-full">{{ formatOutput(nodeOutput) }}</pre>
       </div>
 
       <!-- 错误信息 -->
-      <div v-if="node.error" class="panel-section panel-error">
+      <div v-if="nodeError" class="panel-section panel-error">
         <label class="section-label">⚠ 错误</label>
-        <pre class="error-text">{{ node.error }}</pre>
+        <pre class="error-text">{{ nodeError }}</pre>
       </div>
 
       <!-- 执行元数据 -->
-      <div v-if="node.duration !== undefined || node.output !== undefined" class="panel-section panel-meta">
+      <div v-if="nodeDuration !== undefined || nodeOutput !== undefined" class="panel-section panel-meta">
         <label class="section-label">📊 执行详情</label>
         <div class="meta-grid">
-          <div v-if="node.duration !== undefined" class="meta-item">
+          <div v-if="nodeDuration !== undefined" class="meta-item">
             <span class="meta-key">耗时</span>
-            <span class="meta-value">{{ node.duration }}ms</span>
+            <span class="meta-value">{{ nodeDuration }}ms</span>
           </div>
-          <div v-if="node.output !== undefined" class="meta-item">
+          <div v-if="nodeOutput !== undefined" class="meta-item">
             <span class="meta-key">类型</span>
-            <span class="meta-value">{{ getDataType(node.output) }}</span>
+            <span class="meta-value">{{ getDataType(nodeOutput) }}</span>
           </div>
-          <div v-if="node.output !== undefined" class="meta-item">
+          <div v-if="nodeOutput !== undefined" class="meta-item">
             <span class="meta-key">大小</span>
-            <span class="meta-value">{{ getDataSize(node.output) }}</span>
+            <span class="meta-value">{{ getDataSize(nodeOutput) }}</span>
           </div>
         </div>
       </div>
@@ -249,116 +169,97 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { FlowNode } from './pinTypes'
-import { getNodeDef, pinColor, pinBadge } from './pinTypes'
+import type { LGraphNode, IBaseWidget, IComboWidget } from '@comfyorg/litegraph'
+import { getNodeDef, pinColor } from './pinTypes'
 
 const props = defineProps<{
-  node: FlowNode | null
+  /** LiteGraph 节点引用（从画布直接传入） */
+  lgNode: LGraphNode | null
+  /** 节点输出数据（从 store 同步） */
+  output?: unknown
+  /** 节点错误信息 */
+  error?: string
+  /** 节点执行耗时 (ms) */
+  duration?: number
 }>()
 
 const emit = defineEmits<{
-  'update-label': [id: string, label: string]
-  'update-config': [id: string, config: Record<string, unknown>]
-  'delete': [id: string]
+  'update-label': [node: LGraphNode, label: string]
+  'update-widget': [node: LGraphNode, widgetName: string, value: unknown]
+  'delete': [node: LGraphNode]
 }>()
 
 const expandData = ref(false)
 
 const nodeDef = computed(() => {
-  if (!props.node) return undefined
-  return getNodeDef(props.node.type)
+  if (!props.lgNode || !props.lgNode.type) return undefined
+  return getNodeDef(props.lgNode.type)
 })
 
-const params = computed<Record<string, unknown>>(() => {
-  return props.node ? { ...props.node.config } : {}
+const widgets = computed<IBaseWidget[]>(() => {
+  return props.lgNode?.widgets ?? []
 })
 
-// ─── 下拉字段映射 ───
-const SELECT_FIELDS: Record<string, string[]> = {
-  method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'],
-  format: ['json', 'yaml', 'csv', 'txt', 'xml'],
-  encoding: ['utf-8', 'gbk', 'ascii', 'base64'],
-  action: ['set', 'get', 'merge', 'default', 'length'],
-  op: ['==', '!=', '>', '<', '>=', '<=', 'not_empty', 'contains', 'regex'],
-  condition_op: ['not_empty', '==', '!=', '>', '<', '>=', '<=', 'contains', 'regex'],
+const nodeOutput = computed(() => props.output)
+const nodeError = computed(() => props.error)
+const nodeDuration = computed(() => props.duration)
+
+// ─── Widget helpers ───
+
+function comboOptions(widget: IBaseWidget): string[] {
+  const opts = widget.options?.values
+  if (!opts) return []
+  if (typeof opts === 'function') return (opts as () => string[])()
+  if (Array.isArray(opts)) return opts as string[]
+  if (typeof opts === 'object') return Object.keys(opts as Record<string, string>)
+  return []
 }
 
-const PLACEHOLDER_MAP: Record<string, string> = {
-  url: 'https://api.example.com/data',
-  expression: '$.data.items[*]',
-  template: '你好 {{name}}，今天 {{weather}}',
-  path: './output/data.json',
-  output_key: 'result',
-  target_field: '$',
-  key: 'variable_name',
-  value: 'value or expression',
-  left: '{{variable}} or literal',
-  right: '{{variable}} or literal',
-  items: '{{previous.output}} or [1,2,3]',
-  duration_ms: '1000',
-  max_iterations: '1000',
-  check: 'variable or {{__current}}',
+function formatKey(name: string): string {
+  return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function isSelectField(key: string): boolean {
-  return key in SELECT_FIELDS
-}
-
-function selectOptions(key: string): string[] {
-  return SELECT_FIELDS[key] || []
-}
-
-function getPlaceholder(key: string): string {
-  return PLACEHOLDER_MAP[key] || ''
-}
-
-function formatLabel(key: string): string {
-  // snake_case → Title Case
-  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
-
-function formatOutput(data: unknown): string {
-  try {
-    return JSON.stringify(data, null, 2)
-  } catch {
-    return String(data)
+function widgetPlaceholder(widget: IBaseWidget): string {
+  const defaults: Record<string, string> = {
+    url: 'https://api.example.com/data',
+    path: './output/data.json',
+    expression: '$.data.items[*]',
+    template: '你好 {{name}}',
+    key: 'variable_name',
+    value: 'value or expression',
+    items: '{{previous.output}}',
   }
-}
-
-// ─── 嵌套参数处理（如 condition.check）───
-function getNestedParam(key: string): unknown {
-  if (!props.node) return ''
-  const cond = props.node.config.condition as Record<string, unknown> | undefined
-  return cond?.[key] ?? ''
-}
-
-function onNestedParamChange(parentKey: string, childKey: string, value: unknown) {
-  if (!props.node) return
-  const currentParent = (props.node.config[parentKey] as Record<string, unknown>) || {}
-  emit('update-config', props.node.id, {
-    [parentKey]: { ...currentParent, [childKey]: value },
-  })
+  return defaults[widget.name] || ''
 }
 
 // ─── 事件处理 ───
+
 function onLabelChange(event: Event) {
   const target = event.target as HTMLInputElement
-  if (props.node) {
-    emit('update-label', props.node.id, target.value)
+  if (props.lgNode) {
+    emit('update-label', props.lgNode, target.value)
   }
 }
 
-function onParamChange(key: string, value: unknown) {
-  if (props.node) {
-    emit('update-config', props.node.id, { [key]: value })
+function onWidgetChange(widget: IBaseWidget, value: unknown) {
+  if (props.lgNode) {
+    emit('update-widget', props.lgNode, widget.name, value)
   }
 }
+
+// ─── 针脚颜色 ───
 
 function getPinColor(type: string): string {
   return pinColor(type)
 }
 
-// ─── 数据预览工具函数 ───
+// ─── 输出预览工具 ───
+
+function formatOutput(data: unknown): string {
+  try { return JSON.stringify(data, null, 2) }
+  catch { return String(data) }
+}
+
 function copyData(data: unknown) {
   const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
   navigator.clipboard.writeText(text).catch(() => {})
@@ -368,10 +269,7 @@ function getDataType(data: unknown): string {
   if (data === null) return 'null'
   if (data === undefined) return 'undefined'
   if (Array.isArray(data)) return `array[${data.length}]`
-  if (typeof data === 'object') {
-    const keys = Object.keys(data as Record<string, unknown>)
-    return `object{${keys.length}}`
-  }
+  if (typeof data === 'object') return `object{${Object.keys(data as object).length}}`
   return typeof data
 }
 
@@ -386,309 +284,82 @@ function getDataSize(data: unknown): string {
 
 <style scoped>
 .property-panel {
-  width: 260px;
-  min-width: 260px;
-  height: 100%;
-  background: #0d1117;
-  border-left: 1px solid #21262d;
-  overflow-y: auto;
-  color: #c9d1d9;
-  font-size: 13px;
+  width: 260px; min-width: 260px; height: 100%;
+  background: #0d1117; border-left: 1px solid #21262d;
+  overflow-y: auto; color: #c9d1d9; font-size: 13px;
 }
-
-/* ─── 未选中 ─── */
 .panel-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 100%;
-  color: #484f58;
-  font-size: 13px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; height: 100%;
+  color: #484f58; font-size: 13px;
 }
-
-.empty-icon {
-  opacity: 0.4;
-}
-
-/* ─── 头部 ─── */
+.empty-icon { opacity: 0.4; }
 .panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid #21262d;
-  position: sticky;
-  top: 0;
-  background: #0d1117;
-  z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid #21262d;
+  position: sticky; top: 0; background: #0d1117; z-index: 1;
 }
-
-.panel-title {
-  font-weight: 700;
-  font-size: 13px;
-}
-
+.panel-title { font-weight: 700; font-size: 13px; }
 .btn-delete {
-  padding: 2px 6px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: #8b949e;
-  font-size: 12px;
-  cursor: pointer;
+  padding: 2px 6px; background: none; border: 1px solid transparent;
+  border-radius: 4px; color: #8b949e; font-size: 12px; cursor: pointer;
 }
-
-.btn-delete:hover {
-  background: rgba(248, 81, 73, 0.1);
-  border-color: rgba(248, 81, 73, 0.3);
-  color: #f85149;
-}
-
-/* ─── 区块 ─── */
-.panel-section {
-  padding: 8px 12px;
-  border-bottom: 1px solid #21262d;
-}
-
+.btn-delete:hover { background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); color: #f85149; }
+.panel-section { padding: 8px 12px; border-bottom: 1px solid #21262d; }
 .section-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #8b949e;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  display: block; font-size: 11px; font-weight: 600; color: #8b949e;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
 }
+.node-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.node-info-icon { font-size: 18px; }
+.node-info-type { color: #8b949e; }
 
-/* ─── 节点信息 ─── */
-.node-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.node-info-icon {
-  font-size: 18px;
-}
-
-.node-info-type {
-  color: #8b949e;
-}
-
-/* ─── 表单字段 ─── */
-.field-input,
-.field-select {
-  width: 100%;
-  padding: 5px 8px;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #c9d1d9;
-  font-size: 12px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.field-input:focus,
-.field-select:focus {
-  border-color: #58a6ff;
-}
-
-.field-input::placeholder {
-  color: #484f58;
-}
-
-.field-checkbox {
-  width: 16px;
-  height: 16px;
-  accent-color: #58a6ff;
-  cursor: pointer;
-}
-
-/* ─── 参数行 ─── */
-.param-row {
-  margin-bottom: 8px;
-}
-
-.param-row:last-child {
-  margin-bottom: 0;
-}
-
+.param-row { margin-bottom: 6px; }
+.param-row:last-child { margin-bottom: 0; }
 .param-key {
-  display: block;
-  font-size: 11px;
-  margin-bottom: 3px;
-  color: #8b949e;
+  display: block; font-size: 11px; color: #8b949e; margin-bottom: 3px;
+  text-transform: capitalize;
 }
+.field-input, .field-select, .field-textarea {
+  width: 100%; padding: 5px 8px; background: #161b22;
+  border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;
+  font-size: 12px; outline: none; transition: border-color 0.15s;
+}
+.field-textarea { resize: vertical; font-family: monospace; }
+.field-input:focus, .field-select:focus, .field-textarea:focus { border-color: #58a6ff; }
+.field-checkbox { margin-left: 4px; accent-color: #58a6ff; }
 
-/* ─── 针脚信息 ─── */
 .pin-info-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 0;
+  display: flex; align-items: center; gap: 6px; padding: 3px 0;
   font-size: 12px;
 }
+.pin-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pin-info-label { flex: 1; color: #c9d1d9; }
+.pin-info-type { color: #6e7681; font-size: 11px; }
+.no-pins { color: #484f58; font-size: 12px; font-style: italic; }
 
-.pin-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.pin-info-label {
-  flex: 1;
-  color: #c9d1d9;
-}
-
-.pin-info-type {
-  font-family: monospace;
-  font-size: 10px;
-  color: #8b949e;
-  background: #161b22;
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
-.no-pins {
-  color: #484f58;
-  font-size: 11px;
-}
-
-/* ─── 数据预览 ─── */
 .data-preview {
-  background: #161b22;
-  padding: 8px;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  font-size: 11px;
-  max-height: 180px;
-  overflow: auto;
-  font-family: 'SF Mono', 'Cascadia Code', monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #c9d1d9;
-  line-height: 1.4;
-  margin: 0;
+  margin: 0; padding: 8px; background: #161b22; border: 1px solid #30363d;
+  border-radius: 4px; font-size: 11px; font-family: monospace;
+  max-height: 150px; overflow: auto; white-space: pre-wrap; word-break: break-all;
 }
-
-.data-preview-full {
-  max-height: 400px;
-  margin-top: 8px;
-}
-
-/* ─── 数据操作按钮 ─── */
-.data-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-}
-
+.data-preview-full { max-height: 400px; }
+.data-actions { display: flex; gap: 6px; margin-top: 6px; }
 .data-action-btn {
-  padding: 2px 8px;
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #8b949e;
-  font-size: 10px;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  padding: 3px 8px; background: #21262d; border: 1px solid #30363d;
+  border-radius: 4px; color: #c9d1d9; font-size: 11px; cursor: pointer;
 }
+.data-action-btn:hover { background: #30363d; }
 
-.data-action-btn:hover {
-  background: #30363d;
-  color: #c9d1d9;
-}
-
-/* ─── 执行元数据 ─── */
-.panel-meta {
-  background: rgba(88, 166, 255, 0.03);
-}
-
-.meta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.meta-key {
-  font-size: 10px;
-  color: #8b949e;
-  text-transform: uppercase;
-}
-
-.meta-value {
-  font-size: 12px;
-  color: #c9d1d9;
-  font-family: 'SF Mono', 'Cascadia Code', monospace;
-}
-
-/* ─── 错误 ─── */
-.panel-error {
-  border-top: 1px solid rgba(248, 81, 73, 0.2);
-  background: rgba(248, 81, 73, 0.04);
-}
-
+.panel-error { background: rgba(248,81,73,0.06); }
 .error-text {
-  color: #f85149;
-  font-size: 11px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
+  margin: 0; padding: 6px; background: rgba(248,81,73,0.1);
+  border-radius: 4px; font-size: 11px; color: #f85149;
+  white-space: pre-wrap; word-break: break-all;
 }
-
-/* ─── M2: 节点专用参数 ─── */
-.param-help {
-  font-size: 11px;
-  color: #8b949e;
-  padding: 4px 0 0 0;
-  line-height: 1.5;
-}
-
-.param-unit {
-  font-size: 11px;
-  color: #8b949e;
-  margin-left: 6px;
-  flex-shrink: 0;
-}
-
-.param-subsection {
-  margin-top: 6px;
-  padding: 6px;
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 4px;
-}
-
-.param-subsection-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  color: #58a6ff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.param-key-sm {
-  font-size: 11px !important;
-  width: 65px;
-  flex-shrink: 0;
-}
-
-.body-hint {
-  color: #58a6ff;
-  font-size: 11px;
-  font-style: italic;
-}
+.panel-meta { background: rgba(88,166,255,0.04); }
+.meta-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-key { font-size: 10px; color: #6e7681; text-transform: uppercase; }
+.meta-value { font-size: 12px; color: #c9d1d9; font-weight: 600; }
 </style>
