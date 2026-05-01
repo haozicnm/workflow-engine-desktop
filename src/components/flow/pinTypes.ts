@@ -565,3 +565,8 @@ export const NODE_REGISTRY: NodeDefinition[] = [
 export function getNodeDef(type: string): NodeDefinition | undefined {
   return NODE_REGISTRY.find(d => d.type === type)
 }
+
+/** 针脚类型 → 颜色 */
+export function pinColor(type: string): string {
+  return (PIN_COLORS as Record<string, string>)[type] || '#8b949e'
+}
