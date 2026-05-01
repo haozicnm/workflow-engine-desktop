@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities — grants all core Tauri permissions including event listen",
+  "windows": ["*"],
+  "permissions": [
+    "core:default"
+  ]
+}

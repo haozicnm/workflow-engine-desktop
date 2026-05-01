@@ -42,12 +42,7 @@
         <button class="toolbar-btn" @click="pickElement" title="拾取浏览器元素">
           🎯 拾取
         </button>
-        <button class="toolbar-btn" @click="autoLayout" title="自动布局">
-          ↻ 布局
-        </button>
-        <button class="toolbar-btn" @click="fitView" title="适应画布">
-          ⊞ 适应
-        </button>
+
         <button class="toolbar-btn" @click="clearCanvas">
           🗑 清空
         </button>
@@ -717,31 +712,6 @@ function fitView() {
     { x: minX - 20, y: minY - 20, width: maxX - minX + 40, height: maxY - minY + 40 },
     { zoom: 0.9 }
   )
-}
-
-function autoLayout() {
-  const lgNodes = graph._nodes || []
-  if (lgNodes.length === 0) return
-
-  // 简单水平布局
-  const SPACING_X = 320
-  const SPACING_Y = 200
-  const COLS = Math.max(1, Math.ceil(Math.sqrt(lgNodes.length)))
-
-  for (let i = 0; i < lgNodes.length; i++) {
-    const ln = lgNodes[i]
-    if (!ln) continue
-    const col = i % COLS
-    const row = Math.floor(i / COLS)
-    ln.pos = [col * SPACING_X + 60, row * SPACING_Y + 60]
-  }
-
-  // 标记 graph 为脏，触发重绘
-  graph.setDirtyCanvas(true)
-  setTimeout(() => {
-    fitView()
-  }, 50)
-  addLog('↻ 自动布局完成')
 }
 
 function clearCanvas() {
