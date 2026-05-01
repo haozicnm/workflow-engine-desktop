@@ -10,11 +10,12 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  build-and-release:
+  # ═══ Windows 构建 ═══
+  build-windows:
     runs-on: windows-latest
     timeout-minutes: 35
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -69,6 +70,120 @@ jobs:
           echo "nsis=$NSIS" >> $GITHUB_OUTPUT
           echo "msi=$MSI" >> $GITHUB_OUTPUT
 
+      - name: Upload NSIS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis
+          path: ${{ steps.find.outputs.nsis }}
+          if-no-files-found: warn
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: ${{ steps.find.outputs.msi }}
+          if-no-files-found: ignore
+
+  # ═══ Linux 构建 ═══
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install frontend dependencies
+        working-directory: src
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: src
+        run: npm run build
+
+      - name: Create python-runtime placeholder
+        run: mkdir -p src-tauri/python-runtime/embed && touch src-tauri/python-runtime/embed/.gitkeep
+
+      - name: Build Tauri (Linux)
+        run: npx --prefix src tauri build --bundles deb,appimage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Find Linux packages
+        id: find
+        run: |
+          DEB=$(ls src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1)
+          APPIMAGE=$(ls src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1)
+          echo "deb=$DEB" >> $GITHUB_OUTPUT
+          echo "appimage=$APPIMAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: ${{ steps.find.outputs.deb }}
+          if-no-files-found: warn
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: ${{ steps.find.outputs.appimage }}
+          if-no-files-found: warn
+
+  # ═══ 创建 Release ═══
+  create-release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Show artifacts
+        run: find artifacts -type f -ls
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -76,16 +191,24 @@ jobs:
           body: |
             ## Workflow Engine Desktop ${{ github.ref_name }}
 
-            自动构建的 Windows 安装包。
-
-            ### 下载
+            ### 🪟 Windows
             - **NSIS 安装包** (.exe) — 标准 Windows 安装程序
             - **MSI 安装包** (.msi) — 企业批量部署
+
+            ### 🐧 Linux
+            - **AppImage** — 免安装，下载后 `chmod +x` 直接运行
+            - **deb 包** — Debian/Ubuntu 系安装包
+
+            ### 系统要求
+            - Windows 10+ / Ubuntu 22.04+
+            - Linux 需要 `xdotool` `wmctrl` 运行时依赖（窗口管理节点用）
 
             ### 变更
             详见 [commits](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }})
           files: |
-            ${{ steps.find.outputs.nsis }}
-            ${{ steps.find.outputs.msi }}
+            artifacts/windows-nsis/*.exe
+            artifacts/windows-msi/*.msi
+            artifacts/linux-deb/*.deb
+            artifacts/linux-appimage/*.AppImage
           draft: false
           prerelease: false
