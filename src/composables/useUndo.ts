@@ -41,6 +41,7 @@ export function useUndo(maxSteps = 50) {
     history.value.push(takeSnapshot())
     if (history.value.length > maxSteps) {
       history.value.shift()
+      historyIndex.value = history.value.length - 1
     } else {
       historyIndex.value = history.value.length - 1
     }

@@ -30,7 +30,7 @@
           :value="lgNode.title"
           class="field-input"
           type="text"
-          @change="onLabelChange"
+          @input="onLabelChange"
         />
       </div>
 
@@ -73,7 +73,7 @@
             :max="w.options?.max"
             :step="w.options?.step2 ?? w.options?.step ?? 1"
             class="field-input"
-            @change="onWidgetChange(w, Number(($event.target as HTMLInputElement).value))"
+            @input="onWidgetChange(w, Number(($event.target as HTMLInputElement).value))"
           />
 
           <!-- text → 多行文本 -->
@@ -82,7 +82,7 @@
             :value="w.value"
             class="field-textarea"
             rows="3"
-            @change="onWidgetChange(w, ($event.target as HTMLTextAreaElement).value)"
+            @input="onWidgetChange(w, ($event.target as HTMLTextAreaElement).value)"
           />
 
           <!-- string / 默认 → 单行输入 -->
@@ -92,7 +92,7 @@
             :value="w.value"
             class="field-input"
             :placeholder="widgetPlaceholder(w)"
-            @change="onWidgetChange(w, ($event.target as HTMLInputElement).value)"
+            @input="onWidgetChange(w, ($event.target as HTMLInputElement).value)"
           />
         </div>
       </div>

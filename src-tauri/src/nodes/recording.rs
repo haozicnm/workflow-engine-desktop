@@ -164,7 +164,11 @@ fn get_linux_recorder() -> std::sync::MutexGuard<'static, Option<crate::platform
     INIT.call_once(|| {
         // 初始化占位
     });
-    LINUX_RECORDER.lock().expect("获取 LINUX_RECORDER 锁失败（Mutex 中毒）")
+    LINUX_RECORDER.lock().unwrap_or_else(|e| {
+        tracing::error!("LINUX_RECORDER Mutex 中毒: {:?}", e);
+        // 恢复锁并继续——poisoned Mutex 仍可访问，数据完整性由调用方保证
+        e.into_inner()
+    })
 }
 
 #[allow(dead_code)]
@@ -246,9 +250,13 @@ impl NodeExecutor for RecordingNode {
                     {
                         let mut guard = get_linux_recorder();
                         *guard = Some(crate::platform::recording::LinuxRecordingBackend::new());
-                        guard.as_ref()
-                            .expect("LinuxRecordingBackend 应在 Some 中")
-                            .start()?;
+                        match guard.as_ref() {
+                            Some(r) => r.start()?,
+                            None => {
+                                tracing::error!("LinuxRecordingBackend 意外为 None");
+                                return Err(anyhow::anyhow!("Linux 录制后端未初始化"));
+                            }
+                        }
                     }
                     DESKTOP_RECORDING.store(true, Ordering::SeqCst);
                     RECORDING_ACTIVE.store(true, Ordering::SeqCst);
@@ -274,7 +282,10 @@ impl NodeExecutor for RecordingNode {
                     let (actions, _dropped_guard) = {
                         let mut guard = get_linux_recorder();
                         let actions = if let Some(ref recorder) = *guard {
-                            recorder.stop().unwrap_or_default()
+                            recorder.stop().unwrap_or_else(|e| {
+                                tracing::warn!("录制停止失败: {}", e);
+                                Vec::new()
+                            })
                         } else {
                             Vec::new()
                         };
@@ -324,9 +335,13 @@ impl NodeExecutor for RecordingNode {
                             let started = {
                                 let mut guard = get_linux_recorder();
                                 *guard = Some(crate::platform::recording::LinuxRecordingBackend::new());
-                                guard.as_ref()
-                                    .expect("LinuxRecordingBackend 应在 Some 中")
-                                    .start()
+                                match guard.as_ref() {
+                                    Some(r) => r.start(),
+                                    None => {
+                                        tracing::error!("LinuxRecordingBackend 意外为 None");
+                                        Err(anyhow::anyhow!("Linux 录制后端未初始化"))
+                                    }
+                                }
                             };
                             match started {
                                 Ok(()) => {
@@ -390,7 +405,10 @@ impl NodeExecutor for RecordingNode {
                             use crate::platform::traits::RecordingBackend;
                             let mut guard = get_linux_recorder();
                             let actions = if let Some(ref recorder) = *guard {
-                                recorder.stop().unwrap_or_default()
+                                recorder.stop().unwrap_or_else(|e| {
+                                tracing::warn!("录制停止失败: {}", e);
+                                Vec::new()
+                            })
                             } else {
                                 Vec::new()
                             };

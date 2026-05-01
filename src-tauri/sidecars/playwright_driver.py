@@ -1221,57 +1221,69 @@ _recorded_actions: list = []
 
 async def _recording_start(params: dict) -> dict:
     """开始录制浏览器操作"""
-    global _recording, _recorded_actions
+    global _recording
     page = _get_page()
     if page is None:
         return {"success": False, "error": "无可用页面"}
 
-    _recorded_actions = []
     _recording = True
 
     try:
-        async def on_action(action_type: str, data: dict):
-            if _recording:
-                _recorded_actions.append({"type": action_type, **data})
-
-        try:
-            await page.expose_function("__wfRecord", on_action)
-        except Exception:
-            pass
+        # 用 evaluate 代替 expose_function，在 JS 端维护全局操作数组
+        # expose_function 在页面已加载后不可靠，改用 evaluate 读写全局变量
+        await page.evaluate("window.__wfActions = []")
 
         await page.evaluate("""
         () => {
             if (window.__wfRecording) return;
             window.__wfRecording = true;
+
+            function record(type, data) {
+                if (!window.__wfActions) window.__wfActions = [];
+                window.__wfActions.push(Object.assign({ type }, data));
+            }
+
             document.addEventListener('click', (e) => {
                 const t = e.target;
                 let sel = t.tagName.toLowerCase();
                 if (t.id) sel = '#' + t.id;
                 else if (t.className && typeof t.className === 'string')
                     sel += '.' + t.className.trim().split(/\\s+/)[0];
-                try { window.__wfRecord('click', {selector:sel, x:e.clientX, y:e.clientY}); } catch(e) {}
+                record('click', {selector:sel, x:e.clientX, y:e.clientY});
             }, true);
+
             document.addEventListener('change', (e) => {
                 const t = e.target;
                 if (['INPUT','TEXTAREA','SELECT'].includes(t.tagName)) {
                     let sel = t.tagName.toLowerCase();
                     if (t.id) sel = '#' + t.id;
-                    try { window.__wfRecord('fill', {selector:sel, value:t.value}); } catch(e) {}
+                    record('fill', {selector:sel, value:t.value});
                 }
             }, true);
         }
         """)
         return {"success": True, "data": {"message": "录制已开始，请在浏览器中操作"}}
     except Exception as e:
+        _recording = False
         return {"success": False, "error": f"启动录制失败: {e}"}
 
 
 async def _recording_stop() -> dict:
     """停止录制，返回操作列表"""
-    global _recording, _recorded_actions
+    global _recording
     _recording = False
-    actions = list(_recorded_actions)
-    _recorded_actions = []
+
+    page = _get_page()
+    if page is None:
+        return {"success": True, "data": {"message": "录制已停止，共 0 个操作", "actions": []}}
+
+    try:
+        actions = await page.evaluate("window.__wfActions || []")
+        # 清理
+        await page.evaluate("delete window.__wfActions; delete window.__wfRecording")
+    except Exception:
+        actions = []
+
     return {"success": True, "data": {"message": f"录制已停止，共 {len(actions)} 个操作", "actions": actions}}
 
 

@@ -147,10 +147,16 @@ impl BrowserSidecar {
     pub async fn shutdown(&self) -> Result<()> {
         self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
         let _ = self.send_action_inner("shutdown", serde_json::json!({})).await;
-        // 等待子进程退出
+        // 等待子进程退出（30s 超时，超时则强制 kill）
         let mut guard = self.child.lock().await;
         if let Some(ref mut child) = *guard {
-            let _ = child.wait().await;
+            match tokio::time::timeout(std::time::Duration::from_secs(30), child.wait()).await {
+                Ok(_) => {}
+                Err(_) => {
+                    tracing::warn!("Sidecar shutdown 超时，强制 kill");
+                    let _ = child.kill().await;
+                }
+            }
         }
         Ok(())
     }
@@ -510,7 +516,9 @@ pub async fn send_sidecar_action(action: &str, params: &serde_json::Value) -> Re
 
     // 自动 launch
     if action != "launch" && action != "close" && action != "shutdown" && action != "ping" {
-        let launch_params = serde_json::json!({"headless": true});
+        // 录制/拾取需要用户可见浏览器，非 headless
+        let headless = action != "recording_start" && action != "pick";
+        let launch_params = serde_json::json!({"headless": headless});
         let _ = sidecar.send_action("launch", launch_params).await;
     }
 
@@ -591,7 +599,14 @@ impl NodeExecutor for BrowserNode {
 }
 
 /// 错误截图：保存浏览器当前画面到 screenshots/ 目录
+/// 直接从 sidecar 实例截图，避免 send_sidecar_action 的 auto-launch 逻辑
 async fn try_error_screenshot(step: &Step) -> Option<String> {
+    let sidecar = SIDECAR.read().await;
+    let sidecar = sidecar.as_ref()?;
+    if !sidecar.is_healthy() {
+        return None;
+    }
+
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let dir = std::env::current_exe().ok()?.parent()?.join("screenshots");
     std::fs::create_dir_all(&dir).ok()?;
@@ -599,7 +614,7 @@ async fn try_error_screenshot(step: &Step) -> Option<String> {
     let path = dir.join(&filename);
 
     let params = serde_json::json!({"path": path.to_string_lossy().to_string()});
-    let _ = send_sidecar_action("screenshot", &params).await;
+    let _ = sidecar.send_action("screenshot", params).await;
 
     if path.exists() {
         Some(path.to_string_lossy().to_string())

@@ -36,7 +36,12 @@ pub async fn browser_recording_stop() -> Result<serde_json::Value, String> {
         .as_array()
         .map(|arr| {
             arr.iter()
-                .filter_map(|a| serde_json::from_value(a.clone()).ok())
+                .filter_map(|a| {
+                    match serde_json::from_value(a.clone()) {
+                        Ok(v) => Some(v),
+                        Err(e) => { tracing::warn!("跳过无法解析的录制操作: {}", e); None }
+                    }
+                })
                 .collect()
         })
         .unwrap_or_default();

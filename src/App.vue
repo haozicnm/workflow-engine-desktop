@@ -13,17 +13,19 @@ const { toasts, remove } = useToast()
     <header class="app-header">
       <RouterLink to="/" class="app-brand">
         <span class="brand-icon">⚡</span>
-        <span class="brand-text">Workflow Engine 2.0</span>
+        <span class="brand-text">Workflow Engine</span>
       </RouterLink>
       <nav class="app-nav">
         <RouterLink to="/" :class="{ active: route.path === '/' }">📋 工作流</RouterLink>
         <RouterLink to="/editor/new" :class="{ active: route.path.startsWith('/editor') }">📝 编辑器</RouterLink>
-        <RouterLink to="/history" :class="{ active: route.path.startsWith('/history') }">📊 历史</RouterLink>
-        <RouterLink to="/settings" :class="{ active: route.path === '/settings' }">⚙️ 设置</RouterLink>
       </nav>
     </header>
     <main class="app-main">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <KeepAlive :include="['LiteGraphEditor']">
+          <component :is="Component" />
+        </KeepAlive>
+      </RouterView>
     </main>
     <StatusBar />
 

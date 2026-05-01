@@ -148,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick, toRaw } from 'vue'
 import { useRoute } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
@@ -177,6 +177,10 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const wrapperRef = ref<HTMLDivElement | null>(null)
 let graph: LGraph
 let canvas: LGraphCanvas
+/** 需要 onUnmounted 清理的资源 */
+let _resizeObserver: ResizeObserver | null = null
+let _resizeHandler: (() => void) | null = null
+let _canvasMounted = false  // 防止卸载后 raf 回调执行
 
 // ─── 本地状态 ───
 const selectedLgNode = ref<LGraphNode | null>(null)
@@ -248,6 +252,16 @@ watch(selectedLgNode, (node) => {
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
+/** 浅比较两个 record 的键值是否不同 */
+function shallowDiff(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keysA = Object.keys(a)
+  const keysB = Object.keys(b)
+  if (keysA.length !== keysB.length) return true
+  for (const k of keysA) {
+    if (a[k] !== b[k]) return true
+  }
+  return false
+}
 /** 通过 store 的 string ID 查找 LiteGraph 节点 */
 function findLgNode(storeId: string): LGraphNode | undefined {
   return graph._nodes?.find((n: LGraphNode) => String(n.id) === storeId)
@@ -268,6 +282,7 @@ function throttledSync() {
       pendingRaf = true
       requestAnimationFrame(() => {
         pendingRaf = false
+        if (!_canvasMounted) return
         if (!syncingFromStore) {
           syncGraphToStore()
           undoManager.pushState()
@@ -374,11 +389,17 @@ onMounted(() => {
       const cw = wrapperRef.value.clientWidth
       const ch = wrapperRef.value.clientHeight
       if (cw > 0 && ch > 0 && (canvasRef.value.width !== cw || canvasRef.value.height !== ch)) {
+        // 更新 DOM 元素分辨率（防止 canvas 被 CSS 拉伸）
+        canvasRef.value.width = cw
+        canvasRef.value.height = ch
+        // 同步 LiteGraph 内部 DragAndScale
         canvas.resize(cw, ch)
       }
     }
     const ro = new ResizeObserver(resizeHandler)
     ro.observe(wrapperRef.value!)
+    _resizeObserver = ro
+    _resizeHandler = resizeHandler
     window.addEventListener('resize', resizeHandler)
 
     // 监听 graph 变化 → 同步到 store
@@ -421,12 +442,48 @@ onMounted(() => {
     autoSave.start()
     // 键盘快捷键
     document.addEventListener('keydown', onKeyDown)
+    _canvasMounted = true
   }
 })
 
 onUnmounted(() => {
+  _canvasMounted = false
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
+  // 清理 ResizeObserver 和 window resize
+  if (_resizeObserver) {
+    _resizeObserver.disconnect()
+    _resizeObserver = null
+  }
+  if (_resizeHandler) {
+    window.removeEventListener('resize', _resizeHandler)
+    _resizeHandler = null
+  }
+  // 清理 graph/canvas 回调
+  if (graph) {
+    graph.on_change = undefined
+    graph.onAfterChange = undefined
+    graph.onConnectionChange = undefined
+  }
+  if (canvas) {
+    canvas.onSelectionChange = undefined
+    canvas.onDrawBackground = undefined
+  }
+  // 清理 DAG 事件监听器
+  cleanupDagListeners()
+})
+
+// KeepAlive 激活时刷新画布（切换路由回来不会卡死）
+onActivated(() => {
+  if (canvas) {
+    nextTick(() => {
+      canvas.allow_dragnodes = true
+      canvas.allow_dragcanvas = true
+      canvas.allow_interaction = true
+      canvas.setDirty(true, true)
+      canvas.adjustNodesWidth?.()
+    })
+  }
 })
 
 // ─── LiteGraph 节点 → FlowNode 转换 ───
@@ -477,7 +534,8 @@ function syncGraphToStore() {
           existing.position.x !== ln.pos[0] ||
           existing.position.y !== ln.pos[1]
         const labelChanged = existing.label !== (ln.title || ln.type || '')
-        const configChanged = JSON.stringify(existing.config) !== JSON.stringify(config)
+        // 浅比较 config 键值（避免 JSON.stringify 大对象性能问题）
+        const configChanged = shallowDiff(existing.config, config)
 
         if (posChanged) {
           store.updateNodePosition(nodeId, { x: ln.pos[0], y: ln.pos[1] })
@@ -520,7 +578,7 @@ function syncEdgesToStore() {
   const linkValues = [...((graph as any)._links?.values() || [])]
   if (linkValues.length === 0) {
     // 快速路径：无 link 时只清理 store 中的旧边
-    if (store.edges.length > 0) store.clearEdges?.() || store.edges.forEach(e => store.removeEdge(e.id))
+    if (store.edges.length > 0) store.edges.forEach(e => store.removeEdge(e.id))
     return
   }
 
@@ -623,6 +681,10 @@ function loadFromStore() {
   // 重新同步 store，将 LiteGraph 生成的整数 ID 写回
   syncGraphToStore()
   store.dirty = false
+  // 确保交互属性
+  canvas.allow_dragnodes = true
+  canvas.allow_dragcanvas = true
+  canvas.allow_interaction = true
   // 强制刷新画布，清除可能的残留渲染（解决隐形窗口/鬼影连线问题）
   canvas.setDirty(true, true)
   // 自适应视图使所有节点可见
@@ -656,7 +718,10 @@ function onDrop(event: DragEvent) {
   const def = getNodeDef(nodeType)
   if (!def) return
 
-  const rect = canvasRef.value!.getBoundingClientRect()
+  // 画布可能尚未初始化完成
+  if (!canvasRef.value || !canvas) return
+
+  const rect = canvasRef.value.getBoundingClientRect()
   // ComfyUI LiteGraph: DragAndScale 用数组 [x,y] 格式，不是 {x,y} 对象
   const canvasCoords = canvas.convertOffsetToCanvas(
     [event.clientX - rect.left, event.clientY - rect.top],
@@ -689,19 +754,22 @@ function onDrop(event: DragEvent) {
 
 // ─── 属性面板回调 ───
 function onUpdateLabel(node: LGraphNode, label: string) {
-  node.title = label
+  const raw = toRaw(node)
+  raw.title = label
   graph.setDirtyCanvas(true)
-  store.updateNodeLabel(String(node.id), label)
+  store.updateNodeLabel(String(raw.id), label)
 }
 
 function onUpdateWidget(node: LGraphNode, widgetName: string, value: unknown) {
-  const widget = node.widgets?.find(w => w.name === widgetName)
+  // toRaw 绕过 Vue reactive proxy，ComfyUI LiteGraph 用 ES private 字段
+  const raw = toRaw(node)
+  const widget = raw.widgets?.find(w => w.name === widgetName)
   if (widget) {
     widget.value = value
     graph.setDirtyCanvas(true)
   }
-  store.updateNodeConfig(String(node.id), { [widgetName]: value })
-  widgetVersion.value++  // 触发 PropertyPanel 重新读取 widgets
+  store.updateNodeConfig(String(raw.id), { [widgetName]: value })
+  widgetVersion.value++
 }
 
 function onDeleteNode(node: LGraphNode) {

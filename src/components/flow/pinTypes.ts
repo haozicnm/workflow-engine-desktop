@@ -270,7 +270,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       { id: 'body', label: 'body', type: 'object' },
     ],
     outputs: [{ id: 'result', label: 'result', type: 'object' }],
-    defaultConfig: { url: '', method: 'GET', timeout: 30 },
+    defaultConfig: { url: '', method: 'GET' },
   },
   {
     type: 'file',
@@ -414,7 +414,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       { id: 'result', label: 'result', type: 'boolean' },
       { id: 'branch', label: 'branch', type: 'string' },
     ],
-    defaultConfig: { left: '', op: '>', right: '0' },
+    defaultConfig: { op: '==', left: '', right: '' },
   },
   {
     type: 'delay',
@@ -458,7 +458,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     description: '同时执行多个子步骤',
     inputs: [{ id: 'input', label: 'input', type: 'object' }],
     outputs: [{ id: 'results', label: 'results', type: 'array' }],
-    defaultConfig: { steps: [], concurrency: 4 },
+    defaultConfig: { branch_count: 2 },
   },
   {
     type: 'approval',
@@ -472,7 +472,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
       { id: 'approved', label: '通过', type: 'object' },
       { id: 'rejected', label: '拒绝', type: 'object' },
     ],
-    defaultConfig: { title: '', approvers: [], timeout_hours: 24 },
+    defaultConfig: { message: '请审批此操作', timeout: 300 },
   },
 
   // ═══════════════════════════════════════════

@@ -2,8 +2,10 @@
 import { ref, onMounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
+import pkg from '../../package.json'
 
 const toast = useToast()
+const APP_VERSION = pkg.version
 
 const settings = ref({
   theme: 'system',
@@ -176,6 +178,21 @@ async function clearLogs() {
       </div>
     </section>
 
+    <!-- 版本信息 -->
+    <section class="settings-section">
+      <h2>📦 版本信息</h2>
+      <p class="section-desc">当前版本及更新记录。</p>
+      <div class="version-info">
+        <span class="version-tag">v{{ APP_VERSION }}</span>
+      </div>
+      <div class="changelog">
+        <h3>更新明细</h3>
+        <div class="changelog-item"><strong>v2.1</strong> — ComfyUI 风格 DAG 编辑器 · LiteGraph 画布 · 浏览器录制 · 拾取元素</div>
+        <div class="changelog-item"><strong>v2.0</strong> — Rust DAG 引擎重写 · Tauri 2.0 桌面应用 · 25+ 节点类型</div>
+        <div class="changelog-item"><strong>v1.x</strong> — YAML 工作流引擎原型 · Web 前端 · Playwright 自动化</div>
+      </div>
+    </section>
+
     <div class="save-bar">
       <button class="btn-save" @click="save" :disabled="saving">
         {{ saving ? '保存中...' : '💾 保存设置' }}
@@ -248,4 +265,18 @@ async function clearLogs() {
 }
 .btn-log:hover { border-color: #58a6ff; background: #1f2a37; }
 .btn-log-danger:hover { border-color: #f85149; background: #2a1215; color: #f85149; }
+
+.version-info { margin-bottom: 16px; }
+.version-tag {
+  display: inline-block; padding: 4px 12px; background: #1f6feb22;
+  border: 1px solid #1f6feb; border-radius: 20px;
+  color: #58a6ff; font-size: 14px; font-weight: 700;
+}
+.changelog h3 { font-size: 13px; color: #e6edf3; margin: 0 0 8px 0; }
+.changelog-item {
+  font-size: 12px; color: #8b949e; padding: 6px 0;
+  border-bottom: 1px solid #21262d;
+}
+.changelog-item:last-child { border-bottom: none; }
+.changelog-item strong { color: #e6edf3; }
 </style>
