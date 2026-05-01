@@ -49,7 +49,7 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
             if !base.exists() { continue }
             if let Ok(entries) = std::fs::read_dir(base) {
                 for e in entries.flatten() {
-                    let name = e.file_name().to_string_lossy();
+                    let name = e.file_name().to_string_lossy().to_string();
                     if name.starts_with("Python3") {
                         let py = e.path().join("python.exe");
                         if py.exists() { found.push(py); }
