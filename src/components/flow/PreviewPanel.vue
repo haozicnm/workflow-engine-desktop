@@ -112,7 +112,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { toRaw } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../../utils/tauri'
 import type { LGraphNode, IBaseWidget } from '@comfyorg/litegraph'
 
 // ═══ Props ═══
@@ -295,7 +295,7 @@ async function loadBrowserPreview(node: LGraphNode) {
     return
   }
 
-  const result: any = await invoke('web_scrape_preview', {
+  const result: any = await safeInvoke('web_scrape_preview', {
     url,
     headless: true,
     viewportWidth: 1280,
@@ -323,7 +323,7 @@ async function loadExcelPreview(node: LGraphNode) {
   }
 
   const sheet = getWidgetValue(node, 'sheet') || undefined
-  const result: any = await invoke('preview_excel', { path, sheet })
+  const result: any = await safeInvoke('preview_excel', { path, sheet })
 
   if (result.error) {
     error.value = result.error
@@ -344,7 +344,7 @@ async function loadWordPreview(node: LGraphNode) {
     return
   }
 
-  const result: any = await invoke('preview_word', { path })
+  const result: any = await safeInvoke('preview_word', { path })
 
   if (result.error) {
     error.value = result.error

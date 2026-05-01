@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 
 const toast = useToast()
@@ -53,7 +53,7 @@ onMounted(async () => {
 
 async function loadWorkflowList() {
   try {
-    const list: any[] = await invoke('workflow_list')
+    const list: any[] = await safeInvoke('workflow_list')
     workflowList.value = list.map(w => ({ id: w.id, name: w.name }))
   } catch (e) {
     console.warn('加载工作流列表失败:', e)
@@ -63,7 +63,7 @@ async function loadWorkflowList() {
 async function loadRuns() {
   loading.value = true
   try {
-    runs.value = await invoke<RunHistoryItem[]>('run_list', {
+    runs.value = await safeInvoke<RunHistoryItem[]>('run_list', {
       workflowId: filterWorkflowId.value,
       limit: 100,
     })
@@ -83,7 +83,7 @@ async function toggleExpand(runId: string) {
   if (!detailCache.value[runId]) {
     loadingDetail.value = runId
     try {
-      const detail = await invoke<RunDetail>('run_detail', { runId })
+      const detail = await safeInvoke<RunDetail>('run_detail', { runId })
       detailCache.value[runId] = detail
     } catch (e: any) {
       toast.error('加载详情失败: ' + (e.message || e))

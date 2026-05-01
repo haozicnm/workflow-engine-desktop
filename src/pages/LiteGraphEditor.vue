@@ -115,24 +115,8 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
-import { invoke } from '@tauri-apps/api/core'
 import type { UnlistenFn } from '@tauri-apps/api/event'
-
-// Dev mode: Tauri invoke/event not available
-const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
-
-async function safeInvoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauri) {
-    throw new Error('此功能需要 Tauri 桌面运行时（当前为开发模式）')
-  }
-  return invoke<T>(cmd, args)
-}
-
-async function safeListen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {
-  if (!isTauri) return () => {}
-  const { listen } = await import('@tauri-apps/api/event')
-  return listen<T>(event, handler)
-}
+import { safeInvoke, safeListen } from '../utils/tauri'
 import { useFlowStore } from '../stores/flowStore'
 import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'

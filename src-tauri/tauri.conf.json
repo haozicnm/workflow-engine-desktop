@@ -1,6 +1,6 @@
 {
-  "productName": "Workflow Engine 2.1",
-  "version": "2.1.0",
+  "productName": "Workflow Engine",
+  "version": "2.1.1",
   "identifier": "com.workflow-engine.desktop",
   "build": {
     "frontendDist": "../src/dist",
@@ -26,7 +26,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"

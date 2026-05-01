@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import { describeCron } from '../utils/cron'
 
@@ -72,10 +72,10 @@ async function save() {
   saving.value = true
   try {
     if (editingId.value) {
-      await invoke('schedule_update', { id: editingId.value, cronExpr: cronExpr.value.trim() })
+      await safeInvoke('schedule_update', { id: editingId.value, cronExpr: cronExpr.value.trim() })
       toast.success('计划已更新')
     } else {
-      await invoke('schedule_create', { workflowId: workflowId.value, cronExpr: cronExpr.value.trim() })
+      await safeInvoke('schedule_create', { workflowId: workflowId.value, cronExpr: cronExpr.value.trim() })
       toast.success('计划已创建')
     }
     show.value = false

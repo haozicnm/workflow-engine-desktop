@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../utils/tauri'
 import yaml from 'js-yaml'
 import { useEditorStore } from './editorStore'
 import type { WorkflowListItem, WorkflowFull } from '../types/workflow'
@@ -16,7 +16,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
   async function fetchList() {
     loading.value = true
     try {
-      workflowList.value = await invoke<WorkflowListItem[]>('workflow_list')
+      workflowList.value = await safeInvoke<WorkflowListItem[]>('workflow_list')
     } catch (e) {
       console.error('获取工作流列表失败:', e)
     } finally {
@@ -29,7 +29,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
   async function loadWorkflow(id: string) {
     loading.value = true
     try {
-      const wf = await invoke<WorkflowFull | null>('workflow_get', { id })
+      const wf = await safeInvoke<WorkflowFull | null>('workflow_get', { id })
       if (wf) {
         currentId.value = wf.id
         const editor = useEditorStore()
@@ -51,19 +51,19 @@ export const useWorkflowStore = defineStore('workflow', () => {
     try {
       const editor = useEditorStore()
       if (!currentId.value) {
-        const id = await invoke<string>('workflow_create', {
+        const id = await safeInvoke<string>('workflow_create', {
           name: editor.workflowName,
           description: editor.workflowDesc,
         })
         currentId.value = id
       }
-      await invoke('workflow_update', {
+      await safeInvoke('workflow_update', {
         id: currentId.value,
         name: editor.workflowName,
         description: editor.workflowDesc,
         enabled: true,
       })
-      await invoke('workflow_save_yaml', {
+      await safeInvoke('workflow_save_yaml', {
         id: currentId.value,
         yaml: editor.yamlText,
       })
@@ -80,14 +80,14 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   async function cloneWorkflow(id: string): Promise<string | null> {
     try {
-      const wf = await invoke<WorkflowFull | null>('workflow_get', { id })
+      const wf = await safeInvoke<WorkflowFull | null>('workflow_get', { id })
       if (!wf) return null
-      const newId = await invoke<string>('workflow_create', {
+      const newId = await safeInvoke<string>('workflow_create', {
         name: wf.name + '（副本）',
         description: wf.description,
       })
       if (wf.yaml) {
-        await invoke('workflow_save_yaml', { id: newId, yaml: wf.yaml })
+        await safeInvoke('workflow_save_yaml', { id: newId, yaml: wf.yaml })
       }
       return newId
     } catch (e) {

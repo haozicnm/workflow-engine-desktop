@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../utils/tauri'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from '../composables/useToast'
 import WorkflowGrid from '../components/WorkflowGrid.vue'
@@ -79,7 +79,7 @@ onMounted(async () => {
   // 监听工作流执行结果
   try {
     const { listen } = await import('@tauri-apps/api/event')
-    unlistenRunUpdate = await listen('run-update', (event: { payload: { status: string; error?: string } }) => {
+    unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
       if (status === 'completed') {
         toast.success('工作流执行完成 ✅')
@@ -99,7 +99,7 @@ onUnmounted(() => {
 async function loadList() {
   loading.value = true
   try {
-    workflows.value = await invoke<WorkflowItem[]>('workflow_list')
+    workflows.value = await safeInvoke<WorkflowItem[]>('workflow_list')
   } catch (e: unknown) {
     toast.error('获取工作流列表失败: ' + ((e as Error).message || e))
   } finally {
@@ -109,7 +109,7 @@ async function loadList() {
 
 async function loadTemplates() {
   try {
-    const result = await invoke<TemplateItem[]>('template_list')
+    const result = await safeInvoke<TemplateItem[]>('template_list')
     templates.value = result
     if (!result || result.length === 0) {
       toast.error('未找到内置模板')
@@ -143,7 +143,7 @@ async function createFromTemplate(tpl: TemplateItem) {
     let data: { name?: string; nodes?: unknown[]; edges?: unknown[] }
 
     try {
-      const jsonStr = await invoke<string | null>('template_get_json', { id: tpl.id })
+      const jsonStr = await safeInvoke<string | null>('template_get_json', { id: tpl.id })
       if (!jsonStr) { toast.error('模板数据为空'); return }
       data = JSON.parse(jsonStr)
     } catch {
@@ -172,7 +172,7 @@ async function createFromTemplate(tpl: TemplateItem) {
 
 async function toggleEnabled(item: WorkflowItem) {
   try {
-    await invoke('workflow_update', { id: item.id, enabled: !item.enabled })
+    await safeInvoke('workflow_update', { id: item.id, enabled: !item.enabled })
     item.enabled = !item.enabled
     toast.success(`已${item.enabled ? '启用' : '禁用'}「${item.name}」`)
   } catch (e: unknown) {
@@ -184,7 +184,7 @@ async function deleteWorkflow(item: WorkflowItem) {
   if (!confirm(`确定删除「${item.name}」？此操作不可撤销。`)) return
   deleting.value = item.id
   try {
-    await invoke('workflow_delete', { id: item.id })
+    await safeInvoke('workflow_delete', { id: item.id })
     workflows.value = workflows.value.filter(w => w.id !== item.id)
     toast.success(`已删除「${item.name}」`)
   } catch (e: unknown) {
@@ -194,7 +194,7 @@ async function deleteWorkflow(item: WorkflowItem) {
 
 async function runWorkflow(item: WorkflowItem) {
   try {
-    await invoke<string>('run_start', { workflowId: item.id })
+    await safeInvoke<string>('run_start', { workflowId: item.id })
     toast.info(`「${item.name}」已启动`)
   } catch (e: unknown) {
     toast.error('执行失败: ' + ((e as Error).message || e))
@@ -216,7 +216,7 @@ async function cloneWorkflow(item: WorkflowItem) {
 
 async function exportWorkflow(item: WorkflowItem) {
   try {
-    const wf = await invoke<{ yaml: string | null }>('workflow_get', { id: item.id })
+    const wf = await safeInvoke<{ yaml: string | null }>('workflow_get', { id: item.id })
     if (wf?.yaml) {
       const blob = new Blob([wf.yaml], { type: 'text/yaml' })
       const url = URL.createObjectURL(blob)
@@ -240,8 +240,8 @@ async function handleImport(e: Event) {
   try {
     const result = await store.importYaml(file)
     if (!result) { toast.error('导入失败: 无效的工作流 YAML'); return }
-    const id = await invoke<string>('workflow_create', { name: result.name, description: '从文件导入' })
-    await invoke('workflow_save_yaml', { id, yaml: result.yaml })
+    const id = await safeInvoke<string>('workflow_create', { name: result.name, description: '从文件导入' })
+    await safeInvoke('workflow_save_yaml', { id, yaml: result.yaml })
     toast.success(`已导入「${result.name}」`)
     await loadList()
   } catch (e: unknown) {
@@ -254,7 +254,7 @@ async function handleImport(e: Event) {
 async function loadSchedules() {
   scheduleLoading.value = true
   try {
-    schedules.value = await invoke<ScheduleInfo[]>('schedule_list')
+    schedules.value = await safeInvoke<ScheduleInfo[]>('schedule_list')
   } catch (e) {
     console.warn('加载计划失败:', e)
   } finally { scheduleLoading.value = false }
@@ -262,7 +262,7 @@ async function loadSchedules() {
 
 async function toggleSchedule(s: ScheduleInfo) {
   try {
-    await invoke('schedule_update', { id: s.id, enabled: !s.enabled })
+    await safeInvoke('schedule_update', { id: s.id, enabled: !s.enabled })
     s.enabled = !s.enabled
     toast.success(`计划已${s.enabled ? '启用' : '禁用'}`)
   } catch (e: unknown) {
@@ -273,7 +273,7 @@ async function toggleSchedule(s: ScheduleInfo) {
 async function deleteSchedule(s: ScheduleInfo) {
   if (!confirm(`确定删除此定时计划？`)) return
   try {
-    await invoke('schedule_delete', { id: s.id })
+    await safeInvoke('schedule_delete', { id: s.id })
     schedules.value = schedules.value.filter(x => x.id !== s.id)
     toast.success('计划已删除')
   } catch (e: unknown) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
+import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 
 const toast = useToast()
@@ -35,13 +35,13 @@ const logLevelOptions = [
 onMounted(async () => {
   loading.value = true
   try {
-    const s = await invoke<any>('settings_get').catch(() => ({}))
+    const s = await safeInvoke<any>('settings_get').catch(() => ({}))
     settings.value = { ...settings.value, ...(s || {}) }
   } catch (e: any) {
     console.warn('加载设置失败，使用默认值:', e)
   }
   try {
-    sysInfo.value = await invoke('system_check_browser')
+    sysInfo.value = await safeInvoke('system_check_browser')
   } catch (e: any) {
     console.warn('获取系统信息失败:', e)
   }
@@ -51,7 +51,7 @@ onMounted(async () => {
 async function save() {
   saving.value = true
   try {
-    await invoke('settings_update', { settings: settings.value })
+    await safeInvoke('settings_update', { settings: settings.value })
     toast.success('设置已保存')
   } catch (e: any) {
     toast.error('保存失败: ' + e)
@@ -62,7 +62,7 @@ async function save() {
 
 async function openLogDir() {
   try {
-    await invoke('open_log_dir')
+    await safeInvoke('open_log_dir')
   } catch (e: any) {
     toast.error('打开日志目录失败: ' + e)
   }
@@ -70,7 +70,7 @@ async function openLogDir() {
 
 async function clearLogs() {
   try {
-    await invoke('clear_logs')
+    await safeInvoke('clear_logs')
     toast.success('日志已清空')
   } catch (e: any) {
     toast.error('清空日志失败: ' + e)
