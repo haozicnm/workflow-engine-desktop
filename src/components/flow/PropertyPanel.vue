@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 import type { LGraphNode, IBaseWidget, IComboWidget } from '@comfyorg/litegraph'
 import { getNodeDef, pinColor } from './pinTypes'
 
@@ -196,8 +196,11 @@ const nodeDef = computed(() => {
   return getNodeDef(props.lgNode.type)
 })
 
+// ⚠️ ComfyUI LiteGraph 使用 ES2022 #private 字段
+// Vue reactive proxy 无法访问，必须 toRaw() 后再读 widgets
 const widgets = computed<IBaseWidget[]>(() => {
-  return props.lgNode?.widgets ?? []
+  const raw = props.lgNode ? toRaw(props.lgNode) : null
+  return raw?.widgets ?? []
 })
 
 const nodeOutput = computed(() => props.output)

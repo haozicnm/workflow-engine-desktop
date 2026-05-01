@@ -7,7 +7,7 @@ import {
 } from '@comfyorg/litegraph'
 
 // ═══════════════════════════════════════════
-// Color constants (dark theme)
+// Color constants (dark theme — improved contrast)
 // ═══════════════════════════════════════════
 const COLOR_AI = '#58a6ff'
 const COLOR_DATA = '#3fb950'
@@ -15,8 +15,9 @@ const COLOR_CONTROL = '#d29922'
 const COLOR_OUTPUT = '#f78166'
 const COLOR_DEFAULT = '#8b949e'
 
-const BG_DARK = '#161b22'
-const BOX_DARK = '#21262d'
+// 节点背景：画布是 #0d1117，需要明显反差
+const BG_DARK = '#1c2129'
+const BOX_DARK = '#2a3040'
 
 // ═══════════════════════════════════════════
 // Base class shared by all workflow nodes
@@ -42,7 +43,7 @@ class HttpNode extends WorkflowNode {
     super(title || 'HTTP 请求')
     this.color = COLOR_DATA
     this.addOutput('data', 'object')
-    this.addWidget('combo', 'method', 'GET', null, {
+    this.addWidget('combo', 'method', 'GET', null, { property: "method", 
       values: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
     })
     this.addWidget('string', 'url', 'https://httpbin.org/get', 'url')
@@ -63,7 +64,7 @@ class FileNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addOutput('data', 'string')
     this.addWidget('string', 'path', '', 'path')
-    this.addWidget('combo', 'encoding', 'utf-8', null, {
+    this.addWidget('combo', 'encoding', 'utf-8', null, { property: "encoding", 
       values: ['utf-8', 'ascii', 'latin1', 'utf-16', 'base64'],
     })
   }
@@ -82,7 +83,7 @@ class ClipboardNode extends WorkflowNode {
     super(title || '剪贴板')
     this.color = COLOR_DATA
     this.addOutput('data', 'string')
-    this.addWidget('combo', 'format', 'text', null, {
+    this.addWidget('combo', 'format', 'text', null, { property: "format", 
       values: ['text', 'html', 'image', 'files'],
     })
   }
@@ -122,7 +123,7 @@ class RegexNode extends WorkflowNode {
     this.addInput('data', 'string')
     this.addOutput('data', 'string')
     this.addWidget('string', 'pattern', '', 'pattern')
-    this.addWidget('combo', 'action', 'extract', null, {
+    this.addWidget('combo', 'action', 'extract', null, { property: "action", 
       values: ['extract', 'replace', 'match', 'split', 'test'],
     })
     this.addWidget('string', 'replacement', '', 'replacement')
@@ -144,7 +145,7 @@ class ArrayNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('data', 'array')
     this.addOutput('data', 'array')
-    this.addWidget('combo', 'action', 'filter', null, {
+    this.addWidget('combo', 'action', 'filter', null, { property: "action", 
       values: ['filter', 'map', 'sort', 'dedupe', 'slice', 'reverse', 'join', 'group'],
     })
     this.addWidget('string', 'expression', '', 'expression')
@@ -166,10 +167,10 @@ class ConvertNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('data', 'string')
     this.addOutput('data', 'string')
-    this.addWidget('combo', 'from', 'auto', null, {
+    this.addWidget('combo', 'from', 'auto', null, { property: "from", 
       values: ['auto', 'string', 'number', 'boolean', 'json', 'base64', 'hex'],
     })
-    this.addWidget('combo', 'to', 'string', null, {
+    this.addWidget('combo', 'to', 'string', null, { property: "to", 
       values: ['string', 'number', 'boolean', 'json', 'base64', 'hex'],
     })
   }
@@ -207,7 +208,7 @@ class DataNode extends WorkflowNode {
     super(title || '变量操作')
     this.color = COLOR_DATA
     this.addOutput('data', 'any')
-    this.addWidget('combo', 'action', 'set', null, {
+    this.addWidget('combo', 'action', 'set', null, { property: "action", 
       values: ['set', 'get', 'merge', 'default', 'delete', 'length', 'keys'],
     })
     this.addWidget('string', 'key', '', 'key')
@@ -261,7 +262,7 @@ class LoopNode extends WorkflowNode {
       max: 100000,
       step2: 100,
     })
-    this.addWidget('combo', 'on_error', 'fail', null, {
+    this.addWidget('combo', 'on_error', 'fail', null, { property: "on_error", 
       values: ['fail', 'skip', 'retry'],
     })
   }
@@ -282,7 +283,7 @@ class WhileNode extends WorkflowNode {
     this.addInput('trigger', 'action')
     this.addOutput('body', 'action')
     this.addOutput('done', 'action')
-    this.addWidget('combo', 'condition_op', 'not_empty', null, {
+    this.addWidget('combo', 'condition_op', 'not_empty', null, { property: "condition_op", 
       values: ['not_empty', 'is_empty', 'equals', 'contains', 'gt', 'lt'],
     })
     this.addWidget('number', 'max_iterations', 1000, 'max_iterations', {
@@ -308,7 +309,7 @@ class ConditionNode extends WorkflowNode {
     this.addInput('trigger', 'action')
     this.addOutput('true', 'action')
     this.addOutput('false', 'action')
-    this.addWidget('combo', 'op', '==', null, {
+    this.addWidget('combo', 'op', '==', null, { property: "op", 
       values: [
         '==', '!=', '>', '<', '>=', '<=',
         'contains', 'starts_with', 'ends_with',
@@ -402,7 +403,7 @@ class AiNode extends WorkflowNode {
     this.color = COLOR_AI
     this.addInput('prompt', 'string')
     this.addOutput('result', 'string')
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: [
         'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4o',
         'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku',
@@ -437,19 +438,19 @@ class AiTranslateNode extends WorkflowNode {
     this.color = COLOR_AI
     this.addInput('text', 'string')
     this.addOutput('result', 'string')
-    this.addWidget('combo', 'source_lang', 'auto', null, {
+    this.addWidget('combo', 'source_lang', 'auto', null, { property: "source_lang", 
       values: [
         'auto', 'zh', 'en', 'ja', 'ko', 'fr', 'de', 'es',
         'pt', 'ru', 'ar', 'hi', 'th', 'vi', 'it', 'nl',
       ],
     })
-    this.addWidget('combo', 'target_lang', 'en', null, {
+    this.addWidget('combo', 'target_lang', 'en', null, { property: "target_lang", 
       values: [
         'en', 'zh', 'ja', 'ko', 'fr', 'de', 'es',
         'pt', 'ru', 'ar', 'hi', 'th', 'vi', 'it', 'nl',
       ],
     })
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'claude-3-haiku'],
     })
   }
@@ -469,7 +470,7 @@ class AiSummarizeNode extends WorkflowNode {
     this.color = COLOR_AI
     this.addInput('text', 'string')
     this.addOutput('result', 'string')
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'claude-3-haiku'],
     })
     this.addWidget('number', 'max_length', 200, 'max_length', {
@@ -495,7 +496,7 @@ class AiClassifyNode extends WorkflowNode {
     this.addInput('text', 'string')
     this.addOutput('result', 'string')
     this.addWidget('string', 'labels', '', 'labels')
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'claude-3-haiku'],
     })
   }
@@ -515,7 +516,7 @@ class AiSentimentNode extends WorkflowNode {
     this.color = COLOR_AI
     this.addInput('text', 'string')
     this.addOutput('result', 'string')
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'claude-3-haiku'],
     })
   }
@@ -536,7 +537,7 @@ class AiEntitiesNode extends WorkflowNode {
     this.addInput('text', 'string')
     this.addOutput('result', 'string')
     this.addWidget('string', 'entity_types', 'person,org,location', 'entity_types')
-    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, {
+    this.addWidget('combo', 'model', 'gpt-3.5-turbo', null, { property: "model", 
       values: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'claude-3-haiku'],
     })
   }
@@ -561,10 +562,10 @@ class FileSaveNode extends WorkflowNode {
     this.addInput('data', 'string')
     this.addOutput('trigger', 'action')
     this.addWidget('string', 'path', './output.txt', 'path')
-    this.addWidget('combo', 'format', 'json', null, {
+    this.addWidget('combo', 'format', 'json', null, { property: "format", 
       values: ['json', 'yaml', 'csv', 'txt', 'binary', 'auto'],
     })
-    this.addWidget('combo', 'encoding', 'utf-8', null, {
+    this.addWidget('combo', 'encoding', 'utf-8', null, { property: "encoding", 
       values: ['utf-8', 'ascii', 'latin1', 'utf-16', 'base64'],
     })
   }
@@ -603,7 +604,7 @@ class NotifyNode extends WorkflowNode {
     this.color = COLOR_OUTPUT
     this.addInput('trigger', 'action')
     this.addOutput('trigger', 'action')
-    this.addWidget('combo', 'notify_type', 'system', null, {
+    this.addWidget('combo', 'notify_type', 'system', null, { property: "notify_type", 
       values: ['system', 'email', 'feishu', 'wechat', 'sms', 'webhook'],
     })
     this.addWidget('string', 'title', '通知标题', 'title')
@@ -629,12 +630,12 @@ class MouseKeyboardNode extends WorkflowNode {
     this.color = COLOR_DEFAULT
     this.addInput('trigger', 'action')
     this.addOutput('trigger', 'action')
-    this.addWidget('combo', 'action', 'click', null, {
+    this.addWidget('combo', 'action', 'click', null, { property: "action", 
       values: ['click', 'dblclick', 'move', 'drag', 'scroll', 'type', 'keypress', 'hotkey'],
     })
     this.addWidget('number', 'x', 0, 'x')
     this.addWidget('number', 'y', 0, 'y')
-    this.addWidget('combo', 'button', 'left', null, {
+    this.addWidget('combo', 'button', 'left', null, { property: "button", 
       values: ['left', 'right', 'middle'],
     })
   }
@@ -654,7 +655,7 @@ class WindowNode extends WorkflowNode {
     this.color = COLOR_DEFAULT
     this.addInput('trigger', 'action')
     this.addOutput('trigger', 'action')
-    this.addWidget('combo', 'action', 'find', null, {
+    this.addWidget('combo', 'action', 'find', null, { property: "action", 
       values: ['find', 'focus', 'minimize', 'maximize', 'close', 'resize', 'move', 'screenshot'],
     })
     this.addWidget('string', 'title', '', 'title')
@@ -679,7 +680,7 @@ class RecordingNode extends WorkflowNode {
     this.color = COLOR_DEFAULT
     this.addInput('trigger', 'action')
     this.addOutput('trigger', 'action')
-    this.addWidget('combo', 'action', 'start', null, {
+    this.addWidget('combo', 'action', 'start', null, { property: "action", 
       values: ['start', 'stop', 'play', 'save', 'load'],
     })
     this.addWidget('toggle', 'headless', false, 'headless')
@@ -701,10 +702,10 @@ class OcrNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('image', 'string')
     this.addOutput('text', 'string')
-    this.addWidget('combo', 'action', 'read', null, {
+    this.addWidget('combo', 'action', 'read', null, { property: "action", 
       values: ['read', 'read_screen', 'read_region', 'read_clipboard'],
     })
-    this.addWidget('combo', 'language', 'auto', null, {
+    this.addWidget('combo', 'language', 'auto', null, { property: "language", 
       values: ['auto', 'chi_sim', 'chi_tra', 'eng', 'jpn', 'kor', 'fra', 'deu', 'spa'],
     })
   }
@@ -715,30 +716,173 @@ class OcrNode extends WorkflowNode {
 }
 
 /** 浏览器节点 - 控制浏览器执行操作 */
+/** 浏览器通用节点（万能兜底，支持自定义 action） */
 class BrowserNode extends WorkflowNode {
-  static title = '浏览器'
+  static title = '浏览器（万能）'
   static type = 'browser'
 
   constructor(title?: string) {
     super(title || '浏览器')
     this.color = COLOR_DATA
-    this.addInput('url', 'string')
+    this.addInput('input', 'any')
     this.addOutput('data', 'any')
-    this.addWidget('combo', 'action', 'navigate', null, {
-      values: ['navigate', 'click', 'fill', 'screenshot', 'pdf', 'execute', 'wait'],
-    })
+    this.addOutput('error', 'string')
+    this.addWidget('string', 'action', 'navigate', 'action')
     this.addWidget('string', 'url', 'https://example.com', 'url')
     this.addWidget('string', 'selector', '', 'selector')
-    this.addWidget('number', 'timeout', 30000, 'timeout', {
-      min: 1000,
-      max: 300000,
-      step2: 1000,
+    this.addWidget('string', 'value', '', 'value')
+    this.addWidget('number', 'timeout', 30000, 'timeout', { min: 1000, max: 300000, step2: 1000 })
+  }
+  onExecute(): void {}
+}
+
+// ═══════════════════════════════════════════════
+// 专用浏览器节点 (v2) — 每个映射一个 Playwright 动作
+// ═══════════════════════════════════════════════
+
+/** 导航到 URL */
+class BrowserNavigateNode extends WorkflowNode {
+  static title = '浏览器导航'
+  static type = 'browser_navigate'
+  constructor(title?: string) {
+    super(title || '导航')
+    this.color = COLOR_DATA
+    this.addInput('url', 'string')
+    this.addOutput('page', 'object')
+    this.addOutput('error', 'string')
+    this.addWidget('string', 'url', 'https://example.com', 'url')
+    this.addWidget('combo', 'wait_until', 'load', null, { property: "wait_until",
+      values: ['load', 'domcontentloaded', 'networkidle'],
     })
   }
+  onExecute(): void {}
+}
 
-  onExecute(): void {
-    // Drive browser
+/** 点击元素 */
+class BrowserClickNode extends WorkflowNode {
+  static title = '浏览器点击'
+  static type = 'browser_click'
+  constructor(title?: string) {
+    super(title || '点击')
+    this.color = COLOR_DATA
+    this.addInput('selector', 'string')
+    this.addOutput('data', 'object')
+    this.addOutput('error', 'string')
+    this.addWidget('string', 'selector', '', 'selector')
   }
+  onExecute(): void {}
+}
+
+/** 填写表单 */
+class BrowserFillNode extends WorkflowNode {
+  static title = '浏览器填写'
+  static type = 'browser_fill'
+  constructor(title?: string) {
+    super(title || '填写')
+    this.color = COLOR_DATA
+    this.addInput('selector', 'string')
+    this.addInput('value', 'string')
+    this.addOutput('data', 'object')
+    this.addOutput('error', 'string')
+    this.addWidget('string', 'selector', '', 'selector')
+    this.addWidget('string', 'value', '', 'value')
+    this.addWidget('toggle', 'clear', true, 'clear')
+  }
+  onExecute(): void {}
+}
+
+/** 提取页面数据 */
+class BrowserExtractNode extends WorkflowNode {
+  static title = '浏览器提取'
+  static type = 'browser_extract'
+  constructor(title?: string) {
+    super(title || '提取')
+    this.color = COLOR_DATA
+    this.addInput('selector', 'string')
+    this.addOutput('data', 'array')
+    this.addOutput('error', 'string')
+    this.addWidget('combo', 'mode', 'text', null, { property: "mode",
+      values: ['text', 'html', 'table', 'links', 'attribute'],
+    })
+    this.addWidget('string', 'selector', '', 'selector')
+    this.addWidget('string', 'attribute', 'href', 'attribute')
+  }
+  onExecute(): void {}
+}
+
+/** 截图 */
+class BrowserScreenshotNode extends WorkflowNode {
+  static title = '浏览器截图'
+  static type = 'browser_screenshot'
+  constructor(title?: string) {
+    super(title || '截图')
+    this.color = COLOR_DATA
+    this.addOutput('path', 'string')
+    this.addOutput('error', 'string')
+    this.addWidget('string', 'path', 'screenshot.png', 'path')
+    this.addWidget('toggle', 'full_page', false, 'full_page')
+  }
+  onExecute(): void {}
+}
+
+/** 执行 JS */
+class BrowserEvaluateNode extends WorkflowNode {
+  static title = '浏览器执行JS'
+  static type = 'browser_evaluate'
+  constructor(title?: string) {
+    super(title || '执行JS')
+    this.color = COLOR_DATA
+    this.addInput('script', 'string')
+    this.addOutput('result', 'any')
+    this.addOutput('error', 'string')
+    this.addWidget('text', 'script', 'document.title', 'script')
+  }
+  onExecute(): void {}
+}
+
+/** 滚动页面 */
+class BrowserScrollNode extends WorkflowNode {
+  static title = '浏览器滚动'
+  static type = 'browser_scroll'
+  constructor(title?: string) {
+    super(title || '滚动')
+    this.color = COLOR_DATA
+    this.addOutput('data', 'object')
+    this.addWidget('combo', 'direction', 'bottom', null, { property: "direction",
+      values: ['bottom', 'top'],
+    })
+    this.addWidget('number', 'times', 1, 'times', { min: 1, max: 100, step2: 1 })
+    this.addWidget('number', 'delay_ms', 500, 'delay_ms', { min: 0, max: 10000, step2: 100 })
+  }
+  onExecute(): void {}
+}
+
+/** 等待元素 */
+class BrowserWaitNode extends WorkflowNode {
+  static title = '浏览器等待'
+  static type = 'browser_wait'
+  constructor(title?: string) {
+    super(title || '等待')
+    this.color = COLOR_DATA
+    this.addInput('selector', 'string')
+    this.addOutput('found', 'boolean')
+    this.addWidget('string', 'selector', '', 'selector')
+    this.addWidget('number', 'timeout_ms', 30000, 'timeout_ms', { min: 1000, max: 300000, step2: 1000 })
+  }
+  onExecute(): void {}
+}
+
+/** 生成 PDF */
+class BrowserPdfNode extends WorkflowNode {
+  static title = '浏览器PDF'
+  static type = 'browser_pdf'
+  constructor(title?: string) {
+    super(title || '生成PDF')
+    this.color = COLOR_DATA
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', 'output.pdf', 'path')
+  }
+  onExecute(): void {}
 }
 
 /** 网页抓取节点 - 抓取网页内容 */
@@ -781,7 +925,7 @@ class ScriptNode extends WorkflowNode {
     this.color = COLOR_DEFAULT
     this.addInput('trigger', 'action')
     this.addOutput('trigger', 'action')
-    this.addWidget('combo', 'language', 'javascript', null, {
+    this.addWidget('combo', 'language', 'javascript', null, { property: "language", 
       values: ['javascript', 'python', 'bash', 'powershell', 'lua'],
     })
     this.addWidget('text', 'script', '// 在此编写脚本\n1 + 1', 'script', { multiline: true })
@@ -821,7 +965,7 @@ class ExcelNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('file', 'string')
     this.addOutput('data', 'object')
-    this.addWidget('combo', 'action', 'read', null, {
+    this.addWidget('combo', 'action', 'read', null, { property: "action", 
       values: ['read', 'write', 'append', 'create', 'merge'],
     })
     this.addWidget('string', 'path', './input.xlsx', 'path')
@@ -844,11 +988,11 @@ class WordNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('file', 'string')
     this.addOutput('data', 'string')
-    this.addWidget('combo', 'action', 'read', null, {
+    this.addWidget('combo', 'action', 'read', null, { property: "action", 
       values: ['read', 'write', 'create', 'convert', 'merge'],
     })
     this.addWidget('string', 'path', './input.docx', 'path')
-    this.addWidget('combo', 'format', 'text', null, {
+    this.addWidget('combo', 'format', 'text', null, { property: "format", 
       values: ['text', 'html', 'markdown', 'docx'],
     })
   }
@@ -902,6 +1046,15 @@ export function registerAllNodes(): void {
   LiteGraph.registerNodeType('recording', RecordingNode)
   LiteGraph.registerNodeType('ocr', OcrNode)
   LiteGraph.registerNodeType('browser', BrowserNode)
+  LiteGraph.registerNodeType('browser_navigate', BrowserNavigateNode)
+  LiteGraph.registerNodeType('browser_click', BrowserClickNode)
+  LiteGraph.registerNodeType('browser_fill', BrowserFillNode)
+  LiteGraph.registerNodeType('browser_extract', BrowserExtractNode)
+  LiteGraph.registerNodeType('browser_screenshot', BrowserScreenshotNode)
+  LiteGraph.registerNodeType('browser_evaluate', BrowserEvaluateNode)
+  LiteGraph.registerNodeType('browser_scroll', BrowserScrollNode)
+  LiteGraph.registerNodeType('browser_wait', BrowserWaitNode)
+  LiteGraph.registerNodeType('browser_pdf', BrowserPdfNode)
   LiteGraph.registerNodeType('web_scrape', WebScrapeNode)
   LiteGraph.registerNodeType('script', ScriptNode)
   LiteGraph.registerNodeType('map', MapNode)
@@ -939,6 +1092,15 @@ export {
   RecordingNode,
   OcrNode,
   BrowserNode,
+  BrowserNavigateNode,
+  BrowserClickNode,
+  BrowserFillNode,
+  BrowserExtractNode,
+  BrowserScreenshotNode,
+  BrowserEvaluateNode,
+  BrowserScrollNode,
+  BrowserWaitNode,
+  BrowserPdfNode,
   NotifyNode,
   ApprovalNode,
   ScriptNode,

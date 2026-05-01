@@ -115,8 +115,19 @@ async function loadTemplates() {
       toast.error('未找到内置模板')
     }
   } catch (e) {
-    console.error('加载内置模板失败:', e)
-    toast.error('加载模板失败: ' + ((e as Error).message || String(e)))
+    // Dev mode fallback: 浏览器环境无 Tauri，fetch 模板 API
+    console.warn('Tauri invoke 不可用，使用 fetch 模板 fallback:', e)
+    try {
+      const res = await fetch('/api/templates')
+      const list = await res.json() as TemplateItem[]
+      templates.value = list
+      if (!list || list.length === 0) {
+        toast.error('未找到内置模板')
+      }
+    } catch (fe) {
+      console.error('加载内置模板失败:', fe)
+      toast.error('加载模板失败')
+    }
   }
 }
 
@@ -129,16 +140,25 @@ function openEditor(id?: string) {
 async function createFromTemplate(tpl: TemplateItem) {
   creatingFromTemplate.value = tpl.id
   try {
-    const jsonStr = await invoke<string | null>('template_get_json', { id: tpl.id })
-    if (!jsonStr) { toast.error('模板数据为空'); return }
-    const data = JSON.parse(jsonStr)
-    // 通过 flowStore 预加载模板数据，编辑器 mount 时读取
+    let data: { name?: string; nodes?: unknown[]; edges?: unknown[] }
+
+    try {
+      const jsonStr = await invoke<string | null>('template_get_json', { id: tpl.id })
+      if (!jsonStr) { toast.error('模板数据为空'); return }
+      data = JSON.parse(jsonStr)
+    } catch {
+      // Dev mode fallback: 浏览器环境无 Tauri，fetch 模板 JSON
+      const res = await fetch(`/api/templates/${tpl.id}`)
+      if (!res.ok) { toast.error('模板数据为空'); return }
+      data = await res.json()
+    }
+
     const { useFlowStore } = await import('../stores/flowStore')
     const flowStore = useFlowStore()
     flowStore.load({
       name: data.name || tpl.name,
-      nodes: data.nodes || [],
-      edges: data.edges || [],
+      nodes: (data.nodes || []) as any,
+      edges: (data.edges || []) as any,
     })
     flowStore.templateSource = tpl.id
     toast.success(`已从模板创建「${tpl.name}」`)

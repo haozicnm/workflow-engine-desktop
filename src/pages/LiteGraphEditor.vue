@@ -32,6 +32,16 @@
         </button>
       </div>
       <div class="toolbar-right">
+        <button
+          :class="['toolbar-btn', recording ? 'recording-active' : '']"
+          @click="toggleRecording"
+          title="录制浏览器操作"
+        >
+          {{ recording ? '⏹ 停止录制' : '🔴 录制' }}
+        </button>
+        <button class="toolbar-btn" @click="pickElement" title="拾取浏览器元素">
+          🎯 拾取
+        </button>
         <button class="toolbar-btn" @click="autoLayout" title="自动布局">
           ↻ 布局
         </button>
@@ -132,6 +142,7 @@ let resizeObserver: ResizeObserver | null = null
 // ─── 本地状态 ───
 const selectedLgNode = ref<LGraphNode | null>(null)
 const isRunning = ref(false)
+const recording = ref(false)  // 浏览器录制状态
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
@@ -142,6 +153,31 @@ function findLgNode(storeId: string): LGraphNode | undefined {
 
 // ─── 标记：是否正在从 store 同步到 graph（避免循环更新） ───
 let syncingFromStore = false
+let lastSyncTime = 0
+let pendingRaf = false  // 防止 raf 堆叠
+const SYNC_THROTTLE_MS = 100
+
+function throttledSync() {
+  if (syncingFromStore) return
+  const now = Date.now()
+  if (now - lastSyncTime < SYNC_THROTTLE_MS) {
+    // 只排一个 raf，避免堆叠
+    if (!pendingRaf) {
+      pendingRaf = true
+      requestAnimationFrame(() => {
+        pendingRaf = false
+        if (!syncingFromStore) {
+          syncGraphToStore()
+          undoManager.pushState()
+        }
+      })
+    }
+    return
+  }
+  lastSyncTime = now
+  syncGraphToStore()
+  undoManager.pushState()
+}
 
 // ─── 日志 ───
 function addLog(text: string, level = 'info') {
@@ -159,74 +195,88 @@ onMounted(() => {
   // 创建 graph
   graph = new LGraph()
 
-  // 创建 canvas - LiteGraph 直接接管 canvas 元素
-  canvas = new LGraphCanvas(canvasRef.value!, graph)
-
-  // 配置 canvas 外观（暗色主题）
-  canvas.background_image = ''
-  canvas.clear_background = true
-  canvas.render_canvas_border = false
-  canvas.render_border = false
-
-  // 监听 graph 变化 → 同步到 store
-  graph.onAfterChange = () => {
-    if (syncingFromStore) return
-    syncGraphToStore()
-    undoManager.pushState()
-  }
-
-  // 监听选中变化 → 更新属性面板
-  canvas.onSelectionChange = (selectedDict: Record<string, LGraphNode>) => {
-    const selected = Object.values(selectedDict)[0]
-    selectedLgNode.value = selected instanceof LGraphNode ? selected : null
-  }
-
-  // 监听连线变化
-  graph.onConnectionChange = () => {
-    if (syncingFromStore) return
-    syncEdgesToStore()
-  }
-
-  // 路由参数
-  const id = route.params.id
-  if (id && typeof id === 'string' && id !== 'new') {
-    store.setWorkflowId(id)
-    addLog(`📂 加载工作流: ${id}`)
-  }
-
-  // 模板数据已通过 Dashboard 预加载
-  if (store.nodes.length > 0) {
-    loadFromStore()
-    if (id !== 'new') {
-      addLog(`📋 已加载模板「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
-    }
-  } else if (id === 'new') {
-    // 自动恢复上次未保存的工作流
-    const restored = autoSave.loadAutoSave()
-    if (restored) {
-      loadFromStore()
-      addLog('📂 已恢复上次未保存的工作流', 'info')
-    }
-  }
-
-  // 初始化撤销系统
-  undoManager.init()
-  // 启动自动保存
-  autoSave.start()
-  // 键盘快捷键
-  document.addEventListener('keydown', onKeyDown)
-
-  // 监听窗口 resize
-  // 使用 ResizeObserver 适配 wrapper 尺寸
+  // ⚠️ 等 CSS flex 布局完成后再设尺寸、初始化 LGraphCanvas
+  // onMounted 时 wrapper 的 clientWidth/Height 可能还是 0
   nextTick(() => {
-    if (canvasRef.value && wrapperRef.value) {
+    requestAnimationFrame(() => {
+      if (!canvasRef.value || !wrapperRef.value) return
       const w = wrapperRef.value.clientWidth
       const h = wrapperRef.value.clientHeight
-      canvasRef.value.width = w
-      canvasRef.value.height = h
-      canvas.resize(w, h)
+      if (w === 0 || h === 0) {
+        // 极端情况：再等一帧
+        requestAnimationFrame(() => {
+          const w2 = wrapperRef.value!.clientWidth
+          const h2 = wrapperRef.value!.clientHeight
+          if (w2 > 0 && h2 > 0) initCanvas(w2, h2)
+        })
+        return
+      }
+      initCanvas(w, h)
+    })
+  })
+
+  function initCanvas(w: number, h: number) {
+    // CSS 用 absolute 定位铺满 wrapper，属性设内部坐标系
+    canvasRef.value!.width = w
+    canvasRef.value!.height = h
+
+    // 创建 canvas
+    canvas = new LGraphCanvas(canvasRef.value!, graph)
+    canvas.autoresize = false  // 手动控制 resize，避免内部自动缩放冲突
+
+    // 显式 resize 确保内部坐标系与元素属性一致
+    canvas.resize(w, h)
+
+    // 配置 canvas 外观（暗色主题）
+    canvas.background_image = ''
+    canvas.clear_background = true
+    canvas.clear_background_color = '#0d1117'  // 覆盖默认 #222，匹配画布背景
+    canvas.render_canvas_border = false
+    canvas.render_border = false
+    canvas.node_title_color = '#e6edf3'
+
+    // 监听 graph 变化 → 同步到 store
+    graph.on_change = () => throttledSync()
+    graph.onAfterChange = () => throttledSync()
+
+    // 监听选中变化 → 更新属性面板
+    canvas.onSelectionChange = (selectedDict: Record<string, LGraphNode>) => {
+      const selected = Object.values(selectedDict)[0]
+      selectedLgNode.value = selected instanceof LGraphNode ? selected : null
     }
-    // ResizeObserver 动态跟踪
+
+    // 监听连线变化
+    graph.onConnectionChange = () => throttledSync()
+
+    // 路由参数
+    const id = route.params.id
+    if (id && typeof id === 'string' && id !== 'new') {
+      store.setWorkflowId(id)
+      addLog(`📂 加载工作流: ${id}`)
+    }
+
+    // 模板数据已通过 Dashboard 预加载
+    if (store.nodes.length > 0) {
+      loadFromStore()
+      if (id !== 'new') {
+        addLog(`📋 已加载模板「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
+      }
+    } else if (id === 'new') {
+      const restored = autoSave.loadAutoSave()
+      if (restored) {
+        loadFromStore()
+        addLog('📂 已恢复上次未保存的工作流', 'info')
+      }
+    }
+
+    // 初始化撤销系统
+    undoManager.init()
+    // 启动自动保存
+    autoSave.start()
+    // 键盘快捷键
+    document.addEventListener('keydown', onKeyDown)
+
+    // ResizeObserver 动态跟踪 wrapper 尺寸变化
     if (wrapperRef.value) {
       resizeObserver = new ResizeObserver(() => {
         if (canvasRef.value && wrapperRef.value) {
@@ -241,7 +291,7 @@ onMounted(() => {
       })
       resizeObserver.observe(wrapperRef.value)
     }
-  })
+  }
 })
 
 onUnmounted(() => {
@@ -338,23 +388,32 @@ function syncGraphToStore() {
 
 // ─── 同步连线到 store ───
 function syncEdgesToStore() {
-  const links = (graph as any)._links || []
-  const storeEdgeIds = new Set(store.edges.map(e => e.id))
+  const linkValues = [...((graph as any)._links?.values() || [])]
+  if (linkValues.length === 0) {
+    // 快速路径：无 link 时只清理 store 中的旧边
+    if (store.edges.length > 0) store.clearEdges?.() || store.edges.forEach(e => store.removeEdge(e.id))
+    return
+  }
 
-  for (const link of links) {
+  // 预建 nodeById 索引，后续 O(1) 查找替代 O(n)
+  const nodeById = new Map<string, LGraphNode>()
+  for (const n of (graph._nodes || [])) {
+    if (n) nodeById.set(String(n.id), n)
+  }
+
+  const storeEdgeIds = new Set(store.edges.map(e => e.id))
+  const linkIds = new Set<string>()
+
+  for (const link of linkValues) {
     const sourceId = String(link.origin_id)
     const targetId = String(link.target_id)
-    const sourceSlot = link.origin_slot
-    const targetSlot = link.target_slot
+    const srcNode = nodeById.get(sourceId)
+    const tgtNode = nodeById.get(targetId)
 
-    // 获取 pin 名称
-    const srcNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === sourceId)
-    const tgtNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === targetId)
-
-    const sourceHandle = srcNode?.outputs?.[sourceSlot]?.name || `out_${sourceSlot}`
-    const targetHandle = tgtNode?.inputs?.[targetSlot]?.name || `in_${targetSlot}`
-
+    const sourceHandle = srcNode?.outputs?.[link.origin_slot]?.name || `out_${link.origin_slot}`
+    const targetHandle = tgtNode?.inputs?.[link.target_slot]?.name || `in_${link.target_slot}`
     const edgeId = `e_${sourceId}_${sourceHandle}_${targetId}_${targetHandle}`
+    linkIds.add(edgeId)
 
     if (!storeEdgeIds.has(edgeId)) {
       store.addEdge({
@@ -368,20 +427,8 @@ function syncEdgesToStore() {
   }
 
   // 删除不在 graph 中的连线
-  const linkIds = new Set(
-    links.map((l: any) => {
-      const sId = String(l.origin_id)
-      const tId = String(l.target_id)
-      const sNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === sId)
-      const tNode = graph._nodes?.find((n: LGraphNode) => String(n.id) === tId)
-      return `e_${sId}_${sNode?.outputs?.[l.origin_slot]?.name || `out_${l.origin_slot}`}_${tId}_${tNode?.inputs?.[l.target_slot]?.name || `in_${l.target_slot}`}`
-    })
-  )
-
   for (const edge of store.edges) {
-    if (!linkIds.has(edge.id)) {
-      store.removeEdge(edge.id)
-    }
+    if (!linkIds.has(edge.id)) store.removeEdge(edge.id)
   }
 }
 
@@ -463,12 +510,13 @@ function onDrop(event: DragEvent) {
   if (!def) return
 
   const rect = canvasRef.value!.getBoundingClientRect()
-  // 使用 LiteGraph 的坐标转换（考虑缩放和平移）
-  // convertOffsetToCanvas(pos: Point, out: Point): Point
+  // ComfyUI LiteGraph: DragAndScale 用数组 [x,y] 格式，不是 {x,y} 对象
   const canvasCoords = canvas.convertOffsetToCanvas(
-    { x: event.clientX - rect.left, y: event.clientY - rect.top },
-    { x: 0, y: 0 }
+    [event.clientX - rect.left, event.clientY - rect.top],
+    [0, 0]
   )
+  // 返回的是数组 [x, y]
+  const [cx, cy] = canvasCoords
 
   const node = LiteGraph.createNode(nodeType)
   if (!node) {
@@ -476,7 +524,7 @@ function onDrop(event: DragEvent) {
     return
   }
 
-  node.pos = [canvasCoords.x, canvasCoords.y]
+  node.pos = [cx, cy]
   node.title = def.label
 
   // 设置默认 config 到 widgets
@@ -489,9 +537,7 @@ function onDrop(event: DragEvent) {
   }
 
   graph.add(node)
-  // LiteGraph 已分配整数 ID，syncGraphToStore 会生成 store ID 并建立映射
   addLog(`➕ 添加节点: ${def.label}`)
-  undoManager.pushState()
 }
 
 // ─── 属性面板回调 ───
@@ -687,6 +733,59 @@ function clearCanvas() {
   undoManager.pushState()
 }
 
+// ─── 浏览器录制 ───
+
+async function toggleRecording() {
+  if (recording.value) {
+    // 停止录制
+    try {
+      const result = await invoke<{ name: string; nodes: unknown[]; edges: unknown[] }>('browser_recording_stop')
+      recording.value = false
+      if (result && result.nodes && result.nodes.length > 0) {
+        store.load(result)
+        loadFromStore()
+        addLog(`🎬 录制已停止，生成 ${result.nodes.length} 个节点`)
+        fitView()
+      } else {
+        addLog('🎬 录制已停止，未捕获到操作')
+      }
+    } catch (e: any) {
+      recording.value = false
+      addLog(`❌ 停止录制失败: ${e}`, 'error')
+    }
+  } else {
+    try {
+      await invoke('browser_recording_start')
+      recording.value = true
+      addLog('🔴 录制已开始 — 请在浏览器中操作')
+    } catch (e: any) {
+      addLog(`❌ 开始录制失败: ${e}`, 'error')
+    }
+  }
+}
+
+async function pickElement() {
+  try {
+    const result = await invoke<{ selector?: string }>('browser_pick_element')
+    if (result?.selector) {
+      // 如果选中了节点且有 selector widget，自动填入
+      if (selectedLgNode.value) {
+        const selWidget = selectedLgNode.value.widgets?.find(
+          w => w.name === 'selector'
+        )
+        if (selWidget) {
+          selWidget.value = result.selector
+          graph.setDirtyCanvas(true)
+          store.updateNodeConfig(String(selectedLgNode.value.id), { selector: result.selector })
+        }
+      }
+      addLog(`🎯 已拾取元素: ${result.selector}`)
+    }
+  } catch (e: any) {
+    addLog(`❌ 元素拾取失败: ${e}`, 'error')
+  }
+}
+
 // ─── 路由参数监听 ───
 watch(
   () => route.params.id,
@@ -835,6 +934,24 @@ function onKeyDown(e: KeyboardEvent) {
   background: #2ea043;
 }
 
+.toolbar-btn.recording-active {
+  background: #da3633;
+  border-color: #f85149;
+  color: #fff;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.toolbar-btn.btn-pick {
+  background: #1f6feb;
+  border-color: #388bfd;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* ─── 主体 ─── */
 .editor-body {
   display: flex;
@@ -849,8 +966,15 @@ function onKeyDown(e: KeyboardEvent) {
   overflow: hidden;
 }
 
-.litegraph-canvas {
-  display: block;
+/* 覆盖 LiteGraph 默认 .lgraphcanvas 的 max-height 限制 */
+.canvas-wrapper .litegraph-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none !important;
+  background: #0d1117 !important;
 }
 
 /* ─── 空画布提示 ─── */

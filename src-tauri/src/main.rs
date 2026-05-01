@@ -92,6 +92,10 @@ fn main() {
             // DAG execution (JSON workflow format)
             workflow_engine::commands::dag_run::dag_run_start,
             workflow_engine::commands::dag_run::dag_run_cancel,
+            // Browser recording
+            workflow_engine::commands::browser_recording::browser_recording_start,
+            workflow_engine::commands::browser_recording::browser_recording_stop,
+            workflow_engine::commands::browser_recording::browser_pick_element,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

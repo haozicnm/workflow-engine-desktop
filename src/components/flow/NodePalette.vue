@@ -62,6 +62,7 @@ const CATEGORY_DEFS = [
   { name: 'source', label: '📥 数据源' },
   { name: 'process', label: '🔧 处理' },
   { name: 'ai', label: '🤖 AI' },
+  { name: 'automation', label: '🖥️ 浏览器' },
   { name: 'output', label: '📤 输出' },
 ] as const
 

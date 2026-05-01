@@ -136,6 +136,202 @@ pub fn convert_actions_to_workflow(
     }
 }
 
+// ═══════════════════════════════════════════════
+// v2.0 JSON 输出（nodes + edges）
+// ═══════════════════════════════════════════════
+
+/// 将录制操作列表转换为工作流 JSON（v2.0 格式：nodes + edges 数组）
+///
+/// 输出格式：
+/// ```json
+/// {
+///   "name": "录制工作流",
+///   "description": "由录制生成的浏览器自动化",
+///   "nodes": [
+///     {"id": "n1", "type": "browser_navigate", "label": "打开页面", "position": {"x": 60, "y": 60}, "config": {"url": "...", "wait_until": "load"}},
+///     {"id": "n2", "type": "browser_click", "label": "点击元素", "position": {"x": 380, "y": 60}, "config": {"selector": "#btn"}}
+///   ],
+///   "edges": [
+///     {"id": "e_n1_n2", "source": "n1", "target": "n2", "sourceHandle": "page", "targetHandle": "selector"}
+///   ]
+/// }
+/// ```
+///
+/// 节点类型映射：
+///   navigate → browser_navigate（输出 pin: page）
+///   click    → browser_click（输入: selector, 输出: data）
+///   fill     → browser_fill（输入: selector + value, 输出: data）
+///   type     → browser_fill（同 fill）
+///   scroll   → browser_scroll
+///   wait     → browser_wait
+///   hotkey   → browser（万能节点，action="evaluate"）
+///
+/// 布局：水平排列，320px 间距，60px 边距
+pub fn convert_to_json(actions: &[RecordedAction], source: &str) -> Value {
+    let mut nodes: Vec<Value> = Vec::new();
+    let mut edges: Vec<Value> = Vec::new();
+
+    let margin: f64 = 60.0;
+    let spacing: f64 = 320.0;
+
+    // 步骤 1：每个操作 → 节点
+    for (i, action) in actions.iter().enumerate() {
+        let id = format!("n{}", i + 1);
+        let x = margin + (i as f64) * spacing;
+        let y = margin;
+
+        let (node_type, label, config) = action_to_node(action);
+
+        nodes.push(serde_json::json!({
+            "id": id,
+            "type": node_type,
+            "label": label,
+            "position": {"x": x, "y": y},
+            "config": config,
+        }));
+    }
+
+    // 步骤 2：生成顺序连线
+    for i in 1..actions.len() {
+        let source_id = format!("n{}", i);
+        let target_id = format!("n{}", i + 1);
+        let (source_handle, target_handle) = get_handles(&actions[i - 1], &actions[i]);
+
+        edges.push(serde_json::json!({
+            "id": format!("e_{}_{}", source_id, target_id),
+            "source": source_id,
+            "target": target_id,
+            "sourceHandle": source_handle,
+            "targetHandle": target_handle,
+        }));
+    }
+
+    serde_json::json!({
+        "name": "录制工作流",
+        "description": format!("由录制生成的浏览器自动化 — 来源: {}", source),
+        "nodes": nodes,
+        "edges": edges,
+    })
+}
+
+/// 单条操作 → 节点类型、标签、配置
+fn action_to_node(action: &RecordedAction) -> (&'static str, String, Value) {
+    match action.action_type.as_str() {
+        "navigate" => {
+            let url = action.url.clone().unwrap_or_default();
+            (
+                "browser_navigate",
+                "打开页面".to_string(),
+                serde_json::json!({
+                    "url": url,
+                    "wait_until": "load",
+                }),
+            )
+        }
+        "click" => {
+            let label = if let Some(ref sel) = action.selector {
+                format!("点击 {}", sel)
+            } else if let (Some(x), Some(y)) = (action.x, action.y) {
+                format!("点击 ({}, {})", x, y)
+            } else {
+                "点击元素".to_string()
+            };
+            (
+                "browser_click",
+                label,
+                serde_json::json!({
+                    "selector": action.selector.clone().unwrap_or_default(),
+                }),
+            )
+        }
+        "fill" | "type" => {
+            let value = action.value.clone().unwrap_or_default();
+            let label = if let Some(ref sel) = action.selector {
+                format!("填写 {}", sel)
+            } else {
+                "填写输入".to_string()
+            };
+            (
+                "browser_fill",
+                label,
+                serde_json::json!({
+                    "selector": action.selector.clone().unwrap_or_default(),
+                    "value": value,
+                }),
+            )
+        }
+        "scroll" => {
+            let amount = action.amount.unwrap_or(3);
+            (
+                "browser_scroll",
+                format!("滚动 x{}", amount),
+                serde_json::json!({
+                    "direction": if amount > 0 { "down" } else { "up" },
+                    "amount": amount.abs(),
+                }),
+            )
+        }
+        "wait" => {
+            (
+                "browser_wait",
+                "等待".to_string(),
+                serde_json::json!({
+                    "selector": action.selector.clone().unwrap_or_default(),
+                    "timeout": 10000,
+                }),
+            )
+        }
+        "hotkey" => {
+            let keys = action.keys.clone().unwrap_or_default();
+            (
+                "browser",
+                format!("快捷键 {}", keys),
+                serde_json::json!({
+                    "action": "evaluate",
+                    "expression": format!("await page.keyboard.press('{}')", keys),
+                }),
+            )
+        }
+        _ => {
+            // 未知类型 → 万能 browser 节点（保留操作数据供用户手动调整）
+            (
+                "browser",
+                "未知操作".to_string(),
+                serde_json::json!({
+                    "action": "evaluate",
+                    "expression": "",
+                    "_raw": action,
+                }),
+            )
+        }
+    }
+}
+
+/// 获取两个连续操作之间的连接手柄名称
+///
+/// 上游输出手柄：
+///   navigate → "page"
+///   其他     → "data"
+///
+/// 下游输入手柄：
+///   navigate        → "url"
+///   click/fill/wait → "selector"
+///   其他            → "selector"
+fn get_handles(from: &RecordedAction, to: &RecordedAction) -> (&'static str, &'static str) {
+    let source_handle = match from.action_type.as_str() {
+        "navigate" => "page",
+        _ => "data",
+    };
+
+    let target_handle = match to.action_type.as_str() {
+        "navigate" => "url",
+        "click" | "fill" | "type" | "wait" | "scroll" => "selector",
+        _ => "selector",
+    };
+
+    (source_handle, target_handle)
+}
+
 /// 单个操作 → 步骤模板
 fn action_to_template(action: &RecordedAction, index: usize) -> StepTemplate {
     let id = format!("step_{}", index + 1);

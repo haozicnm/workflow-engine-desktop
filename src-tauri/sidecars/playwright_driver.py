@@ -19,6 +19,7 @@
   wait                — 等待元素 (params: selector, timeout_ms?)
   select              — 下拉选择 (params: selector, value)
   check               — 勾选复选框 (params: selector)
+  pick                — 元素选择器 (hover 高亮，点击返回最佳 CSS 选择器)
   close               — 关闭浏览器
 
   === 新增动作 (v1.1) ===
@@ -187,6 +188,9 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _preview(params)
             case "click_at_position":
                 return await _click_at_position(params)
+            # v1.4 元素选择器
+            case "pick":
+                return await _pick(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -1026,6 +1030,122 @@ async def _click_at_position(params: dict) -> dict:
     await page.mouse.click(x, y)
     await asyncio.sleep(0.3)
     return {"success": True, "data": {"x": x, "y": y}}
+
+
+async def _pick(params: dict) -> dict:
+    """元素选择器：hover 时蓝色高亮，点击返回最佳 CSS 选择器
+
+    选择器优先级：id > data-testid/data-id/data-key > 唯一 class > nth-child 路径
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    try:
+        await page.evaluate("""
+        () => {
+            if (window.__wfPickActive) return;
+            window.__wfPickActive = true;
+            window.__wfPickResult = null;
+
+            const style = document.createElement('style');
+            style.id = '__wf-pick-style';
+            style.textContent = `
+                .wf-pick-hover { outline: 2px solid #58a6ff !important; outline-offset: 1px; }
+                .wf-pick-selected { outline: 2px solid #3fb950 !important; outline-offset: 1px; }
+            `;
+            document.head.appendChild(style);
+
+            let _hovered = null;
+
+            function buildSelector(el) {
+                // 优先级 1: id
+                if (el.id) return '#' + CSS.escape(el.id);
+
+                // 优先级 2: data-testid / data-id / data-key
+                const testId = el.getAttribute('data-testid');
+                if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+                const dataId = el.getAttribute('data-id');
+                if (dataId) return '[data-id="' + CSS.escape(dataId) + '"]';
+                const dataKey = el.getAttribute('data-key');
+                if (dataKey) return '[data-key="' + CSS.escape(dataKey) + '"]';
+
+                // 优先级 3: 唯一 class
+                const tag = el.tagName.toLowerCase();
+                if (typeof el.className === 'string' && el.className.trim()) {
+                    const classes = el.className.trim().split(/\\s+/);
+                    for (const cls of classes) {
+                        if (!cls) continue;
+                        const sel = tag + '.' + CSS.escape(cls);
+                        if (document.querySelectorAll(sel).length === 1) return sel;
+                    }
+                }
+
+                // 优先级 4: nth-child 路径
+                const path = [];
+                let cur = el;
+                while (cur && cur !== document.body && cur !== document.documentElement) {
+                    const parent = cur.parentElement;
+                    if (!parent) break;
+                    const siblings = Array.from(parent.children).filter(
+                        c => c.tagName === cur.tagName
+                    );
+                    if (siblings.length > 1) {
+                        const idx = siblings.indexOf(cur) + 1;
+                        path.unshift(cur.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
+                    } else {
+                        path.unshift(cur.tagName.toLowerCase());
+                    }
+                    cur = parent;
+                }
+                return path.join(' > ');
+            }
+
+            window.__wfPickMouseover = function(e) {
+                if (_hovered) _hovered.classList.remove('wf-pick-hover');
+                _hovered = e.target;
+                _hovered.classList.add('wf-pick-hover');
+            };
+
+            window.__wfPickClick = function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (_hovered) _hovered.classList.remove('wf-pick-hover');
+                const sel = buildSelector(e.target);
+                window.__wfPickResult = sel;
+                window.__wfPickCleanup();
+            };
+
+            window.__wfPickCleanup = function() {
+                document.removeEventListener('mouseover', window.__wfPickMouseover, true);
+                document.removeEventListener('click', window.__wfPickClick, true);
+                const s = document.getElementById('__wf-pick-style');
+                if (s) s.remove();
+                if (_hovered) _hovered.classList.remove('wf-pick-hover');
+                window.__wfPickActive = false;
+            };
+
+            document.addEventListener('mouseover', window.__wfPickMouseover, true);
+            document.addEventListener('click', window.__wfPickClick, true);
+        }
+        """)
+
+        # 轮询等待用户点击（最多 30 秒）
+        for _ in range(300):
+            await asyncio.sleep(0.1)
+            result = await page.evaluate("window.__wfPickResult")
+            if result:
+                return {"success": True, "data": {"selector": result}}
+
+        # 超时，清理注入的 JS
+        try:
+            await page.evaluate("window.__wfPickCleanup && window.__wfPickCleanup()")
+        except Exception:
+            pass
+        return {"success": False, "error": "元素选择超时（30 秒内未点击任何元素）"}
+
+    except Exception as e:
+        return {"success": False, "error": f"pick 失败: {e}"}
 
 
 # ═══════════════════════════════════════════
