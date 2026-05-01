@@ -121,7 +121,23 @@ import { useRoute } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { UnlistenFn } from '@tauri-apps/api/event'
+
+// Dev mode: Tauri invoke/event not available
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
+
+async function safeInvoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri) {
+    throw new Error('此功能需要 Tauri 桌面运行时（当前为开发模式）')
+  }
+  return invoke<T>(cmd, args)
+}
+
+async function safeListen<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {
+  if (!isTauri) return () => {}
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen<T>(event, handler)
+}
 import { useFlowStore } from '../stores/flowStore'
 import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'
@@ -591,7 +607,7 @@ function runSingle() {
 async function stopRun() {
   if (currentRunId.value) {
     try {
-      await invoke('dag_run_cancel', { runId: currentRunId.value })
+      await safeInvoke('dag_run_cancel', { runId: currentRunId.value })
       addLog('■ 已发送取消指令', 'warn')
     } catch (e) {
       addLog(`■ 取消失败: ${e}`, 'error')
@@ -630,7 +646,7 @@ async function runDagFlow() {
 
   try {
     await setupDagListeners()
-    const runId = await invoke<string>('dag_run_start', { workflowJson })
+    const runId = await safeInvoke<string>('dag_run_start', { workflowJson })
     currentRunId.value = runId
     addLog(`🚀 DAG 运行已启动: ${runId.slice(0, 8)}...`, 'info')
   } catch (e) {
@@ -643,7 +659,7 @@ async function runDagFlow() {
 async function setupDagListeners() {
   cleanupDagListeners()
 
-  const u1 = await listen<{ step_id: string; step_name: string; status: string; current_step: number; total_steps: number }>(
+  const u1 = await safeListen<{ step_id: string; step_name: string; status: string; current_step: number; total_steps: number }>(
     'step-status-update',
     (event) => {
       const { step_id, step_name, status, current_step, total_steps } = event.payload
@@ -654,7 +670,7 @@ async function setupDagListeners() {
   )
   dagEventUnlisteners.push(u1)
 
-  const u2 = await listen<{ run_id: string; status: string }>(
+  const u2 = await safeListen<{ run_id: string; status: string }>(
     'run-update',
     (event) => {
       if (event.payload.status === 'completed') {
@@ -669,7 +685,7 @@ async function setupDagListeners() {
   )
   dagEventUnlisteners.push(u2)
 
-  const u3 = await listen<{ step_id: string; step_name: string }>(
+  const u3 = await safeListen<{ step_id: string; step_name: string }>(
     'breakpoint-hit',
     (event) => {
       const { step_id, step_name } = event.payload
@@ -747,7 +763,7 @@ async function toggleRecording() {
   if (recording.value) {
     // 停止录制
     try {
-      const result = await invoke<{ name: string; nodes: unknown[]; edges: unknown[] }>('browser_recording_stop')
+      const result = await safeInvoke<{ name: string; nodes: unknown[]; edges: unknown[] }>('browser_recording_stop')
       recording.value = false
       if (result && result.nodes && result.nodes.length > 0) {
         store.load(result)
@@ -763,7 +779,7 @@ async function toggleRecording() {
     }
   } else {
     try {
-      await invoke('browser_recording_start')
+      await safeInvoke('browser_recording_start')
       recording.value = true
       addLog('🔴 录制已开始 — 请在浏览器中操作')
     } catch (e: any) {
@@ -774,7 +790,7 @@ async function toggleRecording() {
 
 async function pickElement() {
   try {
-    const result = await invoke<{ selector?: string }>('browser_pick_element')
+    const result = await safeInvoke<{ selector?: string }>('browser_pick_element')
     if (result?.selector) {
       // 如果选中了节点且有 selector widget，自动填入
       if (selectedLgNode.value) {
