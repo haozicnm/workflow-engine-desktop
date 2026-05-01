@@ -74,6 +74,7 @@
       <!-- 右侧面板：属性 + 预览 -->
       <div class="right-panels">
         <PropertyPanel
+          :key="widgetVersion"
           :lg-node="selectedLgNode"
           :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
           :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
@@ -145,6 +146,7 @@ let canvas: LGraphCanvas
 const selectedLgNode = ref<LGraphNode | null>(null)
 const isRunning = ref(false)
 const recording = ref(false)  // 浏览器录制状态
+const widgetVersion = ref(0)  // 递增触发 PropertyPanel 重渲染
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
@@ -535,6 +537,7 @@ function onUpdateWidget(node: LGraphNode, widgetName: string, value: unknown) {
     graph.setDirtyCanvas(true)
   }
   store.updateNodeConfig(String(node.id), { [widgetName]: value })
+  widgetVersion.value++  // 触发 PropertyPanel 重新读取 widgets
 }
 
 function onDeleteNode(node: LGraphNode) {
