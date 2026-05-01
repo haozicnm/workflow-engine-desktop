@@ -96,6 +96,9 @@ fn main() {
             workflow_engine::commands::browser_recording::browser_recording_start,
             workflow_engine::commands::browser_recording::browser_recording_stop,
             workflow_engine::commands::browser_recording::browser_pick_element,
+            // Preview
+            workflow_engine::commands::preview::preview_excel,
+            workflow_engine::commands::preview::preview_word,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

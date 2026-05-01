@@ -76,16 +76,20 @@
         <canvas ref="canvasRef" class="litegraph-canvas"></canvas>
       </div>
 
-      <!-- 右侧：属性面板 -->
-      <PropertyPanel
-        :lg-node="selectedLgNode"
-        :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
-        :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
-        :duration="undefined"
-        @update-label="onUpdateLabel"
-        @update-widget="onUpdateWidget"
-        @delete="onDeleteNode"
-      />
+      <!-- 右侧面板：属性 + 预览 -->
+      <div class="right-panels">
+        <PropertyPanel
+          :lg-node="selectedLgNode"
+          :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
+          :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
+          :duration="undefined"
+          @update-label="onUpdateLabel"
+          @update-widget="onUpdateWidget"
+          @delete="onDeleteNode"
+        />
+        <div class="panel-divider"></div>
+        <PreviewPanel :lg-node="selectedLgNode" />
+      </div>
     </div>
 
     <!-- 底部控制台 -->
@@ -120,6 +124,7 @@ import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'
 import NodePalette from '../components/flow/NodePalette.vue'
 import PropertyPanel from '../components/flow/PropertyPanel.vue'
+import PreviewPanel from '../components/flow/PreviewPanel.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
@@ -964,6 +969,32 @@ function onKeyDown(e: KeyboardEvent) {
   position: relative;
   background: #0d1117;
   overflow: hidden;
+}
+
+/* ─── 右侧双面板 ─── */
+.right-panels {
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+  max-width: 340px;
+  border-left: 1px solid #30363d;
+  overflow: hidden;
+}
+
+.right-panels > :first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.right-panels > :last-child {
+  flex: 0 0 auto;
+}
+
+.panel-divider {
+  height: 1px;
+  background: #21262d;
+  flex-shrink: 0;
 }
 
 /* 覆盖 LiteGraph 默认 .lgraphcanvas 的 max-height 限制 */

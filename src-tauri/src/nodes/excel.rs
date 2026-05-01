@@ -33,7 +33,7 @@ impl NodeExecutor for ExcelNode {
 }
 
 /// 读取 Excel 工作表数据
-async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).map(String::from);
 

@@ -287,8 +287,8 @@ function getDataSize(data: unknown): string {
 
 <style scoped>
 .property-panel {
-  width: 260px; min-width: 260px; height: 100%;
-  background: #0d1117; border-left: 1px solid #21262d;
+  height: 100%;
+  background: #0d1117;
   overflow-y: auto; color: #c9d1d9; font-size: 13px;
 }
 .panel-empty {

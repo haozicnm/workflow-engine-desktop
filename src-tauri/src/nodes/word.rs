@@ -265,7 +265,7 @@ fn build_document_xml_from_blocks(blocks: &[Block]) -> String {
 // ─── 操作函数 ───
 
 /// 读取 docx 文件中的所有段落文本（纯文本，保持不变）
-async fn word_read(path: &str) -> Result<serde_json::Value> {
+pub async fn word_read(path: &str) -> Result<serde_json::Value> {
     let path = path.to_string();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
