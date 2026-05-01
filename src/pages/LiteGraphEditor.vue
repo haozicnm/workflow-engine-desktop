@@ -140,7 +140,6 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const wrapperRef = ref<HTMLDivElement | null>(null)
 let graph: LGraph
 let canvas: LGraphCanvas
-let resizeObserver: ResizeObserver | null = null
 
 // ─── 本地状态 ───
 const selectedLgNode = ref<LGraphNode | null>(null)
@@ -274,27 +273,10 @@ onMounted(() => {
     autoSave.start()
     // 键盘快捷键
     document.addEventListener('keydown', onKeyDown)
-
-    // ResizeObserver 动态跟踪 wrapper 尺寸变化
-    if (wrapperRef.value) {
-      resizeObserver = new ResizeObserver(() => {
-        if (canvasRef.value && wrapperRef.value) {
-          const w2 = wrapperRef.value.clientWidth
-          const h2 = wrapperRef.value.clientHeight
-          if (canvasRef.value.width !== w2 || canvasRef.value.height !== h2) {
-            canvasRef.value.width = w2
-            canvasRef.value.height = h2
-            canvas.resize(w2, h2)
-          }
-        }
-      })
-      resizeObserver.observe(wrapperRef.value)
-    }
   }
 })
 
 onUnmounted(() => {
-  resizeObserver?.disconnect()
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
 })
