@@ -52,7 +52,7 @@ export interface NodeDefinition {
   label: string
   icon: string
   color: string
-  category: 'source' | 'process' | 'output' | 'ai' | 'automation'
+  category: 'browser' | 'excel' | 'word' | 'data' | 'logic' | 'output' | 'other'
   description?: string
   inputs: PinDefinition[]
   outputs: PinDefinition[]
@@ -81,382 +81,17 @@ export interface FlowEdge {
   targetHandle: string
 }
 
-// ─── P1 基础节点注册表 ───
+// ─── 节点注册表 ───
 export const NODE_REGISTRY: NodeDefinition[] = [
-  {
-    type: 'http',
-    label: 'HTTP 请求',
-    icon: '🌐',
-    color: '#58a6ff',
-    category: 'source',
-    description: '发送 HTTP 请求获取数据',
-    inputs: [
-      { id: 'headers', label: 'headers', type: 'object' },
-      { id: 'body', label: 'body', type: 'object' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'object' },
-    ],
-    defaultConfig: { url: '', method: 'GET', timeout: 30 },
-  },
-  {
-    type: 'file',
-    label: '文件操作',
-    icon: '📄',
-    color: '#9CA3AF',
-    category: 'source',
-    description: '读取本地文件内容',
-    inputs: [],
-    outputs: [
-      { id: 'content', label: 'content', type: 'string' },
-      { id: 'bytes', label: 'bytes', type: 'file' },
-    ],
-    defaultConfig: { path: '', encoding: 'utf-8' },
-  },
-  {
-    type: 'clipboard',
-    label: '剪贴板',
-    icon: '📋',
-    color: '#FBBF24',
-    category: 'source',
-    description: '读取系统剪贴板内容',
-    inputs: [],
-    outputs: [
-      { id: 'text', label: 'text', type: 'string' },
-    ],
-    defaultConfig: { format: 'text' },
-  },
-  {
-    type: 'json_parse',
-    label: 'JSON 解析',
-    icon: '🔀',
-    color: '#bc8cff',
-    category: 'process',
-    description: '用 JSONPath 提取字段',
-    inputs: [
-      { id: 'input', label: 'input', type: 'object', required: true },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'object' },
-    ],
-    defaultConfig: { expression: '$', target_field: '' },
-  },
-  {
-    type: 'regex',
-    label: '正则处理',
-    icon: '🔤',
-    color: '#C084FC',
-    category: 'process',
-    description: '使用正则表达式提取/替换文本',
-    inputs: [
-      { id: 'input', label: 'input', type: 'string', required: true },
-    ],
-    outputs: [
-      { id: 'matches', label: 'matches', type: 'array' },
-      { id: 'result', label: 'result', type: 'string' },
-    ],
-    defaultConfig: { pattern: '', action: 'extract', replacement: '', flags: '' },
-  },
-  {
-    type: 'array',
-    label: '数组操作',
-    icon: '🔢',
-    color: '#f97316',
-    category: 'process',
-    description: '数组过滤、映射、排序、去重',
-    inputs: [
-      { id: 'input', label: 'input', type: 'array', required: true },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'array' },
-    ],
-    defaultConfig: { action: 'filter', expression: '', limit: 100 },
-  },
-  {
-    type: 'convert',
-    label: '类型转换',
-    icon: '🔄',
-    color: '#fbbf24',
-    category: 'process',
-    description: '字符串↔数字↔布尔↔JSON 等类型互转',
-    inputs: [
-      { id: 'input', label: 'input', type: 'any', required: true },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'any' },
-    ],
-    defaultConfig: { from: 'auto', to: 'string', encoding: 'utf-8' },
-  },
-  {
-    type: 'text_template',
-    label: '文本拼接',
-    icon: '📝',
-    color: '#a371f7',
-    category: 'process',
-    description: '模板替换拼接文本',
-    inputs: [
-      { id: 'data', label: 'data', type: 'object' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'string' },
-    ],
-    defaultConfig: { template: '', output_key: '' },
-  },
-  {
-    type: 'file_save',
-    label: '保存文件',
-    icon: '💾',
-    color: '#8b949e',
-    category: 'output',
-    description: '写入文件到本地',
-    inputs: [
-      { id: 'content', label: 'content', type: 'object', required: true },
-    ],
-    outputs: [
-      { id: 'path', label: 'path', type: 'string' },
-    ],
-    defaultConfig: { path: '', format: 'json', encoding: 'utf-8' },
-  },
-  {
-    type: 'print',
-    label: '控制台打印',
-    icon: '🖨️',
-    color: '#6EE7B7',
-    category: 'output',
-    description: '将数据输出到控制台日志',
-    inputs: [
-      { id: 'data', label: 'data', type: 'any', required: true },
-    ],
-    outputs: [
-      { id: 'pass', label: 'pass', type: 'any' },
-    ],
-    defaultConfig: { prefix: '', colorize: true },
-  },
-  // ─── P3 AI 节点 ───
-  {
-    type: 'ai',
-    label: 'AI 调用',
-    icon: '🤖',
-    color: '#7c3aed',
-    category: 'ai',
-    description: '调用 LLM 执行翻译/摘要/分类/情感分析/实体提取',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'object' },
-    ],
-    defaultConfig: { action: 'call_llm', model: 'gpt-3.5-turbo', prompt: '', temperature: 0.7, max_tokens: 1024 },
-  },
-  {
-    type: 'ai_translate',
-    label: 'AI 翻译',
-    icon: '🌍',
-    color: '#10b981',
-    category: 'ai',
-    description: '使用 AI 翻译文本',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string', required: true },
-    ],
-    outputs: [
-      { id: 'translated', label: 'translated', type: 'string' },
-    ],
-    defaultConfig: { action: 'translate', source_lang: 'auto', target_lang: 'en', model: 'gpt-3.5-turbo' },
-  },
-  {
-    type: 'ai_summarize',
-    label: 'AI 摘要',
-    icon: '📝',
-    color: '#f59e0b',
-    category: 'ai',
-    description: '使用 AI 生成文本摘要',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string', required: true },
-    ],
-    outputs: [
-      { id: 'summary', label: 'summary', type: 'string' },
-    ],
-    defaultConfig: { action: 'summarize', max_length: 200, model: 'gpt-3.5-turbo' },
-  },
-  {
-    type: 'ai_classify',
-    label: 'AI 分类',
-    icon: '🏷️',
-    color: '#ef4444',
-    category: 'ai',
-    description: '使用 AI 对文本进行分类',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string', required: true },
-      { id: 'labels', label: 'labels', type: 'array' },
-    ],
-    outputs: [
-      { id: 'label', label: 'label', type: 'string' },
-      { id: 'confidence', label: 'confidence', type: 'number' },
-    ],
-    defaultConfig: { action: 'classify', labels: [] },
-  },
-  {
-    type: 'ai_sentiment',
-    label: 'AI 情感分析',
-    icon: '💬',
-    color: '#ec4899',
-    category: 'ai',
-    description: '分析文本的情感倾向（正面/负面/中性）',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string', required: true },
-    ],
-    outputs: [
-      { id: 'sentiment', label: 'sentiment', type: 'string' },
-      { id: 'score', label: 'score', type: 'number' },
-    ],
-    defaultConfig: { action: 'sentiment' },
-  },
-  {
-    type: 'ai_entities',
-    label: 'AI 实体提取',
-    icon: '🔍',
-    color: '#06b6d4',
-    category: 'ai',
-    description: '使用 AI 提取文本中的命名实体',
-    inputs: [
-      { id: 'text', label: 'text', type: 'string', required: true },
-      { id: 'types', label: 'types', type: 'array' },
-    ],
-    outputs: [
-      { id: 'entities', label: 'entities', type: 'array' },
-    ],
-    defaultConfig: { action: 'extract_entities', entity_types: [] },
-  },
-  // ─── P4: 子流程图（复合节点） ───
-  {
-    type: 'sub_workflow',
-    label: '子流程',
-    icon: '📦',
-    color: '#fb923c',
-    category: 'process',
-    description: '打包一组节点为可复用的子流程图',
-    inputs: [
-      { id: 'input', label: 'input', type: 'object' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'object' },
-    ],
-    defaultConfig: {
-      inline_steps: [],
-      vars_mapping: {},
-      output_mapping: {},
-      output_key: 'result',
-    },
-  },
-  // ─── M2 控制流节点 ───
-  {
-    type: 'loop',
-    label: '循环',
-    icon: '🔁',
-    color: '#f97316',
-    category: 'process',
-    description: '遍历数组，对每个元素执行子步骤',
-    inputs: [
-      { id: 'items', label: 'items', type: 'array', required: true },
-    ],
-    outputs: [
-      { id: 'results', label: 'results', type: 'array' },
-      { id: 'count', label: 'count', type: 'number' },
-    ],
-    defaultConfig: {
-      items: '',
-      body: [],
-      max_iterations: 1000,
-      on_error: 'fail',
-    },
-  },
-  {
-    type: 'while',
-    label: 'While 循环',
-    icon: '🔄',
-    color: '#ea580c',
-    category: 'process',
-    description: '条件循环，满足条件时重复执行子步骤',
-    inputs: [
-      { id: 'items', label: 'items', type: 'array' },
-    ],
-    outputs: [
-      { id: 'results', label: 'results', type: 'array' },
-      { id: 'count', label: 'count', type: 'number' },
-      { id: 'stopped_at', label: 'stopped_at', type: 'number' },
-    ],
-    defaultConfig: {
-      items: '',
-      condition: { check: '__current', op: 'not_empty' },
-      body: [],
-      max_iterations: 1000,
-    },
-  },
-  {
-    type: 'condition',
-    label: '条件判断',
-    icon: '🔀',
-    color: '#a78bfa',
-    category: 'process',
-    description: '根据条件表达式选择执行分支',
-    inputs: [
-      { id: 'left', label: 'left', type: 'any' },
-      { id: 'right', label: 'right', type: 'any' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'boolean' },
-      { id: 'branch', label: 'branch', type: 'string' },
-    ],
-    defaultConfig: {
-      left: '',
-      op: '>',
-      right: '0',
-    },
-  },
-  {
-    type: 'data',
-    label: '变量操作',
-    icon: '📊',
-    color: '#06b6d4',
-    category: 'process',
-    description: '变量设置/读取/合并/默认值/长度计算',
-    inputs: [
-      { id: 'value', label: 'value', type: 'any' },
-    ],
-    outputs: [
-      { id: 'result', label: 'result', type: 'any' },
-    ],
-    defaultConfig: {
-      action: 'set',
-      key: '',
-      value: '',
-    },
-  },
-  {
-    type: 'delay',
-    label: '延时',
-    icon: '⏱️',
-    color: '#9ca3af',
-    category: 'process',
-    description: '暂停执行指定时长（毫秒）',
-    inputs: [],
-    outputs: [
-      { id: 'duration_ms', label: 'duration_ms', type: 'number' },
-    ],
-    defaultConfig: {
-      duration_ms: 1000,
-      max_duration_ms: 300000,
-    },
-  },
   // ═══════════════════════════════════════════
-  // 🖥️ 浏览器自动化 (v2)
+  // 🖥️ 浏览器（核心功能，最上面）
   // ═══════════════════════════════════════════
   {
     type: 'browser_navigate',
     label: '浏览器导航',
     icon: '🧭',
     color: '#3fb950',
-    category: 'automation',
+    category: 'browser',
     description: '导航到指定 URL',
     inputs: [{ id: 'url', label: 'URL', type: 'string' }],
     outputs: [{ id: 'page', label: '页面数据', type: 'object' }],
@@ -467,7 +102,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器点击',
     icon: '👆',
     color: '#3fb950',
-    category: 'automation',
+    category: 'browser',
     description: '点击页面元素',
     inputs: [{ id: 'selector', label: '选择器', type: 'string' }],
     outputs: [{ id: 'data', label: '结果', type: 'object' }],
@@ -478,7 +113,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器填写',
     icon: '⌨️',
     color: '#3fb950',
-    category: 'automation',
+    category: 'browser',
     description: '填写表单字段',
     inputs: [
       { id: 'selector', label: '选择器', type: 'string' },
@@ -492,7 +127,7 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器提取',
     icon: '⛏️',
     color: '#3fb950',
-    category: 'automation',
+    category: 'browser',
     description: '提取页面数据（文本/HTML/表格/链接/属性）',
     inputs: [{ id: 'selector', label: '选择器', type: 'string' }],
     outputs: [{ id: 'data', label: '数据', type: 'array' }],
@@ -503,8 +138,8 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器截图',
     icon: '📸',
     color: '#3fb950',
-    category: 'automation',
-    description: '截取页面截图',
+    category: 'browser',
+    description: '截取当前页面',
     inputs: [],
     outputs: [{ id: 'path', label: '路径', type: 'string' }],
     defaultConfig: { path: 'screenshot.png', full_page: false },
@@ -514,30 +149,30 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器执行JS',
     icon: '⚡',
     color: '#3fb950',
-    category: 'automation',
+    category: 'browser',
     description: '在页面中执行 JavaScript',
     inputs: [{ id: 'script', label: '脚本', type: 'string' }],
     outputs: [{ id: 'result', label: '结果', type: 'any' }],
-    defaultConfig: { script: 'document.title' },
+    defaultConfig: { script: 'return document.title' },
   },
   {
     type: 'browser_scroll',
     label: '浏览器滚动',
     icon: '📜',
     color: '#3fb950',
-    category: 'automation',
-    description: '滚动页面到底部或顶部',
+    category: 'browser',
+    description: '滚动页面',
     inputs: [],
     outputs: [{ id: 'data', label: '结果', type: 'object' }],
-    defaultConfig: { direction: 'bottom', times: 1, delay_ms: 500 },
+    defaultConfig: { direction: 'down', distance: 300 },
   },
   {
     type: 'browser_wait',
     label: '浏览器等待',
     icon: '⏳',
     color: '#3fb950',
-    category: 'automation',
-    description: '等待元素出现',
+    category: 'browser',
+    description: '等待元素出现或指定时长',
     inputs: [{ id: 'selector', label: '选择器', type: 'string' }],
     outputs: [{ id: 'found', label: '找到', type: 'boolean' }],
     defaultConfig: { selector: '', timeout_ms: 30000 },
@@ -547,45 +182,386 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     label: '浏览器PDF',
     icon: '📑',
     color: '#3fb950',
-    category: 'automation',
-    description: '生成页面 PDF',
+    category: 'browser',
+    description: '导出当前页面为 PDF',
     inputs: [],
     outputs: [{ id: 'path', label: '路径', type: 'string' }],
-    defaultConfig: { path: 'output.pdf' },
+    defaultConfig: { path: 'page.pdf' },
   },
   {
     type: 'browser',
     label: '浏览器（万能）',
     icon: '🌐',
     color: '#3fb950',
-    category: 'automation',
-    description: '通用浏览器操作（自定义 action）',
+    category: 'browser',
+    description: '通用浏览器操作（兼容旧版）',
     inputs: [{ id: 'input', label: '输入', type: 'any' }],
     outputs: [
       { id: 'data', label: '数据', type: 'any' },
       { id: 'error', label: '错误', type: 'string' },
     ],
-    defaultConfig: { action: 'navigate', url: '', selector: '', value: '', timeout: 30000 },
+    defaultConfig: { action: 'navigate', url: '', selector: '' },
   },
   {
     type: 'web_scrape',
     label: '网页抓取',
-    icon: '🕷️',
+    icon: '🕸️',
     color: '#3fb950',
-    category: 'automation',
-    description: '抓取网页内容并提取正文',
+    category: 'browser',
+    description: '抓取网页内容（无需浏览器）',
     inputs: [{ id: 'url', label: 'URL', type: 'string' }],
     outputs: [{ id: 'data', label: '数据', type: 'string' }],
-    defaultConfig: { url: '', wait_for: 'body', delay_ms: 1000, scroll: false, max_pages: 1 },
+    defaultConfig: { url: '', method: 'GET' },
+  },
+  {
+    type: 'recording',
+    label: '录制回放',
+    icon: '🔴',
+    color: '#f85149',
+    category: 'browser',
+    description: '录制浏览器操作并回放',
+    inputs: [],
+    outputs: [{ id: 'data', label: '结果', type: 'object' }],
+    defaultConfig: { source: '' },
+  },
+
+  // ═══════════════════════════════════════════
+  // 📊 Excel 文档处理
+  // ═══════════════════════════════════════════
+  {
+    type: 'excel',
+    label: 'Excel 操作',
+    icon: '📊',
+    color: '#4ADE80',
+    category: 'excel',
+    description: '读取/写入 Excel 文件',
+    inputs: [{ id: 'input', label: '输入', type: 'any' }],
+    outputs: [{ id: 'data', label: '数据', type: 'object' }],
+    defaultConfig: { path: '', sheet: '', action: 'read' },
+  },
+
+  // ═══════════════════════════════════════════
+  // 📄 Word 文档处理
+  // ═══════════════════════════════════════════
+  {
+    type: 'word',
+    label: 'Word 操作',
+    icon: '📝',
+    color: '#60A5FA',
+    category: 'word',
+    description: '读取/写入 Word 文档',
+    inputs: [{ id: 'input', label: '输入', type: 'any' }],
+    outputs: [{ id: 'data', label: '数据', type: 'object' }],
+    defaultConfig: { path: '', action: 'read' },
+  },
+
+  // ═══════════════════════════════════════════
+  // 🔧 数据处理
+  // ═══════════════════════════════════════════
+  {
+    type: 'http',
+    label: 'HTTP 请求',
+    icon: '🌐',
+    color: '#58a6ff',
+    category: 'data',
+    description: '发送 HTTP 请求获取数据',
+    inputs: [
+      { id: 'headers', label: 'headers', type: 'object' },
+      { id: 'body', label: 'body', type: 'object' },
+    ],
+    outputs: [{ id: 'result', label: 'result', type: 'object' }],
+    defaultConfig: { url: '', method: 'GET', timeout: 30 },
+  },
+  {
+    type: 'file',
+    label: '文件读取',
+    icon: '📄',
+    color: '#9CA3AF',
+    category: 'data',
+    description: '读取本地文件内容',
+    inputs: [],
+    outputs: [
+      { id: 'content', label: 'content', type: 'string' },
+      { id: 'bytes', label: 'bytes', type: 'file' },
+    ],
+    defaultConfig: { path: '', encoding: 'utf-8' },
+  },
+  {
+    type: 'clipboard',
+    label: '剪贴板',
+    icon: '📋',
+    color: '#FBBF24',
+    category: 'data',
+    description: '读取系统剪贴板内容',
+    inputs: [],
+    outputs: [{ id: 'text', label: 'text', type: 'string' }],
+    defaultConfig: { format: 'text' },
+  },
+  {
+    type: 'json_parse',
+    label: 'JSON 解析',
+    icon: '🔀',
+    color: '#bc8cff',
+    category: 'data',
+    description: '用 JSONPath 提取字段',
+    inputs: [{ id: 'input', label: 'input', type: 'object', required: true }],
+    outputs: [{ id: 'result', label: 'result', type: 'object' }],
+    defaultConfig: { expression: '$', target_field: '' },
+  },
+  {
+    type: 'regex',
+    label: '正则处理',
+    icon: '🔤',
+    color: '#C084FC',
+    category: 'data',
+    description: '使用正则表达式提取/替换文本',
+    inputs: [{ id: 'input', label: 'input', type: 'string', required: true }],
+    outputs: [
+      { id: 'matches', label: 'matches', type: 'array' },
+      { id: 'result', label: 'result', type: 'string' },
+    ],
+    defaultConfig: { pattern: '', action: 'extract', replacement: '', flags: '' },
+  },
+  {
+    type: 'array',
+    label: '数组操作',
+    icon: '🔢',
+    color: '#f97316',
+    category: 'data',
+    description: '数组过滤、映射、排序、去重',
+    inputs: [{ id: 'input', label: 'input', type: 'array', required: true }],
+    outputs: [{ id: 'result', label: 'result', type: 'array' }],
+    defaultConfig: { action: 'filter', expression: '', limit: 100 },
+  },
+  {
+    type: 'convert',
+    label: '类型转换',
+    icon: '🔄',
+    color: '#fbbf24',
+    category: 'data',
+    description: '字符串↔数字↔布尔↔JSON 等类型互转',
+    inputs: [{ id: 'input', label: 'input', type: 'any', required: true }],
+    outputs: [{ id: 'result', label: 'result', type: 'any' }],
+    defaultConfig: { from: 'auto', to: 'string', encoding: 'utf-8' },
+  },
+  {
+    type: 'text_template',
+    label: '文本拼接',
+    icon: '📝',
+    color: '#a371f7',
+    category: 'data',
+    description: '模板替换拼接文本',
+    inputs: [{ id: 'data', label: 'data', type: 'object' }],
+    outputs: [{ id: 'result', label: 'result', type: 'string' }],
+    defaultConfig: { template: '', output_key: '' },
+  },
+  {
+    type: 'data',
+    label: '变量操作',
+    icon: '📦',
+    color: '#06b6d4',
+    category: 'data',
+    description: '变量设置/读取/合并',
+    inputs: [{ id: 'value', label: 'value', type: 'any' }],
+    outputs: [{ id: 'result', label: 'result', type: 'any' }],
+    defaultConfig: { action: 'set', key: '', value: '' },
+  },
+
+  // ═══════════════════════════════════════════
+  // 🔀 逻辑判断
+  // ═══════════════════════════════════════════
+  {
+    type: 'loop',
+    label: '循环',
+    icon: '🔁',
+    color: '#f97316',
+    category: 'logic',
+    description: '遍历数组，对每个元素执行子步骤',
+    inputs: [{ id: 'items', label: 'items', type: 'array', required: true }],
+    outputs: [
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'count', label: 'count', type: 'number' },
+    ],
+    defaultConfig: { items: '', body: [], max_iterations: 1000, on_error: 'fail' },
+  },
+  {
+    type: 'while',
+    label: 'While 循环',
+    icon: '🔄',
+    color: '#ea580c',
+    category: 'logic',
+    description: '条件循环，满足条件时重复执行',
+    inputs: [{ id: 'items', label: 'items', type: 'array' }],
+    outputs: [
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'count', label: 'count', type: 'number' },
+      { id: 'stopped_at', label: 'stopped_at', type: 'number' },
+    ],
+    defaultConfig: { items: '', condition: { check: '__current', op: 'not_empty' }, body: [], max_iterations: 1000 },
+  },
+  {
+    type: 'condition',
+    label: '条件判断',
+    icon: '🔀',
+    color: '#a78bfa',
+    category: 'logic',
+    description: '根据条件表达式选择执行分支',
+    inputs: [
+      { id: 'left', label: 'left', type: 'any' },
+      { id: 'right', label: 'right', type: 'any' },
+    ],
+    outputs: [
+      { id: 'result', label: 'result', type: 'boolean' },
+      { id: 'branch', label: 'branch', type: 'string' },
+    ],
+    defaultConfig: { left: '', op: '>', right: '0' },
+  },
+  {
+    type: 'delay',
+    label: '延时',
+    icon: '⏱️',
+    color: '#9ca3af',
+    category: 'logic',
+    description: '暂停执行指定时长',
+    inputs: [],
+    outputs: [{ id: 'duration_ms', label: 'duration_ms', type: 'number' }],
+    defaultConfig: { duration_ms: 1000, max_duration_ms: 300000 },
+  },
+  {
+    type: 'sub_workflow',
+    label: '子流程',
+    icon: '📦',
+    color: '#fb923c',
+    category: 'logic',
+    description: '打包一组节点为可复用的子流程图',
+    inputs: [{ id: 'input', label: 'input', type: 'object' }],
+    outputs: [{ id: 'result', label: 'result', type: 'object' }],
+    defaultConfig: { inline_steps: [], vars_mapping: {}, output_mapping: {}, output_key: 'result' },
+  },
+  {
+    type: 'map',
+    label: '映射处理',
+    icon: '🗺️',
+    color: '#c084fc',
+    category: 'logic',
+    description: '并行处理数组每个元素',
+    inputs: [{ id: 'items', label: 'items', type: 'array' }],
+    outputs: [{ id: 'results', label: 'results', type: 'array' }],
+    defaultConfig: { items: '', body: [], concurrency: 4 },
+  },
+  {
+    type: 'parallel',
+    label: '并行执行',
+    icon: '⚡',
+    color: '#a78bfa',
+    category: 'logic',
+    description: '同时执行多个子步骤',
+    inputs: [{ id: 'input', label: 'input', type: 'object' }],
+    outputs: [{ id: 'results', label: 'results', type: 'array' }],
+    defaultConfig: { steps: [], concurrency: 4 },
+  },
+  {
+    type: 'approval',
+    label: '审批节点',
+    icon: '✅',
+    color: '#f59e0b',
+    category: 'logic',
+    description: '等待人工审批',
+    inputs: [{ id: 'trigger', label: '触发', type: 'any' }],
+    outputs: [
+      { id: 'approved', label: '通过', type: 'object' },
+      { id: 'rejected', label: '拒绝', type: 'object' },
+    ],
+    defaultConfig: { title: '', approvers: [], timeout_hours: 24 },
+  },
+
+  // ═══════════════════════════════════════════
+  // 📤 输出
+  // ═══════════════════════════════════════════
+  {
+    type: 'file_save',
+    label: '保存文件',
+    icon: '💾',
+    color: '#8b949e',
+    category: 'output',
+    description: '写入文件到本地',
+    inputs: [{ id: 'content', label: 'content', type: 'object', required: true }],
+    outputs: [{ id: 'path', label: 'path', type: 'string' }],
+    defaultConfig: { path: '', format: 'json', encoding: 'utf-8' },
+  },
+  {
+    type: 'print',
+    label: '控制台打印',
+    icon: '🖨️',
+    color: '#6EE7B7',
+    category: 'output',
+    description: '将数据输出到控制台日志',
+    inputs: [{ id: 'data', label: 'data', type: 'any', required: true }],
+    outputs: [{ id: 'pass', label: 'pass', type: 'any' }],
+    defaultConfig: { prefix: '', colorize: true },
+  },
+  {
+    type: 'notify',
+    label: '通知',
+    icon: '🔔',
+    color: '#fbbf24',
+    category: 'output',
+    description: '发送桌面通知',
+    inputs: [{ id: 'message', label: '消息', type: 'string' }],
+    outputs: [],
+    defaultConfig: { title: '', message: '', level: 'info' },
+  },
+
+  // ═══════════════════════════════════════════
+  // 📦 其它
+  // ═══════════════════════════════════════════
+  {
+    type: 'script',
+    label: '脚本执行',
+    icon: '💻',
+    color: '#ec4899',
+    category: 'other',
+    description: '运行自定义脚本',
+    inputs: [{ id: 'input', label: '输入', type: 'any' }],
+    outputs: [{ id: 'result', label: '结果', type: 'any' }],
+    defaultConfig: { language: 'python', code: '', timeout: 30 },
+  },
+  {
+    type: 'window',
+    label: '窗口操作',
+    icon: '🪟',
+    color: '#06b6d4',
+    category: 'other',
+    description: '操作桌面窗口',
+    inputs: [],
+    outputs: [{ id: 'data', label: '结果', type: 'object' }],
+    defaultConfig: { action: 'list', title: '' },
+  },
+  {
+    type: 'mouse_keyboard',
+    label: '键鼠操作',
+    icon: '🖱️',
+    color: '#84cc16',
+    category: 'other',
+    description: '模拟键盘鼠标输入',
+    inputs: [],
+    outputs: [{ id: 'data', label: '结果', type: 'object' }],
+    defaultConfig: { action: 'type', text: '', key: '' },
+  },
+  {
+    type: 'ocr',
+    label: 'OCR 识别',
+    icon: '👁️',
+    color: '#8b5cf6',
+    category: 'other',
+    description: '图片文字识别',
+    inputs: [{ id: 'image', label: '图片', type: 'file' }],
+    outputs: [{ id: 'text', label: '文字', type: 'string' }],
+    defaultConfig: { path: '', lang: 'chi_sim+eng' },
   },
 ]
 
-// ─── 辅助函数 ───
-
+/** 通过类型获取节点定义 */
 export function getNodeDef(type: string): NodeDefinition | undefined {
   return NODE_REGISTRY.find(d => d.type === type)
-}
-
-export function pinColor(type: string): string {
-  return (PIN_COLORS as Record<string, string>)[type] || '#8b949e'
 }

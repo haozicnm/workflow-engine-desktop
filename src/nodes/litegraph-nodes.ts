@@ -1027,14 +1027,6 @@ export function registerAllNodes(): void {
   LiteGraph.registerNodeType('approval', ApprovalNode)
   LiteGraph.registerNodeType('parallel', ParallelNode)
 
-  // AI nodes
-  LiteGraph.registerNodeType('ai', AiNode)
-  LiteGraph.registerNodeType('ai_translate', AiTranslateNode)
-  LiteGraph.registerNodeType('ai_summarize', AiSummarizeNode)
-  LiteGraph.registerNodeType('ai_classify', AiClassifyNode)
-  LiteGraph.registerNodeType('ai_sentiment', AiSentimentNode)
-  LiteGraph.registerNodeType('ai_entities', AiEntitiesNode)
-
   // Output nodes
   LiteGraph.registerNodeType('file_save', FileSaveNode)
   LiteGraph.registerNodeType('print', PrintNode)
@@ -1079,12 +1071,6 @@ export {
   WhileNode,
   ConditionNode,
   SubWorkflowNode,
-  AiNode,
-  AiTranslateNode,
-  AiSummarizeNode,
-  AiClassifyNode,
-  AiSentimentNode,
-  AiEntitiesNode,
   FileSaveNode,
   PrintNode,
   MouseKeyboardNode,

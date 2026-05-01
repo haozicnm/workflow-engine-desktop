@@ -59,18 +59,20 @@ import { NODE_REGISTRY } from './pinTypes'
 
 // ─── 分类定义 ───
 const CATEGORY_DEFS = [
-  { name: 'source', label: '📥 数据源' },
-  { name: 'process', label: '🔧 处理' },
-  { name: 'ai', label: '🤖 AI' },
-  { name: 'automation', label: '🖥️ 浏览器' },
+  { name: 'browser', label: '🖥️ 浏览器' },
+  { name: 'excel', label: '📊 Excel' },
+  { name: 'word', label: '📄 Word' },
+  { name: 'data', label: '🔧 数据处理' },
+  { name: 'logic', label: '🔀 逻辑判断' },
   { name: 'output', label: '📤 输出' },
+  { name: 'other', label: '📦 其它' },
 ] as const
 
 // ─── 搜索 ───
 const search = ref('')
 
 // ─── 折叠状态 ───
-const expanded = reactive(new Set<string>(['source', 'process', 'output']))
+const expanded = reactive(new Set<string>(['browser', 'data', 'logic']))
 
 function toggleCategory(name: string) {
   if (expanded.has(name)) {

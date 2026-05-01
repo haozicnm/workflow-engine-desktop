@@ -42,12 +42,26 @@
         <button class="toolbar-btn" @click="pickElement" title="拾取浏览器元素">
           🎯 拾取
         </button>
-
+        <button class="toolbar-btn" @click="importWorkflow" title="导入工作流 JSON">
+          📥 导入
+        </button>
+        <button class="toolbar-btn" @click="exportWorkflow" title="导出工作流 JSON">
+          📤 导出
+        </button>
         <button class="toolbar-btn" @click="clearCanvas">
           🗑 清空
         </button>
       </div>
     </header>
+
+    <!-- 导入文件 input（隐藏） -->
+    <input
+      ref="importInputRef"
+      type="file"
+      accept=".json"
+      style="display:none"
+      @change="onImportFile"
+    />
 
     <!-- 主体三栏布局 -->
     <div class="editor-body">
@@ -71,7 +85,7 @@
         <canvas ref="canvasRef" class="litegraph-canvas"></canvas>
       </div>
 
-      <!-- 右侧面板：属性 + 预览 -->
+      <!-- 右侧面板：属性 -->
       <div class="right-panels">
         <PropertyPanel
           :key="widgetVersion"
@@ -83,13 +97,35 @@
           @update-widget="onUpdateWidget"
           @delete="onDeleteNode"
         />
-        <div class="panel-divider"></div>
-        <PreviewPanel
-          :lg-node="selectedLgNode"
-          @update-widget="onUpdateWidget"
-        />
       </div>
     </div>
+
+    <!-- 预览弹窗 overlay -->
+    <Teleport to="body">
+      <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
+        <div
+          ref="previewPopupRef"
+          class="preview-popup"
+          :style="previewStyle"
+          @mousedown.stop
+        >
+          <div class="preview-popup-header" @mousedown="onPreviewDragStart">
+            <span>{{ previewTitle }}</span>
+            <div class="preview-popup-actions">
+              <button @click="previewVisible = false">✕</button>
+            </div>
+          </div>
+          <div class="preview-popup-body">
+            <PreviewPanel
+              :lg-node="selectedLgNode"
+              @update-widget="onUpdateWidget"
+            />
+          </div>
+          <!-- 右下角 resize handle -->
+          <div class="preview-resize-handle" @mousedown="onPreviewResizeStart"></div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 底部控制台 -->
     <footer v-if="logs.length > 0" class="console">
@@ -112,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
@@ -147,6 +183,68 @@ const selectedLgNode = ref<LGraphNode | null>(null)
 const isRunning = ref(false)
 const recording = ref(false)  // 浏览器录制状态
 const widgetVersion = ref(0)  // 递增触发 PropertyPanel 重渲染
+const importInputRef = ref<HTMLInputElement | null>(null)
+const previewVisible = ref(false)  // 预览弹窗
+const previewPopupRef = ref<HTMLDivElement | null>(null)
+const previewPos = ref({ x: 100, y: 100 })
+const previewSize = ref({ w: 560, h: 420 })
+const previewTitle = ref('预览')
+let previewDragging = false, previewDragOff = { x: 0, y: 0 }
+let previewResizing = false, previewResizeStart = { x: 0, y: 0, w: 0, h: 0 }
+
+const previewStyle = computed(() => ({
+  left: `${previewPos.value.x}px`,
+  top: `${previewPos.value.y}px`,
+  width: `${previewSize.value.w}px`,
+  height: `${previewSize.value.h}px`,
+}))
+
+function onPreviewDragStart(e: MouseEvent) {
+  previewDragging = true
+  previewDragOff = { x: e.clientX - previewPos.value.x, y: e.clientY - previewPos.value.y }
+  document.addEventListener('mousemove', onPreviewDrag)
+  document.addEventListener('mouseup', onPreviewDragEnd)
+}
+function onPreviewDrag(e: MouseEvent) {
+  if (!previewDragging) return
+  previewPos.value = { x: e.clientX - previewDragOff.x, y: e.clientY - previewDragOff.y }
+}
+function onPreviewDragEnd() {
+  previewDragging = false
+  document.removeEventListener('mousemove', onPreviewDrag)
+  document.removeEventListener('mouseup', onPreviewDragEnd)
+}
+
+function onPreviewResizeStart(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  previewResizing = true
+  previewResizeStart = { x: e.clientX, y: e.clientY, w: previewSize.value.w, h: previewSize.value.h }
+  document.addEventListener('mousemove', onPreviewResize)
+  document.addEventListener('mouseup', onPreviewResizeEnd)
+}
+function onPreviewResize(e: MouseEvent) {
+  if (!previewResizing) return
+  previewSize.value = {
+    w: Math.max(320, previewResizeStart.w + e.clientX - previewResizeStart.x),
+    h: Math.max(200, previewResizeStart.h + e.clientY - previewResizeStart.y),
+  }
+}
+function onPreviewResizeEnd() {
+  previewResizing = false
+  document.removeEventListener('mousemove', onPreviewResize)
+  document.removeEventListener('mouseup', onPreviewResizeEnd)
+}
+
+// 选中文件/浏览器节点时自动弹出预览
+const previewTypes = new Set(['browser_navigate', 'browser_click', 'browser_extract', 'browser_screenshot',
+  'browser_evaluate', 'browser', 'excel', 'word', 'file', 'file_save', 'http', 'web_scrape'])
+watch(selectedLgNode, (node) => {
+  if (node && previewTypes.has(node.type)) {
+    previewTitle.value = node.title || node.type
+    previewVisible.value = true
+  }
+})
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
@@ -227,13 +325,41 @@ onMounted(() => {
     // 创建 canvas
     canvas = new LGraphCanvas(canvasRef.value!, graph)
 
-    // 配置 canvas 外观（暗色主题）
+    // 配置 canvas 外观（暗色主题 + 网格线）
     canvas.background_image = ''
     canvas.clear_background = true
-    canvas.clear_background_color = '#0d1117'  // 覆盖默认 #222，匹配画布背景
+    canvas.clear_background_color = '#0d1117'
     canvas.render_canvas_border = false
     canvas.render_border = false
     canvas.node_title_color = '#e6edf3'
+
+    // 画布网格背景
+    canvas.onDrawBackground = (ctx: CanvasRenderingContext2D) => {
+      const ds = (canvas as any).ds
+      const scale = ds?.scale || 1
+      const offset = ds?.offset || [0, 0]
+      const gridSize = 40 * scale
+      const alpha = Math.max(0.08, Math.min(0.15, scale * 0.06))
+
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`
+      ctx.lineWidth = 1
+
+      const startX = Math.floor(-offset[0] / gridSize) * gridSize
+      const startY = Math.floor(-offset[1] / gridSize) * gridSize
+      const endX = offset[0] + canvasRef.value!.width / scale + gridSize
+      const endY = offset[1] + canvasRef.value!.height / scale + gridSize
+
+      ctx.beginPath()
+      for (let x = startX; x <= endX; x += gridSize) {
+        ctx.moveTo(x, startY)
+        ctx.lineTo(x, endY)
+      }
+      for (let y = startY; y <= endY; y += gridSize) {
+        ctx.moveTo(startX, y)
+        ctx.lineTo(endX, y)
+      }
+      ctx.stroke()
+    }
 
     // 显式开启节点拖拽（WebView2 中默认可能不生效）
     canvas.allow_dragnodes = true
@@ -730,6 +856,43 @@ function clearCanvas() {
   undoManager.pushState()
 }
 
+// ─── 导入导出 ───
+function importWorkflow() {
+  importInputRef.value?.click()
+}
+
+async function onImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  try {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    store.load(data)
+    loadFromStore()
+    addLog(`📥 已导入: ${data.name || file.name}`, 'info')
+    fitView()
+  } catch (e: any) {
+    addLog(`❌ 导入失败: ${e.message}`, 'error')
+  } finally {
+    input.value = ''  // 允许重复导入同一文件
+  }
+}
+
+function exportWorkflow() {
+  syncGraphToStore()
+  const json = JSON.stringify(store.toJSON(), null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${store.workflowName || 'workflow'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  addLog('📤 工作流已导出')
+}
+
 // ─── 浏览器录制 ───
 
 async function toggleRecording() {
@@ -1108,4 +1271,69 @@ function onKeyDown(e: KeyboardEvent) {
 .log-line.error { color: #f85149; }
 .log-line.warn { color: #d29922; }
 .log-line.success { color: #3fb950; }
+
+/* ═══════════ 预览弹窗 ═══════ */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+.preview-popup {
+  position: fixed;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 320px;
+  min-height: 200px;
+}
+
+.preview-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #21262d;
+  border-bottom: 1px solid #30363d;
+  cursor: move;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.preview-popup-actions button {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.preview-popup-actions button:hover { background: #30363d; color: #f85149; }
+
+.preview-popup-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+.preview-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, #30363d 50%);
+  border-radius: 0 0 8px 0;
+}
 </style>
