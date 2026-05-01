@@ -235,6 +235,26 @@ onMounted(() => {
     canvas.render_border = false
     canvas.node_title_color = '#e6edf3'
 
+    // 显式开启节点拖拽（WebView2 中默认可能不生效）
+    canvas.allow_dragnodes = true
+    canvas.allow_dragcanvas = true
+    canvas.allow_interaction = true
+    // 防止 WebView2 手势冲突
+    canvasRef.value!.style.touchAction = 'none'
+
+    // 窗口大小变化时同步 canvas 尺寸（autoresize 只处理内部变换，不管 DOM 尺寸）
+    const resizeHandler = () => {
+      if (!canvasRef.value || !wrapperRef.value) return
+      const cw = wrapperRef.value.clientWidth
+      const ch = wrapperRef.value.clientHeight
+      if (cw > 0 && ch > 0 && (canvasRef.value.width !== cw || canvasRef.value.height !== ch)) {
+        canvas.resize(cw, ch)
+      }
+    }
+    const ro = new ResizeObserver(resizeHandler)
+    ro.observe(wrapperRef.value!)
+    window.addEventListener('resize', resizeHandler)
+
     // 监听 graph 变化 → 同步到 store
     graph.on_change = () => throttledSync()
     graph.onAfterChange = () => throttledSync()
@@ -445,16 +465,30 @@ function loadFromStore() {
   }
 
   // 添加连线（使用 ID 映射）
+  // 兼容端口名不匹配：先精确匹配，失败则回退到第一个输出/输入端口
   for (const edge of store.edges) {
     const sourceNode = oldToNew.get(edge.source)
     const targetNode = oldToNew.get(edge.target)
-    if (!sourceNode || !targetNode) continue
+    if (!sourceNode || !targetNode) {
+      addLog(`⚠ 连线跳过: 节点 ${edge.source}→${edge.target} 不存在`, 'warn')
+      continue
+    }
 
-    const sourceSlot = sourceNode.outputs?.findIndex((o: any) => o.name === edge.sourceHandle)
-    const targetSlot = targetNode.inputs?.findIndex((i: any) => i.name === edge.targetHandle)
+    let sourceSlot = sourceNode.outputs?.findIndex((o: any) => o.name === edge.sourceHandle)
+    let targetSlot = targetNode.inputs?.findIndex((i: any) => i.name === edge.targetHandle)
+
+    // fallback: 端口名不匹配时用第一个可用端口（LiteGraph 节点通常只有一个）
+    if (sourceSlot < 0 && sourceNode.outputs && sourceNode.outputs.length > 0) {
+      sourceSlot = 0
+    }
+    if (targetSlot < 0 && targetNode.inputs && targetNode.inputs.length > 0) {
+      targetSlot = 0
+    }
 
     if (sourceSlot >= 0 && targetSlot >= 0) {
       sourceNode.connect(sourceSlot, targetNode, targetSlot)
+    } else {
+      addLog(`⚠ 连线失败: ${sourceNode.type}[${edge.sourceHandle}]→${targetNode.type}[${edge.targetHandle}] 无可匹配端口`, 'warn')
     }
   }
 
@@ -463,6 +497,10 @@ function loadFromStore() {
   // 重新同步 store，将 LiteGraph 生成的整数 ID 写回
   syncGraphToStore()
   store.dirty = false
+  // 强制刷新画布，清除可能的残留渲染（解决隐形窗口/鬼影连线问题）
+  canvas.setDirty(true, true)
+  // 自适应视图使所有节点可见
+  nextTick(() => fitView())
 }
 
 // ─── 保存：从 graph 同步到 store 再导出 JSON ───
@@ -960,6 +998,9 @@ function onKeyDown(e: KeyboardEvent) {
   height: 100%;
   max-height: none !important;
   background: #0d1117 !important;
+  touch-action: none;         /* WebView2: 防止手势拦截拖拽 */
+  user-select: none;           /* 防止文本选择干扰 */
+  outline: none;               /* 防止焦点环 */
 }
 
 /* ─── 空画布提示 ─── */

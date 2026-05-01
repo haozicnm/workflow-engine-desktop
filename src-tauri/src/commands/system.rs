@@ -17,7 +17,8 @@ pub struct AppSettings {
 
 #[tauri::command]
 pub async fn system_check_browser() -> Result<serde_json::Value, String> {
-    // 检查内置 Python
+    // ─── Python 检测 ───
+    // 1. 内置 Python
     let bundled = if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let python = dir.join("embed").join("python.exe");
@@ -25,29 +26,87 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
         } else { None }
     } else { None };
 
-    // 检查系统 Python
+    // 2. 系统 PATH 中的 Python
     let system_python = which::which("python3")
         .or_else(|_| which::which("python"))
         .ok()
         .map(|p| p.to_string_lossy().to_string());
 
-    // 检查系统浏览器
-    let has_edge = {
-        let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
-        let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
-        std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe").exists()
-            || std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe").exists()
+    // 3. Windows 目录扫描（不依赖 PATH，始终执行）
+    #[cfg(target_os = "windows")]
+    let scanned_python: Option<String> = {
+        use std::path::PathBuf;
+        let candidates: [(String, PathBuf); 3] = [
+            (std::env::var("LOCALAPPDATA").unwrap_or_default(),
+             PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Programs").join("Python")),
+            (std::env::var("PROGRAMFILES").unwrap_or_default(),
+             PathBuf::from(std::env::var("PROGRAMFILES").unwrap_or_default()).join("Python")),
+            ("C:\\".into(),
+             PathBuf::from("C:\\Python")),
+        ];
+        let mut found: Vec<PathBuf> = Vec::new();
+        for (_label, base) in &candidates {
+            if !base.exists() { continue }
+            if let Ok(entries) = std::fs::read_dir(base) {
+                for e in entries.flatten() {
+                    let name = e.file_name().to_string_lossy();
+                    if name.starts_with("Python3") {
+                        let py = e.path().join("python.exe");
+                        if py.exists() { found.push(py); }
+                    }
+                }
+            }
+        }
+        found.sort_by(|a, b| b.cmp(a)); // 降序取最新版本
+        found.into_iter().next().map(|p| p.to_string_lossy().to_string())
     };
-    let has_chrome = which::which("chrome").is_ok()
-        || std::path::PathBuf::from(&std::env::var("PROGRAMFILES").unwrap_or_default())
-            .join("Google/Chrome/Application/chrome.exe").exists();
+    #[cfg(not(target_os = "windows"))]
+    let scanned_python: Option<String> = None;
 
-    let python_available = bundled.is_some() || system_python.is_some();
+    // 取最优 Python
+    let best_python = scanned_python.or(system_python);
+
+    // ─── 浏览器检测 ───
+    let has_edge = {
+        #[cfg(target_os = "windows")]
+        {
+            let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
+            let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
+            let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe").exists()
+                || std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe").exists()
+                || std::path::PathBuf::from(&local).join("Microsoft/Edge/Application/msedge.exe").exists()
+        }
+        #[cfg(not(target_os = "windows"))]
+        { which::which("microsoft-edge").is_ok() }
+    };
+
+    let has_chrome = {
+        #[cfg(target_os = "windows")]
+        {
+            let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
+            let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
+            let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            which::which("chrome").is_ok()
+                || std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe").exists()
+                || std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe").exists()
+                || std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe").exists()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            which::which("google-chrome-stable").is_ok()
+                || which::which("google-chrome").is_ok()
+                || which::which("chromium-browser").is_ok()
+                || which::which("chromium").is_ok()
+        }
+    };
+
+    let python_available = bundled.is_some() || best_python.is_some();
 
     Ok(serde_json::json!({
         "python_available": python_available,
         "bundled_python": bundled,
-        "system_python": system_python,
+        "system_python": best_python,
         "has_edge": has_edge,
         "has_chrome": has_chrome,
     }))
