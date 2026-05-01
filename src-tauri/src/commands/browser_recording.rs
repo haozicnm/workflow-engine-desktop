@@ -3,7 +3,7 @@
 // 提供 Tauri 前端可直接调用的录制开始/停止/元素选取命令，
 // 复用 crate::nodes::browser::send_sidecar_action 与录制转换器。
 
-use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
+use crate::engine::recording_converter::{self, RecordedAction};
 
 /// 开始浏览器录制
 ///
