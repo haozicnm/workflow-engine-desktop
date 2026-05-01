@@ -212,13 +212,65 @@ fn find_python() -> Result<std::path::PathBuf> {
             }
         }
     }
-    // 3. 系统 Python
-    which::which("python3")
-        .or_else(|_| which::which("python"))
+    // 3. 系统 PATH 中的 Python
+    let system_python = which::which("python3")
+        .or_else(|_| which::which("python"));
+
+    // 3.5 Windows: 扫描常见安装位置（AppData / Program Files）
+    #[cfg(target_os = "windows")]
+    {
+        if system_python.is_err() {
+            if let Ok(p) = find_windows_python() {
+                return Ok(p);
+            }
+        }
+    }
+
+    system_python
         .map_err(|_| anyhow!(
             "未找到 Python。浏览器节点需要 Python 3.8+\n\
              下载地址: https://www.python.org/downloads/"
         ))
+}
+
+/// Windows: 扫描常见 Python 安装目录
+#[cfg(target_os = "windows")]
+fn find_windows_python() -> Result<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    let candidates: Vec<PathBuf> = vec![
+        // AppData 用户安装
+        std::env::var("LOCALAPPDATA")
+            .map(|d| PathBuf::from(d).join("Programs").join("Python"))
+            .unwrap_or_default(),
+        // Program Files
+        std::env::var("ProgramFiles")
+            .map(|d| PathBuf::from(d).join("Python"))
+            .unwrap_or_default(),
+        // C 盘根目录
+        PathBuf::from("C:\\Python"),
+    ];
+
+    for base in &candidates {
+        if !base.exists() { continue }
+        if let Ok(entries) = std::fs::read_dir(base) {
+            // Find the newest Python version
+            let mut pythons: Vec<PathBuf> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_name().to_string_lossy().starts_with("Python3"))
+                .map(|e| e.path().join("python.exe"))
+                .filter(|p| p.exists())
+                .collect();
+            // Sort descending by version (Python313 > Python312 > ...)
+            pythons.sort_by(|a, b| b.cmp(a));
+            if let Some(p) = pythons.into_iter().next() {
+                info!("Windows 自动检测到 Python: {:?}", p);
+                return Ok(p);
+            }
+        }
+    }
+
+    Err(anyhow!("Windows Python 扫描未找到"))
 }
 
 // ─── 全局 sidecar 实例（RwLock<Option<Arc<...>>> 支持健康检查和自动重启） ───
