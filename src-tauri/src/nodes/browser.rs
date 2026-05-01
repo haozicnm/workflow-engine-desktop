@@ -198,39 +198,68 @@ fn find_bundled_python() -> Option<std::path::PathBuf> {
 }
 
 /// 查找 Python（优先内置 → 用户配置 → 系统）
+///
+/// 返回 (path, source_label) 供错误报告使用
 fn find_python() -> Result<std::path::PathBuf> {
+    let mut tried: Vec<String> = Vec::new();
+
     // 1. 内置 Python
     if let Some(p) = find_bundled_python() {
         return Ok(p);
     }
+    tried.push("内置 (embed/python.exe)".into());
+
     // 2. 用户在设置中配置的 Python 路径
     if let Ok(config) = crate::data::config::AppConfig::load_default() {
         if let Some(ref path) = config.python_path {
             if !path.is_empty() {
+                tried.push(format!("用户配置: {}", path));
                 let p = std::path::PathBuf::from(path);
                 if p.exists() { return Ok(p); }
             }
         }
     }
+
     // 3. 系统 PATH 中的 Python
     let system_python = which::which("python3")
         .or_else(|_| which::which("python"));
+    if let Ok(ref p) = system_python {
+        tried.push(format!("系统 PATH: {:?}", p));
+    } else {
+        tried.push("系统 PATH: 未找到 python3/python".into());
+    }
 
-    // 3.5 Windows: 扫描常见安装位置（AppData / Program Files）
+    // 4. Windows: 扫描常见安装位置 — 始终执行，不依赖 PATH 结果
+    //    取版本最高的，优于 PATH 找到的可能过期/残缺的 python
     #[cfg(target_os = "windows")]
     {
-        if system_python.is_err() {
-            if let Ok(p) = find_windows_python() {
-                return Ok(p);
+        let windows_scan = find_windows_python();
+        match (&system_python, &windows_scan) {
+            (_, Ok(ref wp)) => {
+                // Windows 扫描按版本降序，总是取它（最新）
+                info!("Windows 自动检测到 Python: {:?}", wp);
+                return Ok(wp.clone());
+            }
+            (Ok(_), Err(_)) => {
+                tried.push("Windows 目录扫描: 未找到".into());
+                // fall through to use PATH result
+            }
+            (Err(_), Err(_)) => {
+                tried.push("Windows 目录扫描: 未找到".into());
+                // will error below
             }
         }
     }
 
-    system_python
-        .map_err(|_| anyhow!(
-            "未找到 Python。浏览器节点需要 Python 3.8+\n\
+    // 5. Linux/macOS: 直接返回 PATH 结果
+    system_python.map_err(|_| {
+        let tried_list = tried.join("\n  • ");
+        anyhow!(
+            "未找到 Python 3.8+。浏览器节点需要 Python\n\
+             已尝试:\n  • {tried_list}\n\
              下载地址: https://www.python.org/downloads/"
-        ))
+        )
+    })
 }
 
 /// Windows: 扫描常见 Python 安装目录
@@ -332,7 +361,7 @@ async fn preflight_check() -> Result<()> {
     if !output.status.success() {
         info!("Playwright 未安装，正在自动安装...");
 
-        // pip install playwright
+        // pip install playwright — 直连 PyPI，失败后切清华镜像
         let install = tokio::process::Command::new(&python)
             .args(["-m", "pip", "install", "playwright", "-q"])
             .output()
@@ -340,31 +369,58 @@ async fn preflight_check() -> Result<()> {
             .map_err(|e| anyhow!("执行 pip 失败: {}", e))?;
 
         if !install.status.success() {
-            let stderr = String::from_utf8_lossy(&install.stderr);
-            return Err(anyhow!(
-                "自动安装 Playwright 失败。\n\
-                 请手动执行: pip install playwright && playwright install chromium\n\n\
-                 错误: {}",
-                stderr
-            ));
+            // 国内网络环境下 PyPI 直连可能超时，切清华镜像重试
+            info!("PyPI 直连失败，尝试清华镜像...");
+            let install_mirror = tokio::process::Command::new(&python)
+                .args(["-m", "pip", "install", "playwright", "-q",
+                       "-i", "https://pypi.tuna.tsinghua.edu.cn/simple",
+                       "--trusted-host", "pypi.tuna.tsinghua.edu.cn"])
+                .output()
+                .await
+                .map_err(|e| anyhow!("执行 pip (镜像) 失败: {}", e))?;
+
+            if !install_mirror.status.success() {
+                let stderr = String::from_utf8_lossy(&install_mirror.stderr);
+                return Err(anyhow!(
+                    "自动安装 Playwright 失败。\n\
+                     请手动执行: pip install playwright && playwright install chromium\n\n\
+                     错误: {}",
+                    stderr
+                ));
+            }
         }
         info!("Playwright 包安装完成");
     }
 
     // 4. 检查浏览器 — 优先用系统 Edge/Chrome，不需要下载 Playwright Chromium
     let has_system_browser = {
-        // Windows: 检查 Edge
+        // Windows: 检查 Edge + Chrome
         #[cfg(target_os = "windows")]
         {
             let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
             let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
+            let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
             let edge1 = std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe");
             let edge2 = std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe");
-            edge1.exists() || edge2.exists()
+            let chrome1 = std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe");
+            let chrome2 = std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe");
+            let chrome3 = std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe");
+            let found = edge1.exists() || edge2.exists() || chrome1.exists() || chrome2.exists() || chrome3.exists();
+            if found {
+                let which = if edge1.exists() || edge2.exists() { "Edge" } else { "Chrome" };
+                info!("检测到系统浏览器: {}", which);
+            }
+            found
         }
         #[cfg(not(target_os = "windows"))]
         {
-            which::which("microsoft-edge").is_ok() || which::which("google-chrome").is_ok()
+            let found = which::which("microsoft-edge").is_ok()
+                || which::which("google-chrome-stable").is_ok()
+                || which::which("google-chrome").is_ok()
+                || which::which("chromium-browser").is_ok()
+                || which::which("chromium").is_ok();
+            if found { info!("检测到系统浏览器 (Linux) ✓"); }
+            found
         }
     };
 
