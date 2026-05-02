@@ -13,7 +13,7 @@ jobs:
   # ═══ Windows 构建 ═══
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -55,6 +55,41 @@ jobs:
       - name: Create python-runtime placeholder
         run: New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed; Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Collect Lite NSIS installer
+        id: lite-find
+        shell: bash
+        run: |
+          NSIS=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -1)
+          cp "$NSIS" "src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe"
+          echo "path=$NSIS" >> $GITHUB_OUTPUT
+          echo "lite_path=src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe" >> $GITHUB_OUTPUT
+
+      - name: Download Playwright Chromium (Win7 compat: v109)
+        shell: pwsh
+        run: |
+          pip install playwright==1.29.0
+          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
+          python -m playwright install chromium
+
+      - name: Build Tauri Full (with Chromium)
+        run: npx --prefix src tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Collect Full NSIS installer
+        id: full-find
+        shell: bash
+        run: |
+          FULL=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | grep -v '\-lite' | head -1)
+          cp "$FULL" "src-tauri/target/release/bundle/nsis/$(basename "$FULL" .exe)-full.exe"
+          echo "path=$FULL" >> $GITHUB_OUTPUT
+
       - name: Build Tauri (Windows)
         run: npx --prefix src tauri build
         env:
@@ -88,7 +123,7 @@ jobs:
   # ═══ Linux 构建 ═══
   build-linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -141,34 +176,82 @@ jobs:
       - name: Create python-runtime placeholder
         run: mkdir -p src-tauri/python-runtime/embed && touch src-tauri/python-runtime/embed/.gitkeep
 
-      - name: Build Tauri (Linux)
+      # ─── Lite build (no Chromium) ───
+      - name: Build Tauri Lite
         run: npx --prefix src tauri build --bundles deb,appimage
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Find Linux packages
-        id: find
+      - name: Collect & Upload Lite packages
+        id: lite
         run: |
           DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1 || true)
-          APPIMAGE=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1 || true)
+          AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1 || true)
+          # Rename with -lite suffix
+          if [ -n "$DEB" ]; then cp "$DEB" "$(dirname "$DEB")/$(basename "$DEB" .deb)-lite.deb"; fi
+          if [ -n "$AI" ]; then cp "$AI" "$(dirname "$AI")/$(basename "$AI" .AppImage)-lite.AppImage"; fi
           echo "deb=$DEB" >> $GITHUB_OUTPUT
-          echo "appimage=$APPIMAGE" >> $GITHUB_OUTPUT
+          echo "appimage=$AI" >> $GITHUB_OUTPUT
 
-      - name: Upload deb artifact
-        if: steps.find.outputs.deb != ''
+      - name: Upload Lite deb
+        if: steps.lite.outputs.deb != ''
         uses: actions/upload-artifact@v4
         with:
-          name: linux-deb
-          path: ${{ steps.find.outputs.deb }}
+          name: linux-deb-lite
+          path: "$(dirname '${{ steps.lite.outputs.deb }}')/$(basename '${{ steps.lite.outputs.deb }}' .deb)-lite.deb"
           if-no-files-found: warn
 
-      - name: Upload AppImage artifact
-        if: steps.find.outputs.appimage != ''
+      - name: Upload Lite AppImage
+        if: steps.lite.outputs.appimage != ''
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: ${{ steps.find.outputs.appimage }}
+          name: linux-appimage-lite
+          path: "$(dirname '${{ steps.lite.outputs.appimage }}')/$(basename '${{ steps.lite.outputs.appimage }}' .AppImage)-lite.AppImage"
+          if-no-files-found: warn
+
+      # ─── Full build (with Chromium) ───
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download Playwright Chromium
+        run: |
+          pip install playwright
+          export PLAYWRIGHT_BROWSERS_PATH="${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
+          python -m playwright install chromium
+
+      - name: Build Tauri Full
+        run: npx --prefix src tauri build --bundles deb,appimage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Collect & Upload Full packages
+        id: full
+        run: |
+          DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | grep -v '\-lite' | head -1 || true)
+          AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | grep -v '\-lite' | head -1 || true)
+          if [ -n "$DEB" ]; then cp "$DEB" "$(dirname "$DEB")/$(basename "$DEB" .deb)-full.deb"; fi
+          if [ -n "$AI" ]; then cp "$AI" "$(dirname "$AI")/$(basename "$AI" .AppImage)-full.AppImage"; fi
+          echo "deb=$DEB" >> $GITHUB_OUTPUT
+          echo "appimage=$AI" >> $GITHUB_OUTPUT
+
+      - name: Upload Full deb
+        if: steps.full.outputs.deb != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb-full
+          path: "$(dirname '${{ steps.full.outputs.deb }}')/$(basename '${{ steps.full.outputs.deb }}' .deb)-full.deb"
+          if-no-files-found: warn
+
+      - name: Upload Full AppImage
+        if: steps.full.outputs.appimage != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-full
+          path: "$(dirname '${{ steps.full.outputs.appimage }}')/$(basename '${{ steps.full.outputs.appimage }}' .AppImage)-full.AppImage"
           if-no-files-found: warn
 
   # ═══ 创建 Release ═══
@@ -196,23 +279,27 @@ jobs:
             ## Workflow Engine Desktop ${{ github.ref_name }}
 
             ### 🪟 Windows
-            - **NSIS 安装包** (.exe) — 标准 Windows 安装程序
+            - **Lite 安装包** (.exe) — 不含 Playwright Chromium（需在线下载浏览器）
+            - **Full 安装包** (.exe) — 离线版，内置 Playwright Chromium 109（Win7+ 兼容）
             - **MSI 安装包** (.msi) — 企业批量部署
 
             ### 🐧 Linux
-            - **AppImage** — 免安装，下载后 `chmod +x` 直接运行
-            - **deb 包** — Debian/Ubuntu 系安装包
+            - **Lite AppImage / deb** — 不含 Chromium
+            - **Full AppImage / deb** — 内置 Playwright Chromium
 
             ### 系统要求
-            - Windows 10+ / Ubuntu 22.04+
-            - Linux 需要 `xdotool` `wmctrl` 运行时依赖（窗口管理节点用）
+            - Windows 7+ (Lite) / Windows 10+ (Tauri)
+            - Ubuntu 22.04+
 
             ### 变更
             详见 [commits](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }})
           files: |
-            artifacts/windows-nsis/*.exe
+            artifacts/windows-nsis-lite/*.exe
+            artifacts/windows-nsis-full/*.exe
             artifacts/windows-msi/*.msi
-            artifacts/linux-deb/*.deb
-            artifacts/linux-appimage/*.AppImage
+            artifacts/linux-deb-lite/*.deb
+            artifacts/linux-deb-full/*.deb
+            artifacts/linux-appimage-lite/*.AppImage
+            artifacts/linux-appimage-full/*.AppImage
           draft: false
           prerelease: false
