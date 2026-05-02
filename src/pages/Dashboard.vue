@@ -232,8 +232,6 @@ async function handleImport(e: Event) {
       </div>
       <div class="dash-actions">
         <button class="btn btn-sm" @click="triggerImport">📥 导入 YAML</button>
-        <button class="btn btn-sm" @click="emit('navigate', '/history')">📊 运行历史</button>
-        <button class="btn btn-sm" @click="emit('navigate', '/settings')">⚙️ 设置</button>
         <button class="btn btn-primary" @click="openEditor()">＋ 新建工作流</button>
         <input ref="fileInput" type="file" accept=".yaml,.yml" style="display:none" @change="handleImport" />
       </div>

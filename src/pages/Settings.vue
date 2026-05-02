@@ -78,6 +78,11 @@ async function clearLogs() {
     toast.error('清空日志失败: ' + e)
   }
 }
+
+function truncatePath(path: string, maxLen: number): string {
+  if (path.length <= maxLen) return path
+  return '...' + path.slice(-(maxLen - 3))
+}
 </script>
 
 <template>
@@ -114,9 +119,19 @@ async function clearLogs() {
         <h3>系统检测</h3>
         <div class="info-grid">
           <div class="info-item">
-            <span class="info-label">内置 Python + Playwright</span>
+            <span class="info-label">Python 环境</span>
+            <span :class="sysInfo.python_available ? 'tag-ok' : 'tag-miss'">
+              {{ sysInfo.python_available ? '✅ 已检测到' : '❌ 未检测到' }}
+            </span>
+          </div>
+          <div class="info-item" v-if="sysInfo.system_python">
+            <span class="info-label">　↳ 系统 Python</span>
+            <span class="tag-ok" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">　↳ 内置 Python</span>
             <span :class="sysInfo.bundled_python ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.bundled_python ? '✅ 已内置' : '❌ 未内置' }}
+              {{ sysInfo.bundled_python ? '✅ 已内置' : '—' }}
             </span>
           </div>
           <div class="info-item">
