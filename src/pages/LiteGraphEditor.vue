@@ -2,7 +2,7 @@
   <!-- ═══════════ 叠加层架构 — Canvas 全屏背景 + UI 浮层 ═══════════ -->
   <div class="editor-app">
     <!-- 层 0：Canvas 全屏 -->
-    <canvas ref="canvasRef" class="editor-canvas" @drop="onDrop" @dragover.prevent></canvas>
+    <canvas ref="canvasRef" class="editor-canvas"></canvas>
 
     <!-- 空画布提示（叠加在 canvas 上） -->
     <div v-if="store.nodes.length === 0" class="empty-canvas">
@@ -510,6 +510,10 @@ onMounted(() => {
     document.addEventListener('keydown', onKeyDown)
     _canvasMounted = true
 
+    // 拖放：document 级事件，不受 z-index / pointer-events 干扰
+    document.addEventListener('dragover', onDocDragOver)
+    document.addEventListener('drop', onDocDrop)
+
     // 初始化第一个标签页
     const tid = tabStore.ensureTab()
     if (!tabDataCache.has(tid)) {
@@ -522,6 +526,8 @@ onUnmounted(() => {
   _canvasMounted = false
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('dragover', onDocDragOver)
+  document.removeEventListener('drop', onDocDrop)
   if (_resizeObserver) {
     _resizeObserver.disconnect()
     _resizeObserver = null
@@ -758,7 +764,18 @@ function loadFromStore() {
   nextTick(() => fitView())
 }
 
-// ─── 拖放节点 ───
+// ─── 拖放节点（document 级，绕开 z-index / pointer-events） ───
+function onDocDragOver(e: DragEvent) {
+  // 只有拖的是节点类型才允许 drop
+  if (e.dataTransfer?.types.includes('application/flow-node-type')) {
+    e.preventDefault()
+  }
+}
+
+function onDocDrop(e: DragEvent) {
+  onDrop(e)
+}
+
 function onDragStart(_def: unknown, _event: DragEvent) {
   // NodePalette 已在内部设置 dataTransfer
 }
@@ -766,9 +783,9 @@ function onDragStart(_def: unknown, _event: DragEvent) {
 function onDrop(event: DragEvent) {
   const nodeType = event.dataTransfer?.getData('application/flow-node-type')
   if (!nodeType) return
-  // 忽略在 UI 区域内的拖放（侧边栏、属性面板、控制台）
+  // 忽略在 UI 区域内或浮层上的拖放
   const target = event.target as HTMLElement
-  if (target?.closest('.overlay-left, .overlay-right, .overlay-bottom, .overlay-top')) return
+  if (target?.closest('.overlay-left, .overlay-top, .overlay-bottom, .floating-panel')) return
 
   const def = getNodeDef(nodeType)
   if (!def) return
