@@ -1,215 +1,200 @@
 <template>
-  <!-- ═══════════ 叠加层架构 — Canvas 全屏背景 + UI 浮层 ═══════════ -->
+  <!-- ═══════════ Grid 布局（对齐 ComfyUI GraphView） ═══════════ -->
   <div class="editor-app">
-    <!-- 层 0：Canvas 全屏 -->
-    <canvas ref="canvasRef" class="editor-canvas"></canvas>
-
-    <!-- 空画布提示（叠加在 canvas 上） -->
-    <div v-if="store.nodes.length === 0" class="empty-canvas">
-      <div class="empty-icon">🎨</div>
-      <div class="empty-title">空画布</div>
-      <div class="empty-hint">
-        双击空白画布搜索节点，或右键查看更多操作
-      </div>
+    <!-- Row 1: Top bar -->
+    <div class="grid-top">
+      <WorkflowTabs @add="onTabAdd" />
+      <TopMenuSection
+        :name="store.workflowName" :node-count="store.nodeCount" :edge-count="store.edgeCount"
+        :dirty="store.dirty" :running="isRunning" :recording="recording"
+        :disable-run="store.nodes.length === 0"
+        @run="runAll" @step="runSingle" @stop="stopRun"
+        @record="toggleRecording" @pick="pickElement"
+        @import="importWorkflow" @export="exportWorkflow"
+        @clear="clearCanvas" @save="onSaveWorkflow"
+      />
     </div>
 
-    <!-- 层 999：UI 浮层（pointer-events: none，穿透到 canvas） -->
-    <div class="ui-overlay">
-      <!-- 顶部菜单栏 -->
-      <div class="overlay-top">
-        <WorkflowTabs @add="onTabAdd" />
-        <TopMenuSection
-          :name="store.workflowName"
-          :node-count="store.nodeCount"
-          :edge-count="store.edgeCount"
-          :dirty="store.dirty"
-          :running="isRunning"
-          :recording="recording"
-          :disable-run="store.nodes.length === 0"
-          @run="runAll"
-          @step="runSingle"
-          @stop="stopRun"
-          @record="toggleRecording"
-          @pick="pickElement"
-          @import="importWorkflow"
-          @export="exportWorkflow"
-          @clear="clearCanvas"
-          @save="onSaveWorkflow"
-        />
-      </div>
+    <!-- Row 2, Col 1: Sidebar -->
+    <div class="grid-sidebar">
+      <SideToolbar
+        :show-console="showConsole"
+        @toggle-dashboard="showDashboard = !showDashboard"
+        @toggle-palette="showPalette = !showPalette"
+        @toggle-history="showHistory = !showHistory"
+        @toggle-console="showConsole = !showConsole"
+        @toggle-settings="showSettings = !showSettings"
+        @toggle-schedule="showSchedule = !showSchedule"
+      />
+    </div>
 
-      <!-- 主体区域 -->
-      <div class="overlay-main">
-        <!-- 左侧：仅图标栏 -->
-        <div class="overlay-left">
-          <SideToolbar
-            :show-console="showConsole"
-            @toggle-dashboard="showDashboard = !showDashboard"
-            @toggle-palette="showPalette = !showPalette"
-            @toggle-history="showHistory = !showHistory"
-            @toggle-console="showConsole = !showConsole"
-            @toggle-settings="showSettings = !showSettings"
-            @toggle-schedule="showSchedule = !showSchedule"
-          />
-        </div>
-
-        <!-- 中央：canvas 交互区（pointer-events: none，穿透） -->
-        <div class="overlay-center" />
-      </div>
-
-      <!-- 底部控制台 -->
-      <div v-if="showConsole && logs.length > 0" class="overlay-bottom">
-        <div class="console-header">
-          <span>📋 执行日志</span>
-          <button class="console-clear" @click="logs = []">清除</button>
-        </div>
-        <div class="console-body">
-          <div
-            v-for="log in logs"
-            :key="log.id"
-            :class="['log-line', log.level]"
-          >
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-text">{{ log.text }}</span>
-          </div>
+    <!-- Row 2, Col 2: Canvas -->
+    <div class="grid-canvas">
+      <canvas ref="canvasRef" class="editor-canvas" />
+      <div class="canvas-overlay">
+        <div v-if="store.nodes.length === 0" class="empty-canvas">
+          <div class="empty-icon">🎨</div>
+          <div class="empty-title">空画布</div>
+          <div class="empty-hint">双击空白画布搜索节点，或右键查看更多操作</div>
         </div>
       </div>
     </div>
 
-    <!-- 导入文件 input -->
-    <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
-
-    <!-- 节点库浮层 -->
-    <FloatingPanel
-      :visible="showPalette"
-      title="节点库"
-      :width="240"
-      :height="450"
-      @close="showPalette = false"
-    >
-      <NodePalette @add-node="onAddNodeFromPalette" />
-    </FloatingPanel>
-
-    <!-- 属性面板浮层 -->
-    <FloatingPanel
-      :visible="!!selectedLgNode"
-      :title="selectedLgNode?.title || selectedLgNode?.type || '属性'"
-      :width="300"
-      :height="420"
-      @close="onDeselectNode"
-    >
-      <PropertyPanel
-        :key="widgetVersion"
-        :lg-node="selectedLgNode"
-        :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
-        :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
-        :duration="undefined"
-        @update-label="onUpdateLabel"
-        @update-widget="onUpdateWidget"
-        @delete="onDeleteNode"
-      />
-    </FloatingPanel>
-
-    <!-- 工作流列表浮层 -->
-    <FloatingPanel
-      :visible="showDashboard"
-      title="📋 工作流"
-      :width="720"
-      :height="560"
-      @close="showDashboard = false"
-    >
-      <Dashboard
-        @open-workflow="onOpenWorkflow"
-        @create-from-template="onCreateFromTemplate"
-        @navigate="onDashboardNavigate"
-      />
-    </FloatingPanel>
-
-    <!-- 设置浮层 -->
-    <FloatingPanel
-      :visible="showSettings"
-      title="⚙️ 设置"
-      :width="560"
-      :height="500"
-      @close="showSettings = false"
-    >
-      <Settings />
-    </FloatingPanel>
-
-    <!-- 运行历史浮层 -->
-    <FloatingPanel
-      :visible="showHistory"
-      title="📊 运行历史"
-      :width="640"
-      :height="500"
-      @close="showHistory = false"
-    >
-      <RunHistory />
-    </FloatingPanel>
-
-    <!-- 定时计划浮层 -->
-    <FloatingPanel
-      :visible="showSchedule"
-      title="📅 定时计划"
-      :width="560"
-      :height="420"
-      @close="showSchedule = false"
-    >
-      <ScheduleSection
-        :schedules="scheduleList"
-        :loading="scheduleLoading"
-        @toggle-schedule="onToggleSchedule"
-        @delete-schedule="onDeleteSchedule"
-        @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
-        @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)"
-      />
-      <ScheduleDialog ref="scheduleDialogRef" @saved="loadSchedules" />
-    </FloatingPanel>
-
-    <!-- 预览弹窗 -->
-    <Teleport to="body">
-      <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
-        <div ref="previewPopupRef" class="preview-popup" :style="previewStyle" @mousedown.stop>
-          <div class="preview-popup-header" @mousedown="onPreviewDragStart">
-            <span>{{ previewTitle }}</span>
-            <div class="preview-popup-actions">
-              <button @click="previewVisible = false">✕</button>
-            </div>
-          </div>
-          <div class="preview-popup-body">
-            <PreviewPanel :lg-node="selectedLgNode" @update-widget="onUpdateWidget" />
-          </div>
-          <div class="preview-resize-handle" @mousedown="onPreviewResizeStart"></div>
+    <!-- Row 3: Console -->
+    <div v-if="showConsole && logs.length > 0" class="grid-console">
+      <div class="console-header">
+        <span>📋 执行日志</span>
+        <button class="console-clear" @click="logs = []">清除</button>
+      </div>
+      <div class="console-body">
+        <div v-for="log in logs" :key="log.id" :class="['log-line', log.level]">
+          <span class="log-time">{{ log.time }}</span>
+          <span class="log-text">{{ log.text }}</span>
         </div>
       </div>
-    </Teleport>
+    </div>
   </div>
 
-  <!-- ═══════════ P0: MiniMap + 右键菜单 + 搜索弹窗 ═══════════ -->
-  <MiniMap
-    v-if="canvasReady"
-    :canvas="canvas"
-    :graph="graph"
-    :visible="showMiniMap"
-  />
+  <!-- ═══════════ 浮层组件 ═══════════ -->
+  <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
+  <MiniMap v-if="canvasReady" :canvas="canvas" :graph="graph" :visible="showMiniMap" />
+  <CanvasContextMenu :visible="contextMenuVisible" :x="contextMenuPos.x" :y="contextMenuPos.y" :items="contextMenuItems" @close="contextMenuVisible = false" />
+  <CanvasSearchPopover :visible="searchVisible" :x="searchPos.x" :y="searchPos.y" :graph="graph" @close="searchVisible = false" @node-added="onSearchNodeAdded" />
 
-  <CanvasContextMenu
-    :visible="contextMenuVisible"
-    :x="contextMenuPos.x"
-    :y="contextMenuPos.y"
-    :items="contextMenuItems"
-    @close="contextMenuVisible = false"
-  />
+  <FloatingPanel :visible="showPalette" title="节点库" :width="240" :height="450" @close="showPalette = false">
+    <NodePalette @add-node="onAddNodeFromPalette" />
+  </FloatingPanel>
+  <FloatingPanel :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'" :width="300" :height="420" @close="onDeselectNode">
+    <PropertyPanel :key="widgetVersion" :lg-node="selectedLgNode"
+      :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
+      :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
+      :duration="undefined"
+      @update-label="onUpdateLabel" @update-widget="onUpdateWidget" @delete="onDeleteNode" />
+  </FloatingPanel>
+  <FloatingPanel :visible="showDashboard" title="📋 工作流" :width="720" :height="560" @close="showDashboard = false">
+    <Dashboard @open-workflow="onOpenWorkflow" @create-from-template="onCreateFromTemplate" @navigate="onDashboardNavigate" />
+  </FloatingPanel>
+  <FloatingPanel :visible="showSettings" title="⚙\ufe0f 设置" :width="560" :height="500" @close="showSettings = false">
+    <Settings />
+  </FloatingPanel>
+  <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="640" :height="500" @close="showHistory = false">
+    <RunHistory />
+  </FloatingPanel>
+  <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="560" :height="420" @close="showSchedule = false">
+    <ScheduleSection :schedules="scheduleList" :loading="scheduleLoading"
+      @toggle-schedule="onToggleSchedule" @delete-schedule="onDeleteSchedule"
+      @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
+      @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)" />
+    <ScheduleDialog ref="scheduleDialogRef" @saved="loadSchedules" />
+  </FloatingPanel>
 
-  <CanvasSearchPopover
-    :visible="searchVisible"
-    :x="searchPos.x"
-    :y="searchPos.y"
-    :graph="graph"
-    @close="searchVisible = false"
-    @node-added="onSearchNodeAdded"
-  />
+  <Teleport to="body">
+    <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
+      <div ref="previewPopupRef" class="preview-popup" :style="previewStyle" @mousedown.stop>
+        <div class="preview-popup-header" @mousedown="onPreviewDragStart">
+          <span>{{ previewTitle }}</span>
+          <div class="preview-popup-actions"><button @click="previewVisible = false">✕</button></div>
+        </div>
+        <div class="preview-popup-body"><PreviewPanel :lg-node="selectedLgNode" @update-widget="onUpdateWidget" /></div>
+        <div class="preview-resize-handle" @mousedown="onPreviewResizeStart"></div>
+      </div>
+    </div>
+  </Teleport>
 </template>
+
+<style scoped>
+.editor-app {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  grid-template-rows: auto 1fr auto;
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+.grid-top {
+  grid-column: 1 / -1; grid-row: 1; z-index: 1001;
+}
+.grid-sidebar {
+  grid-column: 1; grid-row: 2; z-index: 10;
+}
+.grid-canvas {
+  grid-column: 2; grid-row: 2;
+  position: relative; overflow: hidden;
+  background: var(--color-bg);
+}
+.editor-canvas {
+  position: absolute; inset: 0; display: block;
+  background: var(--color-bg);
+  touch-action: none; user-select: none; outline: none;
+}
+.canvas-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.empty-canvas {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none; user-select: none;
+}
+.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+.empty-title { font-size: 18px; font-weight: 600; color: #8b949e; margin-bottom: 6px; }
+.empty-hint { font-size: 13px; color: #484f58; }
+
+.grid-console {
+  grid-column: 1 / -1; grid-row: 3; height: 140px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  display: flex; flex-direction: column;
+}
+.console-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 12px; border-bottom: 1px solid #21262d;
+  font-size: 11px; font-weight: 600; color: #8b949e; flex-shrink: 0;
+}
+.console-clear {
+  padding: 1px 8px; background: none; border: 1px solid #30363d;
+  border-radius: 4px; color: #8b949e; font-size: 10px; cursor: pointer;
+}
+.console-clear:hover { background: #21262d; color: #c9d1d9; }
+.console-body {
+  flex: 1; overflow-y: auto; padding: 4px 12px;
+  font-family: monospace; font-size: 11px; line-height: 1.5;
+}
+.log-line { display: flex; gap: 8px; padding: 1px 0; }
+.log-time { color: #484f58; flex-shrink: 0; }
+.log-text { word-break: break-all; }
+.log-line.info { color: #8b949e; }
+.log-line.error { color: #f85149; }
+.log-line.warn { color: #d29922; }
+.log-line.success { color: #3fb950; }
+
+.preview-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.3); pointer-events: auto;
+}
+.preview-popup {
+  position: fixed; background: #161b22; border: 1px solid #30363d;
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  display: flex; flex-direction: column; overflow: hidden;
+  min-width: 320px; min-height: 200px;
+}
+.preview-popup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; background: #21262d; border-bottom: 1px solid #30363d;
+  cursor: move; font-size: 12px; font-weight: 600; color: #c9d1d9; flex-shrink: 0; user-select: none;
+}
+.preview-popup-actions button {
+  background: none; border: none; color: #8b949e;
+  cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
+}
+.preview-popup-actions button:hover { background: #30363d; color: #f85149; }
+.preview-popup-body { flex: 1; overflow: auto; padding: 0; }
+.preview-resize-handle {
+  position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, #30363d 50%);
+  border-radius: 0 0 8px 0;
+}
+</style>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, toRaw } from 'vue'
