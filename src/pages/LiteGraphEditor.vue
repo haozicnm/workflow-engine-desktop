@@ -17,6 +17,7 @@
     <div class="ui-overlay">
       <!-- 顶部菜单栏 -->
       <div class="overlay-top">
+        <WorkflowTabs @add="onTabAdd" />
         <TopMenuSection
           :name="store.workflowName"
           :node-count="store.nodeCount"
@@ -117,6 +118,7 @@ import '@comfyorg/litegraph/style.css'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useFlowStore } from '../stores/flowStore'
+import { useTabStore } from '../stores/tabStore'
 import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'
 import NodePalette from '../components/flow/NodePalette.vue'
@@ -124,6 +126,7 @@ import PropertyPanel from '../components/flow/PropertyPanel.vue'
 import PreviewPanel from '../components/flow/PreviewPanel.vue'
 import SideToolbar from '../components/SideToolbar.vue'
 import TopMenuSection from '../components/TopMenuSection.vue'
+import WorkflowTabs from '../components/WorkflowTabs.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
@@ -131,6 +134,7 @@ import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
 // ─── Props ───
 const route = useRoute()
 const store = useFlowStore()
+const tabStore = useTabStore()
 
 // ─── 撤销/重做 + 自动保存 ───
 const undoManager = useUndo()
@@ -211,6 +215,23 @@ watch(selectedLgNode, (node) => {
     previewVisible.value = true
   }
 })
+
+// 标签页切换：保存当前 → 加载目标
+watch(() => tabStore.activeTabId, (newId, oldId) => {
+  if (!newId || newId === oldId || !graph) return
+  if (oldId) saveCurrentTab()
+  loadTabData(newId)
+})
+
+// 名称变化同步到 tab
+watch(() => store.workflowName, (name) => {
+  tabStore.renameTab(tabStore.activeTabId || '', name)
+})
+
+// dirty 状态同步到 tab
+watch(() => store.dirty, (d) => {
+  tabStore.setDirty(tabStore.activeTabId || '', d)
+})
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── 面板状态 ───
@@ -220,6 +241,44 @@ const showPalette = ref(true)
 // ─── 导航 ───
 const router = useRouter()
 function onNavigate(path: string) { router.push(path) }
+
+// ─── 标签页数据缓存 ───
+const tabDataCache = new Map<string, { nodes: any[]; edges: any[]; name: string }>()
+
+/** 保存当前画布到标签页缓存 */
+function saveCurrentTab() {
+  const tid = tabStore.activeTabId
+  if (!tid) return
+  tabDataCache.set(tid, {
+    nodes: store.nodes.map(n => ({ ...n })),
+    edges: store.edges.map(e => ({ ...e })),
+    name: store.workflowName,
+  })
+}
+
+/** 从标签页缓存加载到画布 */
+function loadTabData(tabId: string) {
+  const data = tabDataCache.get(tabId)
+  if (data) {
+    store.$patch({
+      workflowName: data.name,
+      nodes: data.nodes,
+      edges: data.edges,
+    })
+  } else {
+    store.$patch({ workflowName: '未命名', nodes: [], edges: [] })
+  }
+  // 重新渲染画布
+  loadFromStore()
+  undoManager.init()  // 重置撤销历史
+}
+
+function onTabAdd() {
+  saveCurrentTab()
+  const newId = tabStore.addTab('工作流 ' + tabStore.tabCount)
+  tabDataCache.set(newId, { nodes: [], edges: [], name: '工作流 ' + tabStore.tabCount })
+  loadTabData(newId)
+}
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
 /** 浅比较两个 record 的键值是否不同 */
@@ -422,6 +481,12 @@ onMounted(() => {
     // 键盘快捷键
     document.addEventListener('keydown', onKeyDown)
     _canvasMounted = true
+
+    // 初始化第一个标签页
+    const tid = tabStore.ensureTab()
+    if (!tabDataCache.has(tid)) {
+      tabDataCache.set(tid, { nodes: [], edges: [], name: store.workflowName || '工作流 1' })
+    }
   }
 })
 
