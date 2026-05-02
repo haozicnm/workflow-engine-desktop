@@ -39,7 +39,7 @@
 
       <!-- 主体区域 -->
       <div class="overlay-main">
-        <!-- 左侧：图标栏 + 节点库 -->
+        <!-- 左侧：仅图标栏 -->
         <div class="overlay-left">
           <SideToolbar
             :show-console="showConsole"
@@ -47,25 +47,10 @@
             @toggle-palette="showPalette = !showPalette"
             @toggle-console="showConsole = !showConsole"
           />
-          <NodePalette v-show="showPalette" class="overlay-palette" @drag-start="onDragStart" />
         </div>
 
         <!-- 中央：canvas 交互区（pointer-events: none，穿透） -->
         <div class="overlay-center" />
-
-        <!-- 右侧：属性面板 -->
-        <div v-show="selectedLgNode" class="overlay-right">
-          <PropertyPanel
-            :key="widgetVersion"
-            :lg-node="selectedLgNode"
-            :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
-            :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
-            :duration="undefined"
-            @update-label="onUpdateLabel"
-            @update-widget="onUpdateWidget"
-            @delete="onDeleteNode"
-          />
-        </div>
       </div>
 
       <!-- 底部控制台 -->
@@ -89,6 +74,37 @@
 
     <!-- 导入文件 input -->
     <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
+
+    <!-- 节点库浮层 -->
+    <FloatingPanel
+      :visible="showPalette"
+      title="节点库"
+      :width="240"
+      :height="450"
+      @close="showPalette = false"
+    >
+      <NodePalette @drag-start="onDragStart" />
+    </FloatingPanel>
+
+    <!-- 属性面板浮层 -->
+    <FloatingPanel
+      :visible="!!selectedLgNode"
+      :title="selectedLgNode?.title || selectedLgNode?.type || '属性'"
+      :width="300"
+      :height="420"
+      @close="onDeselectNode"
+    >
+      <PropertyPanel
+        :key="widgetVersion"
+        :lg-node="selectedLgNode"
+        :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
+        :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
+        :duration="undefined"
+        @update-label="onUpdateLabel"
+        @update-widget="onUpdateWidget"
+        @delete="onDeleteNode"
+      />
+    </FloatingPanel>
 
     <!-- 预览弹窗 -->
     <Teleport to="body">
@@ -127,6 +143,7 @@ import PreviewPanel from '../components/flow/PreviewPanel.vue'
 import SideToolbar from '../components/SideToolbar.vue'
 import TopMenuSection from '../components/TopMenuSection.vue'
 import WorkflowTabs from '../components/WorkflowTabs.vue'
+import FloatingPanel from '../components/FloatingPanel.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
@@ -820,6 +837,11 @@ function onDeleteNode(node: LGraphNode) {
   undoManager.pushState()
 }
 
+function onDeselectNode() {
+  canvas.deselectAllNodes()
+  selectedLgNode.value = null
+}
+
 // ─── 工具栏操作 ───
 function runAll() {
   if (store.nodes.length === 0) return
@@ -1100,8 +1122,7 @@ function onKeyDown(e: KeyboardEvent) {
   }
   // Escape — 取消选择
   if (e.key === 'Escape') {
-    canvas.deselectAllNodes()
-    selectedLgNode.value = null
+    onDeselectNode()
     return
   }
 }
@@ -1160,25 +1181,10 @@ function onKeyDown(e: KeyboardEvent) {
   flex-shrink: 0;
 }
 
-.overlay-palette {
-  flex-shrink: 0;
-}
-
 .overlay-center {
   flex: 1;
   pointer-events: none;  /* 穿透到 canvas */
   min-width: 0;
-}
-
-.overlay-right {
-  pointer-events: auto;
-  min-width: 280px;
-  max-width: 340px;
-  border-left: 1px solid var(--color-border);
-  background: var(--color-surface);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
 }
 
 /* ─── 空画布提示（浮在 canvas 上方，z-index 在 ui-overlay 之下） ─── */
