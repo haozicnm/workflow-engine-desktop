@@ -84,17 +84,16 @@ jobs:
           if-no-files-found: warn
 
       # ─── Full build (with Chromium) ───
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Download Playwright Chromium (Win7 compat v109)
         shell: pwsh
         run: |
-          pip install playwright==1.29.0
-          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
-          python -m playwright install chromium
+          $dest = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers/chromium-1091"
+          New-Item -ItemType Directory -Force -Path $dest
+          $zip = "${{ runner.temp }}/chromium-win64.zip"
+          Invoke-WebRequest -Uri "https://playwright.azureedge.net/builds/chromium/1091/chromium-win64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          # Verify
+          Get-ChildItem $dest -Recurse -Name | Select-Object -First 5
 
       - name: Build Tauri Full (with Chromium)
         run: npx --prefix src tauri build
