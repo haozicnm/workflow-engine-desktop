@@ -1,8 +1,8 @@
 <template>
   <!-- ═══════════ 叠加层架构 — Canvas 全屏背景 + UI 浮层 ═══════════ -->
-  <div class="editor-app" @drop="onDrop" @dragover.prevent>
+  <div class="editor-app">
     <!-- 层 0：Canvas 全屏 -->
-    <canvas ref="canvasRef" class="editor-canvas"></canvas>
+    <canvas ref="canvasRef" class="editor-canvas" @drop="onDrop" @dragover.prevent></canvas>
 
     <!-- 空画布提示（叠加在 canvas 上） -->
     <div v-if="store.nodes.length === 0" class="empty-canvas">
