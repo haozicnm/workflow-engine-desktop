@@ -71,11 +71,27 @@ jobs:
           $chromium = $browserJson.browsers | Where-Object { $_.name -eq "chromium" } | Select-Object -First 1
           $chromiumRev = $chromium.revision
           Write-Host "Chromium revision: $chromiumRev"
-          # Download from Playwright CDN
+          # Download from Playwright CDN with retry
           $dest = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers/chromium-$chromiumRev"
           New-Item -ItemType Directory -Force -Path $dest
           $zip = "${{ runner.temp }}/chromium-win64.zip"
-          Invoke-WebRequest -Uri "https://playwright.azureedge.net/builds/chromium/$chromiumRev/chromium-win64.zip" -OutFile $zip
+          $url = "https://playwright.azureedge.net/builds/chromium/$chromiumRev/chromium-win64.zip"
+          $maxRetries = 3
+          for ($i = 0; $i -lt $maxRetries; $i++) {
+            try {
+              Write-Host "Downloading Chromium (attempt $($i+1)/$maxRetries)..."
+              Invoke-WebRequest -Uri $url -OutFile $zip -ErrorAction Stop -TimeoutSec 120
+              break
+            } catch {
+              Write-Host "Download failed: $_"
+              if ($i -lt $maxRetries - 1) {
+                Write-Host "Retrying in 15s..."
+                Start-Sleep -Seconds 15
+              } else {
+                throw
+              }
+            }
+          }
           Expand-Archive -Path $zip -DestinationPath $dest -Force
           Get-ChildItem $dest -Recurse -Name | Select-Object -First 5
         timeout-minutes: 5
@@ -239,3 +255,4 @@ jobs:
             artifacts/linux-appimage/*.AppImage
           draft: false
           prerelease: false
+
