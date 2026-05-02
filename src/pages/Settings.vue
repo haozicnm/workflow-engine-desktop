@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
-import pkg from '../../package.json'
+import pkg from '../package.json'
 
 const toast = useToast()
 const APP_VERSION = pkg.version
