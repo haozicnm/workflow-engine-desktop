@@ -232,6 +232,17 @@ watch(() => store.workflowName, (name) => {
 watch(() => store.dirty, (d) => {
   tabStore.setDirty(tabStore.activeTabId || '', d)
 })
+
+// 标签关闭时清理缓存
+watch(() => tabStore.tabs.length, (len, oldLen) => {
+  if (len < (oldLen ?? 0)) {
+    // 有标签被删除，清理不在 store 中的缓存
+    const activeIds = new Set(tabStore.tabs.map(t => t.id))
+    for (const key of tabDataCache.keys()) {
+      if (!activeIds.has(key)) tabDataCache.delete(key)
+    }
+  }
+})
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── 面板状态 ───
@@ -730,29 +741,17 @@ function loadFromStore() {
   nextTick(() => fitView())
 }
 
-// ─── 保存：从 graph 同步到 store 再导出 JSON ───
-function saveToJSON() {
-  syncGraphToStore()
-  const data = store.toJSON()
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${store.workflowName || 'workflow'}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  store.dirty = false
-  addLog('💾 工作流已导出')
-}
-
 // ─── 拖放节点 ───
-function onDragStart(_def: unknown, event: DragEvent) {
-  // NodePalette 已设置 dataTransfer
+function onDragStart(_def: unknown, _event: DragEvent) {
+  // NodePalette 已在内部设置 dataTransfer
 }
 
 function onDrop(event: DragEvent) {
   const nodeType = event.dataTransfer?.getData('application/flow-node-type')
   if (!nodeType) return
+  // 忽略在 UI 区域内的拖放（侧边栏、属性面板、控制台）
+  const target = event.target as HTMLElement
+  if (target?.closest('.overlay-left, .overlay-right, .overlay-bottom, .overlay-top')) return
 
   const def = getNodeDef(nodeType)
   if (!def) return
@@ -1088,7 +1087,7 @@ function onKeyDown(e: KeyboardEvent) {
   // Ctrl+S / Cmd+S — 保存（导出 JSON）
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault()
-    saveToJSON()
+    exportWorkflow()
     return
   }
   // Delete / Backspace — 删除选中节点

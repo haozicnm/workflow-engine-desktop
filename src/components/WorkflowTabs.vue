@@ -26,7 +26,6 @@ const store = useTabStore()
 
 const emit = defineEmits<{
   'add': []
-  'switch': [tabId: string]
 }>()
 
 function onAdd() {
