@@ -1034,15 +1034,10 @@ function onKeyDown(e: KeyboardEvent) {
 </script>
 
 <style scoped>
-.flow-editor {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-<style scoped>
 /* ═══════════ Grid 布局（对齐 ComfyUI） ═══════════ */
 .editor-grid {
   display: grid;
-  grid-template-columns: 48px 1fr 280px;
+  grid-template-columns: 48px 1fr;
   grid-template-rows: 1fr;
   height: 100vh;
   background: #0f1117;
