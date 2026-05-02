@@ -1,114 +1,97 @@
 <template>
-  <div class="flow-editor">
-    <!-- 工具栏 -->
-    <header class="toolbar">
-      <div class="toolbar-left">
-        <span class="workflow-name">📁 {{ store.workflowName }}</span>
-        <span class="stat-badge">{{ store.nodeCount }} 节点</span>
-        <span class="stat-badge">{{ store.edgeCount }} 连线</span>
-        <span v-if="store.dirty" class="stat-badge dirty">● 已修改</span>
-      </div>
-      <div class="toolbar-center">
-        <button
-          class="toolbar-btn primary"
-          :disabled="isRunning || store.nodes.length === 0"
-          @click="runAll"
-        >
-          ▶ 运行
-        </button>
-        <button
-          class="toolbar-btn"
-          :disabled="isRunning || store.nodes.length === 0"
-          @click="runSingle"
-        >
-          ⏯ 单步
-        </button>
-        <button
-          class="toolbar-btn"
-          :disabled="!isRunning"
-          @click="stopRun"
-        >
-          ■ 停止
-        </button>
-      </div>
-      <div class="toolbar-right">
-        <button
-          :class="['toolbar-btn', recording ? 'recording-active' : '']"
-          @click="toggleRecording"
-          title="录制浏览器操作"
-        >
-          {{ recording ? '⏹ 停止录制' : '🔴 录制' }}
-        </button>
-        <button class="toolbar-btn" @click="pickElement" title="拾取浏览器元素">
-          🎯 拾取
-        </button>
-        <button class="toolbar-btn" @click="importWorkflow" title="导入工作流 JSON">
-          📥 导入
-        </button>
-        <button class="toolbar-btn" @click="exportWorkflow" title="导出工作流 JSON">
-          📤 导出
-        </button>
-        <button class="toolbar-btn" @click="clearCanvas">
-          🗑 清空
-        </button>
-      </div>
-    </header>
-
-    <!-- 导入文件 input（隐藏） -->
-    <input
-      ref="importInputRef"
-      type="file"
-      accept=".json"
-      style="display:none"
-      @change="onImportFile"
+  <div class="editor-grid">
+    <!-- 左侧：图标栏 -->
+    <SideToolbar
+      :show-console="showConsole"
+      @navigate="onNavigate"
+      @toggle-palette="showPalette = !showPalette"
+      @toggle-console="showConsole = !showConsole"
     />
 
-    <!-- 主体三栏布局 -->
-    <div class="editor-body">
-      <!-- 左侧：节点库 -->
-      <NodePalette @drag-start="onDragStart" />
+    <!-- 主区域 -->
+    <div class="main-area">
+      <!-- 顶部：菜单栏 -->
+      <TopMenuSection
+        :name="store.workflowName"
+        :node-count="store.nodeCount"
+        :edge-count="store.edgeCount"
+        :dirty="store.dirty"
+        :running="isRunning"
+        :recording="recording"
+        :disable-run="store.nodes.length === 0"
+        @run="runAll"
+        @step="runSingle"
+        @stop="stopRun"
+        @record="toggleRecording"
+        @pick="pickElement"
+        @import="importWorkflow"
+        @export="exportWorkflow"
+        @clear="clearCanvas"
+      />
 
-      <!-- 中央：画布 -->
-      <div
-        ref="wrapperRef"
-        class="canvas-wrapper"
-        @drop="onDrop"
-        @dragover.prevent
-      >
-        <!-- 空状态提示 -->
-        <div v-if="store.nodes.length === 0" class="empty-canvas">
-          <div class="empty-icon">🎨</div>
-          <div class="empty-title">空画布</div>
-          <div class="empty-hint">从左侧拖节点到此处，或按 <kbd>Ctrl+S</kbd> 保存</div>
+      <!-- 主体：画布 + 面板 -->
+      <div class="editor-body">
+        <!-- 节点库（左侧面板，可折叠） -->
+        <NodePalette v-show="showPalette" @drag-start="onDragStart" />
+
+        <!-- 中央：画布 -->
+        <div
+          ref="wrapperRef"
+          class="canvas-wrapper"
+          @drop="onDrop"
+          @dragover.prevent
+        >
+          <div v-if="store.nodes.length === 0" class="empty-canvas">
+            <div class="empty-icon">🎨</div>
+            <div class="empty-title">空画布</div>
+            <div class="empty-hint">
+              从节点库拖节点到此处，或按 <kbd>Ctrl+S</kbd> 保存
+            </div>
+          </div>
+          <canvas ref="canvasRef" class="litegraph-canvas"></canvas>
         </div>
 
-        <canvas ref="canvasRef" class="litegraph-canvas"></canvas>
+        <!-- 右侧面板：属性 -->
+        <div class="right-panels">
+          <PropertyPanel
+            :key="widgetVersion"
+            :lg-node="selectedLgNode"
+            :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
+            :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
+            :duration="undefined"
+            @update-label="onUpdateLabel"
+            @update-widget="onUpdateWidget"
+            @delete="onDeleteNode"
+          />
+        </div>
       </div>
 
-      <!-- 右侧面板：属性 -->
-      <div class="right-panels">
-        <PropertyPanel
-          :key="widgetVersion"
-          :lg-node="selectedLgNode"
-          :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
-          :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
-          :duration="undefined"
-          @update-label="onUpdateLabel"
-          @update-widget="onUpdateWidget"
-          @delete="onDeleteNode"
-        />
+      <!-- 底部控制台 -->
+      <div v-if="showConsole && logs.length > 0" class="console">
+        <div class="console-header">
+          <span>📋 执行日志</span>
+          <button class="console-clear" @click="logs = []">清除</button>
+        </div>
+        <div class="console-body">
+          <div
+            v-for="log in logs"
+            :key="log.id"
+            :class="['log-line', log.level]"
+          >
+            <span class="log-time">{{ log.time }}</span>
+            <span class="log-text">{{ log.text }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 预览弹窗 overlay -->
+    <!-- 导入文件 input -->
+    <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
+
+    <!-- 预览弹窗 -->
     <Teleport to="body">
       <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
-        <div
-          ref="previewPopupRef"
-          class="preview-popup"
-          :style="previewStyle"
-          @mousedown.stop
-        >
+        <div ref="previewPopupRef" class="preview-popup" :style="previewStyle" @mousedown.stop>
           <div class="preview-popup-header" @mousedown="onPreviewDragStart">
             <span>{{ previewTitle }}</span>
             <div class="preview-popup-actions">
@@ -116,40 +99,18 @@
             </div>
           </div>
           <div class="preview-popup-body">
-            <PreviewPanel
-              :lg-node="selectedLgNode"
-              @update-widget="onUpdateWidget"
-            />
+            <PreviewPanel :lg-node="selectedLgNode" @update-widget="onUpdateWidget" />
           </div>
-          <!-- 右下角 resize handle -->
           <div class="preview-resize-handle" @mousedown="onPreviewResizeStart"></div>
         </div>
       </div>
     </Teleport>
-
-    <!-- 底部控制台 -->
-    <footer v-if="logs.length > 0" class="console">
-      <div class="console-header">
-        <span>📋 执行日志</span>
-        <button class="console-clear" @click="logs = []">清除</button>
-      </div>
-      <div class="console-body">
-        <div
-          v-for="log in logs"
-          :key="log.id"
-          :class="['log-line', log.level]"
-        >
-          <span class="log-time">{{ log.time }}</span>
-          <span class="log-text">{{ log.text }}</span>
-        </div>
-      </div>
-    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick, toRaw } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import type { UnlistenFn } from '@tauri-apps/api/event'
@@ -160,6 +121,8 @@ import { useAutoSave } from '../composables/useAutoSave'
 import NodePalette from '../components/flow/NodePalette.vue'
 import PropertyPanel from '../components/flow/PropertyPanel.vue'
 import PreviewPanel from '../components/flow/PreviewPanel.vue'
+import SideToolbar from '../components/SideToolbar.vue'
+import TopMenuSection from '../components/TopMenuSection.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
@@ -249,6 +212,14 @@ watch(selectedLgNode, (node) => {
   }
 })
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
+
+// ─── 面板状态 ───
+const showConsole = ref(false)
+const showPalette = ref(true)
+
+// ─── 导航 ───
+const router = useRouter()
+function onNavigate(path: string) { router.push(path) }
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
 /** 浅比较两个 record 的键值是否不同 */
@@ -1067,117 +1038,30 @@ function onKeyDown(e: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0d1117;
-  color: #c9d1d9;
-}
-
-/* ─── 工具栏 ─── */
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: #161b22;
-  border-bottom: 1px solid #21262d;
-  flex-shrink: 0;
-  gap: 12px;
-  z-index: 10;
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.workflow-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #c9d1d9;
-  white-space: nowrap;
+<style scoped>
+/* ═══════════ Grid 布局（对齐 ComfyUI） ═══════════ */
+.editor-grid {
+  display: grid;
+  grid-template-columns: 48px 1fr 280px;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  background: #0f1117;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.stat-badge {
-  font-size: 10px;
-  color: #8b949e;
-  background: #21262d;
-  padding: 2px 7px;
-  border-radius: 10px;
-  white-space: nowrap;
-}
-
-.stat-badge.dirty {
-  color: #d29922;
-}
-
-.toolbar-center {
+.main-area {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.toolbar-right {
-  display: flex;
-  gap: 6px;
-}
-
-.toolbar-btn {
-  padding: 4px 12px;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  background: #21262d;
-  color: #c9d1d9;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
-}
-
-.toolbar-btn:hover {
-  background: #30363d;
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.toolbar-btn.primary {
-  background: #238636;
-  border-color: #2ea043;
-  color: #fff;
-  font-weight: 600;
-}
-
-.toolbar-btn.primary:hover:not(:disabled) {
-  background: #2ea043;
-}
-
-.toolbar-btn.recording-active {
-  background: #da3633;
-  border-color: #f85149;
-  color: #fff;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.toolbar-btn.btn-pick {
-  background: #1f6feb;
-  border-color: #388bfd;
-  color: #fff;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-/* ─── 主体 ─── */
+/* ─── 主体三栏 ─── */
 .editor-body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 .canvas-wrapper {
@@ -1187,7 +1071,7 @@ function onKeyDown(e: KeyboardEvent) {
   overflow: hidden;
 }
 
-/* ─── 右侧双面板 ─── */
+/* ─── 右侧面板 ─── */
 .right-panels {
   display: flex;
   flex-direction: column;
