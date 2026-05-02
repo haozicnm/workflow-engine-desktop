@@ -1,123 +1,90 @@
 <template>
-  <!-- ═══════════ 叠加层架构（Canvas 全屏 + UI 浮层）—— 已验证可用 ═══════════ -->
+  <!-- ═══════════ Grid 布局（对齐 ComfyUI GraphView）— v2 修复尺寸塌陷 ═══════════ -->
   <div class="editor-app">
-    <!-- Canvas 全屏 -->
-    <canvas ref="canvasRef" class="editor-canvas" />
-
-    <!-- 空画布提示 -->
-    <div v-if="store.nodes.length === 0" class="empty-canvas">
-      <div class="empty-icon">🎨</div>
-      <div class="empty-title">空画布</div>
-      <div class="empty-hint">双击空白画布搜索节点，或右键查看更多操作</div>
+    <!-- Row 1: Top bar -->
+    <div class="grid-top">
+      <WorkflowTabs @add="onTabAdd" />
+      <TopMenuSection
+        :name="store.workflowName" :node-count="store.nodeCount" :edge-count="store.edgeCount"
+        :dirty="store.dirty" :running="isRunning" :recording="recording"
+        :disable-run="store.nodes.length === 0"
+        @run="runAll" @step="runSingle" @stop="stopRun"
+        @record="toggleRecording" @pick="pickElement"
+        @import="importWorkflow" @export="exportWorkflow"
+        @clear="clearCanvas" @save="onSaveWorkflow"
+      />
     </div>
 
-    <!-- UI 浮层 -->
-    <div class="ui-overlay">
-      <div class="overlay-top">
-        <WorkflowTabs @add="onTabAdd" />
-        <TopMenuSection
-          :name="store.workflowName" :node-count="store.nodeCount" :edge-count="store.edgeCount"
-          :dirty="store.dirty" :running="isRunning" :recording="recording"
-          :disable-run="store.nodes.length === 0"
-          @run="runAll" @step="runSingle" @stop="stopRun"
-          @record="toggleRecording" @pick="pickElement"
-          @import="importWorkflow" @export="exportWorkflow"
-          @clear="clearCanvas" @save="onSaveWorkflow"
-        />
-      </div>
+    <!-- Row 2, Col 1: Sidebar -->
+    <div class="grid-sidebar">
+      <SideToolbar
+        :show-console="showConsole"
+        @toggle-dashboard="showDashboard = !showDashboard"
+        @toggle-palette="showPalette = !showPalette"
+        @toggle-history="showHistory = !showHistory"
+        @toggle-console="showConsole = !showConsole"
+        @toggle-settings="showSettings = !showSettings"
+        @toggle-schedule="showSchedule = !showSchedule"
+      />
+    </div>
 
-      <div class="overlay-main">
-        <div class="overlay-left">
-          <SideToolbar
-            :show-console="showConsole"
-            @toggle-dashboard="showDashboard = !showDashboard"
-            @toggle-palette="showPalette = !showPalette"
-            @toggle-history="showHistory = !showHistory"
-            @toggle-console="showConsole = !showConsole"
-            @toggle-settings="showSettings = !showSettings"
-            @toggle-schedule="showSchedule = !showSchedule"
-          />
-        </div>
-        <div class="overlay-center" />
-      </div>
-
-      <div v-if="showConsole && logs.length > 0" class="overlay-bottom">
-        <div class="console-header">
-          <span>📋 执行日志</span>
-          <button class="console-clear" @click="logs = []">清除</button>
-        </div>
-        <div class="console-body">
-          <div v-for="log in logs" :key="log.id" :class="['log-line', log.level]">
-            <span class="log-time">{{ log.time }}</span>
-            <span class="log-text">{{ log.text }}</span>
-          </div>
+    <!-- Row 2, Col 2: Canvas — 显式 1fr，canvas 加 width/height:100% -->
+    <div class="grid-canvas">
+      <canvas ref="canvasRef" class="editor-canvas" />
+      <div class="canvas-overlay">
+        <div v-if="store.nodes.length === 0" class="empty-canvas">
+          <div class="empty-icon">🎨</div>
+          <div class="empty-title">空画布</div>
+          <div class="empty-hint">双击空白画布搜索节点，或右键查看更多操作</div>
         </div>
       </div>
     </div>
 
-    <!-- MiniMap -->
-    <MiniMap v-if="canvasReady" :canvas="canvas" :graph="graph" :visible="showMiniMap" />
-
-    <!-- 右键菜单 -->
-    <CanvasContextMenu
-      :visible="contextMenuVisible" :x="contextMenuPos.x" :y="contextMenuPos.y"
-      :items="contextMenuItems" @close="contextMenuVisible = false"
-    />
-
-    <!-- 搜索弹窗 -->
-    <CanvasSearchPopover
-      :visible="searchVisible" :x="searchPos.x" :y="searchPos.y"
-      :graph="graph" @close="searchVisible = false" @node-added="onSearchNodeAdded"
-    />
+    <!-- Row 3: Console -->
+    <div v-if="showConsole && logs.length > 0" class="grid-console">
+      <div class="console-header"><span>📋 执行日志</span><button class="console-clear" @click="logs = []">清除</button></div>
+      <div class="console-body">
+        <div v-for="log in logs" :key="log.id" :class="['log-line', log.level]">
+          <span class="log-time">{{ log.time }}</span><span class="log-text">{{ log.text }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Import -->
+  <!-- ═══════════ 全局浮层 ═══════════ -->
+  <MiniMap v-if="canvasReady" :canvas="canvas" :graph="graph" :visible="showMiniMap" />
+  <CanvasContextMenu :visible="contextMenuVisible" :x="contextMenuPos.x" :y="contextMenuPos.y" :items="contextMenuItems" @close="contextMenuVisible = false" />
+  <CanvasSearchPopover :visible="searchVisible" :x="searchPos.x" :y="searchPos.y" :graph="graph" @close="searchVisible = false" @node-added="onSearchNodeAdded" />
+
   <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
 
-  <!-- 节点库 -->
   <FloatingPanel :visible="showPalette" title="节点库" :width="240" :height="450" @close="showPalette = false">
     <NodePalette @add-node="onAddNodeFromPalette" />
   </FloatingPanel>
-
-  <!-- 属性面板 -->
-  <FloatingPanel
-    :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'"
-    :width="300" :height="420" @close="onDeselectNode"
-  >
+  <FloatingPanel :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'" :width="300" :height="420" @close="onDeselectNode">
     <PropertyPanel :key="widgetVersion" :lg-node="selectedLgNode"
       :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
       :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
       :duration="undefined"
-      @update-label="onUpdateLabel" @update-widget="onUpdateWidget" @delete="onDeleteNode"
-    />
+      @update-label="onUpdateLabel" @update-widget="onUpdateWidget" @delete="onDeleteNode" />
   </FloatingPanel>
-
-  <!-- 工作流列表 -->
   <FloatingPanel :visible="showDashboard" title="📋 工作流" :width="720" :height="560" @close="showDashboard = false">
     <Dashboard @open-workflow="onOpenWorkflow" @create-from-template="onCreateFromTemplate" @navigate="onDashboardNavigate" />
   </FloatingPanel>
-
-  <!-- 设置 -->
   <FloatingPanel :visible="showSettings" title="⚙️ 设置" :width="560" :height="500" @close="showSettings = false">
     <Settings />
   </FloatingPanel>
-
-  <!-- 运行历史 -->
   <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="640" :height="500" @close="showHistory = false">
     <RunHistory />
   </FloatingPanel>
-
-  <!-- 定时计划 -->
   <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="560" :height="420" @close="showSchedule = false">
     <ScheduleSection :schedules="scheduleList" :loading="scheduleLoading"
       @toggle-schedule="onToggleSchedule" @delete-schedule="onDeleteSchedule"
       @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
-      @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)"
-    />
+      @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)" />
     <ScheduleDialog ref="scheduleDialogRef" @saved="loadSchedules" />
   </FloatingPanel>
 
-  <!-- Preview -->
   <Teleport to="body">
     <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
       <div ref="previewPopupRef" class="preview-popup" :style="previewStyle" @mousedown.stop>
@@ -133,20 +100,48 @@
 </template>
 
 <style scoped>
-/* ═══════════ 叠加层架构（Canvas 全屏 + UI 浮层） ═══════════ */
+/* ═══════════ Grid 布局（对齐 ComfyUI GraphView）— 显式轨道 + canvas 100% ═══════════ */
 
 .editor-app {
-  position: relative;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  grid-template-rows: auto 1fr auto;
   width: 100vw; height: 100vh;
   overflow: hidden;
   background: var(--color-bg);
 }
 
-/* Canvas 全视口背景 */
+/* Row 1: Top bar */
+.grid-top {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 1001;
+}
+
+/* Col 1 Row 2: Sidebar */
+.grid-sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  z-index: 10;
+}
+
+/* Col 2 Row 2: Canvas — 显式 1fr 轨道 */
+.grid-canvas {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg);
+  /* 关键：让 Grid 子元素可以撑满 cell */
+  min-width: 0; min-height: 0;
+}
+
+/* FIX: Canvas 必须 width:100%; height:100% 防止 Grid 尺寸塌陷 */
 .editor-canvas {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   background: var(--color-bg);
   touch-action: none;
@@ -154,79 +149,37 @@
   outline: none;
 }
 
-/* 空画布提示 */
-.empty-canvas {
-  position: fixed;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 10;
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-  user-select: none;
+}
+
+.empty-canvas {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none; user-select: none;
 }
 .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
 .empty-title { font-size: 18px; font-weight: 600; color: #8b949e; margin-bottom: 6px; }
 .empty-hint { font-size: 13px; color: #484f58; }
 
-/* UI 浮层 */
-.ui-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-}
-
-.overlay-top {
-  pointer-events: auto;
-  flex-shrink: 0;
-}
-
-.overlay-main {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
-.overlay-left {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: row;
-  flex-shrink: 0;
-}
-
-.overlay-center {
-  flex: 1;
-  pointer-events: none;
-  min-width: 0;
-}
-
-/* 底部控制台 */
-.overlay-bottom {
-  pointer-events: auto;
+/* Row 3: Console */
+.grid-console {
+  grid-column: 1 / -1; grid-row: 3;
   height: 140px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
+  display: flex; flex-direction: column;
 }
-
 .console-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 4px 12px; border-bottom: 1px solid #21262d;
   font-size: 11px; font-weight: 600; color: #8b949e; flex-shrink: 0;
 }
-.console-clear {
-  padding: 1px 8px; background: none; border: 1px solid #30363d;
-  border-radius: 4px; color: #8b949e; font-size: 10px; cursor: pointer;
-}
+.console-clear { padding: 1px 8px; background: none; border: 1px solid #30363d; border-radius: 4px; color: #8b949e; font-size: 10px; cursor: pointer; }
 .console-clear:hover { background: #21262d; color: #c9d1d9; }
-.console-body {
-  flex: 1; overflow-y: auto; padding: 4px 12px;
-  font-family: monospace; font-size: 11px; line-height: 1.5;
-}
+.console-body { flex: 1; overflow-y: auto; padding: 4px 12px; font-family: monospace; font-size: 11px; line-height: 1.5; }
 .log-line { display: flex; gap: 8px; padding: 1px 0; }
 .log-time { color: #484f58; flex-shrink: 0; }
 .log-text { word-break: break-all; }
@@ -236,33 +189,13 @@
 .log-line.success { color: #3fb950; }
 
 /* Preview */
-.preview-overlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,0.3); pointer-events: auto;
-}
-.preview-popup {
-  position: fixed; background: #161b22; border: 1px solid #30363d;
-  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  display: flex; flex-direction: column; overflow: hidden;
-  min-width: 320px; min-height: 200px;
-}
-.preview-popup-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px; background: #21262d; border-bottom: 1px solid #30363d;
-  cursor: move; font-size: 12px; font-weight: 600; color: #c9d1d9; flex-shrink: 0; user-select: none;
-}
-.preview-popup-actions button {
-  background: none; border: none; color: #8b949e;
-  cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
-}
+.preview-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.3); pointer-events: auto; }
+.preview-popup { position: fixed; background: #161b22; border: 1px solid #30363d; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; min-width: 320px; min-height: 200px; }
+.preview-popup-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #21262d; border-bottom: 1px solid #30363d; cursor: move; font-size: 12px; font-weight: 600; color: #c9d1d9; flex-shrink: 0; user-select: none; }
+.preview-popup-actions button { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
 .preview-popup-actions button:hover { background: #30363d; color: #f85149; }
 .preview-popup-body { flex: 1; overflow: auto; padding: 0; }
-.preview-resize-handle {
-  position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
-  cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, #30363d 50%);
-  border-radius: 0 0 8px 0;
-}
+.preview-resize-handle { position: absolute; bottom: 0; right: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #30363d 50%); border-radius: 0 0 8px 0; }
 </style>
 
 <script setup lang="ts">
@@ -700,14 +633,14 @@ onMounted(() => {
     const c = canvasRef.value!
     // 全视口：先清固定分辨率 → 取 CSS 实际尺寸 → DPI 缩放
     c.width = c.height = NaN as unknown as number
-    const { width, height } = c.getBoundingClientRect()
+    const width = c.offsetWidth, height = c.offsetHeight
     if (width === 0 || height === 0) {
       // 极端 case：再等一帧
       requestAnimationFrame(() => {
         if (!canvasRef.value) return
-        const b = canvasRef.value.getBoundingClientRect()
-        if (b.width > 0 && b.height > 0) {
-          initCanvasReal(b.width, b.height)
+        const b = canvasRef.value
+        if (b.offsetWidth > 0 && b.offsetHeight > 0) {
+          initCanvasReal(b.offsetWidth, b.offsetHeight)
         }
       })
       return
@@ -774,7 +707,7 @@ onMounted(() => {
       if (!canvasRef.value || !canvas) return
       const c = canvasRef.value
       c.width = c.height = NaN as unknown as number  // 清固定分辨率，让 CSS 100% 生效
-      const { width, height } = c.getBoundingClientRect()
+      const width = c.offsetWidth, height = c.offsetHeight
       if (width === 0 || height === 0) return
       const dpr = Math.max(window.devicePixelRatio || 1, 1)
       c.width = Math.round(width * dpr)
