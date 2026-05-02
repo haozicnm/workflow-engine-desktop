@@ -401,10 +401,21 @@ async fn preflight_check() -> Result<()> {
 
             if !install_mirror.status.success() {
                 let stderr = String::from_utf8_lossy(&install_mirror.stderr);
+                // 检查是否已有内置浏览器（Full 包）—— 只需 pip 包，无需下载 Chromium
+                let has_bundled = std::env::current_exe().ok()
+                    .and_then(|p| p.parent().map(|d| d.join("playwright-browsers")))
+                    .map(|p| p.exists())
+                    .unwrap_or(false);
+                let extra_hint = if has_bundled {
+                    "\n  （浏览器已内置，只需 pip 包：pip install playwright）"
+                } else {
+                    ""
+                };
                 return Err(anyhow!(
                     "自动安装 Playwright 失败。\n\
-                     请手动执行: pip install playwright && playwright install chromium\n\n\
+                     请手动执行: pip install playwright{}\n\n\
                      错误: {}",
+                    extra_hint,
                     stderr
                 ));
             }
@@ -412,45 +423,61 @@ async fn preflight_check() -> Result<()> {
         info!("Playwright 包安装完成");
     }
 
-    // 4. 检查浏览器 — 优先用系统 Edge/Chrome，不需要下载 Playwright Chromium
-    let has_system_browser = {
-        // Windows: 检查 Edge + Chrome
-        #[cfg(target_os = "windows")]
-        {
-            let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
-            let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
-            let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            let edge1 = std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe");
-            let edge2 = std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe");
-            let chrome1 = std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe");
-            let chrome2 = std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe");
-            let chrome3 = std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe");
-            let found = edge1.exists() || edge2.exists() || chrome1.exists() || chrome2.exists() || chrome3.exists();
-            if found {
-                let which = if edge1.exists() || edge2.exists() { "Edge" } else { "Chrome" };
-                info!("检测到系统浏览器: {}", which);
-            }
-            found
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            let found = which::which("microsoft-edge").is_ok()
-                || which::which("google-chrome-stable").is_ok()
-                || which::which("google-chrome").is_ok()
-                || which::which("chromium-browser").is_ok()
-                || which::which("chromium").is_ok();
-            if found { info!("检测到系统浏览器 (Linux) ✓"); }
-            found
-        }
+    // 4. 检查浏览器 — 优先用内置（Full包自带），其次系统Edge/Chrome，最后在线下载
+    let has_bundled_chromium = {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        if let Some(ref dir) = exe_dir {
+            let browsers_path = dir.join("playwright-browsers");
+            if browsers_path.exists() {
+                info!("检测到内置 playwright-browsers: {:?}", browsers_path);
+                true
+            } else { false }
+        } else { false }
     };
 
-    if has_system_browser {
-        info!("检测到系统浏览器，无需下载 Chromium ✓");
+    if has_bundled_chromium {
+        info!("使用内置 Chromium，无需下载 ✓");
     } else {
-        // 无系统浏览器，检查 Playwright 自带 Chromium
-        let mut cmd = tokio::process::Command::new(&python);
-            hide_console(&mut cmd);
-            let output = cmd.args(["-c", r#"
+        // 检查系统 Edge/Chrome
+        let has_system_browser = {
+            #[cfg(target_os = "windows")]
+            {
+                let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
+                let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
+                let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                let edge1 = std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe");
+                let edge2 = std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe");
+                let chrome1 = std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe");
+                let chrome2 = std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe");
+                let chrome3 = std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe");
+                let found = edge1.exists() || edge2.exists() || chrome1.exists() || chrome2.exists() || chrome3.exists();
+                if found {
+                    let which = if edge1.exists() || edge2.exists() { "Edge" } else { "Chrome" };
+                    info!("检测到系统浏览器: {}", which);
+                }
+                found
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let found = which::which("microsoft-edge").is_ok()
+                    || which::which("google-chrome-stable").is_ok()
+                    || which::which("google-chrome").is_ok()
+                    || which::which("chromium-browser").is_ok()
+                    || which::which("chromium").is_ok();
+                if found { info!("检测到系统浏览器 (Linux) ✓"); }
+                found
+            }
+        };
+
+        if has_system_browser {
+            info!("检测到系统浏览器，无需下载 Chromium ✓");
+        } else {
+            // 检查 Playwright 自带 Chromium（ms-playwright 缓存）
+            let mut cmd = tokio::process::Command::new(&python);
+                hide_console(&mut cmd);
+                let output = cmd.args(["-c", r#"
 import os, sys
 home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
     os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
@@ -458,33 +485,34 @@ home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
 chromium_dir = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
 print('ok' if chromium_dir else 'missing')
 "#])
-            .output()
-            .await;
-
-        let needs_chromium = match output {
-            Ok(o) => String::from_utf8_lossy(&o.stdout).trim() != "ok",
-            Err(_) => true,
-        };
-
-        if needs_chromium {
-            info!("无系统浏览器且 Chromium 未安装，正在自动安装（可能需要几分钟）...");
-            let mut cmd = tokio::process::Command::new(&python);
-                hide_console(&mut cmd);
-                let install = cmd.args(["-m", "playwright", "install", "chromium"])
                 .output()
-                .await
-                .map_err(|e| anyhow!("安装 Chromium 失败: {}", e))?;
+                .await;
 
-            if !install.status.success() {
-                let stderr = String::from_utf8_lossy(&install.stderr);
-                return Err(anyhow!(
-                    "自动安装 Chromium 失败。建议安装 Edge 或 Chrome 浏览器以跳过此步骤。\n\
-                     或手动执行: playwright install chromium\n\n\
-                     错误: {}",
-                    stderr
-                ));
+            let needs_chromium = match output {
+                Ok(o) => String::from_utf8_lossy(&o.stdout).trim() != "ok",
+                Err(_) => true,
+            };
+
+            if needs_chromium {
+                info!("无系统浏览器且 Chromium 未安装，正在自动安装（可能需要几分钟）...");
+                let mut cmd = tokio::process::Command::new(&python);
+                    hide_console(&mut cmd);
+                    let install = cmd.args(["-m", "playwright", "install", "chromium"])
+                    .output()
+                    .await
+                    .map_err(|e| anyhow!("安装 Chromium 失败: {}", e))?;
+
+                if !install.status.success() {
+                    let stderr = String::from_utf8_lossy(&install.stderr);
+                    return Err(anyhow!(
+                        "自动安装 Chromium 失败。建议安装 Edge 或 Chrome 浏览器以跳过此步骤。\n\
+                         或手动执行: playwright install chromium\n\n\
+                         错误: {}",
+                        stderr
+                    ));
+                }
+                info!("Chromium 安装完成");
             }
-            info!("Chromium 安装完成");
         }
     }
 
