@@ -1,58 +1,59 @@
 <template>
-  <div class="editor-grid">
-    <!-- 左侧：图标栏 -->
-    <SideToolbar
-      :show-console="showConsole"
-      @navigate="onNavigate"
-      @toggle-palette="showPalette = !showPalette"
-      @toggle-console="showConsole = !showConsole"
-    />
+  <!-- ═══════════ 叠加层架构 — Canvas 全屏背景 + UI 浮层 ═══════════ -->
+  <div class="editor-app" @drop="onDrop" @dragover.prevent>
+    <!-- 层 0：Canvas 全屏 -->
+    <canvas ref="canvasRef" class="editor-canvas"></canvas>
 
-    <!-- 主区域 -->
-    <div class="main-area">
-      <!-- 顶部：菜单栏 -->
-      <TopMenuSection
-        :name="store.workflowName"
-        :node-count="store.nodeCount"
-        :edge-count="store.edgeCount"
-        :dirty="store.dirty"
-        :running="isRunning"
-        :recording="recording"
-        :disable-run="store.nodes.length === 0"
-        @run="runAll"
-        @step="runSingle"
-        @stop="stopRun"
-        @record="toggleRecording"
-        @pick="pickElement"
-        @import="importWorkflow"
-        @export="exportWorkflow"
-        @clear="clearCanvas"
-      />
+    <!-- 空画布提示（叠加在 canvas 上） -->
+    <div v-if="store.nodes.length === 0" class="empty-canvas">
+      <div class="empty-icon">🎨</div>
+      <div class="empty-title">空画布</div>
+      <div class="empty-hint">
+        从节点库拖节点到此处，或按 <kbd>Ctrl+S</kbd> 保存
+      </div>
+    </div>
 
-      <!-- 主体：画布 + 面板 -->
-      <div class="editor-body">
-        <!-- 节点库（左侧面板，可折叠） -->
-        <NodePalette v-show="showPalette" @drag-start="onDragStart" />
+    <!-- 层 999：UI 浮层（pointer-events: none，穿透到 canvas） -->
+    <div class="ui-overlay">
+      <!-- 顶部菜单栏 -->
+      <div class="overlay-top">
+        <TopMenuSection
+          :name="store.workflowName"
+          :node-count="store.nodeCount"
+          :edge-count="store.edgeCount"
+          :dirty="store.dirty"
+          :running="isRunning"
+          :recording="recording"
+          :disable-run="store.nodes.length === 0"
+          @run="runAll"
+          @step="runSingle"
+          @stop="stopRun"
+          @record="toggleRecording"
+          @pick="pickElement"
+          @import="importWorkflow"
+          @export="exportWorkflow"
+          @clear="clearCanvas"
+        />
+      </div>
 
-        <!-- 中央：画布 -->
-        <div
-          ref="wrapperRef"
-          class="canvas-wrapper"
-          @drop="onDrop"
-          @dragover.prevent
-        >
-          <div v-if="store.nodes.length === 0" class="empty-canvas">
-            <div class="empty-icon">🎨</div>
-            <div class="empty-title">空画布</div>
-            <div class="empty-hint">
-              从节点库拖节点到此处，或按 <kbd>Ctrl+S</kbd> 保存
-            </div>
-          </div>
-          <canvas ref="canvasRef" class="litegraph-canvas"></canvas>
+      <!-- 主体区域 -->
+      <div class="overlay-main">
+        <!-- 左侧：图标栏 + 节点库 -->
+        <div class="overlay-left">
+          <SideToolbar
+            :show-console="showConsole"
+            @navigate="onNavigate"
+            @toggle-palette="showPalette = !showPalette"
+            @toggle-console="showConsole = !showConsole"
+          />
+          <NodePalette v-show="showPalette" class="overlay-palette" @drag-start="onDragStart" />
         </div>
 
-        <!-- 右侧面板：属性 -->
-        <div class="right-panels">
+        <!-- 中央：canvas 交互区（pointer-events: none，穿透） -->
+        <div class="overlay-center" />
+
+        <!-- 右侧：属性面板 -->
+        <div v-show="selectedLgNode" class="overlay-right">
           <PropertyPanel
             :key="widgetVersion"
             :lg-node="selectedLgNode"
@@ -67,7 +68,7 @@
       </div>
 
       <!-- 底部控制台 -->
-      <div v-if="showConsole && logs.length > 0" class="console">
+      <div v-if="showConsole && logs.length > 0" class="overlay-bottom">
         <div class="console-header">
           <span>📋 执行日志</span>
           <button class="console-clear" @click="logs = []">清除</button>
@@ -137,7 +138,6 @@ const autoSave = useAutoSave(30000) // 30 秒自动保存
 
 // ─── LiteGraph 引用 ───
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const wrapperRef = ref<HTMLDivElement | null>(null)
 let graph: LGraph
 let canvas: LGraphCanvas
 /** 防止卸载后 raf 回调执行 */
@@ -282,33 +282,43 @@ onMounted(() => {
   // 创建 graph
   graph = new LGraph()
 
-  // ⚠️ 等 CSS flex 布局完成后再设尺寸、初始化 LGraphCanvas
-  // onMounted 时 wrapper 的 clientWidth/Height 可能还是 0
+  // ⚠️ 等待 DOM 就绪后初始化 — 全视口 canvas，无需 wrapper 尺寸
   nextTick(() => {
     requestAnimationFrame(() => {
-      if (!canvasRef.value || !wrapperRef.value) return
-      const w = wrapperRef.value.clientWidth
-      const h = wrapperRef.value.clientHeight
-      if (w === 0 || h === 0) {
-        // 极端情况：再等一帧
-        requestAnimationFrame(() => {
-          const w2 = wrapperRef.value!.clientWidth
-          const h2 = wrapperRef.value!.clientHeight
-          if (w2 > 0 && h2 > 0) initCanvas(w2, h2)
-        })
-        return
-      }
-      initCanvas(w, h)
+      if (!canvasRef.value) return
+      initCanvas()
     })
   })
 
-  function initCanvas(w: number, h: number) {
-    // CSS 用 absolute 定位铺满 wrapper，属性设内部坐标系
-    canvasRef.value!.width = w
-    canvasRef.value!.height = h
+  function initCanvas() {
+    const c = canvasRef.value!
+    // 全视口：先清固定分辨率 → 取 CSS 实际尺寸 → DPI 缩放
+    c.width = c.height = NaN as unknown as number
+    const { width, height } = c.getBoundingClientRect()
+    if (width === 0 || height === 0) {
+      // 极端 case：再等一帧
+      requestAnimationFrame(() => {
+        if (!canvasRef.value) return
+        const b = canvasRef.value.getBoundingClientRect()
+        if (b.width > 0 && b.height > 0) {
+          initCanvasReal(b.width, b.height)
+        }
+      })
+      return
+    }
+    initCanvasReal(width, height)
+  }
 
-    // 创建 canvas
-    canvas = new LGraphCanvas(canvasRef.value!, graph)
+  function initCanvasReal(w: number, h: number) {
+    const c = canvasRef.value!
+    // 设置 canvas 分辨率（DPI 缩放）
+    const dpr = Math.max(window.devicePixelRatio || 1, 1)
+    c.width = Math.round(w * dpr)
+    c.height = Math.round(h * dpr)
+    c.getContext('2d')?.scale(dpr, dpr)
+
+    // 创建 LGraphCanvas
+    canvas = new LGraphCanvas(c, graph)
 
     // 配置 canvas 外观（暗色主题 + 网格线）
     canvas.background_image = ''
@@ -1034,86 +1044,87 @@ function onKeyDown(e: KeyboardEvent) {
 </script>
 
 <style scoped>
-/* ═══════════ Grid 布局（对齐 ComfyUI） ═══════════ */
-.editor-grid {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  grid-template-rows: 1fr;
-  height: 100vh;
-  background: #0f1117;
-  overflow: hidden;
-}
+/* ═══════════ 叠加层架构（对齐 ComfyUI LiteGraphCanvasSplitterOverlay） ═══════════ */
 
-.main-area {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* ─── 主体三栏 ─── */
-.editor-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-}
-
-.canvas-wrapper {
-  flex: 1;
+/* 层 0：全屏容器 */
+.editor-app {
   position: relative;
-  background: #0d1117;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
+  background: #0d1117;
 }
 
-/* ─── 右侧面板 ─── */
-.right-panels {
+/* 层 0：Canvas 全视口背景 */
+.editor-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  background: #0d1117;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+/* 层 999：UI 浮层 — 默认穿透事件到 canvas */
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
-  min-width: 280px;
-  max-width: 340px;
-  border-left: 1px solid #30363d;
-  overflow: hidden;
 }
 
-.right-panels > :first-child {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-
-.right-panels > :last-child {
-  flex: 0 0 auto;
-}
-
-.panel-divider {
-  height: 1px;
-  background: #21262d;
+/* ─── 各 UI 区域：pointer-events: auto 恢复交互 ─── */
+.overlay-top {
+  pointer-events: auto;
   flex-shrink: 0;
 }
 
-/* 覆盖 LiteGraph 默认 .lgraphcanvas 的 max-height 限制 */
-.canvas-wrapper .litegraph-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  max-height: none !important;
-  background: #0d1117 !important;
-  touch-action: none;         /* WebView2: 防止手势拦截拖拽 */
-  user-select: none;           /* 防止文本选择干扰 */
-  outline: none;               /* 防止焦点环 */
+.overlay-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
-/* ─── 空画布提示 ─── */
+.overlay-left {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+
+.overlay-palette {
+  flex-shrink: 0;
+}
+
+.overlay-center {
+  flex: 1;
+  pointer-events: none;  /* 穿透到 canvas */
+  min-width: 0;
+}
+
+.overlay-right {
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 340px;
+  border-left: 1px solid #30363d;
+  background: #161b22;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ─── 空画布提示（浮在 canvas 上方，z-index 在 ui-overlay 之下） ─── */
 .empty-canvas {
-  position: absolute;
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  z-index: 5;
+  z-index: 10;
   pointer-events: none;
   user-select: none;
 }
@@ -1147,10 +1158,11 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 /* ─── 底部控制台 ─── */
-.console {
+.overlay-bottom {
+  pointer-events: auto;
   height: 140px;
   background: #161b22;
-  border-top: 1px solid #21262d;
+  border-top: 1px solid #30363d;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
