@@ -506,14 +506,20 @@ async fn get_or_start_sidecar() -> Result<Arc<BrowserSidecar>> {
         // guard drops here, releasing read lock
     }
 
-    // 需要启动新的 sidecar
+    // 需要启动新的 sidecar — 先清理旧进程
     let mut guard = SIDECAR.write().await;
-    // 双重检查：可能在等待写锁期间已有其他任务启动了
-    if let Some(ref sidecar) = *guard {
-        if is_sidecar_healthy(sidecar).await {
-            return Ok(Arc::clone(sidecar));
+    if let Some(ref old) = *guard {
+        warn!("清理旧 sidecar 进程...");
+        let mut child_guard = old.child.lock().await;
+        if let Some(ref mut old_child) = *child_guard {
+            let _ = old_child.kill().await;
+            let _ = old_child.wait().await;
         }
     }
+    *guard = None; // 确保旧实例被丢弃
+
+    // 双重检查：可能在等待写锁期间已有其他任务启动了
+    // (已在上方清理，此处重新获取健康 sidecar)
 
     // 执行 preflight 检查并启动新 sidecar
     preflight_check().await?;
