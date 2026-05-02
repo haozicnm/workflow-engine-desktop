@@ -13,6 +13,15 @@ use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::{info, warn};
 
+/// Windows: 禁止子进程弹出 cmd 窗口
+#[cfg(target_os = "windows")]
+fn hide_console(cmd: &mut tokio::process::Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+}
+#[cfg(not(target_os = "windows"))]
+fn hide_console(_cmd: &mut tokio::process::Command) {}
+
 /// 浏览器 sidecar 进程管理器
 pub struct BrowserSidecar {
     #[allow(dead_code)] // 保持子进程存活，Drop 时自动清理
@@ -37,6 +46,7 @@ impl BrowserSidecar {
             .ok()
             .and_then(|p| p.parent().map(|d| d.to_path_buf()));
         let mut cmd = tokio::process::Command::new(&python);
+        hide_console(&mut cmd);
         cmd.arg(&script_path);
         if let Some(ref dir) = exe_dir {
             let browsers_path = dir.join("playwright-browsers");
@@ -341,8 +351,9 @@ async fn preflight_check() -> Result<()> {
     info!("使用系统 Python: {:?}", python);
 
     // 2. 检查 Python 版本
-    let output = tokio::process::Command::new(&python)
-        .arg("--version")
+    let mut cmd = tokio::process::Command::new(&python);
+        hide_console(&mut cmd);
+        let output = cmd.arg("--version")
         .output()
         .await
         .map_err(|e| anyhow!("执行 Python 失败: {}", e))?;
@@ -358,8 +369,9 @@ async fn preflight_check() -> Result<()> {
     }
 
     // 3. 检查 Playwright — 缺失则自动安装
-    let output = tokio::process::Command::new(&python)
-        .args(["-c", "import playwright; print('ok')"])
+    let mut cmd = tokio::process::Command::new(&python);
+        hide_console(&mut cmd);
+        let output = cmd.args(["-c", "import playwright; print('ok')"])
         .output()
         .await
         .map_err(|e| anyhow!("检查 Playwright 失败: {}", e))?;
@@ -368,8 +380,9 @@ async fn preflight_check() -> Result<()> {
         info!("Playwright 未安装，正在自动安装...");
 
         // pip install playwright — 直连 PyPI，失败后切清华镜像
-        let install = tokio::process::Command::new(&python)
-            .args(["-m", "pip", "install", "playwright", "-q"])
+        let mut cmd = tokio::process::Command::new(&python);
+            hide_console(&mut cmd);
+            let install = cmd.args(["-m", "pip", "install", "playwright", "-q"])
             .output()
             .await
             .map_err(|e| anyhow!("执行 pip 失败: {}", e))?;
@@ -377,8 +390,9 @@ async fn preflight_check() -> Result<()> {
         if !install.status.success() {
             // 国内网络环境下 PyPI 直连可能超时，切清华镜像重试
             info!("PyPI 直连失败，尝试清华镜像...");
-            let install_mirror = tokio::process::Command::new(&python)
-                .args(["-m", "pip", "install", "playwright", "-q",
+            let mut cmd = tokio::process::Command::new(&python);
+                hide_console(&mut cmd);
+                let install_mirror = cmd.args(["-m", "pip", "install", "playwright", "-q",
                        "-i", "https://pypi.tuna.tsinghua.edu.cn/simple",
                        "--trusted-host", "pypi.tuna.tsinghua.edu.cn"])
                 .output()
@@ -434,8 +448,9 @@ async fn preflight_check() -> Result<()> {
         info!("检测到系统浏览器，无需下载 Chromium ✓");
     } else {
         // 无系统浏览器，检查 Playwright 自带 Chromium
-        let output = tokio::process::Command::new(&python)
-            .args(["-c", r#"
+        let mut cmd = tokio::process::Command::new(&python);
+            hide_console(&mut cmd);
+            let output = cmd.args(["-c", r#"
 import os, sys
 home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
     os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
@@ -453,8 +468,9 @@ print('ok' if chromium_dir else 'missing')
 
         if needs_chromium {
             info!("无系统浏览器且 Chromium 未安装，正在自动安装（可能需要几分钟）...");
-            let install = tokio::process::Command::new(&python)
-                .args(["-m", "playwright", "install", "chromium"])
+            let mut cmd = tokio::process::Command::new(&python);
+                hide_console(&mut cmd);
+                let install = cmd.args(["-m", "playwright", "install", "chromium"])
                 .output()
                 .await
                 .map_err(|e| anyhow!("安装 Chromium 失败: {}", e))?;

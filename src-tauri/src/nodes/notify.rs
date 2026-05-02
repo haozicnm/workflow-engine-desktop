@@ -9,7 +9,16 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use tracing::{info, warn};
 
-#[derive(Default)]
+/// Windows: 禁止子进程弹出 cmd 窗口
+#[cfg(target_os = "windows")]
+fn hide_console(cmd: &mut tokio::process::Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000);
+}
+#[cfg(not(target_os = "windows"))]
+fn hide_console(_cmd: &mut tokio::process::Command) {}
+
+// nodes/notify.rs
 pub struct NotifyNode;
 
 #[async_trait]
@@ -62,7 +71,9 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
             body.replace('"', "'"),
         );
 
-        match tokio::process::Command::new("powershell").args(["-Command", &script]).output().await {
+        let mut cmd = tokio::process::Command::new("powershell");
+        hide_console(&mut cmd);
+        match cmd.args(["-Command", &script]).output().await {
             Ok(_) => info!("系统通知已发送: {}", title),
             Err(e) => warn!("系统通知发送失败: {}（非关键错误）", e),
         }

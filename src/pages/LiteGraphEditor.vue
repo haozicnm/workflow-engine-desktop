@@ -177,10 +177,9 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const wrapperRef = ref<HTMLDivElement | null>(null)
 let graph: LGraph
 let canvas: LGraphCanvas
-/** 需要 onUnmounted 清理的资源 */
+/** 防止卸载后 raf 回调执行 */
+let _canvasMounted = false
 let _resizeObserver: ResizeObserver | null = null
-let _resizeHandler: (() => void) | null = null
-let _canvasMounted = false  // 防止卸载后 raf 回调执行
 
 // ─── 本地状态 ───
 const selectedLgNode = ref<LGraphNode | null>(null)
@@ -383,24 +382,23 @@ onMounted(() => {
     // 防止 WebView2 手势冲突
     canvasRef.value!.style.touchAction = 'none'
 
-    // 窗口大小变化时同步 canvas 尺寸（autoresize 只处理内部变换，不管 DOM 尺寸）
+    // Canvas resize — 采用 ComfyUI 方式：先清 NaN → 取 CSS 尺寸 → 设 DPI 缩放分辨率
     const resizeHandler = () => {
-      if (!canvasRef.value || !wrapperRef.value) return
-      const cw = wrapperRef.value.clientWidth
-      const ch = wrapperRef.value.clientHeight
-      if (cw > 0 && ch > 0 && (canvasRef.value.width !== cw || canvasRef.value.height !== ch)) {
-        // 更新 DOM 元素分辨率（防止 canvas 被 CSS 拉伸）
-        canvasRef.value.width = cw
-        canvasRef.value.height = ch
-        // 同步 LiteGraph 内部 DragAndScale
-        canvas.resize(cw, ch)
-      }
+      if (!canvasRef.value || !canvas) return
+      const c = canvasRef.value
+      c.width = c.height = NaN as unknown as number  // 清固定分辨率，让 CSS 100% 生效
+      const { width, height } = c.getBoundingClientRect()
+      if (width === 0 || height === 0) return
+      const dpr = Math.max(window.devicePixelRatio || 1, 1)
+      c.width = Math.round(width * dpr)
+      c.height = Math.round(height * dpr)
+      c.getContext('2d')?.scale(dpr, dpr)
+      canvas.draw(true, true)
     }
-    const ro = new ResizeObserver(resizeHandler)
-    ro.observe(wrapperRef.value!)
-    _resizeObserver = ro
-    _resizeHandler = resizeHandler
-    window.addEventListener('resize', resizeHandler)
+    _resizeObserver = new ResizeObserver(resizeHandler)
+    _resizeObserver.observe(canvasRef.value!)
+    // 初始化时立即触发一次（确保尺寸正确）
+    resizeHandler()
 
     // 监听 graph 变化 → 同步到 store
     graph.on_change = () => throttledSync()
@@ -450,14 +448,9 @@ onUnmounted(() => {
   _canvasMounted = false
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
-  // 清理 ResizeObserver 和 window resize
   if (_resizeObserver) {
     _resizeObserver.disconnect()
     _resizeObserver = null
-  }
-  if (_resizeHandler) {
-    window.removeEventListener('resize', _resizeHandler)
-    _resizeHandler = null
   }
   // 清理 graph/canvas 回调
   if (graph) {

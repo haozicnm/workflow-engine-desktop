@@ -18,7 +18,16 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-/// 桌面录制 sidecar 管理器
+/// Windows: 禁止子进程弹出 cmd 窗口
+#[cfg(target_os = "windows")]
+fn hide_console(cmd: &mut tokio::process::Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000);
+}
+#[cfg(not(target_os = "windows"))]
+fn hide_console(_cmd: &mut tokio::process::Command) {}
+
+// nodes/recording.rs
 pub struct DesktopRecorder {
     #[allow(dead_code)]
     child: Mutex<Option<Child>>,
@@ -31,7 +40,9 @@ impl DesktopRecorder {
         let python = find_desktop_recorder_python()?;
         let script_path = find_desktop_recorder_script()?;
 
-        let mut child = tokio::process::Command::new(&python)
+        let mut cmd = tokio::process::Command::new(&python);
+        hide_console(&mut cmd);
+        let mut child = cmd
             .arg(&script_path)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
