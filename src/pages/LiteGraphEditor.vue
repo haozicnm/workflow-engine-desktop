@@ -9,7 +9,7 @@
       <div class="empty-icon">🎨</div>
       <div class="empty-title">空画布</div>
       <div class="empty-hint">
-        从节点库拖节点到此处，或按 <kbd>Ctrl+S</kbd> 保存
+        双击空白画布搜索节点，或右键查看更多操作
       </div>
     </div>
 
@@ -184,6 +184,31 @@
       </div>
     </Teleport>
   </div>
+
+  <!-- ═══════════ P0: MiniMap + 右键菜单 + 搜索弹窗 ═══════════ -->
+  <MiniMap
+    v-if="canvasReady"
+    :canvas="canvas"
+    :graph="graph"
+    :visible="showMiniMap"
+  />
+
+  <CanvasContextMenu
+    :visible="contextMenuVisible"
+    :x="contextMenuPos.x"
+    :y="contextMenuPos.y"
+    :items="contextMenuItems"
+    @close="contextMenuVisible = false"
+  />
+
+  <CanvasSearchPopover
+    :visible="searchVisible"
+    :x="searchPos.x"
+    :y="searchPos.y"
+    :graph="graph"
+    @close="searchVisible = false"
+    @node-added="onSearchNodeAdded"
+  />
 </template>
 
 <script setup lang="ts">
@@ -208,6 +233,10 @@ import ScheduleDialog from '../components/ScheduleDialog.vue'
 import Dashboard from './Dashboard.vue'
 import Settings from './Settings.vue'
 import RunHistory from './RunHistory.vue'
+import MiniMap from '../components/MiniMap.vue'
+import CanvasContextMenu from '../components/CanvasContextMenu.vue'
+import CanvasSearchPopover from '../components/CanvasSearchPopover.vue'
+import type { ContextMenuItem } from '../components/CanvasContextMenu.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
@@ -335,6 +364,47 @@ const showDashboard = ref(false)
 const showSettings = ref(false)
 const showHistory = ref(false)
 const showSchedule = ref(false)
+
+// ─── P0：MiniMap / 右键菜单 / 搜索弹窗 ───
+const canvasReady = ref(false)  // initCanvasReal 完成后设为 true
+const showMiniMap = ref(true)
+const contextMenuVisible = ref(false)
+const contextMenuPos = ref({ x: 0, y: 0 })
+const searchVisible = ref(false)
+const searchPos = ref({ x: 0, y: 0 })
+
+// ─── 右键菜单项 ───
+const contextMenuItems = computed<ContextMenuItem[]>(() => {
+  const items: ContextMenuItem[] = [
+    { label: '🔍 搜索节点', action: () => {
+      searchVisible.value = true
+      searchPos.value = { ...contextMenuPos.value }
+    }},
+    { label: 'separator', action: () => {}, divider: true },
+    { label: '📋 复制', action: () => {
+      // TODO: 复制选中节点
+      canvas?.copyToClipboard?.()
+      addLog('📋 已复制', 'info')
+    }, disabled: !selectedLgNode.value },
+    { label: '📌 粘贴', action: () => {
+      // paste at menu position
+      const rect = canvasRef.value?.getBoundingClientRect()
+      if (!rect) return
+      const worldPos = canvas?.convertOffsetToCanvas?.(
+        [contextMenuPos.value.x - rect.left, contextMenuPos.value.y - rect.top], [0, 0]
+      )
+      canvas?.pasteFromClipboard?.(worldPos)
+      addLog('📌 已粘贴', 'info')
+    }},
+    { label: '🗑 删除选中', action: () => {
+      if (selectedLgNode.value) onDeleteNode(selectedLgNode.value)
+    }, disabled: !selectedLgNode.value },
+    { label: 'separator', action: () => {}, divider: true },
+    { label: '📐 适应视图', action: () => { fitView() }},
+    { label: '🗑 清空画布', action: () => { clearCanvas() }},
+  ]
+  return items
+})
 
 // ─── 标签页数据缓存 ───
 const tabDataCache = new Map<string, { nodes: any[]; edges: any[]; name: string }>()
@@ -695,10 +765,33 @@ onMounted(() => {
     // 键盘快捷键
     document.addEventListener('keydown', onKeyDown)
     _canvasMounted = true
+    canvasReady.value = true
 
     // Canvas mousemove — 追踪鼠标位置供 ghost placement 使用
     canvasRef.value!.addEventListener('mousemove', (e) => {
       _lastMousePos = { x: e.clientX, y: e.clientY }
+    })
+
+    // 右键菜单
+    canvasRef.value!.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault()
+      contextMenuPos.value = { x: e.clientX, y: e.clientY }
+      contextMenuVisible.value = true
+    })
+
+    // 双击空白画布 — 搜索弹窗
+    canvasRef.value!.addEventListener('dblclick', (e: MouseEvent) => {
+      // 只响应空白画布双击（非节点上）
+      const target = e.target as HTMLElement
+      if (target.tagName !== 'CANVAS') return
+      // 检查是否双击到了节点：LiteGraph 的 dblclick 会选中节点
+      // 延迟检查 selectedLgNode
+      setTimeout(() => {
+        if (!selectedLgNode.value) {
+          searchPos.value = { x: e.clientX, y: e.clientY }
+          searchVisible.value = true
+        }
+      }, 10)
     })
 
     // 初始化第一个标签页
@@ -964,6 +1057,38 @@ function onAddNodeFromPalette(def: NodeDefinition) {
   })
   graph.add(node, { ghost: true, dragEvent: event })
   addLog(`👻 放置节点: ${def.label}（点击画布落位，Esc 取消）`)
+}
+
+// ─── 搜索弹窗添加节点 ───
+function onSearchNodeAdded(def: NodeDefinition) {
+  if (!canvasRef.value || !canvas) return
+
+  const node = LiteGraph.createNode(def.type)
+  if (!node) {
+    addLog(`⚠ 无法创建节点: ${def.label}`, 'error')
+    return
+  }
+
+  node.title = def.label
+  if (def.defaultConfig && node.widgets) {
+    for (const w of node.widgets) {
+      if (def.defaultConfig[w.name] !== undefined) {
+        w.value = def.defaultConfig[w.name]
+      }
+    }
+  }
+
+  // 非 ghost 模式：直接放到搜索弹窗位置（双击位置）
+  const rect = canvasRef.value.getBoundingClientRect()
+  const worldPos = canvas.convertOffsetToCanvas?.(
+    [searchPos.value.x - rect.left, searchPos.value.y - rect.top],
+    [0, 0]
+  )
+  if (worldPos) {
+    node.pos = [worldPos[0], worldPos[1]]
+  }
+  graph.add(node)
+  addLog(`✅ 添加节点: ${def.label}`)
 }
 
 // ─── 属性面板回调 ───
