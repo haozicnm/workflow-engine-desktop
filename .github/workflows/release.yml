@@ -224,7 +224,3 @@ jobs:
             artifacts/linux-appimage/*.AppImage
           draft: false
           prerelease: false
-
-
----SHA---
-6c8ff18bb060a4b478abb3c0377f060aac59e179
