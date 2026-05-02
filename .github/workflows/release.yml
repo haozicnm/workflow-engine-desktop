@@ -89,7 +89,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Download Playwright Chromium (Win7 compat: v109)
+      - name: Download Playwright Chromium (Win7 compat v109)
         shell: pwsh
         run: |
           pip install playwright==1.29.0
