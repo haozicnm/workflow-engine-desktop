@@ -553,9 +553,10 @@ impl NodeExecutor for BrowserNode {
 
         // 对于需要 launch 的操作，自动先 launch
         if action != "launch" && action != "close" && action != "ping" {
+            let headless = action != "recording_start" && action != "pick";
             let mut launch_params = config.get("launch")
                 .cloned()
-                .unwrap_or_else(|| serde_json::json!({"headless": true}));
+                .unwrap_or_else(|| serde_json::json!({"headless": headless}));
 
             // 从上下文读取浏览器通道设置（用户配置 > step config > 自动检测）
             let channel = step.config.get("channel").and_then(|v| v.as_str())
