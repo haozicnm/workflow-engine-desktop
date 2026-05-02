@@ -5,9 +5,6 @@ import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from '../composables/useToast'
 import WorkflowGrid from '../components/WorkflowGrid.vue'
 import TemplateSection from '../components/TemplateSection.vue'
-import ScheduleSection from '../components/ScheduleSection.vue'
-import ProgressSection from '../components/ProgressSection.vue'
-import ScheduleDialog from '../components/ScheduleDialog.vue'
 
 interface WorkflowItem {
   id: string
@@ -18,28 +15,12 @@ interface WorkflowItem {
   updated_at: string
 }
 
-interface ScheduleInfo {
+interface TemplateItem {
   id: string
-  workflow_name: string
-  cron_expr: string
-  enabled: boolean
-  last_run_at: string | null
+  name: string
+  description: string
 }
-
-import pkg from '../package.json'
-const APP_VERSION = pkg.version
-
-// ─── 开发进度 ───
-const milestones = [
-  { id: 'P0', label: '项目骨架', desc: 'Tauri 窗口 + 数据层 + 空白前端 + 4 个页面', done: true },
-  { id: 'P1', label: '引擎核心', desc: '解析器 / 调度器 / 状态机 / HTTP·数据·脚本·条件·循环节点 / 重试·超时 / DB 持久化 / 事件推送', done: true },
-  { id: 'P2', label: '文件节点 + 桌面录制', desc: 'Excel / Word / 操作录制→工作流转换', done: true },
-  { id: 'P3', label: '前端画布 v1', desc: '拖拽编辑器 + YAML 双向编辑 + 流程连线 + 运行历史', done: true },
-  { id: 'P4', label: '桌面集成', desc: '系统托盘 + 定时调度 + 内置 Python + Playwright', done: true },
-  { id: 'v2.0', label: 'ComfyUI DAG 编辑器', desc: 'Vue Flow 画布 + 节点拖拽 + 属性面板 + 撤销/重做 + 自动保存', done: true },
-  { id: '1.0β', label: '正式 Beta', desc: '全面代码审查 + Bug 修复 + 可正式使用', done: true },
-  { id: '1.1β', label: '网页抓取增强', desc: 'web_scrape 声明式节点 / 浏览器 +16 动作 / Cookie·代理·多标签页 / 步骤耗时显示', done: true },
-]
+const templates = ref<TemplateItem[]>([])
 
 const emit = defineEmits<{
   'open-workflow': [id?: string]
@@ -54,9 +35,6 @@ const deleting = ref<string | null>(null)
 const cloning = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const creatingFromTemplate = ref<string | null>(null)
-const scheduleDialog = ref<InstanceType<typeof ScheduleDialog> | null>(null)
-const schedules = ref<ScheduleInfo[]>([])
-const scheduleLoading = ref(false)
 
 // ─── 搜索 ───
 const searchQuery = ref('')
@@ -68,17 +46,10 @@ const filteredWorkflows = computed(() => {
   )
 })
 
-interface TemplateItem {
-  id: string
-  name: string
-  description: string
-}
-const templates = ref<TemplateItem[]>([])
-
 let unlistenRunUpdate: (() => void) | null = null
 
 onMounted(async () => {
-  await Promise.all([loadList(), loadTemplates(), loadSchedules()])
+  await Promise.all([loadList(), loadTemplates()])
   // 监听工作流执行结果
   try {
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
@@ -249,43 +220,6 @@ async function handleImport(e: Event) {
 }
 
 // ─── 定时计划 ───
-
-async function loadSchedules() {
-  scheduleLoading.value = true
-  try {
-    schedules.value = await safeInvoke<ScheduleInfo[]>('schedule_list')
-  } catch (e) {
-    console.warn('加载计划失败:', e)
-  } finally { scheduleLoading.value = false }
-}
-
-async function toggleSchedule(s: ScheduleInfo) {
-  try {
-    await safeInvoke('schedule_update', { id: s.id, enabled: !s.enabled })
-    s.enabled = !s.enabled
-    toast.success(`计划已${s.enabled ? '启用' : '禁用'}`)
-  } catch (e: unknown) {
-    toast.error((e as Error).message || String(e))
-  }
-}
-
-async function deleteSchedule(s: ScheduleInfo) {
-  if (!confirm(`确定删除此定时计划？`)) return
-  try {
-    await safeInvoke('schedule_delete', { id: s.id })
-    schedules.value = schedules.value.filter(x => x.id !== s.id)
-    toast.success('计划已删除')
-  } catch (e: unknown) {
-    toast.error((e as Error).message || String(e))
-  }
-}
-
-function openScheduleDialog(schedule?: ScheduleInfo) {
-  const wfs = workflows.value.map(w => ({ id: w.id, name: w.name }))
-  scheduleDialog.value?.open(wfs, schedule)
-}
-
-async function onScheduleSaved() { await loadSchedules() }
 </script>
 
 <template>
@@ -333,21 +267,6 @@ async function onScheduleSaved() { await loadSchedules() }
       :creating-from-template="creatingFromTemplate"
       @create-from-template="createFromTemplate"
     />
-
-    <!-- 定时计划 -->
-    <ScheduleSection
-      :schedules="schedules"
-      :loading="scheduleLoading"
-      @toggle-schedule="toggleSchedule"
-      @delete-schedule="deleteSchedule"
-      @edit-schedule="(s: ScheduleInfo) => openScheduleDialog(s)"
-      @new-schedule="openScheduleDialog()"
-    />
-
-    <ScheduleDialog ref="scheduleDialog" @saved="onScheduleSaved" />
-
-    <!-- 开发进度 -->
-    <ProgressSection :milestones="milestones" :version="APP_VERSION" />
   </div>
 </template>
 

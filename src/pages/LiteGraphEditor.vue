@@ -34,6 +34,7 @@
           @import="importWorkflow"
           @export="exportWorkflow"
           @clear="clearCanvas"
+          @save="onSaveWorkflow"
         />
       </div>
 
@@ -48,6 +49,7 @@
             @toggle-history="showHistory = !showHistory"
             @toggle-console="showConsole = !showConsole"
             @toggle-settings="showSettings = !showSettings"
+            @toggle-schedule="showSchedule = !showSchedule"
           />
         </div>
 
@@ -85,7 +87,7 @@
       :height="450"
       @close="showPalette = false"
     >
-      <NodePalette @drag-start="onDragStart" />
+      <NodePalette @add-node="onAddNodeFromPalette" />
     </FloatingPanel>
 
     <!-- 属性面板浮层 -->
@@ -145,6 +147,25 @@
       <RunHistory />
     </FloatingPanel>
 
+    <!-- 定时计划浮层 -->
+    <FloatingPanel
+      :visible="showSchedule"
+      title="📅 定时计划"
+      :width="560"
+      :height="420"
+      @close="showSchedule = false"
+    >
+      <ScheduleSection
+        :schedules="scheduleList"
+        :loading="scheduleLoading"
+        @toggle-schedule="onToggleSchedule"
+        @delete-schedule="onDeleteSchedule"
+        @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
+        @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)"
+      />
+      <ScheduleDialog ref="scheduleDialogRef" @saved="loadSchedules" />
+    </FloatingPanel>
+
     <!-- 预览弹窗 -->
     <Teleport to="body">
       <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
@@ -182,6 +203,8 @@ import SideToolbar from '../components/SideToolbar.vue'
 import TopMenuSection from '../components/TopMenuSection.vue'
 import WorkflowTabs from '../components/WorkflowTabs.vue'
 import FloatingPanel from '../components/FloatingPanel.vue'
+import ScheduleSection from '../components/ScheduleSection.vue'
+import ScheduleDialog from '../components/ScheduleDialog.vue'
 import Dashboard from './Dashboard.vue'
 import Settings from './Settings.vue'
 import RunHistory from './RunHistory.vue'
@@ -302,12 +325,16 @@ watch(() => tabStore.tabs.length, (len, oldLen) => {
 })
 const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
+// ─── 鼠标位置追踪（供 ghost placement 用） ───
+let _lastMousePos = { x: 0, y: 0 }
+
 // ─── 面板状态 ───
 const showConsole = ref(false)
 const showPalette = ref(true)
 const showDashboard = ref(false)
 const showSettings = ref(false)
 const showHistory = ref(false)
+const showSchedule = ref(false)
 
 // ─── 标签页数据缓存 ───
 const tabDataCache = new Map<string, { nodes: any[]; edges: any[]; name: string }>()
@@ -398,6 +425,82 @@ function onDashboardNavigate(path: string) {
   showDashboard.value = false
   if (path === '/history') { showHistory.value = true }
   if (path === '/settings') { showSettings.value = true }
+}
+
+// ─── 定时计划 ───
+const scheduleList = ref<any[]>([])
+const scheduleLoading = ref(false)
+const scheduleDialogRef = ref<InstanceType<typeof ScheduleDialog> | null>(null)
+const workflowListForSchedule = ref<{ id: string; name: string }[]>([])
+
+async function loadSchedules() {
+  scheduleLoading.value = true
+  try {
+    scheduleList.value = await safeInvoke<any[]>('schedule_list')
+  } catch (e) {
+    console.warn('加载计划失败:', e)
+  } finally { scheduleLoading.value = false }
+}
+
+async function onToggleSchedule(s: any) {
+  try {
+    await safeInvoke('schedule_update', { id: s.id, enabled: !s.enabled })
+    s.enabled = !s.enabled
+    addLog(`计划已${s.enabled ? '启用' : '禁用'}`, 'info')
+  } catch (e: unknown) {
+    addLog(`❌ ${(e as Error).message || e}`, 'error')
+  }
+}
+
+async function onDeleteSchedule(s: any) {
+  if (!confirm(`确定删除此定时计划？`)) return
+  try {
+    await safeInvoke('schedule_delete', { id: s.id })
+    scheduleList.value = scheduleList.value.filter(x => x.id !== s.id)
+    addLog('计划已删除', 'info')
+  } catch (e: unknown) {
+    addLog(`❌ ${(e as Error).message || e}`, 'error')
+  }
+}
+
+// 监听 schedule 面板打开时加载数据
+watch(showSchedule, (v) => {
+  if (v) {
+    loadSchedules()
+    // 加载工作流列表供 schedule dialog 用
+    safeInvoke<any[]>('workflow_list').then(list => {
+      workflowListForSchedule.value = (list || []).map((w: any) => ({ id: w.id, name: w.name }))
+    }).catch(() => {})
+  }
+})
+
+// ─── 保存工作流 ───
+async function onSaveWorkflow() {
+  if (store.nodes.length === 0) {
+    addLog('⚠ 画布为空，无需保存', 'warn')
+    return
+  }
+  try {
+    const id = store.workflowId
+    if (id) {
+      // 更新已有工作流
+      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
+      await safeInvoke('workflow_save_yaml', { id, yaml })
+      addLog(`💾 已保存「${store.workflowName}」`)
+    } else {
+      // 新建工作流
+      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
+      const newId = await safeInvoke<string>('workflow_create', { name: store.workflowName, description: '' })
+      if (newId) {
+        await safeInvoke('workflow_save_yaml', { id: newId, yaml })
+        store.setWorkflowId(newId)
+        addLog(`💾 已保存「${store.workflowName}」`)
+      }
+    }
+    store.dirty = false
+  } catch (e: unknown) {
+    addLog(`❌ 保存失败: ${(e as Error).message || e}`, 'error')
+  }
 }
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
@@ -593,9 +696,10 @@ onMounted(() => {
     document.addEventListener('keydown', onKeyDown)
     _canvasMounted = true
 
-    // 拖放：document 级事件，不受 z-index / pointer-events 干扰
-    document.addEventListener('dragover', onDocDragOver)
-    document.addEventListener('drop', onDocDrop)
+    // Canvas mousemove — 追踪鼠标位置供 ghost placement 使用
+    canvasRef.value!.addEventListener('mousemove', (e) => {
+      _lastMousePos = { x: e.clientX, y: e.clientY }
+    })
 
     // 初始化第一个标签页
     const tid = tabStore.ensureTab()
@@ -609,8 +713,6 @@ onUnmounted(() => {
   _canvasMounted = false
   autoSave.stop()
   document.removeEventListener('keydown', onKeyDown)
-  document.removeEventListener('dragover', onDocDragOver)
-  document.removeEventListener('drop', onDocDrop)
   if (_resizeObserver) {
     _resizeObserver.disconnect()
     _resizeObserver = null
@@ -834,53 +936,18 @@ function loadFromStore() {
   nextTick(() => fitView())
 }
 
-// ─── 拖放节点（document 级，绕开 z-index / pointer-events） ───
-function onDocDragOver(e: DragEvent) {
-  // 只有拖的是节点类型才允许 drop
-  if (e.dataTransfer?.types.includes('application/flow-node-type')) {
-    e.preventDefault()
-  }
-}
-
-function onDocDrop(e: DragEvent) {
-  onDrop(e)
-}
-
-function onDragStart(_def: NodeDefinition, _event: DragEvent) {
-  // NodePalette 已在内部设置 dataTransfer
-}
-
-function onDrop(event: DragEvent) {
-  const nodeType = event.dataTransfer?.getData('application/flow-node-type')
-  if (!nodeType) return
-  // 忽略在 UI 区域内或浮层上的拖放
-  const target = event.target as HTMLElement
-  if (target?.closest('.overlay-left, .overlay-top, .overlay-bottom, .floating-panel')) return
-
-  const def = getNodeDef(nodeType)
-  if (!def) return
-
-  // 画布可能尚未初始化完成
+// ─── Ghost placement（对齐 ComfyUI：双击节点库 → 创建 ghost 节点跟随鼠标 → 点击落位） ───
+function onAddNodeFromPalette(def: NodeDefinition) {
+  showPalette.value = false
   if (!canvasRef.value || !canvas) return
 
-  const rect = canvasRef.value.getBoundingClientRect()
-  // ComfyUI LiteGraph: DragAndScale 用数组 [x,y] 格式，不是 {x,y} 对象
-  const canvasCoords = canvas.convertOffsetToCanvas(
-    [event.clientX - rect.left, event.clientY - rect.top],
-    [0, 0]
-  )
-  // 返回的是数组 [x, y]
-  const [cx, cy] = canvasCoords
-
-  const node = LiteGraph.createNode(nodeType)
+  const node = LiteGraph.createNode(def.type)
   if (!node) {
     addLog(`⚠ 无法创建节点: ${def.label}`, 'error')
     return
   }
 
-  node.pos = [cx, cy]
   node.title = def.label
-
   // 设置默认 config 到 widgets
   if (def.defaultConfig && node.widgets) {
     for (const w of node.widgets) {
@@ -890,8 +957,13 @@ function onDrop(event: DragEvent) {
     }
   }
 
-  graph.add(node)
-  addLog(`➕ 添加节点: ${def.label}`)
+  // Ghost placement：节点跟随鼠标，点击落位，Esc 取消
+  const event = new MouseEvent('mousemove', {
+    clientX: _lastMousePos.x,
+    clientY: _lastMousePos.y,
+  })
+  graph.add(node, { ghost: true, dragEvent: event })
+  addLog(`👻 放置节点: ${def.label}（点击画布落位，Esc 取消）`)
 }
 
 // ─── 属性面板回调 ───

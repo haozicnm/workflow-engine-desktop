@@ -16,6 +16,9 @@
       <button class="menu-btn" :disabled="!running" @click="$emit('stop')">
         ■ 停止
       </button>
+      <button class="menu-btn" @click="$emit('save')" title="保存到工作流">
+        💾 保存
+      </button>
     </div>
     <div class="menu-right">
       <button
@@ -56,6 +59,7 @@ defineEmits<{
   run: []
   step: []
   stop: []
+  save: []
   record: []
   pick: []
   import: []

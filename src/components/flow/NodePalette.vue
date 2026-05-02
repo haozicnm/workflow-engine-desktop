@@ -33,8 +33,7 @@
             :key="def.type"
             class="palette-item"
             :style="{ '--accent': def.color }"
-            draggable="true"
-            @dragstart="onDrag($event, def)"
+            @dblclick="emit('add-node', def)"
           >
             <span class="item-icon">{{ def.icon }}</span>
             <div class="item-info">
@@ -109,14 +108,8 @@ const filteredCategories = computed(() => {
 
 // ─── 拖拽 ───
 const emit = defineEmits<{
-  'drag-start': [def: NodeDefinition, event: DragEvent]
+  'add-node': [def: NodeDefinition]
 }>()
-
-function onDrag(event: DragEvent, def: NodeDefinition) {
-  event.dataTransfer?.setData('application/flow-node-type', def.type)
-  event.dataTransfer!.effectAllowed = 'move'
-  emit('drag-start', def, event)
-}
 </script>
 
 <style scoped>
