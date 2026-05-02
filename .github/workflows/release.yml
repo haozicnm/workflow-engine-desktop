@@ -188,26 +188,31 @@ jobs:
         run: |
           DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1 || true)
           AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1 || true)
-          # Rename with -lite suffix
-          if [ -n "$DEB" ]; then cp "$DEB" "$(dirname "$DEB")/$(basename "$DEB" .deb)-lite.deb"; fi
-          if [ -n "$AI" ]; then cp "$AI" "$(dirname "$AI")/$(basename "$AI" .AppImage)-lite.AppImage"; fi
-          echo "deb=$DEB" >> $GITHUB_OUTPUT
-          echo "appimage=$AI" >> $GITHUB_OUTPUT
+          if [ -n "$DEB" ]; then
+            DEB_LITE="$(dirname "$DEB")/$(basename "$DEB" .deb)-lite.deb"
+            cp "$DEB" "$DEB_LITE"
+          fi
+          if [ -n "$AI" ]; then
+            AI_LITE="$(dirname "$AI")/$(basename "$AI" .AppImage)-lite.AppImage"
+            cp "$AI" "$AI_LITE"
+          fi
+          echo "deb_lite=${DEB_LITE:-}" >> $GITHUB_OUTPUT
+          echo "ai_lite=${AI_LITE:-}" >> $GITHUB_OUTPUT
 
       - name: Upload Lite deb
-        if: steps.lite.outputs.deb != ''
+        if: steps.lite.outputs.deb_lite != ''
         uses: actions/upload-artifact@v4
         with:
           name: linux-deb-lite
-          path: "$(dirname '${{ steps.lite.outputs.deb }}')/$(basename '${{ steps.lite.outputs.deb }}' .deb)-lite.deb"
+          path: ${{ steps.lite.outputs.deb_lite }}
           if-no-files-found: warn
 
       - name: Upload Lite AppImage
-        if: steps.lite.outputs.appimage != ''
+        if: steps.lite.outputs.ai_lite != ''
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage-lite
-          path: "$(dirname '${{ steps.lite.outputs.appimage }}')/$(basename '${{ steps.lite.outputs.appimage }}' .AppImage)-lite.AppImage"
+          path: ${{ steps.lite.outputs.ai_lite }}
           if-no-files-found: warn
 
       # ─── Full build (with Chromium) ───
@@ -233,25 +238,31 @@ jobs:
         run: |
           DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | grep -v '\-lite' | head -1 || true)
           AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | grep -v '\-lite' | head -1 || true)
-          if [ -n "$DEB" ]; then cp "$DEB" "$(dirname "$DEB")/$(basename "$DEB" .deb)-full.deb"; fi
-          if [ -n "$AI" ]; then cp "$AI" "$(dirname "$AI")/$(basename "$AI" .AppImage)-full.AppImage"; fi
-          echo "deb=$DEB" >> $GITHUB_OUTPUT
-          echo "appimage=$AI" >> $GITHUB_OUTPUT
+          if [ -n "$DEB" ]; then
+            DEB_FULL="$(dirname "$DEB")/$(basename "$DEB" .deb)-full.deb"
+            cp "$DEB" "$DEB_FULL"
+          fi
+          if [ -n "$AI" ]; then
+            AI_FULL="$(dirname "$AI")/$(basename "$AI" .AppImage)-full.AppImage"
+            cp "$AI" "$AI_FULL"
+          fi
+          echo "deb_full=${DEB_FULL:-}" >> $GITHUB_OUTPUT
+          echo "ai_full=${AI_FULL:-}" >> $GITHUB_OUTPUT
 
       - name: Upload Full deb
-        if: steps.full.outputs.deb != ''
+        if: steps.full.outputs.deb_full != ''
         uses: actions/upload-artifact@v4
         with:
           name: linux-deb-full
-          path: "$(dirname '${{ steps.full.outputs.deb }}')/$(basename '${{ steps.full.outputs.deb }}' .deb)-full.deb"
+          path: ${{ steps.full.outputs.deb_full }}
           if-no-files-found: warn
 
       - name: Upload Full AppImage
-        if: steps.full.outputs.appimage != ''
+        if: steps.full.outputs.ai_full != ''
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage-full
-          path: "$(dirname '${{ steps.full.outputs.appimage }}')/$(basename '${{ steps.full.outputs.appimage }}' .AppImage)-full.AppImage"
+          path: ${{ steps.full.outputs.ai_full }}
           if-no-files-found: warn
 
   # ═══ 创建 Release ═══

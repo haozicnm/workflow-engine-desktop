@@ -103,10 +103,23 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
 
     let python_available = bundled.is_some() || best_python.is_some();
 
+    // ─── Playwright Chromium 检测（离线包内置） ───
+    let has_playwright_chromium = if let Ok(exe) = std::env::current_exe() {
+        exe.parent()
+            .map(|d| d.join("playwright-browsers"))
+            .map(|p| p.exists() && p.read_dir().ok()
+                .map(|mut entries| entries.any(|e| e.ok()
+                    .map(|f| f.file_name().to_string_lossy().starts_with("chromium-"))
+                    .unwrap_or(false)))
+                .unwrap_or(false))
+            .unwrap_or(false)
+    } else { false };
+
     Ok(serde_json::json!({
         "python_available": python_available,
         "bundled_python": bundled,
         "system_python": best_python,
+        "has_playwright_chromium": has_playwright_chromium,
         "has_edge": has_edge,
         "has_chrome": has_chrome,
     }))
