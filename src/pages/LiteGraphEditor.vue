@@ -1034,13 +1034,17 @@ function onAddNodeFromPalette(def: NodeDefinition) {
     }
   }
 
-  // Ghost placement：节点跟随鼠标，点击落位，Esc 取消
-  const event = new MouseEvent('mousemove', {
-    clientX: _lastMousePos.x,
-    clientY: _lastMousePos.y,
-  })
-  graph.add(node, { ghost: true, dragEvent: event })
-  addLog(`👻 放置节点: ${def.label}（点击画布落位，Esc 取消）`)
+  // 直接用鼠标位置算世界坐标放置（不用 ghost 模式——Grid 下坐标转换不可靠）
+  const rect = canvasRef.value.getBoundingClientRect()
+  const worldPos = canvas.convertOffsetToCanvas(
+    [_lastMousePos.x - rect.left, _lastMousePos.y - rect.top],
+    [0, 0]
+  )
+  if (worldPos) {
+    node.pos = [worldPos[0], worldPos[1]]
+  }
+  graph.add(node)
+  addLog(`✅ 添加节点: ${def.label}`)
 }
 
 // ─── 搜索弹窗添加节点 ───
