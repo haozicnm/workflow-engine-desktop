@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 
 interface WorkflowItem {
   id: string
@@ -25,9 +24,8 @@ const emit = defineEmits<{
   'run-workflow': [item: WorkflowItem]
   'clone-workflow': [item: WorkflowItem]
   'export-workflow': [item: WorkflowItem]
+  'show-history': [workflowId: string]
 }>()
-
-const router = useRouter()
 
 function formatDate(iso: string): string {
   try {
@@ -85,7 +83,7 @@ function openEditor(id?: string) {
       <div class="wf-actions">
         <button class="action-btn" @click="openEditor(wf.id)">✏️ 编辑</button>
         <button class="action-btn run" @click="emit('run-workflow', wf)" :disabled="!wf.enabled">▶ 执行</button>
-        <button class="action-btn" @click="router.push(`/history?workflow_id=${wf.id}`)">📊 历史</button>
+        <button class="action-btn" @click="emit('show-history', wf.id)">📊 历史</button>
         <button class="action-btn" @click="emit('toggle-enabled', wf)">{{ wf.enabled ? '⏸ 禁用' : '▶ 启用' }}</button>
         <button class="action-btn" @click="emit('clone-workflow', wf)" :disabled="cloning === wf.id">
           📋 {{ cloning === wf.id ? '克隆中...' : '克隆' }}

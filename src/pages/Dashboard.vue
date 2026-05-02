@@ -81,7 +81,6 @@ onMounted(async () => {
   await Promise.all([loadList(), loadTemplates(), loadSchedules()])
   // 监听工作流执行结果
   try {
-    const { listen } = await import('@tauri-apps/api/event')
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
       if (status === 'completed') {
@@ -325,6 +324,7 @@ async function onScheduleSaved() { await loadSchedules() }
       @run-workflow="runWorkflow"
       @clone-workflow="cloneWorkflow"
       @export-workflow="exportWorkflow"
+      @show-history="(wfId: string) => emit('navigate', '/history')"
     />
 
     <!-- 内置模板 -->

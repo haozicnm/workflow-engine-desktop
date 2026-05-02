@@ -27,7 +27,7 @@ export const PIN_BADGES: Record<PinType, string> = {
 }
 
 /** 节点执行状态 */
-export type NodeStatus = 'idle' | 'queued' | 'running' | 'success' | 'error' | 'warning'
+export type NodeStatus = 'idle' | 'queued' | 'running' | 'success' | 'error' | 'warning' | 'paused'
 
 export const STATUS_COLORS: Record<NodeStatus, string> = {
   idle: '#484f58',
@@ -36,6 +36,7 @@ export const STATUS_COLORS: Record<NodeStatus, string> = {
   success: '#3fb950',
   error: '#f85149',
   warning: '#d29922',
+  paused: '#d29922',
 }
 
 /** 针脚定义 */

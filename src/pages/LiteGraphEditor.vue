@@ -187,7 +187,7 @@ import Settings from './Settings.vue'
 import RunHistory from './RunHistory.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
-import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
+import type { FlowNode, NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
 
 // ─── Props ───
 const store = useFlowStore()
@@ -395,6 +395,7 @@ function onCreateFromTemplate(tpl: { id: string; name: string; nodes: unknown[];
 
 /** Dashboard 内导航请求（历史/设置）→ 关闭 Dashboard 打开对应面板 */
 function onDashboardNavigate(path: string) {
+  showDashboard.value = false
   if (path === '/history') { showHistory.value = true }
   if (path === '/settings') { showSettings.value = true }
 }
@@ -845,7 +846,7 @@ function onDocDrop(e: DragEvent) {
   onDrop(e)
 }
 
-function onDragStart(_def: unknown, _event: DragEvent) {
+function onDragStart(_def: NodeDefinition, _event: DragEvent) {
   // NodePalette 已在内部设置 dataTransfer
 }
 
