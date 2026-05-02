@@ -53,7 +53,12 @@ jobs:
         run: npm run build
 
       - name: Create python-runtime placeholder
-        run: New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed; Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"; New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers; Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed
+          Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
+          Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
 
       # ─── Lite build (no Chromium) ───
       - name: Build Tauri Lite
