@@ -43,9 +43,11 @@
         <div class="overlay-left">
           <SideToolbar
             :show-console="showConsole"
-            @navigate="onNavigate"
+            @toggle-dashboard="showDashboard = !showDashboard"
             @toggle-palette="showPalette = !showPalette"
+            @toggle-history="showHistory = !showHistory"
             @toggle-console="showConsole = !showConsole"
+            @toggle-settings="showSettings = !showSettings"
           />
         </div>
 
@@ -106,6 +108,43 @@
       />
     </FloatingPanel>
 
+    <!-- 工作流列表浮层 -->
+    <FloatingPanel
+      :visible="showDashboard"
+      title="📋 工作流"
+      :width="720"
+      :height="560"
+      @close="showDashboard = false"
+    >
+      <Dashboard
+        @open-workflow="onOpenWorkflow"
+        @create-from-template="onCreateFromTemplate"
+        @navigate="onDashboardNavigate"
+      />
+    </FloatingPanel>
+
+    <!-- 设置浮层 -->
+    <FloatingPanel
+      :visible="showSettings"
+      title="⚙️ 设置"
+      :width="560"
+      :height="500"
+      @close="showSettings = false"
+    >
+      <Settings />
+    </FloatingPanel>
+
+    <!-- 运行历史浮层 -->
+    <FloatingPanel
+      :visible="showHistory"
+      title="📊 运行历史"
+      :width="640"
+      :height="500"
+      @close="showHistory = false"
+    >
+      <RunHistory />
+    </FloatingPanel>
+
     <!-- 预览弹窗 -->
     <Teleport to="body">
       <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
@@ -127,8 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick, toRaw } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, toRaw } from 'vue'
 import { LGraph, LGraphCanvas, LiteGraph, LGraphNode } from '@comfyorg/litegraph'
 import '@comfyorg/litegraph/style.css'
 import type { UnlistenFn } from '@tauri-apps/api/event'
@@ -144,12 +182,14 @@ import SideToolbar from '../components/SideToolbar.vue'
 import TopMenuSection from '../components/TopMenuSection.vue'
 import WorkflowTabs from '../components/WorkflowTabs.vue'
 import FloatingPanel from '../components/FloatingPanel.vue'
+import Dashboard from './Dashboard.vue'
+import Settings from './Settings.vue'
+import RunHistory from './RunHistory.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
 import { getNodeDef } from '../components/flow/pinTypes'
 import type { FlowNode, NodeStatus } from '../components/flow/pinTypes'
 
 // ─── Props ───
-const route = useRoute()
 const store = useFlowStore()
 const tabStore = useTabStore()
 
@@ -265,10 +305,9 @@ const logs = ref<{ id: number; time: string; text: string; level: string }[]>([]
 // ─── 面板状态 ───
 const showConsole = ref(false)
 const showPalette = ref(true)
-
-// ─── 导航 ───
-const router = useRouter()
-function onNavigate(path: string) { router.push(path) }
+const showDashboard = ref(false)
+const showSettings = ref(false)
+const showHistory = ref(false)
 
 // ─── 标签页数据缓存 ───
 const tabDataCache = new Map<string, { nodes: any[]; edges: any[]; name: string }>()
@@ -306,6 +345,58 @@ function onTabAdd() {
   const newId = tabStore.addTab('工作流 ' + tabStore.tabCount)
   tabDataCache.set(newId, { nodes: [], edges: [], name: '工作流 ' + tabStore.tabCount })
   loadTabData(newId)
+}
+
+// ─── Dashboard 浮层事件处理 ───
+
+/** 加载已有工作流到画布 */
+async function onOpenWorkflow(id?: string) {
+  showDashboard.value = false
+  if (!id) {
+    // 新建空工作流
+    saveCurrentTab()
+    const newId = tabStore.addTab('工作流 ' + tabStore.tabCount)
+    tabDataCache.set(newId, { nodes: [], edges: [], name: '工作流 ' + tabStore.tabCount })
+    loadTabData(newId)
+    return
+  }
+  // 加载已有工作流：workflow_get → YAML → import_workflow → JSON
+  try {
+    const meta = await safeInvoke<any>('workflow_get', { id })
+    if (!meta) { addLog(`❌ 工作流 ${id} 不存在`, 'error'); return }
+    const parsed = await safeInvoke<any>('import_workflow', { yamlContent: meta.yaml })
+    if (!parsed?.nodes) { addLog(`❌ 工作流 ${id} 解析失败`, 'error'); return }
+    store.load({
+      name: meta.name || '未命名',
+      nodes: parsed.nodes,
+      edges: parsed.edges || [],
+    })
+    store.setWorkflowId(id)
+    loadFromStore()
+    undoManager.init()
+    addLog(`📂 已加载「${meta.name || id}」`)
+  } catch (e: unknown) {
+    addLog(`❌ 加载失败: ${(e as Error).message || e}`, 'error')
+  }
+}
+
+/** 从模板创建工作流 */
+function onCreateFromTemplate(tpl: { id: string; name: string; nodes: unknown[]; edges: unknown[] }) {
+  showDashboard.value = false
+  store.load({
+    name: tpl.name,
+    nodes: tpl.nodes as any[],
+    edges: tpl.edges as any[],
+  })
+  store.templateSource = tpl.id
+  loadFromStore()
+  undoManager.init()
+}
+
+/** Dashboard 内导航请求（历史/设置）→ 关闭 Dashboard 打开对应面板 */
+function onDashboardNavigate(path: string) {
+  if (path === '/history') { showHistory.value = true }
+  if (path === '/settings') { showSettings.value = true }
 }
 
 // ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
@@ -481,20 +572,11 @@ onMounted(() => {
     // 监听连线变化
     graph.onConnectionChange = () => throttledSync()
 
-    // 路由参数
-    const id = route.params.id
-    if (id && typeof id === 'string' && id !== 'new') {
-      store.setWorkflowId(id)
-      addLog(`📂 加载工作流: ${id}`)
-    }
-
-    // 模板数据已通过 Dashboard 预加载
+    // 启动时恢复自动保存或从 store 加载
     if (store.nodes.length > 0) {
       loadFromStore()
-      if (id !== 'new') {
-        addLog(`📋 已加载模板「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
-      }
-    } else if (id === 'new') {
+      addLog(`📋 已加载「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
+    } else {
       const restored = autoSave.loadAutoSave()
       if (restored) {
         loadFromStore()
@@ -544,19 +626,6 @@ onUnmounted(() => {
   }
   // 清理 DAG 事件监听器
   cleanupDagListeners()
-})
-
-// KeepAlive 激活时刷新画布（切换路由回来不会卡死）
-onActivated(() => {
-  if (canvas) {
-    nextTick(() => {
-      canvas.allow_dragnodes = true
-      canvas.allow_dragcanvas = true
-      canvas.allow_interaction = true
-      canvas.setDirty(true, true)
-      canvas.adjustNodesWidth?.()
-    })
-  }
 })
 
 // ─── LiteGraph 节点 → FlowNode 转换 ───
@@ -1090,17 +1159,6 @@ async function pickElement() {
     addLog(`❌ 元素拾取失败: ${e}`, 'error')
   }
 }
-
-// ─── 路由参数监听 ───
-watch(
-  () => route.params.id,
-  (id) => {
-    if (id && typeof id === 'string') {
-      store.setWorkflowId(id)
-    }
-  },
-  { immediate: true }
-)
 
 // ─── 键盘快捷键 ───
 function onKeyDown(e: KeyboardEvent) {

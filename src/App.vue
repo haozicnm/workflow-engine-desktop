@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import LiteGraphEditor from './pages/LiteGraphEditor.vue'
 import Toast from './components/Toast.vue'
 import StatusBar from './components/StatusBar.vue'
 import { useToast } from './composables/useToast'
@@ -9,12 +9,10 @@ const { toasts, remove } = useToast()
 
 <template>
   <div class="app-shell">
-    <RouterView v-slot="{ Component }">
-      <KeepAlive :include="['LiteGraphEditor']">
-        <component :is="Component" />
-      </KeepAlive>
-    </RouterView>
-    <StatusBar />
+    <LiteGraphEditor />
+    <div class="status-bar-wrapper">
+      <StatusBar />
+    </div>
 
     <Toast
       v-for="t in toasts"
@@ -33,5 +31,13 @@ const { toasts, remove } = useToast()
   background: #0f1117;
   color: #e1e4e8;
   overflow: hidden;
+}
+
+.status-bar-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
 }
 </style>

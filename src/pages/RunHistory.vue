@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { safeInvoke, safeListen } from '../utils/tauri'
+import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 
 const toast = useToast()
-const router = useRouter()
-const route = useRoute()
+
+// ─── 筛选（浮动面板模式下无 URL query，默认不限） ───
+const filterWorkflowId = ref<string | null>(null)
 
 interface RunHistoryItem {
   id: string
@@ -42,12 +42,9 @@ const detailCache = ref<Record<string, RunDetail>>({})
 const loadingDetail = ref<string | null>(null)
 
 // 筛选
-const filterWorkflowId = ref<string | null>(null)
 const workflowList = ref<{ id: string; name: string }[]>([])
 
 onMounted(async () => {
-  // 从 query 参数读取筛选
-  filterWorkflowId.value = (route.query.workflow_id as string) || null
   await Promise.all([loadRuns(), loadWorkflowList()])
 })
 
@@ -94,10 +91,6 @@ async function toggleExpand(runId: string) {
 }
 
 function onFilterChange() {
-  // 更新 URL query
-  router.replace({
-    query: filterWorkflowId.value ? { workflow_id: filterWorkflowId.value } : {},
-  })
   loadRuns()
 }
 
@@ -163,7 +156,6 @@ const stats = computed(() => {
     <!-- 顶部 -->
     <div class="rh-header">
       <div class="rh-title">
-        <button class="btn btn-sm" @click="router.push('/')">← 返回</button>
         <h2>📊 运行历史</h2>
         <span class="rh-count" v-if="!loading">{{ runs.length }} 条</span>
       </div>

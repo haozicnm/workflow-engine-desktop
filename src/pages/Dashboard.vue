@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from '../composables/useToast'
@@ -42,7 +41,11 @@ const milestones = [
   { id: '1.1β', label: '网页抓取增强', desc: 'web_scrape 声明式节点 / 浏览器 +16 动作 / Cookie·代理·多标签页 / 步骤耗时显示', done: true },
 ]
 
-const router = useRouter()
+const emit = defineEmits<{
+  'open-workflow': [id?: string]
+  'create-from-template': [template: { id: string; name: string; nodes: unknown[]; edges: unknown[] }]
+  'navigate': [path: string]
+}>()
 const store = useWorkflowStore()
 const toast = useToast()
 const workflows = ref<WorkflowItem[]>([])
@@ -134,7 +137,7 @@ async function loadTemplates() {
 // ─── 业务操作 ───
 
 function openEditor(id?: string) {
-  router.push(id ? `/editor/${id}` : '/editor/new')
+  emit('open-workflow', id)
 }
 
 async function createFromTemplate(tpl: TemplateItem) {
@@ -153,16 +156,13 @@ async function createFromTemplate(tpl: TemplateItem) {
       data = await res.json()
     }
 
-    const { useFlowStore } = await import('../stores/flowStore')
-    const flowStore = useFlowStore()
-    flowStore.load({
+    emit('create-from-template', {
+      id: tpl.id,
       name: data.name || tpl.name,
-      nodes: (data.nodes || []) as any,
-      edges: (data.edges || []) as any,
+      nodes: (data.nodes || []) as unknown[],
+      edges: (data.edges || []) as unknown[],
     })
-    flowStore.templateSource = tpl.id
     toast.success(`已从模板创建「${tpl.name}」`)
-    openEditor('new')
   } catch (e: unknown) {
     toast.error('创建失败: ' + ((e as Error).message || e))
   } finally {
@@ -299,8 +299,8 @@ async function onScheduleSaved() { await loadSchedules() }
       </div>
       <div class="dash-actions">
         <button class="btn btn-sm" @click="triggerImport">📥 导入 YAML</button>
-        <button class="btn btn-sm" @click="router.push('/history')">📊 运行历史</button>
-        <button class="btn btn-sm" @click="router.push('/settings')">⚙️ 设置</button>
+        <button class="btn btn-sm" @click="emit('navigate', '/history')">📊 运行历史</button>
+        <button class="btn btn-sm" @click="emit('navigate', '/settings')">⚙️ 设置</button>
         <button class="btn btn-primary" @click="openEditor()">＋ 新建工作流</button>
         <input ref="fileInput" type="file" accept=".yaml,.yml" style="display:none" @change="handleImport" />
       </div>
