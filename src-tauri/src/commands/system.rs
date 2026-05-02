@@ -18,15 +18,7 @@ pub struct AppSettings {
 #[tauri::command]
 pub async fn system_check_browser() -> Result<serde_json::Value, String> {
     // ─── Python 检测 ───
-    // 1. 内置 Python
-    let bundled = if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let python = dir.join("embed").join("python.exe");
-            if python.exists() { Some(python.to_string_lossy().to_string()) } else { None }
-        } else { None }
-    } else { None };
-
-    // 2. 系统 PATH 中的 Python
+    // 1. 系统 PATH 中的 Python
     let system_python = which::which("python3")
         .or_else(|_| which::which("python"))
         .ok()
@@ -101,9 +93,9 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
         }
     };
 
-    let python_available = bundled.is_some() || best_python.is_some();
+    let python_available = best_python.is_some();
 
-    // ─── Playwright Chromium 检测（离线包内置） ───
+    // ─── Playwright Chromium 检测（Full 包内置） ───
     let has_playwright_chromium = if let Ok(exe) = std::env::current_exe() {
         exe.parent()
             .map(|d| d.join("playwright-browsers"))
@@ -115,11 +107,24 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
             .unwrap_or(false)
     } else { false };
 
+    // ─── 内置 wheels 检测（pip 离线安装包） ───
+    let has_wheels = if let Ok(exe) = std::env::current_exe() {
+        exe.parent()
+            .map(|d| d.join("wheels"))
+            .map(|p| p.exists() && p.read_dir().ok()
+                .map(|mut entries| entries.any(|e| e.ok()
+                    .map(|f| f.path().extension()
+                        .map(|ext| ext == "whl").unwrap_or(false))
+                    .unwrap_or(false)))
+                .unwrap_or(false))
+            .unwrap_or(false)
+    } else { false };
+
     Ok(serde_json::json!({
         "python_available": python_available,
-        "bundled_python": bundled,
         "system_python": best_python,
         "has_playwright_chromium": has_playwright_chromium,
+        "has_wheels": has_wheels,
         "has_edge": has_edge,
         "has_chrome": has_chrome,
     }))

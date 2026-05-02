@@ -10,10 +10,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  # ═══ Windows 构建 ═══
+  # ═══ Windows 构建 (Full) ═══
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     permissions:
       contents: read
 
@@ -52,72 +52,61 @@ jobs:
         working-directory: src
         run: npm run build
 
-      - name: Create python-runtime placeholder
+      - name: Create python-runtime directories
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed
-          Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/wheels
           New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
-          Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
 
-      # ─── Lite build (no Chromium) ───
-      - name: Build Tauri Lite
-        run: npx --prefix src tauri build --config src-tauri/tauri.lite.conf.json
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Collect & Upload Lite NSIS
-        id: lite-find
-        shell: bash
-        run: |
-          NSIS=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -1)
-          LITE_PATH="src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe"
-          cp "$NSIS" "$LITE_PATH"
-          echo "lite_path=$LITE_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload Lite NSIS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-nsis-lite
-          path: ${{ steps.lite-find.outputs.lite_path }}
-          if-no-files-found: warn
-
-      # ─── Full build (with Chromium) ───
-      - name: Download Playwright Chromium (Win7 compat v109)
+      # ─── Download latest Playwright Chromium ───
+      - name: Download Playwright Chromium (latest)
         shell: pwsh
         run: |
-          $dest = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers/chromium-1091"
+          # Get latest Chromium revision from Playwright
+          $rev = (Invoke-RestMethod -Uri "https://registry.npmjs.org/playwright-core/latest").version
+          Write-Host "Playwright version: $rev"
+          # Download browser manifests to find Chromium revision
+          npm install playwright-core@$rev --no-save 2>$null
+          $browserJson = Get-Content "node_modules/playwright-core/browsers.json" -Raw | ConvertFrom-Json
+          $chromium = $browserJson.browsers | Where-Object { $_.name -eq "chromium" } | Select-Object -First 1
+          $chromiumRev = $chromium.revision
+          Write-Host "Chromium revision: $chromiumRev"
+          # Download from Playwright CDN
+          $dest = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers/chromium-$chromiumRev"
           New-Item -ItemType Directory -Force -Path $dest
           $zip = "${{ runner.temp }}/chromium-win64.zip"
-          Invoke-WebRequest -Uri "https://playwright.azureedge.net/builds/chromium/1091/chromium-win64.zip" -OutFile $zip
+          Invoke-WebRequest -Uri "https://playwright.azureedge.net/builds/chromium/$chromiumRev/chromium-win64.zip" -OutFile $zip
           Expand-Archive -Path $zip -DestinationPath $dest -Force
-          # Verify
           Get-ChildItem $dest -Recurse -Name | Select-Object -First 5
+        timeout-minutes: 5
 
-      - name: Build Tauri Full (with Chromium)
+      # ─── Download playwright wheels (offline install) ───
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download playwright wheels
+        run: |
+          pip download playwright --dest src-tauri/python-runtime/wheels
+          Write-Host "Wheels downloaded:"
+          Get-ChildItem src-tauri/python-runtime/wheels
+
+      # ─── Build ───
+      - name: Build Tauri (Windows)
         run: npx --prefix src tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Collect & Upload Full NSIS
-        id: full-find
-        shell: bash
-        run: |
-          FULL=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | grep -v '\-lite' | head -1)
-          FULL_PATH="src-tauri/target/release/bundle/nsis/$(basename "$FULL" .exe)-full.exe"
-          cp "$FULL" "$FULL_PATH"
-          echo "full_path=$FULL_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload Full NSIS artifact
+      - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
-          name: windows-nsis-full
-          path: ${{ steps.full-find.outputs.full_path }}
+          name: windows-nsis
+          path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
 
-  # ═══ Linux 构建 ═══
+  # ═══ Linux 构建 (AppImage) ═══
   build-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -170,96 +159,39 @@ jobs:
         working-directory: src
         run: npm run build
 
-      - name: Create python-runtime placeholder
-        run: mkdir -p src-tauri/python-runtime/embed && touch src-tauri/python-runtime/embed/.gitkeep
+      - name: Create python-runtime directories
+        run: mkdir -p src-tauri/python-runtime/wheels src-tauri/python-runtime/playwright-browsers
 
-      # ─── Lite build (no Chromium) ───
-      - name: Build Tauri Lite
-        run: npx --prefix src tauri build --config src-tauri/tauri.lite.conf.json --bundles deb,appimage
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Collect & Upload Lite packages
-        id: lite
-        run: |
-          DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | head -1 || true)
-          AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | head -1 || true)
-          if [ -n "$DEB" ]; then
-            DEB_LITE="$(dirname "$DEB")/$(basename "$DEB" .deb)-lite.deb"
-            cp "$DEB" "$DEB_LITE"
-          fi
-          if [ -n "$AI" ]; then
-            AI_LITE="$(dirname "$AI")/$(basename "$AI" .AppImage)-lite.AppImage"
-            cp "$AI" "$AI_LITE"
-          fi
-          echo "deb_lite=${DEB_LITE:-}" >> $GITHUB_OUTPUT
-          echo "ai_lite=${AI_LITE:-}" >> $GITHUB_OUTPUT
-
-      - name: Upload Lite deb
-        if: steps.lite.outputs.deb_lite != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb-lite
-          path: ${{ steps.lite.outputs.deb_lite }}
-          if-no-files-found: warn
-
-      - name: Upload Lite AppImage
-        if: steps.lite.outputs.ai_lite != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-appimage-lite
-          path: ${{ steps.lite.outputs.ai_lite }}
-          if-no-files-found: warn
-
-      # ─── Full build (with Chromium) ───
+      # ─── Setup Python & download playwright + Chromium ───
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Download playwright wheels
+        run: |
+          pip download playwright --dest src-tauri/python-runtime/wheels
+          ls -la src-tauri/python-runtime/wheels/
 
       - name: Download Playwright Chromium
         run: |
           pip install playwright
           export PLAYWRIGHT_BROWSERS_PATH="${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
           python -m playwright install chromium
+          ls -la "$PLAYWRIGHT_BROWSERS_PATH/"
 
-      - name: Build Tauri Full
-        run: npx --prefix src tauri build --bundles deb,appimage
+      # ─── Build ───
+      - name: Build Tauri (Linux AppImage)
+        run: npx --prefix src tauri build --bundles appimage
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Collect & Upload Full packages
-        id: full
-        run: |
-          DEB=$(ls -t src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | grep -v '\-lite' | head -1 || true)
-          AI=$(ls -t src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null | grep -v '\-lite' | head -1 || true)
-          if [ -n "$DEB" ]; then
-            DEB_FULL="$(dirname "$DEB")/$(basename "$DEB" .deb)-full.deb"
-            cp "$DEB" "$DEB_FULL"
-          fi
-          if [ -n "$AI" ]; then
-            AI_FULL="$(dirname "$AI")/$(basename "$AI" .AppImage)-full.AppImage"
-            cp "$AI" "$AI_FULL"
-          fi
-          echo "deb_full=${DEB_FULL:-}" >> $GITHUB_OUTPUT
-          echo "ai_full=${AI_FULL:-}" >> $GITHUB_OUTPUT
-
-      - name: Upload Full deb
-        if: steps.full.outputs.deb_full != ''
+      - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
-          name: linux-deb-full
-          path: ${{ steps.full.outputs.deb_full }}
-          if-no-files-found: warn
-
-      - name: Upload Full AppImage
-        if: steps.full.outputs.ai_full != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-appimage-full
-          path: ${{ steps.full.outputs.ai_full }}
+          name: linux-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: warn
 
   # ═══ 创建 Release ═══
@@ -287,27 +219,23 @@ jobs:
             ## Workflow Engine Desktop ${{ github.ref_name }}
 
             ### 🪟 Windows
-            - **Lite 安装包** (.exe) — 不含 Playwright Chromium（需在线下载浏览器）
-            - **Full 安装包** (.exe) — 离线版，内置 Playwright Chromium 109（Win7+ 兼容）
-            - **MSI 安装包** (.msi) — 企业批量部署
+            - **Full 安装包** (.exe) — 离线版，内置 Playwright Chromium + pip wheels
 
             ### 🐧 Linux
-            - **Lite AppImage / deb** — 不含 Chromium
-            - **Full AppImage / deb** — 内置 Playwright Chromium
+            - **Full AppImage** — 内置 Playwright Chromium + pip wheels
 
             ### 系统要求
-            - Windows 7+ (Lite) / Windows 10+ (Tauri)
-            - Ubuntu 22.04+
+            - Windows 10+
+            - Ubuntu 22.04+ (或其他支持 AppImage 的发行版)
+
+            ### 内置内容
+            - Playwright Chromium（最新稳定版）
+            - playwright pip 离线安装包（自动安装到系统 Python）
 
             ### 变更
             详见 [commits](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }})
           files: |
-            artifacts/windows-nsis-lite/*.exe
-            artifacts/windows-nsis-full/*.exe
-            artifacts/windows-msi/*.msi
-            artifacts/linux-deb-lite/*.deb
-            artifacts/linux-deb-full/*.deb
-            artifacts/linux-appimage-lite/*.AppImage
-            artifacts/linux-appimage-full/*.AppImage
+            artifacts/windows-nsis/*.exe
+            artifacts/linux-appimage/*.AppImage
           draft: false
           prerelease: false

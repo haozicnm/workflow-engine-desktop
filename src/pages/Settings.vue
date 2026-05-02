@@ -129,24 +129,24 @@ function truncatePath(path: string, maxLen: number): string {
             <span class="tag-ok" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
           </div>
           <div class="info-item">
-            <span class="info-label">　↳ 内置 Python</span>
-            <span :class="sysInfo.bundled_python ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.bundled_python ? '✅ 已内置' : '—' }}
+            <span class="info-label">pip 离线安装包</span>
+            <span :class="sysInfo.has_wheels ? 'tag-ok' : 'tag-miss'">
+              {{ sysInfo.has_wheels ? '✅ 已内置（离线可用）' : '—（需联网安装）' }}
             </span>
           </div>
           <div class="info-item">
             <span class="info-label">Playwright Chromium</span>
             <span :class="sysInfo.has_playwright_chromium ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_playwright_chromium ? '✅ 已内置（离线可用）' : '⚠ 在线版需手动安装' }}
+              {{ sysInfo.has_playwright_chromium ? '✅ 已内置（离线可用）' : '⚠ 需手动安装' }}
             </span>
           </div>
-          <div v-if="!sysInfo.has_playwright_chromium" class="info-item">
+          <div class="info-item">
             <span class="info-label">　↳ 备用: Edge</span>
             <span :class="sysInfo.has_edge ? 'tag-ok' : 'tag-miss'">
               {{ sysInfo.has_edge ? '✅ 可用' : '—' }}
             </span>
           </div>
-          <div v-if="!sysInfo.has_playwright_chromium" class="info-item">
+          <div class="info-item">
             <span class="info-label">　↳ 备用: Chrome</span>
             <span :class="sysInfo.has_chrome ? 'tag-ok' : 'tag-miss'">
               {{ sysInfo.has_chrome ? '✅ 可用' : '—' }}

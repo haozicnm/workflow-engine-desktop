@@ -339,18 +339,28 @@ async fn is_sidecar_healthy(sidecar: &Arc<BrowserSidecar>) -> bool {
     }
 }
 
+/// 查找内置 wheels 目录（pip 离线安装包）
+fn find_bundled_wheels() -> Option<std::path::PathBuf> {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let wheels = dir.join("wheels");
+            if wheels.exists() && wheels.read_dir().ok()
+                .map(|mut d| d.any(|e| e.ok().map(|f| f.path().extension()
+                    .map(|ext| ext == "whl").unwrap_or(false)).unwrap_or(false)))
+                .unwrap_or(false)
+            {
+                return Some(wheels);
+            }
+        }
+    }
+    None
+}
+
 async fn preflight_check() -> Result<()> {
     let python = find_python()?;
+    info!("使用 Python: {:?}", python);
 
-    // 如果使用内置 Python，跳过所有检查（Playwright 已预装）
-    if find_bundled_python().is_some() {
-        info!("使用内置 Python + Playwright: {:?}", python);
-        return Ok(());
-    }
-
-    info!("使用系统 Python: {:?}", python);
-
-    // 2. 检查 Python 版本
+    // 1. 检查 Python 版本
     let mut cmd = tokio::process::Command::new(&python);
         hide_console(&mut cmd);
         let output = cmd.arg("--version")
@@ -368,7 +378,7 @@ async fn preflight_check() -> Result<()> {
         info!("Python 版本: {}", version_str);
     }
 
-    // 3. 检查 Playwright — 缺失则自动安装
+    // 2. 检查 Playwright — 优先离线安装（内置 wheels），其次在线安装
     let mut cmd = tokio::process::Command::new(&python);
         hide_console(&mut cmd);
         let output = cmd.args(["-c", "import playwright; print('ok')"])
@@ -377,53 +387,35 @@ async fn preflight_check() -> Result<()> {
         .map_err(|e| anyhow!("检查 Playwright 失败: {}", e))?;
 
     if !output.status.success() {
-        info!("Playwright 未安装，正在自动安装...");
-
-        // pip install playwright — 直连 PyPI，失败后切清华镜像
-        let mut cmd = tokio::process::Command::new(&python);
-            hide_console(&mut cmd);
-            let install = cmd.args(["-m", "pip", "install", "playwright", "-q"])
-            .output()
-            .await
-            .map_err(|e| anyhow!("执行 pip 失败: {}", e))?;
-
-        if !install.status.success() {
-            // 国内网络环境下 PyPI 直连可能超时，切清华镜像重试
-            info!("PyPI 直连失败，尝试清华镜像...");
+        // 优先尝试离线安装（内置 wheels）
+        if let Some(wheels_dir) = find_bundled_wheels() {
+            info!("使用内置 wheels 离线安装 Playwright: {:?}", wheels_dir);
             let mut cmd = tokio::process::Command::new(&python);
                 hide_console(&mut cmd);
-                let install_mirror = cmd.args(["-m", "pip", "install", "playwright", "-q",
-                       "-i", "https://pypi.tuna.tsinghua.edu.cn/simple",
-                       "--trusted-host", "pypi.tuna.tsinghua.edu.cn"])
+                let install = cmd.args([
+                    "-m", "pip", "install", "playwright", "-q",
+                    "--no-index",
+                    "--find-links", &wheels_dir.to_string_lossy(),
+                ])
                 .output()
                 .await
-                .map_err(|e| anyhow!("执行 pip (镜像) 失败: {}", e))?;
+                .map_err(|e| anyhow!("离线安装 Playwright 失败: {}", e))?;
 
-            if !install_mirror.status.success() {
-                let stderr = String::from_utf8_lossy(&install_mirror.stderr);
-                // 检查是否已有内置浏览器（Full 包）—— 只需 pip 包，无需下载 Chromium
-                let has_bundled = std::env::current_exe().ok()
-                    .and_then(|p| p.parent().map(|d| d.join("playwright-browsers")))
-                    .map(|p| p.exists())
-                    .unwrap_or(false);
-                let extra_hint = if has_bundled {
-                    "\n  （浏览器已内置，只需 pip 包：pip install playwright）"
-                } else {
-                    ""
-                };
-                return Err(anyhow!(
-                    "自动安装 Playwright 失败。\n\
-                     请手动执行: pip install playwright{}\n\n\
-                     错误: {}",
-                    extra_hint,
-                    stderr
-                ));
+            if install.status.success() {
+                info!("Playwright 离线安装完成 ✓");
+            } else {
+                let stderr = String::from_utf8_lossy(&install.stderr);
+                warn!("离线安装失败，回退在线安装: {}", stderr);
+                // Fallback to online install
+                return install_playwright_online(&python).await;
             }
+        } else {
+            // No bundled wheels → online install
+            install_playwright_online(&python).await?;
         }
-        info!("Playwright 包安装完成");
     }
 
-    // 4. 检查浏览器 — 优先用内置（Full包自带），其次系统Edge/Chrome，最后在线下载
+    // 3. 检查浏览器 — 优先内置（Full 包自带），其次系统浏览器
     let has_bundled_chromium = {
         let exe_dir = std::env::current_exe()
             .ok()
@@ -438,7 +430,7 @@ async fn preflight_check() -> Result<()> {
     };
 
     if has_bundled_chromium {
-        info!("使用内置 Chromium，无需下载 ✓");
+        info!("使用内置 Chromium ✓");
     } else {
         // 检查系统 Edge/Chrome
         let has_system_browser = {
@@ -472,9 +464,9 @@ async fn preflight_check() -> Result<()> {
         };
 
         if has_system_browser {
-            info!("检测到系统浏览器，无需下载 Chromium ✓");
+            info!("检测到系统浏览器 ✓");
         } else {
-            // 检查 Playwright 自带 Chromium（ms-playwright 缓存）
+            // 检查 ms-playwright 缓存
             let mut cmd = tokio::process::Command::new(&python);
                 hide_console(&mut cmd);
                 let output = cmd.args(["-c", r#"
@@ -488,35 +480,60 @@ print('ok' if chromium_dir else 'missing')
                 .output()
                 .await;
 
-            let needs_chromium = match output {
-                Ok(o) => String::from_utf8_lossy(&o.stdout).trim() != "ok",
-                Err(_) => true,
+            let has_cache = match output {
+                Ok(o) => String::from_utf8_lossy(&o.stdout).trim() == "ok",
+                Err(_) => false,
             };
 
-            if needs_chromium {
-                info!("无系统浏览器且 Chromium 未安装，正在自动安装（可能需要几分钟）...");
-                let mut cmd = tokio::process::Command::new(&python);
-                    hide_console(&mut cmd);
-                    let install = cmd.args(["-m", "playwright", "install", "chromium"])
-                    .output()
-                    .await
-                    .map_err(|e| anyhow!("安装 Chromium 失败: {}", e))?;
-
-                if !install.status.success() {
-                    let stderr = String::from_utf8_lossy(&install.stderr);
-                    return Err(anyhow!(
-                        "自动安装 Chromium 失败。建议安装 Edge 或 Chrome 浏览器以跳过此步骤。\n\
-                         或手动执行: playwright install chromium\n\n\
-                         错误: {}",
-                        stderr
-                    ));
-                }
-                info!("Chromium 安装完成");
+            if !has_cache {
+                return Err(anyhow!(
+                    "未找到 Chromium 浏览器。\n\
+                     Full 安装包应内置 playwright-browsers/，请检查安装是否完整。\n\
+                     或安装 Edge/Chrome 浏览器。"
+                ));
             }
         }
     }
 
     info!("浏览器节点预检通过 ✓");
+    Ok(())
+}
+
+/// 在线安装 Playwright（PyPI → 清华镜像 fallback）
+async fn install_playwright_online(python: &std::path::Path) -> Result<()> {
+    info!("在线安装 Playwright...");
+
+    // PyPI 直连
+    let mut cmd = tokio::process::Command::new(python);
+        hide_console(&mut cmd);
+        let install = cmd.args(["-m", "pip", "install", "playwright", "-q"])
+        .output()
+        .await
+        .map_err(|e| anyhow!("执行 pip 失败: {}", e))?;
+
+    if !install.status.success() {
+        // 清华镜像重试
+        info!("PyPI 直连失败，尝试清华镜像...");
+        let mut cmd = tokio::process::Command::new(python);
+            hide_console(&mut cmd);
+            let install_mirror = cmd.args(["-m", "pip", "install", "playwright", "-q",
+                   "-i", "https://pypi.tuna.tsinghua.edu.cn/simple",
+                   "--trusted-host", "pypi.tuna.tsinghua.edu.cn"])
+            .output()
+            .await
+            .map_err(|e| anyhow!("执行 pip (镜像) 失败: {}", e))?;
+
+        if !install_mirror.status.success() {
+            let stderr = String::from_utf8_lossy(&install_mirror.stderr);
+            return Err(anyhow!(
+                "自动安装 Playwright 失败。\n\
+                 请手动执行: pip install playwright\n\n\
+                 错误: {}",
+                stderr
+            ));
+        }
+    }
+    info!("Playwright 在线安装完成 ✓");
     Ok(())
 }
 
