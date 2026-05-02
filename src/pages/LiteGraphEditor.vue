@@ -1052,7 +1052,7 @@ function onKeyDown(e: KeyboardEvent) {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: #0d1117;
+  background: var(--color-bg);
 }
 
 /* 层 0：Canvas 全视口背景 */
@@ -1061,7 +1061,7 @@ function onKeyDown(e: KeyboardEvent) {
   inset: 0;
   z-index: 0;
   display: block;
-  background: #0d1117;
+  background: var(--color-bg);
   touch-action: none;
   user-select: none;
   outline: none;
@@ -1110,8 +1110,8 @@ function onKeyDown(e: KeyboardEvent) {
   pointer-events: auto;
   min-width: 280px;
   max-width: 340px;
-  border-left: 1px solid #30363d;
-  background: #161b22;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1161,8 +1161,8 @@ function onKeyDown(e: KeyboardEvent) {
 .overlay-bottom {
   pointer-events: auto;
   height: 140px;
-  background: #161b22;
-  border-top: 1px solid #30363d;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;

@@ -41,8 +41,8 @@ defineEmits<{
   align-items: center;
   width: 48px;
   height: 100%;
-  background: #161b22;
-  border-right: 1px solid #30363d;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
   padding: 8px 0;
   gap: 4px;
   flex-shrink: 0;
@@ -71,12 +71,12 @@ defineEmits<{
   transition: all 0.15s;
 }
 .tool-btn:hover {
-  background: #21262d;
-  color: #e1e4e8;
+  background: var(--color-elevated);
+  color: var(--color-text);
 }
 .tool-btn.active,
 .tool-btn.on {
   background: #1f6feb22;
-  color: #58a6ff;
+  color: var(--color-accent);
 }
 </style>

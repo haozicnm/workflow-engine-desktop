@@ -71,8 +71,8 @@ defineEmits<{
   justify-content: space-between;
   height: 40px;
   padding: 0 12px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   gap: 12px;
 }
@@ -85,7 +85,7 @@ defineEmits<{
 .workflow-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e1e4e8;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
