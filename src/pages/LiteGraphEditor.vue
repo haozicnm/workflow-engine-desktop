@@ -781,11 +781,8 @@ onMounted(() => {
 
     // 双击空白画布 — 搜索弹窗
     canvasRef.value!.addEventListener('dblclick', (e: MouseEvent) => {
-      // 只响应空白画布双击（非节点上）
       const target = e.target as HTMLElement
       if (target.tagName !== 'CANVAS') return
-      // 检查是否双击到了节点：LiteGraph 的 dblclick 会选中节点
-      // 延迟检查 selectedLgNode
       setTimeout(() => {
         if (!selectedLgNode.value) {
           searchPos.value = { x: e.clientX, y: e.clientY }
