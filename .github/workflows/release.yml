@@ -55,19 +55,34 @@ jobs:
       - name: Create python-runtime placeholder
         run: New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/embed; Set-Content -Path src-tauri/python-runtime/embed/.gitkeep -Value "placeholder"
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      # ─── Lite build (no Chromium) ───
+      - name: Build Tauri Lite
+        run: npx --prefix src tauri build --config src-tauri/tauri.lite.conf.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Collect Lite NSIS installer
+      - name: Collect & Upload Lite NSIS
         id: lite-find
         shell: bash
         run: |
           NSIS=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -1)
-          cp "$NSIS" "src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe"
-          echo "path=$NSIS" >> $GITHUB_OUTPUT
-          echo "lite_path=src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe" >> $GITHUB_OUTPUT
+          LITE_PATH="src-tauri/target/release/bundle/nsis/$(basename "$NSIS" .exe)-lite.exe"
+          cp "$NSIS" "$LITE_PATH"
+          echo "lite_path=$LITE_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload Lite NSIS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis-lite
+          path: ${{ steps.lite-find.outputs.lite_path }}
+          if-no-files-found: warn
+
+      # ─── Full build (with Chromium) ───
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Download Playwright Chromium (Win7 compat: v109)
         shell: pwsh
@@ -82,43 +97,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Collect Full NSIS installer
+      - name: Collect & Upload Full NSIS
         id: full-find
         shell: bash
         run: |
           FULL=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | grep -v '\-lite' | head -1)
-          cp "$FULL" "src-tauri/target/release/bundle/nsis/$(basename "$FULL" .exe)-full.exe"
-          echo "path=$FULL" >> $GITHUB_OUTPUT
+          FULL_PATH="src-tauri/target/release/bundle/nsis/$(basename "$FULL" .exe)-full.exe"
+          cp "$FULL" "$FULL_PATH"
+          echo "full_path=$FULL_PATH" >> $GITHUB_OUTPUT
 
-      - name: Build Tauri (Windows)
-        run: npx --prefix src tauri build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Find installer files
-        id: find
-        shell: bash
-        run: |
-          NSIS=$(ls -t src-tauri/target/release/bundle/nsis/*.exe 2>/dev/null | head -1)
-          MSI=$(ls -t src-tauri/target/release/bundle/msi/*.msi 2>/dev/null | head -1 || true)
-          echo "nsis=$NSIS" >> $GITHUB_OUTPUT
-          echo "msi=$MSI" >> $GITHUB_OUTPUT
-
-      - name: Upload NSIS artifact
+      - name: Upload Full NSIS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-nsis
-          path: ${{ steps.find.outputs.nsis }}
+          name: windows-nsis-full
+          path: ${{ steps.full-find.outputs.full_path }}
           if-no-files-found: warn
-
-      - name: Upload MSI artifact
-        if: steps.find.outputs.msi != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-msi
-          path: ${{ steps.find.outputs.msi }}
-          if-no-files-found: ignore
 
   # ═══ Linux 构建 ═══
   build-linux:
@@ -178,7 +171,7 @@ jobs:
 
       # ─── Lite build (no Chromium) ───
       - name: Build Tauri Lite
-        run: npx --prefix src tauri build --bundles deb,appimage
+        run: npx --prefix src tauri build --config src-tauri/tauri.lite.conf.json --bundles deb,appimage
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

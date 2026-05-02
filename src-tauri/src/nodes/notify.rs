@@ -16,6 +16,7 @@ fn hide_console(cmd: &mut tokio::process::Command) {
     cmd.creation_flags(0x08000000);
 }
 #[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
 fn hide_console(_cmd: &mut tokio::process::Command) {}
 
 // nodes/notify.rs

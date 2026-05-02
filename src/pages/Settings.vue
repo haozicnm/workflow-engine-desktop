@@ -208,7 +208,9 @@ function truncatePath(path: string, maxLen: number): string {
       </div>
       <div class="changelog">
         <h3>更新明细</h3>
-        <div class="changelog-item"><strong>v2.1</strong> — ComfyUI 风格 DAG 编辑器 · LiteGraph 画布 · 浏览器录制 · 拾取元素</div>
+        <div class="changelog-item"><strong>v2.3</strong> — Grid 布局 · MiniMap · 右键菜单 · 画布搜索 · 预览面板 · 交互式元素选择</div>
+        <div class="changelog-item"><strong>v2.2</strong> — 单窗口统一架构 · FloatingPanel · Widget 属性面板 · 浏览器自动化 v2</div>
+        <div class="changelog-item"><strong>v2.1</strong> — LiteGraph 画布迁移 · 叠加层架构 · 统一设计令牌 · 模板系统</div>
         <div class="changelog-item"><strong>v2.0</strong> — Rust DAG 引擎重写 · Tauri 2.0 桌面应用 · 25+ 节点类型</div>
         <div class="changelog-item"><strong>v1.x</strong> — YAML 工作流引擎原型 · Web 前端 · Playwright 自动化</div>
       </div>
