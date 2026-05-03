@@ -305,6 +305,7 @@ const recording = ref(false)  // 浏览器录制状态
 const widgetVersion = ref(0)  // 递增触发 PropertyPanel 重渲染
 const importInputRef = ref<HTMLInputElement | null>(null)
 const previewVisible = ref(false)  // 预览弹窗
+const breakpoints = ref(new Set<string>())  // v3: 断点集合
 const previewPopupRef = ref<HTMLDivElement | null>(null)
 const previewPos = ref({ x: 100, y: 100 })
 const previewSize = ref({ w: 560, h: 420 })
@@ -441,6 +442,17 @@ const contextMenuItems = computed<ContextMenuItem[]>(() => {
     }},
     { label: '🗑 删除选中', action: () => {
       if (selectedLgNode.value) onDeleteNode(selectedLgNode.value)
+    }, disabled: !selectedLgNode.value },
+    { label: 'separator', action: () => {}, divider: true },
+    { label: selectedLgNode.value && breakpoints.value.has(String(selectedLgNode.value.id))
+      ? '🔴 取消断点' : '🔵 设置断点', action: () => {
+      if (!selectedLgNode.value) return
+      const id = String(selectedLgNode.value.id)
+      if (breakpoints.value.has(id)) breakpoints.value.delete(id)
+      else breakpoints.value.add(id)
+      breakpoints.value = new Set(breakpoints.value)  // 触发响应式
+      syncNodeStatuses()
+      addLog(breakpoints.value.has(id) ? `🔴 断点: ${selectedLgNode.value.title}` : `🔵 取消断点: ${selectedLgNode.value.title}`)
     }, disabled: !selectedLgNode.value },
     { label: 'separator', action: () => {}, divider: true },
     { label: '📐 适应视图', action: () => { fitView() }},
@@ -693,6 +705,8 @@ function syncNodeStatuses() {
     } else {
       lgNode.boxcolor = '#2a3040'
     }
+    // v3: 断点指示 — 有断点的节点在左上角显示红点
+    ;(lgNode as any)._hasBreakpoint = breakpoints.value.has(String(lgNode.id))
   }
   graph.setDirtyCanvas?.(true)
 }
@@ -700,7 +714,93 @@ function syncNodeStatuses() {
 // 监听状态变化 → 更新节点外观
 watch(() => store.nodeStatuses, () => {
   syncNodeStatuses()
+  // v3: 节点成功后触发数据流动画
+  const lgNodes = graph?._nodes || []
+  for (const lgNode of lgNodes) {
+    if (!lgNode?.id) continue
+    const status = store.nodeStatuses[String(lgNode.id)]
+    if (status === 'success') {
+      // 找到所有从此节点出发的连线
+      const outLinks = (lgNode.outputs || []).flatMap((_o: any, slotIdx: number) => 
+        lgNode.getOutputLinks?.(slotIdx) || []
+      )
+      for (const link of outLinks) {
+        startDataFlowAnimation(link)
+      }
+    }
+  }
 }, { deep: true })
+
+// ─── 数据流动画系统 ───
+interface FlowParticle {
+  link: any
+  progress: number
+  startTime: number
+  duration: number
+}
+
+const flowParticles: FlowParticle[] = []
+let flowAnimFrame: number | null = null
+
+function startDataFlowAnimation(link: any) {
+  flowParticles.push({
+    link,
+    progress: 0,
+    startTime: performance.now(),
+    duration: 600, // ms to cross the link
+  })
+  if (!flowAnimFrame) {
+    flowAnimFrame = requestAnimationFrame(renderFlowParticles)
+  }
+}
+
+function renderFlowParticles(now: number) {
+  if (!canvas) return
+
+  // 过滤已完成的粒子
+  const active = flowParticles.filter(p => {
+    p.progress = Math.min(1, (now - p.startTime) / p.duration)
+    return p.progress < 1
+  })
+
+  if (active.length === 0) {
+    flowParticles.length = 0
+    flowAnimFrame = null
+    return
+  }
+
+  flowParticles.length = 0
+  flowParticles.push(...active)
+
+  const ctx = canvas.ctx
+  const ds = (canvas as any).ds
+  if (!ctx || !ds) {
+    flowAnimFrame = requestAnimationFrame(renderFlowParticles)
+    return
+  }
+
+  for (const p of flowParticles) {
+    const alpha = 1 - p.progress
+    const size = 4 + (1 - p.progress) * 3
+    const [sx, sy] = p.link._pos || [0, 0]
+    const [ex, ey] = p.link._pos_end || [0, 0]
+    const x = sx + (ex - sx) * p.progress
+    const y = sy + (ey - sy) * p.progress
+
+    ctx.save()
+    ctx.globalAlpha = alpha * 0.8
+    ctx.fillStyle = '#3fb950'
+    ctx.shadowColor = '#3fb950'
+    ctx.shadowBlur = 6
+    ctx.beginPath()
+    ctx.arc(x, y, size, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  canvas.setDirty?.(true, false)
+  flowAnimFrame = requestAnimationFrame(renderFlowParticles)
+}
 
 // 监听输出变化 → 在节点上显示数据摘要
 watch(() => store.stepOutputs, () => {
@@ -848,6 +948,41 @@ onMounted(() => {
 
     // 监听连线变化
     graph.onConnectionChange = () => throttledSync()
+
+    // v3: 断点指示器 — 有断点的节点绘制红点和红色边框
+    const origDraw = canvas.draw.bind(canvas)
+    canvas.draw = function(force: boolean, skipLinks: boolean) {
+      origDraw(force, skipLinks)
+      const ctx2 = canvas.ctx
+      if (!ctx2) return
+      const ds = (canvas as any).ds
+      const scale = ds?.scale || 1
+      const offset = ds?.offset || [0, 0]
+      for (const node of graph._nodes || []) {
+        if (!node || !(node as any)._hasBreakpoint) continue
+        const [nx, ny] = node.pos || [0, 0]
+        const [nw, nh] = node.size || [200, 60]
+        const sx = nx * scale + offset[0]
+        const sy = ny * scale + offset[1]
+        const sw = nw * scale
+        const sh = nh * scale
+        // 边框
+        ctx2.save()
+        ctx2.strokeStyle = 'rgba(248, 81, 73, 0.5)'
+        ctx2.lineWidth = 2
+        ctx2.strokeRect(sx - 2, sy - 2, sw + 4, sh + 4)
+        ctx2.restore()
+        // 红点
+        ctx2.save()
+        ctx2.fillStyle = '#f85149'
+        ctx2.shadowColor = '#f85149'
+        ctx2.shadowBlur = 6
+        ctx2.beginPath()
+        ctx2.arc(sx + 10, sy + 10, 5, 0, Math.PI * 2)
+        ctx2.fill()
+        ctx2.restore()
+      }
+    }
 
     // 启动时恢复自动保存或从 store 加载
     if (store.nodes.length > 0) {
@@ -1276,6 +1411,7 @@ async function runDagFlow() {
       targetHandle: e.targetHandle,
     })),
     variables: {},
+    breakpoints: Array.from(breakpoints.value),  // v3: 断点列表
   }
 
   try {
