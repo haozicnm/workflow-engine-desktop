@@ -365,6 +365,19 @@ const previewTypes = new Set(['browser_navigate', 'browser_click', 'browser_extr
 watch(selectedLgNode, (node) => {
   if (node && previewTypes.has(node.type)) {
     previewTitle.value = node.title || node.type
+    // v3: 弹窗定位到节点右下角
+    const rect = canvasRef.value?.getBoundingClientRect()
+    if (rect && canvas) {
+      const [nx, ny] = node.pos || [0, 0]
+      const [nw, nh] = node.size || [200, 60]
+      const ds = (canvas as any).ds
+      const scale = ds?.scale || 1
+      const offset = ds?.offset || [0, 0]
+      previewPos.value = {
+        x: Math.min(rect.right - 580, Math.max(rect.left, rect.left + nx * scale + offset[0] + nw * scale + 16)),
+        y: Math.min(rect.bottom - 440, Math.max(rect.top, rect.top + ny * scale + offset[1])),
+      }
+    }
     previewVisible.value = true
   }
 })
@@ -829,6 +842,21 @@ function summarizeOutput(data: unknown): string {
   return String(data).slice(0, 40)
 }
 
+/** v3: roundRect polyfill for WebView2 compatibility */
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h)
+  ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+}
+
 // ─── Canvas 初始化 ───
 onMounted(() => {
   // 注册所有自定义 LiteGraph 节点
@@ -959,28 +987,53 @@ onMounted(() => {
       const scale = ds?.scale || 1
       const offset = ds?.offset || [0, 0]
       for (const node of graph._nodes || []) {
-        if (!node || !(node as any)._hasBreakpoint) continue
         const [nx, ny] = node.pos || [0, 0]
         const [nw, nh] = node.size || [200, 60]
         const sx = nx * scale + offset[0]
         const sy = ny * scale + offset[1]
         const sw = nw * scale
         const sh = nh * scale
-        // 边框
-        ctx2.save()
-        ctx2.strokeStyle = 'rgba(248, 81, 73, 0.5)'
-        ctx2.lineWidth = 2
-        ctx2.strokeRect(sx - 2, sy - 2, sw + 4, sh + 4)
-        ctx2.restore()
-        // 红点
-        ctx2.save()
-        ctx2.fillStyle = '#f85149'
-        ctx2.shadowColor = '#f85149'
-        ctx2.shadowBlur = 6
-        ctx2.beginPath()
-        ctx2.arc(sx + 10, sy + 10, 5, 0, Math.PI * 2)
-        ctx2.fill()
-        ctx2.restore()
+
+        // v3: 断点指示器
+        if ((node as any)._hasBreakpoint) {
+          ctx2.save()
+          ctx2.strokeStyle = 'rgba(248, 81, 73, 0.5)'
+          ctx2.lineWidth = 2
+          ctx2.strokeRect(sx - 2, sy - 2, sw + 4, sh + 4)
+          ctx2.restore()
+          ctx2.save()
+          ctx2.fillStyle = '#f85149'
+          ctx2.shadowColor = '#f85149'
+          ctx2.shadowBlur = 6
+          ctx2.beginPath()
+          ctx2.arc(sx + 10, sy + 10, 5, 0, Math.PI * 2)
+          ctx2.fill()
+          ctx2.restore()
+        }
+
+        // v3: 输出徽章 — 已执行节点右下角显示数据摘要
+        const badge = (node as any)._outputBadge as string | undefined
+        if (badge) {
+          const fontSize = Math.max(9, Math.min(11, 11 * scale))
+          ctx2.save()
+          ctx2.font = `${fontSize}px monospace`
+          const metrics = ctx2.measureText(badge)
+          const padX = 4, padY = 2
+          const bw = metrics.width + padX * 2
+          const bh = fontSize + padY * 2
+          const bx = sx + sw - bw - 4
+          const by = sy + sh - bh - 2
+          ctx2.fillStyle = 'rgba(22, 27, 34, 0.85)'
+          ctx2.strokeStyle = '#30363d'
+          ctx2.lineWidth = 1
+          roundRect(ctx2, bx, by, bw, bh, 3)
+          ctx2.fill()
+          ctx2.stroke()
+          ctx2.fillStyle = '#58a6ff'
+          ctx2.textBaseline = 'middle'
+          ctx2.fillText(badge, bx + padX, by + bh / 2)
+          ctx2.restore()
+        }
       }
     }
 
@@ -1646,10 +1699,43 @@ function onKeyDown(e: KeyboardEvent) {
     }
     return
   }
-  // Ctrl+S / Cmd+S — 保存（导出 JSON）
+  // Ctrl+S / Cmd+S — 保存工作流
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault()
-    exportWorkflow()
+    onSaveWorkflow()
+    return
+  }
+  // Ctrl+Enter / Cmd+Enter — 运行工作流
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault()
+    runAll()
+    return
+  }
+  // Ctrl+. — 单步执行
+  if ((e.ctrlKey || e.metaKey) && e.key === '.') {
+    e.preventDefault()
+    runSingle()
+    return
+  }
+  // Ctrl+F — 搜索节点
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault()
+    const rect = canvasRef.value?.getBoundingClientRect()
+    searchPos.value = rect ? { x: rect.left + rect.width / 2 - 120, y: rect.top + 100 } : { x: 200, y: 120 }
+    searchVisible.value = true
+    return
+  }
+  // Space — 缩放适配
+  if (e.key === ' ' && !(document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA')) {
+    e.preventDefault()
+    fitView()
+    return
+  }
+  // F — 聚焦选中节点
+  if (e.key === 'f' && !e.ctrlKey && !e.metaKey && selectedLgNode.value) {
+    if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
+    e.preventDefault()
+    canvas?.centerOnNode?.(selectedLgNode.value)
     return
   }
   // Delete / Backspace — 删除选中节点
