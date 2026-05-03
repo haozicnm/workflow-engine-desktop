@@ -55,20 +55,24 @@ function onBackToDashboard() {
 <template>
   <div class="app-shell">
     <!-- Dashboard 首页 -->
-    <Dashboard
-      v-if="currentView === 'dashboard'"
-      @open-workflow="onOpenWorkflow"
-      @create-from-template="onCreateFromTemplate"
-      @navigate="(path: string) => {}"
-    />
+    <Transition name="page-fade">
+      <Dashboard
+        v-if="currentView === 'dashboard'"
+        @open-workflow="onOpenWorkflow"
+        @create-from-template="onCreateFromTemplate"
+        @navigate="(path: string) => {}"
+      />
+    </Transition>
 
     <!-- 编辑器 -->
-    <LiteGraphEditor
-      v-if="currentView === 'editor'"
-      :initial-workflow-id="editorWorkflowId"
-      :initial-template="editorTemplate"
-      @back="onBackToDashboard"
-    />
+    <Transition name="page-fade">
+      <LiteGraphEditor
+        v-if="currentView === 'editor'"
+        :initial-workflow-id="editorWorkflowId"
+        :initial-template="editorTemplate"
+        @back="onBackToDashboard"
+      />
+    </Transition>
 
     <!-- 全局底栏 -->
     <div class="status-bar-wrapper">
@@ -100,5 +104,21 @@ function onBackToDashboard() {
   left: 0;
   right: 0;
   z-index: 10000;
+}
+
+/* 页面过渡动画 */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

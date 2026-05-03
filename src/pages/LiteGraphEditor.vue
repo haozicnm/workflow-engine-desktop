@@ -3,7 +3,10 @@
   <div class="editor-app">
     <!-- Row 1: Top bar -->
     <div class="grid-top">
-      <WorkflowTabs @add="onTabAdd" />
+      <div class="top-left">
+        <button class="btn-back" title="返回首页" @click="emit('back')">🏠</button>
+        <WorkflowTabs @add="onTabAdd" />
+      </div>
       <TopMenuSection
         :name="store.workflowName" :node-count="store.nodeCount" :edge-count="store.edgeCount"
         :dirty="store.dirty" :running="isRunning" :recording="recording"
@@ -127,6 +130,37 @@
   grid-column: 1 / -1;
   grid-row: 1;
   z-index: 1001;
+  display: flex;
+  align-items: center;
+}
+
+.top-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.btn-back {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.btn-back:hover {
+  background: #21262d;
+  color: #e1e4e8;
 }
 
 /* Col 1 Row 2: Sidebar */
