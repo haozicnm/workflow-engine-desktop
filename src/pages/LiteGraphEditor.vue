@@ -1069,11 +1069,6 @@ function loadFromStore() {
       addLog(`⚠ 连线失败: ${sourceNode.type}[${edge.sourceHandle}]→${targetNode.type}[${edge.targetHandle}] 无可匹配端口`, 'warn')
     }
   }
-
-  // 不再需要 oldToNew 映射 — syncGraphToStore 会统一用 LiteGraph 整数 ID 重写 store
-  syncingFromStore = false
-  // 重新同步 store，将 LiteGraph 生成的整数 ID 写回
-  throttledSync()
 }
 
 // ─── v3: 按 ID 加载工作流 ───
@@ -1090,15 +1085,6 @@ async function loadWorkflowById(id: string) {
   } catch (e: any) {
     addLog(`❌ 打开工作流失败: ${e}`, 'error')
   }
-}
-  // 确保交互属性
-  canvas.allow_dragnodes = true
-  canvas.allow_dragcanvas = true
-  canvas.allow_interaction = true
-  // 强制刷新画布，清除可能的残留渲染（解决隐形窗口/鬼影连线问题）
-  canvas.setDirty(true, true)
-  // 自适应视图使所有节点可见
-  nextTick(() => fitView())
 }
 
 // ─── Ghost placement（对齐 ComfyUI：双击节点库 → 创建 ghost 节点跟随鼠标 → 点击落位） ───
