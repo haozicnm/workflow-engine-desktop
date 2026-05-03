@@ -1234,33 +1234,31 @@ async def _recording_start(params: dict) -> dict:
         await page.evaluate("window.__wfActions = []")
 
         await page.evaluate("""
-        () => {
-            if (window.__wfRecording) return;
-            window.__wfRecording = true;
+        if (window.__wfRecording) return;
+        window.__wfRecording = true;
 
-            function record(type, data) {
-                if (!window.__wfActions) window.__wfActions = [];
-                window.__wfActions.push(Object.assign({ type }, data));
-            }
+        function record(type, data) {
+            if (!window.__wfActions) window.__wfActions = [];
+            window.__wfActions.push(Object.assign({ type }, data));
+        }
 
-            document.addEventListener('click', (e) => {
-                const t = e.target;
+        document.addEventListener('click', (e) => {
+            const t = e.target;
+            let sel = t.tagName.toLowerCase();
+            if (t.id) sel = '#' + t.id;
+            else if (t.className && typeof t.className === 'string')
+                sel += '.' + t.className.trim().split(/\\s+/)[0];
+            record('click', {selector:sel, x:e.clientX, y:e.clientY});
+        }, true);
+
+        document.addEventListener('change', (e) => {
+            const t = e.target;
+            if (['INPUT','TEXTAREA','SELECT'].includes(t.tagName)) {
                 let sel = t.tagName.toLowerCase();
                 if (t.id) sel = '#' + t.id;
-                else if (t.className && typeof t.className === 'string')
-                    sel += '.' + t.className.trim().split(/\\s+/)[0];
-                record('click', {selector:sel, x:e.clientX, y:e.clientY});
-            }, true);
-
-            document.addEventListener('change', (e) => {
-                const t = e.target;
-                if (['INPUT','TEXTAREA','SELECT'].includes(t.tagName)) {
-                    let sel = t.tagName.toLowerCase();
-                    if (t.id) sel = '#' + t.id;
-                    record('fill', {selector:sel, value:t.value});
-                }
-            }, true);
-        }
+                record('fill', {selector:sel, value:t.value});
+            }
+        }, true);
         """)
         return {"success": True, "data": {"message": "录制已开始，请在浏览器中操作"}}
     except Exception as e:
