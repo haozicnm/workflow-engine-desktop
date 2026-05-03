@@ -797,9 +797,115 @@ class MapNode extends WorkflowNode {
   }
 }
 
-/** Excel 节点 - 读取/写入 Excel 文件 */
+/** Excel 读取节点 */
+class ExcelReadNode extends WorkflowNode {
+  static title = '读取表格'
+  static type = 'excel_read'
+
+  constructor(title?: string) {
+    super(title || '读取表格')
+    this.color = COLOR_DATA
+    this.addOutput('data', 'array')
+    this.addOutput('sheet', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('string', 'sheet', '', 'sheet')
+  }
+  onExecute(): void {}
+}
+
+/** Excel 写入节点 */
+class ExcelWriteNode extends WorkflowNode {
+  static title = '写入表格'
+  static type = 'excel_write'
+
+  constructor(title?: string) {
+    super(title || '写入表格')
+    this.color = COLOR_DATA
+    this.addInput('data', 'array')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('string', 'sheet', 'Sheet1', 'sheet')
+    this.addWidget('combo', 'write_mode', 'overwrite', null, { property: 'write_mode',
+      values: ['overwrite', 'append'],
+    })
+  }
+  onExecute(): void {}
+}
+
+/** Excel 创建节点 */
+class ExcelCreateNode extends WorkflowNode {
+  static title = '创建表格'
+  static type = 'excel_create'
+
+  constructor(title?: string) {
+    super(title || '创建表格')
+    this.color = COLOR_DATA
+    this.addInput('data', 'array')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '新表格.xlsx', 'path')
+    this.addWidget('string', 'sheet', 'Sheet1', 'sheet')
+    this.addWidget('string', 'headers', '', 'headers')
+  }
+  onExecute(): void {}
+}
+
+/** Excel 筛选节点 */
+class ExcelFilterNode extends WorkflowNode {
+  static title = '筛选数据'
+  static type = 'excel_filter'
+
+  constructor(title?: string) {
+    super(title || '筛选数据')
+    this.color = COLOR_DATA
+    this.addInput('data', 'array')
+    this.addInput('condition', 'object')
+    this.addOutput('result', 'array')
+    this.addWidget('string', 'column', '', 'column')
+    this.addWidget('combo', 'op', '==', null, { property: 'op',
+      values: ['==', '!=', '>', '<', '>=', '<=', 'contains', 'starts_with'],
+    })
+    this.addWidget('string', 'value', '', 'value')
+  }
+  onExecute(): void {}
+}
+
+/** Excel 排序节点 */
+class ExcelSortNode extends WorkflowNode {
+  static title = '排序数据'
+  static type = 'excel_sort'
+
+  constructor(title?: string) {
+    super(title || '排序数据')
+    this.color = COLOR_DATA
+    this.addInput('data', 'array')
+    this.addOutput('result', 'array')
+    this.addWidget('string', 'column', '', 'column')
+    this.addWidget('combo', 'order', 'asc', null, { property: 'order',
+      values: ['asc', 'desc'],
+    })
+  }
+  onExecute(): void {}
+}
+
+/** Excel 追加行节点 */
+class ExcelAppendNode extends WorkflowNode {
+  static title = '追加行'
+  static type = 'excel_append'
+
+  constructor(title?: string) {
+    super(title || '追加行')
+    this.color = COLOR_DATA
+    this.addInput('data', 'array')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('string', 'sheet', 'Sheet1', 'sheet')
+  }
+  onExecute(): void {}
+}
+
+/** Excel 通用节点（兼容旧版） */
 class ExcelNode extends WorkflowNode {
-  static title = 'Excel'
+  static title = 'Excel(通用)'
   static type = 'excel'
 
   constructor(title?: string) {
@@ -807,22 +913,102 @@ class ExcelNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('file', 'string')
     this.addOutput('data', 'object')
-    this.addWidget('combo', 'action', 'read', null, { property: "action", 
+    this.addWidget('combo', 'action', 'read', null, { property: 'action',
       values: ['read', 'write', 'append', 'create', 'merge'],
     })
     this.addWidget('string', 'path', './input.xlsx', 'path')
     this.addWidget('string', 'sheet', 'Sheet1', 'sheet')
     this.addWidget('string', 'range', 'A1', 'range')
   }
-
-  onExecute(): void {
-    // Process Excel file
-  }
+  onExecute(): void {}
 }
 
-/** Word 节点 - 读取/写入 Word 文档 */
+/** Word 读取节点 */
+class WordReadNode extends WorkflowNode {
+  static title = '读取文档'
+  static type = 'word_read'
+
+  constructor(title?: string) {
+    super(title || '读取文档')
+    this.color = COLOR_DATA
+    this.addOutput('text', 'string')
+    this.addOutput('paragraphs', 'array')
+    this.addWidget('string', 'path', '', 'path')
+  }
+  onExecute(): void {}
+}
+
+/** Word 写入节点 */
+class WordWriteNode extends WorkflowNode {
+  static title = '写入文档'
+  static type = 'word_write'
+
+  constructor(title?: string) {
+    super(title || '写入文档')
+    this.color = COLOR_DATA
+    this.addInput('content', 'string')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('combo', 'mode', 'overwrite', null, { property: 'mode',
+      values: ['overwrite', 'append'],
+    })
+  }
+  onExecute(): void {}
+}
+
+/** Word 创建节点 */
+class WordCreateNode extends WorkflowNode {
+  static title = '创建文档'
+  static type = 'word_create'
+
+  constructor(title?: string) {
+    super(title || '创建文档')
+    this.color = COLOR_DATA
+    this.addInput('content', 'string')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '新文档.docx', 'path')
+    this.addWidget('string', 'title', '', 'title')
+  }
+  onExecute(): void {}
+}
+
+/** Word 查找替换节点 */
+class WordReplaceNode extends WorkflowNode {
+  static title = '查找替换'
+  static type = 'word_replace'
+
+  constructor(title?: string) {
+    super(title || '查找替换')
+    this.color = COLOR_DATA
+    this.addInput('content', 'string')
+    this.addOutput('result', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('string', 'find', '', 'find')
+    this.addWidget('string', 'replace', '', 'replace')
+    this.addWidget('number', 'count', 0, 'count', { min: 0, max: 9999, step2: 1 })
+  }
+  onExecute(): void {}
+}
+
+/** Word 合并文档节点 */
+class WordMergeNode extends WorkflowNode {
+  static title = '合并文档'
+  static type = 'word_merge'
+
+  constructor(title?: string) {
+    super(title || '合并文档')
+    this.color = COLOR_DATA
+    this.addInput('files', 'array')
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'paths', '', 'paths')
+    this.addWidget('string', 'output', '合并文档.docx', 'output')
+  }
+  onExecute(): void {}
+}
+
+/** Word 通用节点（兼容旧版） */
 class WordNode extends WorkflowNode {
-  static title = 'Word'
+  static title = 'Word(通用)'
   static type = 'word'
 
   constructor(title?: string) {
@@ -830,18 +1016,15 @@ class WordNode extends WorkflowNode {
     this.color = COLOR_DATA
     this.addInput('file', 'string')
     this.addOutput('data', 'string')
-    this.addWidget('combo', 'action', 'read', null, { property: "action", 
+    this.addWidget('combo', 'action', 'read', null, { property: 'action',
       values: ['read', 'write', 'create', 'convert', 'merge'],
     })
     this.addWidget('string', 'path', './input.docx', 'path')
-    this.addWidget('combo', 'format', 'text', null, { property: "format", 
+    this.addWidget('combo', 'format', 'text', null, { property: 'format',
       values: ['text', 'html', 'markdown', 'docx'],
     })
   }
-
-  onExecute(): void {
-    // Process Word document
-  }
+  onExecute(): void {}
 }
 
 // ═══════════════════════════════════════════
@@ -893,7 +1076,18 @@ export function registerAllNodes(): void {
   LiteGraph.registerNodeType('script', ScriptNode)
   LiteGraph.registerNodeType('map', MapNode)
   LiteGraph.registerNodeType('excel', ExcelNode)
+  LiteGraph.registerNodeType('excel_read', ExcelReadNode)
+  LiteGraph.registerNodeType('excel_write', ExcelWriteNode)
+  LiteGraph.registerNodeType('excel_create', ExcelCreateNode)
+  LiteGraph.registerNodeType('excel_filter', ExcelFilterNode)
+  LiteGraph.registerNodeType('excel_sort', ExcelSortNode)
+  LiteGraph.registerNodeType('excel_append', ExcelAppendNode)
   LiteGraph.registerNodeType('word', WordNode)
+  LiteGraph.registerNodeType('word_read', WordReadNode)
+  LiteGraph.registerNodeType('word_write', WordWriteNode)
+  LiteGraph.registerNodeType('word_create', WordCreateNode)
+  LiteGraph.registerNodeType('word_replace', WordReplaceNode)
+  LiteGraph.registerNodeType('word_merge', WordMergeNode)
 }
 
 // Export all node classes for direct usage
@@ -936,5 +1130,16 @@ export {
   MapNode,
   WebScrapeNode,
   ExcelNode,
+  ExcelReadNode,
+  ExcelWriteNode,
+  ExcelCreateNode,
+  ExcelFilterNode,
+  ExcelSortNode,
+  ExcelAppendNode,
   WordNode,
+  WordReadNode,
+  WordWriteNode,
+  WordCreateNode,
+  WordReplaceNode,
+  WordMergeNode,
 }

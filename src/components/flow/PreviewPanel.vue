@@ -112,7 +112,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { toRaw } from 'vue'
-import { safeInvoke, safeListen } from '../../utils/tauri'
+import { safeInvoke } from '../../utils/tauri'
 import type { LGraphNode, IBaseWidget } from '@comfyorg/litegraph'
 
 // ═══ Props ═══
@@ -169,8 +169,10 @@ function detectType(node: LGraphNode): 'browser' | 'excel' | 'word' | null {
   if (!t) return null
   // 浏览器类型：browser 开头 或 web_scrape
   if (t === 'browser' || t.startsWith('browser_') || t === 'web_scrape') return 'browser'
-  if (t === 'excel') return 'excel'
-  if (t === 'word') return 'word'
+  // Excel：excel 开头
+  if (t === 'excel' || t.startsWith('excel_')) return 'excel'
+  // Word：word 开头
+  if (t === 'word' || t.startsWith('word_')) return 'word'
   return null
 }
 

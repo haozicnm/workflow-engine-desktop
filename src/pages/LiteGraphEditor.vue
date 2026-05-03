@@ -52,33 +52,33 @@
     </div>
   </div>
 
-  <!-- ═══════════ 全局浮层 ═══════════ -->
+  <!-- ═══════════ 全局浮层（统一尺寸规范） ═══════════ -->
   <MiniMap v-if="canvasReady" :canvas="canvas" :graph="graph" :visible="showMiniMap" />
   <CanvasContextMenu :visible="contextMenuVisible" :x="contextMenuPos.x" :y="contextMenuPos.y" :items="contextMenuItems" @close="contextMenuVisible = false" />
   <CanvasSearchPopover :visible="searchVisible" :x="searchPos.x" :y="searchPos.y" :graph="graph" @close="searchVisible = false" @node-added="onSearchNodeAdded" />
 
   <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
 
-  <FloatingPanel :visible="showPalette" title="节点库" :width="240" :height="450" @close="showPalette = false">
+  <FloatingPanel :visible="showPalette" title="节点库" :width="280" :height="480" @close="showPalette = false">
     <NodePalette @add-node="onAddNodeFromPalette" />
   </FloatingPanel>
-  <FloatingPanel :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'" :width="300" :height="420" @close="onDeselectNode">
+  <FloatingPanel :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'" :width="320" :height="480" @close="onDeselectNode">
     <PropertyPanel :key="widgetVersion" :lg-node="selectedLgNode"
       :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
       :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
       :duration="undefined"
       @update-label="onUpdateLabel" @update-widget="onUpdateWidget" @delete="onDeleteNode" />
   </FloatingPanel>
-  <FloatingPanel :visible="showDashboard" title="📋 工作流" :width="720" :height="560" @close="showDashboard = false">
+  <FloatingPanel :visible="showDashboard" title="📋 工作流" :width="760" :height="560" @close="showDashboard = false">
     <Dashboard @open-workflow="onOpenWorkflow" @create-from-template="onCreateFromTemplate" @navigate="onDashboardNavigate" />
   </FloatingPanel>
-  <FloatingPanel :visible="showSettings" title="⚙️ 设置" :width="560" :height="500" @close="showSettings = false">
+  <FloatingPanel :visible="showSettings" title="⚙️ 设置" :width="600" :height="540" @close="showSettings = false">
     <Settings />
   </FloatingPanel>
-  <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="640" :height="500" @close="showHistory = false">
+  <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="680" :height="520" @close="showHistory = false">
     <RunHistory />
   </FloatingPanel>
-  <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="560" :height="420" @close="showSchedule = false">
+  <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="600" :height="480" @close="showSchedule = false">
     <ScheduleSection :schedules="scheduleList" :loading="scheduleLoading"
       @toggle-schedule="onToggleSchedule" @delete-schedule="onDeleteSchedule"
       @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
@@ -227,8 +227,7 @@ import CanvasContextMenu from '../components/CanvasContextMenu.vue'
 import CanvasSearchPopover from '../components/CanvasSearchPopover.vue'
 import type { ContextMenuItem } from '../components/CanvasContextMenu.vue'
 import { registerAllNodes } from '../nodes/litegraph-nodes'
-import { getNodeDef } from '../components/flow/pinTypes'
-import type { FlowNode, NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
+import type { NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
 
 // ─── Props ───
 const store = useFlowStore()
@@ -306,7 +305,9 @@ function onPreviewResizeEnd() {
 
 // 选中文件/浏览器节点时自动弹出预览
 const previewTypes = new Set(['browser_navigate', 'browser_click', 'browser_extract', 'browser_screenshot',
-  'browser_evaluate', 'browser', 'excel', 'word', 'file', 'file_save', 'http', 'web_scrape'])
+  'browser_evaluate', 'browser', 'excel', 'excel_read', 'excel_write', 'excel_filter', 'excel_sort',
+  'word', 'word_read', 'word_write', 'word_replace',
+  'file', 'file_save', 'http', 'web_scrape'])
 watch(selectedLgNode, (node) => {
   if (node && previewTypes.has(node.type)) {
     previewTitle.value = node.title || node.type
@@ -573,10 +574,6 @@ function shallowDiff(a: Record<string, unknown>, b: Record<string, unknown>): bo
   }
   return false
 }
-/** 通过 store 的 string ID 查找 LiteGraph 节点 */
-function findLgNode(storeId: string): LGraphNode | undefined {
-  return graph._nodes?.find((n: LGraphNode) => String(n.id) === storeId)
-}
 
 // ─── 标记：是否正在从 store 同步到 graph（避免循环更新） ───
 let syncingFromStore = false
@@ -809,26 +806,6 @@ onUnmounted(() => {
   // 清理 DAG 事件监听器
   cleanupDagListeners()
 })
-
-// ─── LiteGraph 节点 → FlowNode 转换 ───
-function liteGraphNodeToFlowNode(node: LGraphNode): FlowNode {
-  // 收集 widgets 的值作为 config
-  const config: Record<string, unknown> = {}
-  if (node.widgets) {
-    for (const w of node.widgets) {
-      config[w.name] = w.value
-    }
-  }
-
-  return {
-    id: String(node.id),
-    type: node.type || '',
-    label: node.title || node.type || '',
-    position: { x: node.pos[0], y: node.pos[1] },
-    config,
-    status: (store.nodeStatuses[String(node.id)] as NodeStatus) || 'idle',
-  }
-}
 
 // ─── 从 LiteGraph graph 同步节点到 store ───
 function syncGraphToStore() {

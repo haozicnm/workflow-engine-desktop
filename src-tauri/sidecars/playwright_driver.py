@@ -887,13 +887,13 @@ async def _preview(params: dict) -> dict:
 
     # 获取视口尺寸
     viewport = await page.evaluate("""
-        () => ({ width: window.innerWidth, height: window.innerHeight })
+        ({ width: window.innerWidth, height: window.innerHeight })
     """)
     _preview_orig_width = viewport["width"]
 
     # 获取所有可见元素的信息
     elements = await page.evaluate("""
-        () => {
+        (() => {
             function buildSelector(el) {
                 // 优先级：id > data-* 属性 > 唯一 class 组合 > nth-child 路径
                 if (el.id) {
@@ -1000,7 +1000,7 @@ async def _preview(params: dict) -> dict:
             results.sort((a, b) => (b.bbox.w * b.bbox.h) - (a.bbox.w * a.bbox.h));
 
             return results;
-        }
+        })()
     """)
 
     return {
@@ -1043,7 +1043,7 @@ async def _pick(params: dict) -> dict:
 
     try:
         await page.evaluate("""
-        () => {
+        (() => {
             if (window.__wfPickActive) return;
             window.__wfPickActive = true;
             window.__wfPickResult = null;
@@ -1127,7 +1127,7 @@ async def _pick(params: dict) -> dict:
 
             document.addEventListener('mouseover', window.__wfPickMouseover, true);
             document.addEventListener('click', window.__wfPickClick, true);
-        }
+        })()
         """)
 
         # 轮询等待用户点击（最多 30 秒）
