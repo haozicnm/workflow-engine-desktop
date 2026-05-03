@@ -1420,12 +1420,16 @@ function runAll() {
   showConsole.value = true
   store.resetAllStatuses()
   addLog('▶ DAG 执行开始...', 'info')
-  runDagFlow()
+  runDagFlow(false)
 }
 
 function runSingle() {
   if (store.nodes.length === 0) return
-  addLog('⏯ 单步调试模式（待实现）', 'info')
+  isRunning.value = true
+  showConsole.value = true
+  store.resetAllStatuses()
+  addLog('⏯ 单步调试模式启动...', 'info')
+  runDagFlow(true)
 }
 
 async function stopRun() {
@@ -1446,7 +1450,7 @@ const currentRunId = ref<string | null>(null)
 let dagEventUnlisteners: UnlistenFn[] = []
 const stepStartTimes = new Map<string, number>()  // v3: 耗时追踪
 
-async function runDagFlow() {
+async function runDagFlow(stepMode: boolean) {
   syncGraphToStore()
 
   const workflowJson = {
@@ -1472,9 +1476,9 @@ async function runDagFlow() {
 
   try {
     await setupDagListeners()
-    const runId = await safeInvoke<string>('dag_run_start', { workflowJson })
+    const runId = await safeInvoke<string>('dag_run_start', { workflowJson, stepMode })
     currentRunId.value = runId
-    addLog(`🚀 DAG 运行已启动: ${runId.slice(0, 8)}...`, 'info')
+    addLog(`🚀 DAG 运行已启动: ${runId.slice(0, 8)}...${stepMode ? ' (单步模式)' : ''}`, 'info')
   } catch (e) {
     addLog(`❌ DAG 启动失败: ${e}`, 'error')
     isRunning.value = false

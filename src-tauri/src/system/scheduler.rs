@@ -93,10 +93,9 @@ async fn start_scheduled_run(
 
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    db.create_run(&run_id, workflow_id, &now)
-        .map_err(|e| e.to_string())?;
-
     let workflow_name = workflow.name.clone();
+    db.create_run(&run_id, workflow_id, &workflow_name, &now)
+        .map_err(|e| e.to_string())?;
 
     let _ = app_handle.emit("run-update", serde_json::json!({
         "run_id": run_id,

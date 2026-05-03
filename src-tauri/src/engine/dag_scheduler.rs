@@ -497,6 +497,7 @@ pub async fn run_dag_workflow(
     cancel_flag: Arc<AtomicBool>,
     cancel_token: CancellationToken,
     pause_flag: Arc<AtomicBool>,
+    step_mode: bool,
 ) -> Result<DAGRunResult> {
     if dag.nodes.is_empty() {
         let _ = db.update_run_status(run_id, "completed", None);
@@ -511,7 +512,7 @@ pub async fn run_dag_workflow(
         .map_err(|e| anyhow::anyhow!(e))?;
 
     let breakpoint_flag = Arc::new(AtomicBool::new(false));
-    let step_mode_flag = Arc::new(AtomicBool::new(false));
+    let step_mode_flag = Arc::new(AtomicBool::new(step_mode));
     let snapshots = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
 
     let dag_ctrl = RunControl {

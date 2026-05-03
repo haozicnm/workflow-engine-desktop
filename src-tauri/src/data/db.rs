@@ -145,7 +145,17 @@ impl Database {
             debug!("[db] v2 迁移完成，耗时 {:?}", start.elapsed());
         }
 
-        // 未来: if version < 3 { ... }
+        // v3: 添加 workflow_name 列到 runs 表（支持 DAG 画布直接执行的历史记录）
+        if version < 3 {
+            info!("[db] 执行 v3 迁移…");
+            let start = Instant::now();
+            conn.execute_batch(
+                "ALTER TABLE runs ADD COLUMN workflow_name TEXT DEFAULT ''"
+            ).ok(); // 忽略"列已存在"的错误
+            conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])?;
+            debug!("[db] v3 迁移完成，耗时 {:?}", start.elapsed());
+        }
+
         Ok(())
     }
 
@@ -267,11 +277,11 @@ impl Database {
 
     // ─── Run 持久化 ───
 
-    pub fn create_run(&self, run_id: &str, workflow_id: &str, started_at: &str) -> Result<()> {
+    pub fn create_run(&self, run_id: &str, workflow_id: &str, workflow_name: &str, started_at: &str) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
-            "INSERT INTO runs (id, workflow_id, status, started_at) VALUES (?1, ?2, 'running', ?3)",
-            params![run_id, workflow_id, started_at],
+            "INSERT INTO runs (id, workflow_id, workflow_name, status, started_at) VALUES (?1, ?2, ?3, 'running', ?4)",
+            params![run_id, workflow_id, workflow_name, started_at],
         )?;
         Ok(())
     }
@@ -358,13 +368,13 @@ impl Database {
 
     // ─── 运行历史查询 ───
 
-    /// 查询运行列表（可选按工作流过滤），关联工作流名称
+    /// 查询运行列表（可选按工作流过滤），优先用 workflows 表的名称，回退到 runs.workflow_name
     pub fn list_runs(&self, workflow_id: Option<&str>, limit: usize) -> Result<Vec<RunHistoryItem>> {
         let conn = self.conn()?;
         if let Some(wf_id) = workflow_id {
             let mut stmt = conn.prepare(
-                "SELECT r.id, r.workflow_id, w.name, r.status, r.started_at, r.finished_at, r.error \
-                 FROM runs r JOIN workflows w ON r.workflow_id = w.id \
+                "SELECT r.id, r.workflow_id, COALESCE(w.name, r.workflow_name), r.status, r.started_at, r.finished_at, r.error \
+                 FROM runs r LEFT JOIN workflows w ON r.workflow_id = w.id \
                  WHERE r.workflow_id = ?1 \
                  ORDER BY r.started_at DESC LIMIT ?2"
             )?;
@@ -382,8 +392,8 @@ impl Database {
             rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
         } else {
             let mut stmt = conn.prepare(
-                "SELECT r.id, r.workflow_id, w.name, r.status, r.started_at, r.finished_at, r.error \
-                 FROM runs r JOIN workflows w ON r.workflow_id = w.id \
+                "SELECT r.id, r.workflow_id, COALESCE(w.name, r.workflow_name), r.status, r.started_at, r.finished_at, r.error \
+                 FROM runs r LEFT JOIN workflows w ON r.workflow_id = w.id \
                  ORDER BY r.started_at DESC LIMIT ?1"
             )?;
             let rows = stmt.query_map(rusqlite::params![limit as i64], |row| {
@@ -410,8 +420,10 @@ impl Database {
 
         let workflow_name = {
             let conn = self.conn()?;
-            let mut stmt = conn.prepare("SELECT name FROM workflows WHERE id = ?1")?;
-            stmt.query_row(params![run.workflow_id], |row| row.get::<_, String>(0))
+            let mut stmt = conn.prepare(
+                "SELECT COALESCE(w.name, r.workflow_name) FROM runs r LEFT JOIN workflows w ON r.workflow_id = w.id WHERE r.id = ?1"
+            )?;
+            stmt.query_row(params![run_id], |row| row.get::<_, String>(0))
                 .unwrap_or_default()
         };
 

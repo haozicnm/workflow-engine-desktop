@@ -11,6 +11,7 @@ pub async fn dag_run_start(
     app: State<'_, App>,
     app_handle: AppHandle,
     workflow_json: serde_json::Value,
+    step_mode: Option<bool>,
 ) -> Result<String, String> {
     // 1. 解析 DAG 工作流
     let dag: DAGWorkflow = serde_json::from_value(workflow_json)
@@ -22,7 +23,7 @@ pub async fn dag_run_start(
     // 2. 如果提供了 workflow_id，直接用；否则生成
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_run(&run_id, &workflow_id, &now)
+    app.db.create_run(&run_id, &workflow_id, &dag.name, &now)
         .map_err(|e| e.to_string())?;
 
     // 3. 获取浏览器通道设置
@@ -32,6 +33,7 @@ pub async fn dag_run_start(
     let cancel_flag = Arc::new(AtomicBool::new(false));
     let cancel_token = tokio_util::sync::CancellationToken::new();
     let pause_flag = Arc::new(AtomicBool::new(false));
+    let step_mode_on = step_mode.unwrap_or(false);
 
     // 5. 并发控制
     let semaphore = app.run_semaphore.clone();
@@ -64,7 +66,7 @@ pub async fn dag_run_start(
 
         let result = crate::engine::dag_scheduler::run_dag_workflow(
             &dag, &run_id_clone, &app_handle, &db, &browser_channel,
-            cancel_flag, cancel_token, pause_flag,
+            cancel_flag, cancel_token, pause_flag, step_mode_on,
         ).await;
 
         // 清理

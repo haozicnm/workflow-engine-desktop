@@ -36,7 +36,8 @@ pub async fn run_start(
     // 3. 创建 run 记录
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_run(&run_id, &workflow_id, &now)
+    let workflow_name = workflow.name.clone();
+    app.db.create_run(&run_id, &workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
     // 4. 读取浏览器通道设置
@@ -63,10 +64,7 @@ pub async fn run_start(
     app.breakpoint_flags.write().await.insert(run_id.clone(), breakpoint_flag.clone());
     app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
 
-    // 6. 保存工作流名称（spawn 前 clone）
-    let workflow_name = workflow.name.clone();
-
-    // 7. 发射 run 启动事件
+    // 6. 发射 run 启动事件（workflow_name 已在步骤 3 获取）
     let _ = app_handle.emit("run-update", serde_json::json!({
         "run_id": run_id,
         "workflow_id": workflow_id,
@@ -467,7 +465,7 @@ pub async fn run_dag_start(
     let run_id = uuid::Uuid::new_v4().to_string();
     let workflow_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_run(&run_id, &workflow_id, &now)
+    app.db.create_run(&run_id, &workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
     // 3. 读取浏览器通道设置
