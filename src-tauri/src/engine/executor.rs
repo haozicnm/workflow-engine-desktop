@@ -1,8 +1,7 @@
 // engine/executor.rs — 步骤执行器
 //
-// 节点注册方式：
-//   所有节点通过 register() 显式注册，对应 nodes/registry.rs 中的清单。
-//   新增节点时在此添加一行 register() 调用即可。
+// v3: 所有节点独立 executor，不再使用 action 参数分发。
+//   每个操作一个 struct，一个注册条目。
 
 use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
@@ -29,14 +28,57 @@ impl StepExecutor {
     pub fn new() -> Arc<Self> {
         let mut executors: HashMap<String, Box<dyn NodeExecutor>> = HashMap::new();
 
-        // ── 通过 registry 清单对应注册 ──
-        // P0 核心节点
+        // ── P0 核心节点 ──
         register!(executors, "http", crate::nodes::http::HttpNode);
-        register!(executors, "data", crate::nodes::data::DataNode);
         register!(executors, "script", crate::nodes::script::ScriptNode);
         register!(executors, "condition", crate::nodes::condition::ConditionNode);
 
-        // P2 文件节点
+        // ── 数据处理节点（v3: 独立 executor） ──
+        register!(executors, "data_set", crate::nodes::data::DataSetNode);
+        register!(executors, "data_get", crate::nodes::data::DataGetNode);
+        register!(executors, "data_length", crate::nodes::data::DataLengthNode);
+        register!(executors, "data_default", crate::nodes::data::DataDefaultNode);
+        register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
+
+        // ── 文件节点（v3: 独立 executor） ──
+        register!(executors, "file_read", crate::nodes::file::FileReadNode);
+        register!(executors, "file_write", crate::nodes::file::FileWriteNode);
+        register!(executors, "file_list", crate::nodes::file::FileListNode);
+        register!(executors, "file_delete", crate::nodes::file::FileDeleteNode);
+        register!(executors, "file_exists", crate::nodes::file::FileExistsNode);
+        register!(executors, "file_save", crate::nodes::file_save::FileSaveNode);
+
+        // ── 剪贴板节点（v3: 独立 executor） ──
+        register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
+        register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
+
+        // ── 正则节点（v3: 独立 executor） ──
+        register!(executors, "regex_extract", crate::nodes::regex::RegexExtractNode);
+        register!(executors, "regex_replace", crate::nodes::regex::RegexReplaceNode);
+        register!(executors, "regex_match", crate::nodes::regex::RegexMatchNode);
+
+        // ── 数组节点（v3: 独立 executor） ──
+        register!(executors, "array_filter", crate::nodes::array::ArrayFilterNode);
+        register!(executors, "array_sort", crate::nodes::array::ArraySortNode);
+        register!(executors, "array_dedup", crate::nodes::array::ArrayDedupNode);
+        register!(executors, "array_paginate", crate::nodes::array::ArrayPaginateNode);
+        register!(executors, "array_map", crate::nodes::array::ArrayMapNode);
+        register!(executors, "array_join", crate::nodes::array::ArrayJoinNode);
+        register!(executors, "array_reduce", crate::nodes::array::ArrayReduceNode);
+
+        // ── 转换节点（v3: 独立 executor） ──
+        register!(executors, "convert_to_text", crate::nodes::convert::ConvertToTextNode);
+        register!(executors, "convert_to_number", crate::nodes::convert::ConvertToNumberNode);
+        register!(executors, "convert_to_json", crate::nodes::convert::ConvertToJsonNode);
+        register!(executors, "convert_to_csv", crate::nodes::convert::ConvertToCsvNode);
+        register!(executors, "convert_to_html", crate::nodes::convert::ConvertToHtmlNode);
+        register!(executors, "convert_to_base64", crate::nodes::convert::ConvertToBase64Node);
+
+        // ── 新增数据节点 ──
+        register!(executors, "json_parse", crate::nodes::json_parse::JsonParseNode);
+        register!(executors, "text_template", crate::nodes::text_template::TextTemplateNode);
+
+        // ── P2 文件节点 ──
         register!(executors, "excel", crate::nodes::excel::ExcelNode);
         register!(executors, "excel_read", crate::nodes::excel::ExcelReadNode);
         register!(executors, "excel_write", crate::nodes::excel::ExcelWriteNode);
@@ -52,41 +94,34 @@ impl StepExecutor {
         register!(executors, "word_replace", crate::nodes::word::WordReplaceNode);
         register!(executors, "word_merge", crate::nodes::word::WordMergeNode);
 
-        // P2.5+ 新节点
+        // ── 浏览器节点 ──
         register!(executors, "browser", crate::nodes::browser::BrowserNode);
+        register!(executors, "browser_navigate", crate::nodes::browser::BrowserNavigateNode);
+        register!(executors, "browser_click", crate::nodes::browser::BrowserClickNode);
+        register!(executors, "browser_fill", crate::nodes::browser::BrowserFillNode);
+        register!(executors, "browser_extract", crate::nodes::browser::BrowserExtractNode);
+        register!(executors, "browser_screenshot", crate::nodes::browser::BrowserScreenshotNode);
+        register!(executors, "browser_evaluate", crate::nodes::browser::BrowserEvaluateNode);
+        register!(executors, "browser_scroll", crate::nodes::browser::BrowserScrollNode);
+        register!(executors, "browser_wait", crate::nodes::browser::BrowserWaitNode);
+        register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
+
+        // ── 其他节点 ──
         register!(executors, "notify", crate::nodes::notify::NotifyNode);
         register!(executors, "approval", crate::nodes::approval::ApprovalNode);
-
-        // 循环/并行节点
         register!(executors, "loop", crate::nodes::loop_node::LoopNode);
         register!(executors, "while", crate::nodes::while_node::WhileNode);
         register!(executors, "parallel", crate::nodes::parallel::ParallelNode);
-
-        // v0.7.0 声明式数据节点
         register!(executors, "map", crate::nodes::map::MapNode);
-
-        // v1.1 声明式网页抓取节点
         register!(executors, "web_scrape", crate::nodes::web_scrape::WebScrapeNode);
-
-        // v2.0 AI 节点
-
-        // DAG 执行引擎节点
         register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
         register!(executors, "window", crate::nodes::window::WindowNode);
         register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);
         register!(executors, "delay", crate::nodes::delay::DelayNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
-
-        // v2 通用节点
-        register!(executors, "file", crate::nodes::file::FileNode);
-        register!(executors, "clipboard", crate::nodes::clipboard::ClipboardNode);
-        register!(executors, "regex", crate::nodes::regex::RegexNode);
-        register!(executors, "array", crate::nodes::array::ArrayNode);
-        register!(executors, "convert", crate::nodes::convert::ConvertNode);
         register!(executors, "print", crate::nodes::print::PrintNode);
 
-        // 记录已注册的节点类型
         for type_name in executors.keys() {
             debug!("节点注册: {}", type_name);
         }
@@ -95,9 +130,6 @@ impl StepExecutor {
     }
 
     /// 执行一个步骤（统一入口，所有节点类型通过 trait 分发）
-    ///
-    /// 优化：先 resolve config（变量替换），避免克隆整个 config HashMap 后再丢弃。
-    /// 只克隆轻量的非 config 字段（id, name 等字符串），config 直接使用解析结果。
     pub fn execute<'a>(
         self: &'a Arc<Self>,
         step: &'a Step,
@@ -115,8 +147,6 @@ impl StepExecutor {
             }
         };
 
-        // Resolve config from reference first — avoids cloning the large config HashMap,
-        // only to immediately discard it. The resolved config IS the final result.
         let resolved_config = ctx.resolve_config(&step.config);
         let resolved_step = Step {
             id: step.id.clone(),

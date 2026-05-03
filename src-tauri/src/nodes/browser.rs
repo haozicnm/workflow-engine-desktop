@@ -666,6 +666,63 @@ impl NodeExecutor for BrowserNode {
     }
 }
 
+// ═══════════════════════════════════════════════
+// v3: Browser sub-nodes — 每个浏览器操作独立 executor
+// ═══════════════════════════════════════════════
+
+/// 辅助：获取 sidecar，自动 launch
+async fn ensure_sidecar(action: &str, config: &serde_json::Value, ctx: &ExecutionContext) -> Result<Arc<BrowserSidecar>> {
+    let sidecar = get_or_start_sidecar().await?;
+    if action != "launch" && action != "close" && action != "ping" {
+        let headless = action != "recording_start" && action != "pick";
+        let mut launch_params = config.get("launch").cloned()
+            .unwrap_or_else(|| serde_json::json!({"headless": headless}));
+        let channel = config.get("channel").and_then(|v| v.as_str()).filter(|s| !s.is_empty())
+            .or_else(|| if ctx.browser_channel != "auto" && !ctx.browser_channel.is_empty() { Some(ctx.browser_channel.as_str()) } else { None });
+        if let Some(ch) = channel {
+            if let Some(obj) = launch_params.as_object_mut() { obj.insert("channel".to_string(), serde_json::json!(ch)); }
+        }
+        let _ = sidecar.send_action("launch", launch_params).await;
+    }
+    Ok(sidecar)
+}
+
+macro_rules! browser_sub_node {
+    ($name:ident, $action:literal, $label:literal) => {
+        #[derive(Default)]
+        pub struct $name;
+
+        #[async_trait]
+        impl NodeExecutor for $name {
+            async fn execute(&self, step: &Step, ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+                let config = &step.config;
+                let sidecar = ensure_sidecar($action, config, ctx).await?;
+                let params = config.get("params").cloned().unwrap_or_else(|| serde_json::json!({}));
+                let result = sidecar.send_action($action, params).await;
+                match result {
+                    Ok(r) => Ok(serde_json::json!({ "result": r })),
+                    Err(e) => {
+                        let screenshot_info = try_error_screenshot(step).await;
+                        let mut err_msg = format!("{}", e);
+                        if let Some(path) = screenshot_info { err_msg = format!("{}\n📸 错误截图已保存: {}", path, err_msg); }
+                        Err(anyhow!(err_msg))
+                    }
+                }
+            }
+        }
+    };
+}
+
+browser_sub_node!(BrowserNavigateNode,   "navigate",   "浏览器导航");
+browser_sub_node!(BrowserClickNode,      "click",      "浏览器点击");
+browser_sub_node!(BrowserFillNode,       "fill",       "浏览器填写");
+browser_sub_node!(BrowserExtractNode,    "extract",    "浏览器提取");
+browser_sub_node!(BrowserScreenshotNode, "screenshot", "浏览器截图");
+browser_sub_node!(BrowserEvaluateNode,   "evaluate",   "浏览器执行JS");
+browser_sub_node!(BrowserScrollNode,     "scroll",     "浏览器滚动");
+browser_sub_node!(BrowserWaitNode,       "wait",       "浏览器等待");
+browser_sub_node!(BrowserPdfNode,        "pdf",        "浏览器PDF");
+
 /// 错误截图：保存浏览器当前画面到 screenshots/ 目录
 /// 直接从 sidecar 实例截图，避免 send_sidecar_action 的 auto-launch 逻辑
 async fn try_error_screenshot(step: &Step) -> Option<String> {

@@ -27,3 +27,6 @@ pub mod regex;
 pub mod array;
 pub mod convert;
 pub mod print;
+pub mod json_parse;
+pub mod text_template;
+pub mod file_save;
