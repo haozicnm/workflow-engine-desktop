@@ -38,7 +38,19 @@ impl StepExecutor {
 
         // P2 文件节点
         register!(executors, "excel", crate::nodes::excel::ExcelNode);
+        register!(executors, "excel_read", crate::nodes::excel::ExcelReadNode);
+        register!(executors, "excel_write", crate::nodes::excel::ExcelWriteNode);
+        register!(executors, "excel_create", crate::nodes::excel::ExcelCreateNode);
+        register!(executors, "excel_filter", crate::nodes::excel::ExcelFilterNode);
+        register!(executors, "excel_sort", crate::nodes::excel::ExcelSortNode);
+        register!(executors, "excel_append", crate::nodes::excel::ExcelAppendNode);
+        register!(executors, "excel_csv", crate::nodes::excel::ExcelCsvNode);
         register!(executors, "word", crate::nodes::word::WordNode);
+        register!(executors, "word_read", crate::nodes::word::WordReadNode);
+        register!(executors, "word_write", crate::nodes::word::WordWriteNode);
+        register!(executors, "word_create", crate::nodes::word::WordCreateNode);
+        register!(executors, "word_replace", crate::nodes::word::WordReplaceNode);
+        register!(executors, "word_merge", crate::nodes::word::WordMergeNode);
 
         // P2.5+ 新节点
         register!(executors, "browser", crate::nodes::browser::BrowserNode);

@@ -903,6 +903,25 @@ class ExcelAppendNode extends WorkflowNode {
   onExecute(): void {}
 }
 
+/** CSV 互转节点 */
+class ExcelCsvNode extends WorkflowNode {
+  static title = 'CSV 互转'
+  static type = 'excel_csv'
+
+  constructor(title?: string) {
+    super(title || 'CSV 互转')
+    this.color = COLOR_DATA
+    this.addOutput('path', 'string')
+    this.addWidget('string', 'path', '', 'path')
+    this.addWidget('combo', 'direction', 'csv_to_xlsx', null, { property: 'direction',
+      values: ['csv_to_xlsx', 'xlsx_to_csv'],
+    })
+    this.addWidget('string', 'delimiter', ',', 'delimiter')
+    this.addWidget('string', 'output', '', 'output')
+  }
+  onExecute(): void {}
+}
+
 /** Excel 通用节点（兼容旧版） */
 class ExcelNode extends WorkflowNode {
   static title = 'Excel(通用)'
@@ -1082,6 +1101,7 @@ export function registerAllNodes(): void {
   LiteGraph.registerNodeType('excel_filter', ExcelFilterNode)
   LiteGraph.registerNodeType('excel_sort', ExcelSortNode)
   LiteGraph.registerNodeType('excel_append', ExcelAppendNode)
+  LiteGraph.registerNodeType('excel_csv', ExcelCsvNode)
   LiteGraph.registerNodeType('word', WordNode)
   LiteGraph.registerNodeType('word_read', WordReadNode)
   LiteGraph.registerNodeType('word_write', WordWriteNode)
@@ -1136,6 +1156,7 @@ export {
   ExcelFilterNode,
   ExcelSortNode,
   ExcelAppendNode,
+  ExcelCsvNode,
   WordNode,
   WordReadNode,
   WordWriteNode,

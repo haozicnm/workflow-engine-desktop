@@ -288,6 +288,17 @@ export const NODE_REGISTRY: NodeDefinition[] = [
     defaultConfig: { path: '', sheet: 'Sheet1' },
   },
   {
+    type: 'excel_csv',
+    label: 'CSV 互转',
+    icon: '📄',
+    color: '#4ADE80',
+    category: 'excel',
+    description: 'CSV ↔ Excel 格式互转',
+    inputs: [],
+    outputs: [{ id: 'path', label: '路径', type: 'string' }],
+    defaultConfig: { path: '', direction: 'csv_to_xlsx', delimiter: ',', output: '' },
+  },
+  {
     type: 'excel',
     label: 'Excel(通用)',
     icon: '📊',
