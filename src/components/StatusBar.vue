@@ -98,8 +98,8 @@ const hasActivity = computed(() =>
 </script>
 
 <template>
-  <div class="status-bar" v-if="hasActivity">
-    <div class="status-left">
+  <div class="status-bar">
+    <div class="status-left" v-if="hasActivity">
       <template v-if="activeRuns.length > 0">
         <span class="status-dot running"></span>
         <template v-if="activeRuns.length === 1">
@@ -117,6 +117,7 @@ const hasActivity = computed(() =>
       </template>
     </div>
     <div class="status-right">
+      <span class="status-version">v3.2.0</span>
       <span class="status-elapsed" v-if="activeRuns.length > 0 && elapsed">⏱ {{ elapsed }}</span>
       <span class="status-recent-ok" v-if="recentCompleted > 0">✅ {{ recentCompleted }}</span>
       <span class="status-recent-fail" v-if="recentFailed > 0">❌ {{ recentFailed }}</span>
@@ -179,6 +180,12 @@ const hasActivity = computed(() =>
   color: #58a6ff;
   white-space: nowrap;
 }
+.status-version {
+  color: #484f58;
+  font-size: 11px;
+  margin-right: 12px;
+}
+
 .status-elapsed {
   color: #58a6ff;
   font-variant-numeric: tabular-nums;

@@ -31,15 +31,38 @@ class WorkflowNode extends LGraphNode {
     this.boxcolor = BOX_DARK
   }
 
-  /** v3: 连接类型校验 — 类型不匹配时拒绝连线 */
+  /** v3: 连接类型校验 — 类型不匹配时拒绝连线并有视觉反馈 */
   onConnectOutput(slot: number, inputType: unknown, _input: unknown, _targetNode: unknown, _targetSlot: number): boolean {
     const outputType = this.outputs?.[slot]?.type || (this.outputs?.[slot] as any)?.name || 'any'
-    return isTypeCompatible(String(outputType), String(inputType || 'any'))
+    const compatible = isTypeCompatible(String(outputType), String(inputType || 'any'))
+    if (!compatible) {
+      // 短暂闪红以示拒绝
+      const origColor = this.color
+      const origBox = this.boxcolor
+      this.color = '#f85149'
+      this.boxcolor = '#da3633'
+      setTimeout(() => {
+        this.color = origColor
+        this.boxcolor = origBox
+      }, 200)
+    }
+    return compatible
   }
 
   onConnectInput(targetSlot: number, outputType: unknown, _output: unknown, _sourceNode: unknown, _sourceSlot: number): boolean {
     const inputType = this.inputs?.[targetSlot]?.type || (this.inputs?.[targetSlot] as any)?.name || 'any'
-    return isTypeCompatible(String(outputType || 'any'), String(inputType))
+    const compatible = isTypeCompatible(String(outputType || 'any'), String(inputType))
+    if (!compatible) {
+      const origColor = this.color
+      const origBox = this.boxcolor
+      this.color = '#f85149'
+      this.boxcolor = '#da3633'
+      setTimeout(() => {
+        this.color = origColor
+        this.boxcolor = origBox
+      }, 200)
+    }
+    return compatible
   }
 }
 

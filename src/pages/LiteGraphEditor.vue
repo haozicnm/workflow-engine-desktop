@@ -1041,12 +1041,14 @@ onMounted(() => {
     if (store.nodes.length > 0) {
       loadFromStore()
       addLog(`📋 已加载「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
+      document.title = `${store.workflowName} — Workflow Engine`
     } else if (props.initialTemplate) {
       // v3: 从模板创建
       const tpl = props.initialTemplate
       store.load({ name: tpl.name, nodes: tpl.nodes as any, edges: tpl.edges as any, variables: {} })
       loadFromStore()
       addLog(`📋 从模板「${tpl.name}」创建 (${store.nodeCount} 节点)`, 'info')
+      document.title = `${tpl.name} — Workflow Engine`
       fitView()
     } else if (props.initialWorkflowId) {
       // v3: 打开已有工作流
