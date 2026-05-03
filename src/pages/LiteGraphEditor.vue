@@ -15,6 +15,7 @@
         @record="toggleRecording" @pick="pickElement"
         @import="importWorkflow" @export="exportWorkflow"
         @clear="clearCanvas" @save="onSaveWorkflow"
+        @rename="onRenameWorkflow"
       />
     </div>
 
@@ -1588,6 +1589,14 @@ function clearCanvas() {
   undoManager.pushState()
 }
 
+// ─── v3: 重命名工作流 ───
+function onRenameWorkflow(name: string) {
+  if (!name.trim()) return
+  store.workflowName = name.trim()
+  document.title = `${name.trim()} — Workflow Engine`
+  addLog(`✏ 已重命名为「${name.trim()}」`)
+}
+
 // ─── 导入导出 ───
 function importWorkflow() {
   importInputRef.value?.click()
@@ -1705,6 +1714,22 @@ function onKeyDown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault()
     onSaveWorkflow()
+    return
+  }
+  // Ctrl+C — 复制选中节点
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'c') {
+    if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
+    e.preventDefault()
+    canvas?.copyToClipboard?.()
+    addLog('📋 已复制', 'info')
+    return
+  }
+  // Ctrl+V — 粘贴节点
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'v') {
+    if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
+    e.preventDefault()
+    canvas?.pasteFromClipboard?.()
+    addLog('📌 已粘贴', 'info')
     return
   }
   // Ctrl+Enter / Cmd+Enter — 运行工作流

@@ -1,7 +1,14 @@
 <template>
   <header class="top-menu">
     <div class="menu-left">
-      <span class="workflow-name">{{ name }}</span>
+      <input
+        class="workflow-name-input"
+        :value="name"
+        @change="$emit('rename', ($event.target as HTMLInputElement).value)"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
+        @focus="$event.target?.select?.()"
+        title="点击编辑名称"
+      />
       <span class="stat-badge">{{ nodeCount }} 节点</span>
       <span class="stat-badge">{{ edgeCount }} 连线</span>
       <span v-if="dirty" class="stat-badge dirty">● 已修改</span>
@@ -65,6 +72,7 @@ defineEmits<{
   import: []
   export: []
   clear: []
+  rename: [name: string]
 }>()
 </script>
 
@@ -86,13 +94,24 @@ defineEmits<{
   gap: 10px;
   min-width: 0;
 }
-.workflow-name {
+.workflow-name-input {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 200px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.workflow-name-input:hover {
+  border-color: #30363d;
+}
+.workflow-name-input:focus {
+  border-color: #58a6ff;
+  background: #0d1117;
 }
 .stat-badge {
   font-size: 11px;
