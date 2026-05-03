@@ -45,6 +45,7 @@ impl NodeExecutor for ParallelNode {
                     variables: ctx.variables.clone(),
                     step_outputs: ctx.step_outputs.clone(),
                     browser_channel: ctx.browser_channel.clone(),
+                    browser_executable_path: ctx.browser_executable_path.clone(),
                 };
                 let executor = Arc::clone(executor);
                 let failed = Arc::clone(&failed);

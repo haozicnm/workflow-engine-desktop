@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub python_path: Option<String>,
     /// 浏览器通道: auto / msedge / chrome / chromium
     pub browser_channel: String,
+    /// 浏览器可执行文件路径（留空=自动检测）
+    pub browser_executable_path: String,
     /// 临时存储（断点等运行时数据，不持久化）
     #[serde(skip)]
     pub temp: std::collections::HashMap<String, serde_json::Value>,
@@ -27,6 +29,7 @@ impl Default for AppConfig {
             log_level: "info".to_string(),
             python_path: None,
             browser_channel: "auto".to_string(),
+            browser_executable_path: String::new(),
             temp: std::collections::HashMap::new(),
         }
     }

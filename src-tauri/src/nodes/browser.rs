@@ -643,6 +643,23 @@ impl NodeExecutor for BrowserNode {
                 }
             }
 
+            // 可执行路径（WSL 指向 Windows 浏览器等场景）
+            let exe_path = step.config.get("executable_path").and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    if !ctx.browser_executable_path.is_empty() {
+                        Some(ctx.browser_executable_path.clone())
+                    } else {
+                        None
+                    }
+                });
+            if let Some(ep) = exe_path {
+                if let Some(obj) = launch_params.as_object_mut() {
+                    obj.insert("executable_path".to_string(), serde_json::json!(ep));
+                }
+            }
+
             let _ = sidecar.send_action("launch", launch_params).await;
         }
 

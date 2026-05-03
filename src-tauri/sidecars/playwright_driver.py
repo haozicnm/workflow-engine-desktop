@@ -235,6 +235,8 @@ async def _launch(params: dict) -> dict:
     launch_opts = {"headless": headless}
     if channel:
         launch_opts["channel"] = channel
+    if params.get("executable_path"):
+        launch_opts["executable_path"] = params["executable_path"]
     if proxy_opts:
         launch_opts["proxy"] = proxy_opts
 

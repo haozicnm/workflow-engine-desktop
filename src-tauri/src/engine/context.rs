@@ -12,6 +12,8 @@ pub struct ExecutionContext {
     pub step_outputs: HashMap<String, serde_json::Value>,
     /// 浏览器通道设置（auto / msedge / chrome / chromium）
     pub browser_channel: String,
+    /// 浏览器可执行文件路径（WSL 指向 Windows exe 等场景）
+    pub browser_executable_path: String,
 }
 
 impl ExecutionContext {
@@ -22,6 +24,7 @@ impl ExecutionContext {
             variables,
             step_outputs: HashMap::new(),
             browser_channel: "auto".to_string(),
+            browser_executable_path: String::new(),
         }
     }
 

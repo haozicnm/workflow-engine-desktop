@@ -13,6 +13,8 @@ pub struct AppSettings {
     pub python_path: Option<String>,
     /// 浏览器通道: auto / msedge / chrome / chromium
     pub browser_channel: String,
+    /// 浏览器可执行文件路径: 留空=自动检测
+    pub browser_executable_path: String,
 }
 
 #[tauri::command]
@@ -142,6 +144,7 @@ pub async fn settings_get(
         log_level: config.log_level.clone(),
         python_path: config.python_path.clone(),
         browser_channel: config.browser_channel.clone(),
+        browser_executable_path: config.browser_executable_path.clone(),
     })
 }
 
@@ -157,6 +160,7 @@ pub async fn settings_update(
     config.log_level = settings.log_level;
     config.python_path = settings.python_path;
     config.browser_channel = settings.browser_channel;
+    config.browser_executable_path = settings.browser_executable_path;
     info!("设置已更新");
     config.save().map_err(|e| e.to_string())
 }
