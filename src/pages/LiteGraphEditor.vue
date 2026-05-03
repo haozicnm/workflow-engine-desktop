@@ -29,6 +29,7 @@
         @toggle-console="showConsole = !showConsole"
         @toggle-settings="showSettings = !showSettings"
         @toggle-schedule="showSchedule = !showSchedule"
+        @toggle-debug="showDebug = !showDebug"
       />
     </div>
 
@@ -91,6 +92,9 @@
   </FloatingPanel>
   <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="680" :height="520" @close="showHistory = false">
     <RunHistory />
+  </FloatingPanel>
+  <FloatingPanel :visible="showDebug" title="🔍 变量调试" :width="420" :height="480" @close="showDebug = false">
+    <DebugPanel />
   </FloatingPanel>
   <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="600" :height="480" @close="showSchedule = false">
     <ScheduleSection :schedules="scheduleList" :loading="scheduleLoading"
@@ -267,6 +271,7 @@ import ScheduleDialog from '../components/ScheduleDialog.vue'
 import Dashboard from './Dashboard.vue'
 import Settings from './Settings.vue'
 import RunHistory from './RunHistory.vue'
+import DebugPanel from '../components/DebugPanel.vue'
 import MiniMap from '../components/MiniMap.vue'
 import CanvasContextMenu from '../components/CanvasContextMenu.vue'
 import CanvasSearchPopover from '../components/CanvasSearchPopover.vue'
@@ -422,6 +427,7 @@ const showDashboard = ref(false)
 const showSettings = ref(false)
 const showHistory = ref(false)
 const showSchedule = ref(false)
+const showDebug = ref(false)
 
 // ─── P0：MiniMap / 右键菜单 / 搜索弹窗 ───
 const canvasReady = ref(false)  // initCanvasReal 完成后设为 true
@@ -458,6 +464,10 @@ const contextMenuItems = computed<ContextMenuItem[]>(() => {
       if (selectedLgNode.value) onDeleteNode(selectedLgNode.value)
     }, disabled: !selectedLgNode.value },
     { label: 'separator', action: () => {}, divider: true },
+    { label: '▶ 从此运行', action: () => {
+      if (!selectedLgNode.value) return
+      runFromNode(String(selectedLgNode.value.id))
+    }, disabled: !selectedLgNode.value || isRunning.value },
     { label: selectedLgNode.value && breakpoints.value.has(String(selectedLgNode.value.id))
       ? '🔴 取消断点' : '🔵 设置断点', action: () => {
       if (!selectedLgNode.value) return
@@ -1432,6 +1442,65 @@ function runSingle() {
   runDagFlow(true)
 }
 
+async function runFromNode(nodeId: string) {
+  syncGraphToStore()
+  // 计算从选定节点出发的所有下游节点（BFS）
+  const reachable = new Set<string>()
+  const queue = [nodeId]
+  reachable.add(nodeId)
+  while (queue.length > 0) {
+    const cur = queue.shift()!
+    for (const edge of store.edges) {
+      if (edge.source === cur && !reachable.has(edge.target)) {
+        reachable.add(edge.target)
+        queue.push(edge.target)
+      }
+    }
+  }
+  const filteredNodes = store.nodes.filter(n => reachable.has(n.id))
+  const filteredEdges = store.edges.filter(e => reachable.has(e.source) && reachable.has(e.target))
+  if (filteredNodes.length === 0) {
+    addLog('⚠ 未找到下游节点', 'warn')
+    return
+  }
+  isRunning.value = true
+  showConsole.value = true
+  store.resetAllStatuses()
+  addLog(`▶ 从节点 [${nodeId}] 开始执行 (${filteredNodes.length} 节点)...`, 'info')
+
+  const workflowJson = {
+    name: store.workflowName || '未命名',
+    description: '',
+    nodes: filteredNodes.map(n => ({
+      id: n.id,
+      type: n.type,
+      label: n.label,
+      position: n.position,
+      config: n.config,
+    })),
+    edges: filteredEdges.map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
+    })),
+    variables: {},
+    breakpoints: Array.from(breakpoints.value),
+  }
+
+  try {
+    await setupDagListeners()
+    const runId = await safeInvoke<string>('dag_run_start', { workflowJson, stepMode: false })
+    currentRunId.value = runId
+    addLog(`🚀 DAG 运行已启动: ${runId.slice(0, 8)}... (从此运行)`, 'info')
+  } catch (e) {
+    addLog(`❌ DAG 启动失败: ${e}`, 'error')
+    isRunning.value = false
+    cleanupDagListeners()
+  }
+}
+
 async function stopRun() {
   if (currentRunId.value) {
     try {
@@ -1777,9 +1846,30 @@ function onKeyDown(e: KeyboardEvent) {
     onDeleteNode(selectedLgNode.value)
     return
   }
-  // Escape — 取消选择
+  // Escape — 三级：停止运行 > 取消选择 > 返回首页
   if (e.key === 'Escape') {
-    onDeselectNode()
+    if (isRunning.value) {
+      e.preventDefault()
+      stopRun()
+      return
+    }
+    if (selectedLgNode.value) {
+      onDeselectNode()
+      return
+    }
+    emit('back')
+    return
+  }
+  // P — 切换节点库面板
+  if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    showPalette.value = !showPalette.value
+    return
+  }
+  // ` — 切换控制台
+  if (e.key === '`') {
+    e.preventDefault()
+    showConsole.value = !showConsole.value
     return
   }
 }
