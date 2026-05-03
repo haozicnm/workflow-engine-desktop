@@ -22,7 +22,7 @@ const BG_DARK = '#1c2129'
 const BOX_DARK = '#2a3040'
 
 // ═══════════════════════════════════════════
-// Base class
+// Base class shared by all workflow nodes
 // ═══════════════════════════════════════════
 class WorkflowNode extends LGraphNode {
   constructor(title: string, type?: string) {
@@ -30,6 +30,30 @@ class WorkflowNode extends LGraphNode {
     this.bgcolor = BG_DARK
     this.boxcolor = BOX_DARK
   }
+
+  /** v3: 连接类型校验 — 类型不匹配时拒绝连线 */
+  onConnectOutput(slot: number, inputType: unknown, _input: unknown, _targetNode: unknown, _targetSlot: number): boolean {
+    const outputType = this.outputs?.[slot]?.type || (this.outputs?.[slot] as any)?.name || 'any'
+    return isTypeCompatible(String(outputType), String(inputType || 'any'))
+  }
+
+  onConnectInput(targetSlot: number, outputType: unknown, _output: unknown, _sourceNode: unknown, _sourceSlot: number): boolean {
+    const inputType = this.inputs?.[targetSlot]?.type || (this.inputs?.[targetSlot] as any)?.name || 'any'
+    return isTypeCompatible(String(outputType || 'any'), String(inputType))
+  }
+}
+
+/** 判断两个针脚类型是否兼容 */
+function isTypeCompatible(sourceType: string, targetType: string): boolean {
+  if (sourceType === 'any' || targetType === 'any') return true
+  if (sourceType === targetType) return true
+  // action 触发器兼容所有类型
+  if (sourceType === 'action' || targetType === 'action') return true
+  // 字符串可连到 object (JSON 解析)
+  if (sourceType === 'string' && targetType === 'object') return true
+  // number 可连到 string
+  if (sourceType === 'number' && targetType === 'string') return true
+  return false
 }
 
 // ═══════════════════════════════════════════
