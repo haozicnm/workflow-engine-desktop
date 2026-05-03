@@ -1,0 +1,30 @@
+{
+  "data": {
+    "items": [
+      {
+        "id": 1001,
+        "status": "completed",
+        "amount": 299.0,
+        "customer": "张三"
+      },
+      {
+        "id": 1002,
+        "status": "completed",
+        "amount": 580.0,
+        "customer": "李四"
+      },
+      {
+        "id": 1003,
+        "status": "pending",
+        "amount": 150.0,
+        "customer": "王五"
+      },
+      {
+        "id": 1004,
+        "status": "completed",
+        "amount": 1200.0,
+        "customer": "赵六"
+      }
+    ]
+  }
+}

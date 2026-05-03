@@ -1,0 +1,81 @@
+{
+  "name": "网页监控 → Excel异常报告",
+  "description": "浏览器打开网页 → 提取状态 → 条件判断是否异常 → 异常写入Excel并通知 / 正常记录日志",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "browser_navigate",
+      "label": "打开监控页面",
+      "position": { "x": 60, "y": 120 },
+      "config": { "params": { "url": "file:///templates/data/status-page.html", "wait_until": "load" } }
+    },
+    {
+      "id": "n2",
+      "type": "browser_wait",
+      "label": "等待加载完成",
+      "position": { "x": 60, "y": 320 },
+      "config": { "params": { "selector": ".status-indicator", "timeout_ms": 10000 } }
+    },
+    {
+      "id": "n3",
+      "type": "browser_extract",
+      "label": "提取页面状态",
+      "position": { "x": 360, "y": 120 },
+      "config": { "params": { "selector": ".status-indicator", "mode": "text" } }
+    },
+    {
+      "id": "n4",
+      "type": "browser_screenshot",
+      "label": "截取页面快照",
+      "position": { "x": 360, "y": 320 },
+      "config": { "params": { "path": "templates/data/output/monitor_{{now}}.png", "full_page": false } }
+    },
+    {
+      "id": "n5",
+      "type": "condition",
+      "label": "状态正常?",
+      "position": { "x": 660, "y": 220 },
+      "config": { "left": "{{n3.result}}", "op": "contains", "right": "正常", "true_next": "n6", "false_next": "n7" }
+    },
+    {
+      "id": "n6",
+      "type": "print",
+      "label": "记录正常日志",
+      "position": { "x": 960, "y": 80 },
+      "config": { "message": "[监控] 网站状态正常 ✅", "level": "info" }
+    },
+    {
+      "id": "n7",
+      "type": "excel_create",
+      "label": "创建异常报告",
+      "position": { "x": 960, "y": 200 },
+      "config": { "path": "templates/data/output/异常报告_{{now}}.xlsx", "columns": ["时间", "页面", "状态", "截图"] }
+    },
+    {
+      "id": "n8",
+      "type": "excel_write",
+      "label": "写入异常记录",
+      "position": { "x": 960, "y": 360 },
+      "config": { "data": [{ "时间": "{{now}}", "页面": "file:///templates/data/status-page.html", "状态": "{{n3.result}}", "截图": "{{n4.result}}" }] }
+    },
+    {
+      "id": "n9",
+      "type": "notify",
+      "label": "发送告警通知",
+      "position": { "x": 1260, "y": 280 },
+      "config": { "title": "⚠️ 网站异常告警", "message": "监控页面状态异常: {{n3.result}}\n报告已生成" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e3", "source": "n2", "target": "n4", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e4", "source": "n3", "target": "n5", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e5", "source": "n5", "target": "n6", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e6", "source": "n5", "target": "n7", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e7", "source": "n7", "target": "n8", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e8", "source": "n3", "target": "n8", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e9", "source": "n4", "target": "n8", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e10", "source": "n8", "target": "n9", "sourceHandle": "result", "targetHandle": "input" }
+  ]
+}

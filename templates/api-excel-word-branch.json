@@ -1,0 +1,72 @@
+{
+  "name": "JSON数据 → 条件分流 Word/Excel",
+  "description": "读取JSON文件 → 解析数据 → 条件判断 → 正常数据写入Excel / 异常生成Word报告并通知",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "file_read",
+      "label": "读取订单数据",
+      "position": { "x": 60, "y": 120 },
+      "config": { "path": "templates/data/订单数据.json", "encoding": "utf-8" }
+    },
+    {
+      "id": "n2",
+      "type": "json_parse",
+      "label": "解析订单列表",
+      "position": { "x": 360, "y": 120 },
+      "config": { "expression": "$.data.items[*]", "target_field": "orders" }
+    },
+    {
+      "id": "n3",
+      "type": "condition",
+      "label": "有订单数据?",
+      "position": { "x": 660, "y": 40 },
+      "config": { "left": "{{n2.result}}", "op": "not_empty", "true_next": "n4", "false_next": "n6" }
+    },
+    {
+      "id": "n4",
+      "type": "array_filter",
+      "label": "筛选已完成订单",
+      "position": { "x": 960, "y": -40 },
+      "config": { "field": "status", "op": "==", "value": "completed" }
+    },
+    {
+      "id": "n5",
+      "type": "excel_write",
+      "label": "写入订单Excel报表",
+      "position": { "x": 1260, "y": -40 },
+      "config": { "path": "templates/data/output/订单报表_{{now}}.xlsx", "sheet": "已完成订单", "data": "{{n4.result}}" }
+    },
+    {
+      "id": "n6",
+      "type": "word_create",
+      "label": "创建异常报告",
+      "position": { "x": 960, "y": 160 },
+      "config": { "path": "templates/data/output/异常报告_{{now}}.docx" }
+    },
+    {
+      "id": "n7",
+      "type": "word_write",
+      "label": "填写异常详情",
+      "position": { "x": 960, "y": 320 },
+      "config": { "content": "⚠️ 数据异常报告\n\n时间: {{now}}\n数据文件: templates/data/订单数据.json\n解析结果: {{n2.result}}" }
+    },
+    {
+      "id": "n8",
+      "type": "notify",
+      "label": "异常推送通知",
+      "position": { "x": 1260, "y": 240 },
+      "config": { "title": "⚠️ 订单数据异常", "message": "订单数据为空，已生成Word报告" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "input" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e3", "source": "n3", "target": "n4", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e4", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e5", "source": "n3", "target": "n6", "sourceHandle": "result", "targetHandle": "input" },
+    { "id": "e6", "source": "n6", "target": "n7", "sourceHandle": "result", "targetHandle": "data" },
+    { "id": "e7", "source": "n1", "target": "n7", "sourceHandle": "content", "targetHandle": "data" },
+    { "id": "e8", "source": "n7", "target": "n8", "sourceHandle": "result", "targetHandle": "input" }
+  ]
+}
