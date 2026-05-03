@@ -41,9 +41,10 @@
     </div>
 
     <!-- Row 3: Console -->
-    <div v-if="showConsole && logs.length > 0" class="grid-console">
+    <div v-if="showConsole" class="grid-console">
       <div class="console-header"><span>📋 执行日志</span><button class="console-clear" @click="logs = []">清除</button></div>
       <div class="console-body">
+        <div v-if="logs.length === 0" class="console-hint">等待操作…</div>
         <div v-for="log in logs" :key="log.id" :class="['log-line', log.level]">
           <span class="log-time">{{ log.time }}</span><span class="log-text">{{ log.text }}</span>
         </div>
@@ -180,6 +181,7 @@
 .console-clear { padding: 1px 8px; background: none; border: 1px solid #30363d; border-radius: 4px; color: #8b949e; font-size: 10px; cursor: pointer; }
 .console-clear:hover { background: #21262d; color: #c9d1d9; }
 .console-body { flex: 1; overflow-y: auto; padding: 4px 12px; font-family: monospace; font-size: 11px; line-height: 1.5; }
+.console-hint { color: #484f58; font-style: italic; padding: 8px 0; }
 .log-line { display: flex; gap: 8px; padding: 1px 0; }
 .log-time { color: #484f58; flex-shrink: 0; }
 .log-text { word-break: break-all; }
@@ -1118,6 +1120,7 @@ function onDeselectNode() {
 function runAll() {
   if (store.nodes.length === 0) return
   isRunning.value = true
+  showConsole.value = true
   store.resetAllStatuses()
   addLog('▶ DAG 执行开始...', 'info')
   runDagFlow()
@@ -1317,6 +1320,7 @@ async function toggleRecording() {
     try {
       await safeInvoke('browser_recording_start')
       recording.value = true
+      showConsole.value = true
       addLog('🔴 录制已开始 — 请在浏览器中操作')
     } catch (e: any) {
       addLog(`❌ 开始录制失败: ${e}`, 'error')
@@ -1326,6 +1330,7 @@ async function toggleRecording() {
 
 async function pickElement() {
   try {
+    showConsole.value = true
     const result = await safeInvoke<{ selector?: string }>('browser_pick_element')
     if (result?.selector) {
       // 如果选中了节点且有 selector widget，自动填入
