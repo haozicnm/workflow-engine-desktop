@@ -578,6 +578,28 @@ fn emit_step_update(
     if let Err(e) = app.emit("step-update", event) {
         warn!("[DAG] 发送 step-update 事件失败: {}", e);
     }
+
+    // v3: 同时发射 step-status-update 事件（前端状态可视化用）
+    let current_step = if status == "running" { 0 } else { 0 }; // 由前端自行计数
+    let status_event = serde_json::json!({
+        "step_id": step_id,
+        "step_name": step_name,
+        "status": status,
+        "current_step": current_step,
+        "total_steps": total_steps,
+    });
+    let _ = app.emit("step-status-update", status_event);
+
+    // v3: 成功时发射 step-output 事件（输出内联预览用）
+    if status == "completed" || status == "success" {
+        if let Some(out) = output {
+            let output_event = serde_json::json!({
+                "step_id": step_id,
+                "output": out,
+            });
+            let _ = app.emit("step-output", output_event);
+        }
+    }
 }
 
 fn emit_step_update_with_error(
@@ -598,6 +620,23 @@ fn emit_step_update_with_error(
     if let Err(e) = app.emit("step-update", event) {
         warn!("[DAG] 发送 step-update 事件失败: {}", e);
     }
+
+    // v3: 同时发射 step-status-update + step-error
+    let status_event = serde_json::json!({
+        "step_id": step_id,
+        "step_name": step_name,
+        "status": "error",
+        "current_step": 0,
+        "total_steps": 0,
+    });
+    let _ = app.emit("step-status-update", status_event);
+
+    let error_event = serde_json::json!({
+        "step_id": step_id,
+        "step_name": step_name,
+        "error": error,
+    });
+    let _ = app.emit("step-error", error_event);
 }
 
 fn emit_run_update(

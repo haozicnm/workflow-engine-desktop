@@ -34,8 +34,18 @@
       <div class="canvas-overlay">
         <div v-if="store.nodes.length === 0" class="empty-canvas">
           <div class="empty-icon">🎨</div>
-          <div class="empty-title">空画布</div>
-          <div class="empty-hint">双击空白画布搜索节点，或右键查看更多操作</div>
+          <div class="empty-title">开始搭建工作流</div>
+          <div class="empty-hint">
+            <kbd>双击</kbd> 空白区域搜索节点
+            <span class="hint-spacer">·</span>
+            <kbd>右键</kbd> 查看更多操作
+          </div>
+          <div class="empty-shortcuts">
+            <div class="shortcut-row"><kbd>Ctrl+S</kbd> 保存</div>
+            <div class="shortcut-row"><kbd>Ctrl+Enter</kbd> 运行</div>
+            <div class="shortcut-row"><kbd>Delete</kbd> 删除节点</div>
+            <div class="shortcut-row"><kbd>Ctrl+Z</kbd> 撤销</div>
+          </div>
         </div>
       </div>
     </div>
@@ -230,6 +240,15 @@ import { registerAllNodes } from '../nodes/litegraph-nodes'
 import type { NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
 
 // ─── Props ───
+const props = defineProps<{
+  initialWorkflowId?: string
+  initialTemplate?: { id: string; name: string; nodes: unknown[]; edges: unknown[] } | null
+}>()
+
+const emit = defineEmits<{
+  'back': []
+}>()
+
 const store = useFlowStore()
 const tabStore = useTabStore()
 
@@ -612,6 +631,70 @@ function addLog(text: string, level = 'info') {
   if (logs.value.length > 100) logs.value.shift()
 }
 
+// ─── 节点状态可视化：同步 flowStore.nodeStatuses 到 LiteGraph 节点渲染 ───
+const STATUS_COLORS: Record<string, string> = {
+  idle:    '#2a3040',   // 深灰
+  queued:  '#d29922',   // 橙色
+  running: '#58a6ff',   // 蓝色
+  success: '#3fb950',   // 绿色
+  error:   '#f85149',   // 红色
+  warning: '#d29922',   // 橙色
+  paused:  '#8b949e',   // 灰色
+}
+
+function syncNodeStatuses() {
+  if (!graph) return
+  const lgNodes = graph._nodes || []
+  for (const lgNode of lgNodes) {
+    if (!lgNode || !lgNode.id) continue
+    const status = store.nodeStatuses[String(lgNode.id)] || 'idle'
+    lgNode.color = STATUS_COLORS[status] || STATUS_COLORS.idle
+    // 执行中：闪烁（通过 boxcolor 表达）
+    if (status === 'running') {
+      lgNode.boxcolor = '#1f6feb'
+    } else if (status === 'error') {
+      lgNode.boxcolor = '#da3633'
+    } else if (status === 'success') {
+      lgNode.boxcolor = '#238636'
+    } else {
+      lgNode.boxcolor = '#2a3040'
+    }
+  }
+  graph.setDirtyCanvas?.(true)
+}
+
+// 监听状态变化 → 更新节点外观
+watch(() => store.nodeStatuses, () => {
+  syncNodeStatuses()
+}, { deep: true })
+
+// 监听输出变化 → 在节点上显示数据摘要
+watch(() => store.stepOutputs, () => {
+  if (!graph) return
+  const lgNodes = graph._nodes || []
+  for (const lgNode of lgNodes) {
+    if (!lgNode || !lgNode.id) continue
+    const output = store.stepOutputs[String(lgNode.id)]
+    if (output) {
+      // 在节点上加一个小旗标显示输出摘要
+      ;(lgNode as any)._outputBadge = summarizeOutput(output)
+    }
+  }
+  graph.setDirtyCanvas?.(true)
+}, { deep: true })
+
+function summarizeOutput(data: unknown): string {
+  if (data === null || data === undefined) return 'null'
+  if (typeof data === 'string') return data.length > 40 ? data.slice(0, 40) + '...' : data
+  if (typeof data === 'number') return String(data)
+  if (Array.isArray(data)) return `[${data.length} 条]`
+  if (typeof data === 'object') {
+    const keys = Object.keys(data as object)
+    return `{${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '...' : ''}}`
+  }
+  return String(data).slice(0, 40)
+}
+
 // ─── Canvas 初始化 ───
 onMounted(() => {
   // 注册所有自定义 LiteGraph 节点
@@ -736,6 +819,16 @@ onMounted(() => {
     if (store.nodes.length > 0) {
       loadFromStore()
       addLog(`📋 已加载「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
+    } else if (props.initialTemplate) {
+      // v3: 从模板创建
+      const tpl = props.initialTemplate
+      store.load({ name: tpl.name, nodes: tpl.nodes as any, edges: tpl.edges as any, variables: {} })
+      loadFromStore()
+      addLog(`📋 从模板「${tpl.name}」创建 (${store.nodeCount} 节点)`, 'info')
+      fitView()
+    } else if (props.initialWorkflowId) {
+      // v3: 打开已有工作流
+      loadWorkflowById(props.initialWorkflowId)
     } else {
       const restored = autoSave.loadAutoSave()
       if (restored) {
@@ -980,8 +1073,24 @@ function loadFromStore() {
   // 不再需要 oldToNew 映射 — syncGraphToStore 会统一用 LiteGraph 整数 ID 重写 store
   syncingFromStore = false
   // 重新同步 store，将 LiteGraph 生成的整数 ID 写回
-  syncGraphToStore()
-  store.dirty = false
+  throttledSync()
+}
+
+// ─── v3: 按 ID 加载工作流 ───
+async function loadWorkflowById(id: string) {
+  try {
+    const result = await safeInvoke<{ name: string; nodes: unknown[]; edges: unknown[]; variables?: Record<string, unknown> }>('workflow_get', { id })
+    if (result && result.nodes) {
+      store.load({ name: result.name, nodes: result.nodes as any, edges: result.edges as any, variables: result.variables || {} })
+      store.setWorkflowId(id)
+      loadFromStore()
+      addLog(`📋 已打开「${result.name}」(${store.nodeCount} 节点)`, 'info')
+      fitView()
+    }
+  } catch (e: any) {
+    addLog(`❌ 打开工作流失败: ${e}`, 'error')
+  }
+}
   // 确保交互属性
   canvas.allow_dragnodes = true
   canvas.allow_dragcanvas = true
@@ -1124,6 +1233,7 @@ async function stopRun() {
 // ─── 真实 DAG 执行 ───
 const currentRunId = ref<string | null>(null)
 let dagEventUnlisteners: UnlistenFn[] = []
+const stepStartTimes = new Map<string, number>()  // v3: 耗时追踪
 
 async function runDagFlow() {
   syncGraphToStore()
@@ -1168,11 +1278,28 @@ async function setupDagListeners() {
     (event) => {
       const { step_id, step_name, status, current_step, total_steps } = event.payload
       store.setNodeStatus(step_id, status as NodeStatus)
-      if (status === 'running') addLog(`⏳ [${current_step}/${total_steps}] ${step_name}`)
-      else if (status === 'success') addLog(`✅ [${current_step}/${total_steps}] ${step_name}`)
+      if (status === 'running') {
+        stepStartTimes.set(step_id, performance.now())
+        addLog(`⏳ [${current_step}/${total_steps}] ${step_name}`, 'info')
+      } else if (status === 'success') {
+        const start = stepStartTimes.get(step_id)
+        const ms = start ? Math.round(performance.now() - start) : 0
+        const duration = ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`
+        addLog(`✅ [${current_step}/${total_steps}] ${step_name} (${duration})`, 'success')
+        stepStartTimes.delete(step_id)
+      }
     }
   )
   dagEventUnlisteners.push(u1)
+
+  // v3: 步骤输出事件
+  const u1b = await safeListen<{ step_id: string; output: unknown }>(
+    'step-output',
+    (event) => {
+      store.setNodeOutput(event.payload.step_id, event.payload.output)
+    }
+  )
+  dagEventUnlisteners.push(u1b)
 
   const u2 = await safeListen<{ run_id: string; status: string }>(
     'run-update',
@@ -1189,7 +1316,7 @@ async function setupDagListeners() {
   )
   dagEventUnlisteners.push(u2)
 
-  const u3 = await safeListen<{ step_id: string; step_name: string }>(
+  const u3 = await safeListen<{ step_id: string; step_name: string; error?: string }>(
     'breakpoint-hit',
     (event) => {
       const { step_id, step_name } = event.payload
@@ -1198,6 +1325,20 @@ async function setupDagListeners() {
     }
   )
   dagEventUnlisteners.push(u3)
+
+  // v3: 步骤错误事件（含耗时）
+  const u4 = await safeListen<{ step_id: string; step_name: string; error?: string }>(
+    'step-error',
+    (event) => {
+      const { step_id, step_name, error } = event.payload
+      const start = stepStartTimes.get(step_id)
+      const ms = start ? Math.round(performance.now() - start) : 0
+      const duration = ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`
+      addLog(`❌ ${step_name} (${duration}): ${error || '未知错误'}`, 'error')
+      stepStartTimes.delete(step_id)
+    }
+  )
+  dagEventUnlisteners.push(u4)
 }
 
 function cleanupDagListeners() {
@@ -1468,6 +1609,35 @@ function onKeyDown(e: KeyboardEvent) {
   border-radius: 4px;
   font-family: inherit;
   font-size: 11px;
+}
+
+.hint-spacer {
+  margin: 0 8px;
+  color: #30363d;
+}
+
+.empty-shortcuts {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+}
+
+.shortcut-row {
+  font-size: 12px;
+  color: #6e7681;
+}
+
+.shortcut-row kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  margin-right: 4px;
 }
 
 /* ─── 底部控制台 ─── */
