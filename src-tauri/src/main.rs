@@ -56,6 +56,7 @@ fn main() {
             workflow_engine::commands::run::run_logs,
             workflow_engine::commands::run::run_list,
             workflow_engine::commands::run::run_detail,
+            workflow_engine::commands::run::run_step_logs,
             workflow_engine::commands::run::approval_response,
             // Debug
             workflow_engine::commands::run::debug_step,
@@ -73,12 +74,6 @@ fn main() {
             workflow_engine::commands::system::clear_logs,
             // Pipeline
             workflow_engine::commands::pipeline::run_pipeline,
-            // Templates
-            workflow_engine::commands::template::template_list,
-            workflow_engine::commands::template::template_get_yaml,
-            workflow_engine::commands::template::template_get_json,
-            workflow_engine::commands::template::list_templates,
-            workflow_engine::commands::template::load_template,
             // Schedules
             workflow_engine::commands::schedule::schedule_list,
             workflow_engine::commands::schedule::schedule_create,

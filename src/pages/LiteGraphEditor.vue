@@ -1,199 +1,266 @@
 <template>
-  <!-- ═══════════ Grid 布局（对齐 ComfyUI GraphView）— v2 修复尺寸塌陷 ═══════════ -->
   <div class="editor-app">
-    <!-- Row 1: Top bar -->
-    <div class="grid-top">
-      <div class="top-left">
-        <button class="btn-back" title="返回首页" @click="emit('back')">🏠</button>
-        <WorkflowTabs @add="onTabAdd" />
+    <!-- 顶栏：logo + 名称 + 运行 + 保存 -->
+    <div class="topbar-simple">
+      <div class="topbar-left">
+        <span class="topbar-logo" @click="$emit('back')" title="返回首页">WorkFlow</span>
+        <span class="topbar-sep">|</span>
+        <span class="workflow-name" @click="onRenameWorkflow" title="点击重命名">
+          {{ store.workflowName || '未命名工作流' }}
+        </span>
       </div>
-      <TopMenuSection
-        :name="store.workflowName" :node-count="store.nodeCount" :edge-count="store.edgeCount"
-        :dirty="store.dirty" :running="isRunning" :recording="recording"
-        :disable-run="store.nodes.length === 0"
-        @run="runAll" @step="runSingle" @stop="stopRun"
-        @record="toggleRecording" @pick="pickElement"
-        @import="importWorkflow" @export="exportWorkflow"
-        @clear="clearCanvas" @save="onSaveWorkflow"
-        @rename="onRenameWorkflow"
-      />
+      <div class="topbar-actions">
+        <button class="btn-run" @click="runAll" :disabled="isRunning">
+          {{ isRunning ? '⏸ 运行中...' : '▶ 运行' }}
+        </button>
+        <button class="btn-save" @click="onSaveWorkflow">💾 保存</button>
+      </div>
     </div>
 
-    <!-- Row 2, Col 1: Sidebar -->
-    <div class="grid-sidebar">
-      <SideToolbar
-        :show-console="showConsole"
-        @toggle-dashboard="showDashboard = !showDashboard"
-        @toggle-palette="showPalette = !showPalette"
-        @toggle-history="showHistory = !showHistory"
-        @toggle-console="showConsole = !showConsole"
-        @toggle-settings="showSettings = !showSettings"
-        @toggle-schedule="showSchedule = !showSchedule"
-        @toggle-debug="showDebug = !showDebug"
-      />
-    </div>
-
-    <!-- Row 2, Col 2: Canvas — 显式 1fr，canvas 加 width/height:100% -->
+    <!-- Canvas 画布 -->
     <div class="grid-canvas">
       <canvas ref="canvasRef" class="editor-canvas" />
       <div class="canvas-overlay">
         <div v-if="store.nodes.length === 0" class="empty-canvas">
-          <div class="empty-icon">🎨</div>
-          <div class="empty-title">开始搭建工作流</div>
-          <div class="empty-hint">
-            <kbd>双击</kbd> 空白区域搜索节点
-            <span class="hint-spacer">·</span>
-            <kbd>右键</kbd> 查看更多操作
-          </div>
-          <div class="empty-shortcuts">
-            <div class="shortcut-row"><kbd>Ctrl+S</kbd> 保存</div>
-            <div class="shortcut-row"><kbd>Ctrl+Enter</kbd> 运行</div>
-            <div class="shortcut-row"><kbd>Delete</kbd> 删除节点</div>
-            <div class="shortcut-row"><kbd>Ctrl+Z</kbd> 撤销</div>
-          </div>
+          <p>双击画布或右键添加节点</p>
         </div>
+      </div>
+      <!-- 右键菜单 -->
+      <CanvasContextMenu
+        :visible="contextMenuVisible"
+        :x="contextMenuPos.x" :y="contextMenuPos.y"
+        :items="contextMenuItems"
+        @close="contextMenuVisible = false"
+      />
+      <!-- 搜索弹窗 -->
+      <CanvasSearchPopover
+        :visible="searchVisible"
+        :x="searchPos.x" :y="searchPos.y"
+        :graph="graph"
+        @close="searchVisible = false"
+        @node-added="onSearchNodeAdded"
+      />
+      <!-- 预览窗口（右侧浮出，选中节点时显示） -->
+      <div v-if="selectedLgNode" class="preview-right">
+        <PreviewPanel :lg-node="selectedLgNode" @update-widget="onUpdateWidget" />
       </div>
     </div>
 
-    <!-- Row 3: Console -->
-    <div v-if="showConsole" class="grid-console">
-      <div class="console-header"><span>📋 执行日志</span><button class="console-clear" @click="logs = []">清除</button></div>
-      <div class="console-body">
+    <!-- 控制台（右下角内嵌面板，可折叠） -->
+    <div class="console-float" :class="{ collapsed: consoleCollapsed }">
+      <div class="console-header" @click="consoleCollapsed = !consoleCollapsed">
+        <span>📟 控制台</span>
+        <span class="console-badge">{{ logs.length }}</span>
+        <button class="console-clear" @click.stop="logs = []" title="清除">🗑</button>
+        <button class="console-toggle" title="折叠">{{ consoleCollapsed ? '▲' : '▼' }}</button>
+      </div>
+      <div v-if="!consoleCollapsed" class="console-body">
         <div v-if="logs.length === 0" class="console-hint">等待操作…</div>
         <div v-for="log in logs" :key="log.id" :class="['log-line', log.level]">
           <span class="log-time">{{ log.time }}</span><span class="log-text">{{ log.text }}</span>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ═══════════ 全局浮层（统一尺寸规范） ═══════════ -->
-  <MiniMap v-if="canvasReady" :canvas="canvas" :graph="graph" :visible="showMiniMap" />
-  <CanvasContextMenu :visible="contextMenuVisible" :x="contextMenuPos.x" :y="contextMenuPos.y" :items="contextMenuItems" @close="contextMenuVisible = false" />
-  <CanvasSearchPopover :visible="searchVisible" :x="searchPos.x" :y="searchPos.y" :graph="graph" @close="searchVisible = false" @node-added="onSearchNodeAdded" />
-
-  <input ref="importInputRef" type="file" accept=".json" style="display:none" @change="onImportFile" />
-
-  <FloatingPanel :visible="showPalette" title="节点库" :width="280" :height="480" @close="showPalette = false">
-    <NodePalette @add-node="onAddNodeFromPalette" />
-  </FloatingPanel>
-  <FloatingPanel :visible="!!selectedLgNode" :title="selectedLgNode?.title || selectedLgNode?.type || '属性'" :width="320" :height="480" @close="onDeselectNode">
-    <PropertyPanel :key="widgetVersion" :lg-node="selectedLgNode"
-      :output="selectedLgNode ? store.stepOutputs[String(selectedLgNode.id)] : undefined"
-      :error="selectedLgNode ? store.nodeStatuses[String(selectedLgNode.id)] === 'error' ? '执行失败' : undefined : undefined"
-      :duration="undefined"
-      @update-label="onUpdateLabel" @update-widget="onUpdateWidget" @delete="onDeleteNode" />
-  </FloatingPanel>
-  <FloatingPanel :visible="showDashboard" title="📋 工作流" :width="760" :height="560" @close="showDashboard = false">
-    <Dashboard @open-workflow="onOpenWorkflow" @create-from-template="onCreateFromTemplate" @navigate="onDashboardNavigate" />
-  </FloatingPanel>
-  <FloatingPanel :visible="showSettings" title="⚙️ 设置" :width="600" :height="540" @close="showSettings = false">
-    <Settings />
-  </FloatingPanel>
-  <FloatingPanel :visible="showHistory" title="📊 运行历史" :width="680" :height="520" @close="showHistory = false">
-    <RunHistory />
-  </FloatingPanel>
-  <FloatingPanel :visible="showDebug" title="🔍 变量调试" :width="420" :height="480" @close="showDebug = false">
-    <DebugPanel />
-  </FloatingPanel>
-  <FloatingPanel :visible="showSchedule" title="📅 定时计划" :width="600" :height="480" @close="showSchedule = false">
-    <ScheduleSection :schedules="scheduleList" :loading="scheduleLoading"
-      @toggle-schedule="onToggleSchedule" @delete-schedule="onDeleteSchedule"
-      @edit-schedule="(s: any) => scheduleDialogRef?.open(workflowListForSchedule, s)"
-      @new-schedule="scheduleDialogRef?.open(workflowListForSchedule)" />
-    <ScheduleDialog ref="scheduleDialogRef" @saved="loadSchedules" />
-  </FloatingPanel>
-
-  <Teleport to="body">
-    <div v-if="previewVisible" class="preview-overlay" @mousedown.self="previewVisible = false">
-      <div ref="previewPopupRef" class="preview-popup" :style="previewStyle" @mousedown.stop>
-        <div class="preview-popup-header" @mousedown="onPreviewDragStart">
-          <span>{{ previewTitle }}</span>
-          <div class="preview-popup-actions"><button @click="previewVisible = false">✕</button></div>
+    <!-- v4.0: 容器节点 action 选择器 -->
+    <Teleport to="body">
+      <div
+        v-if="actionPickerVisible"
+        class="action-picker-overlay"
+        @mousedown.prevent.stop
+        @click="actionPickerVisible = false"
+      >
+        <div
+          class="action-picker-popup"
+          :style="{ left: actionPickerPos.x + 'px', top: actionPickerPos.y + 'px' }"
+          @click.stop
+        >
+          <div class="action-picker-header">添加动作</div>
+          <div class="action-picker-list">
+            <div
+              v-for="action in availableActions"
+              :key="action.type"
+              class="action-picker-item"
+              @click="onAddContainerAction(action)"
+            >
+              <span class="action-picker-icon">{{ action.icon }}</span>
+              <div>
+                <div class="action-picker-label">{{ action.label }}</div>
+                <div class="action-picker-desc">{{ action.desc }}</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="preview-popup-body"><PreviewPanel :lg-node="selectedLgNode" @update-widget="onUpdateWidget" /></div>
-        <div class="preview-resize-handle" @mousedown="onPreviewResizeStart"></div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+
+    <!-- v4.0: Action 参数编辑面板 -->
+    <Teleport to="body">
+      <div
+        v-if="actionEditorVisible"
+        class="action-editor-overlay"
+        @mousedown.prevent.stop
+        @click="actionEditorVisible = false"
+      >
+        <div
+          class="action-editor-panel"
+          :style="{ left: Math.min(actionEditorPos.x, window.innerWidth - 280) + 'px', top: Math.min(actionEditorPos.y + 8, window.innerHeight - 320) + 'px' }"
+          @click.stop
+        >
+          <div class="ae-header">
+            <span>⚙️ 动作参数</span>
+            <button class="ae-close" @click="actionEditorVisible = false">×</button>
+          </div>
+          <div class="ae-body">
+            <div
+              v-for="param in actionEditorParams"
+              :key="param.key"
+              class="ae-field"
+            >
+              <label class="ae-label">{{ param.label }}</label>
+              <input
+                v-if="param.type === 'text'"
+                class="ae-input"
+                :placeholder="param.ph || ''"
+                v-model="actionEditorForm[param.key]"
+              />
+              <input
+                v-else-if="param.type === 'number'"
+                class="ae-input"
+                type="number"
+                v-model.number="actionEditorForm[param.key]"
+              />
+              <select
+                v-else-if="param.type === 'select'"
+                class="ae-select"
+                v-model="actionEditorForm[param.key]"
+              >
+                <option v-for="v in param.vals" :key="v" :value="v">{{ v }}</option>
+              </select>
+              <label v-else-if="param.type === 'toggle'" class="ae-toggle">
+                <input type="checkbox" v-model="actionEditorForm[param.key]" />
+                <span class="ae-toggle-slider"></span>
+              </label>
+            </div>
+            <div v-if="actionEditorParams.length === 0" class="ae-empty">
+              此动作无额外参数
+            </div>
+          </div>
+          <div class="ae-footer">
+            <button class="ae-btn ae-btn-del" @click="deleteActionFromEditor">🗑 删除</button>
+            <button class="ae-btn ae-btn-save" @click="saveActionEditor">💾 保存</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+  </div>
 </template>
 
 <style scoped>
-/* ═══════════ Grid 布局（对齐 ComfyUI GraphView）— 显式轨道 + canvas 100% ═══════════ */
-
 .editor-app {
-  display: grid;
-  grid-template-columns: 48px 1fr;
-  grid-template-rows: auto 1fr auto;
-  width: 100vw; height: 100vh;
-  overflow: hidden;
-  background: var(--color-bg);
-}
-
-/* Row 1: Top bar */
-.grid-top {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  z-index: 1001;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  height: 100vh;
+  background: #0d1117;
 }
 
-.top-left {
+.topbar-simple {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0;
-  flex-shrink: 0;
-}
-
-.btn-back {
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: transparent;
-  color: #8b949e;
-  font-size: 18px;
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  margin: 0 4px;
-  flex-shrink: 0;
-}
-
-.btn-back:hover {
-  background: #21262d;
-  color: #e1e4e8;
-}
-
-/* Col 1 Row 2: Sidebar */
-.grid-sidebar {
-  grid-column: 1;
-  grid-row: 2;
+  padding: 6px 16px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
   z-index: 10;
+  flex-shrink: 0;
 }
 
-/* Col 2 Row 2: Canvas — 显式 1fr 轨道 */
+.workflow-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.workflow-name:hover {
+  background: #21262d;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #58a6ff;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  letter-spacing: -0.3px;
+}
+.topbar-logo:hover {
+  background: rgba(88, 166, 255, 0.1);
+}
+.topbar-sep {
+  color: #30363d;
+  font-size: 16px;
+  user-select: none;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-run {
+  padding: 4px 16px;
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-run:hover:not(:disabled) {
+  background: #2ea043;
+}
+
+.btn-save {
+  padding: 4px 12px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-save:hover {
+  background: #30363d;
+}
+
 .grid-canvas {
-  grid-column: 2;
-  grid-row: 2;
+  flex: 1;
   position: relative;
   overflow: hidden;
-  background: var(--color-bg);
-  /* 关键：让 Grid 子元素可以撑满 cell */
-  min-width: 0; min-height: 0;
+  min-height: 0;
 }
 
-/* FIX: Canvas 必须 width:100%; height:100% 防止 Grid 尺寸塌陷 */
 .editor-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  background: var(--color-bg);
+  background: #0d1117;
   touch-action: none;
   user-select: none;
   outline: none;
@@ -206,47 +273,300 @@
 }
 
 .empty-canvas {
-  position: absolute; top: 50%; left: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
-  text-align: center; pointer-events: none; user-select: none;
+  pointer-events: auto;
+  color: #484f58;
+  font-size: 14px;
+  text-align: center;
 }
-.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
-.empty-title { font-size: 18px; font-weight: 600; color: #8b949e; margin-bottom: 6px; }
-.empty-hint { font-size: 13px; color: #484f58; }
 
-/* Row 3: Console */
-.grid-console {
-  grid-column: 1 / -1; grid-row: 3;
-  height: 140px;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  display: flex; flex-direction: column;
+.preview-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  background: #161b22;
+  border-left: 1px solid #30363d;
+  overflow-y: auto;
+  z-index: 50;
 }
+
+/* ─── 控制台（右下角浮动内嵌面板）─── */
+.console-float {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 420px;
+  max-height: 300px;
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: max-height 0.2s;
+  overflow: hidden;
+}
+.console-float.collapsed {
+  max-height: 32px;
+}
+
 .console-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 12px; border-bottom: 1px solid #21262d;
-  font-size: 11px; font-weight: 600; color: #8b949e; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(22, 27, 34, 0.9);
+  font-size: 11px;
+  color: #8b949e;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  border-radius: 8px 8px 0 0;
 }
-.console-clear { padding: 1px 8px; background: none; border: 1px solid #30363d; border-radius: 4px; color: #8b949e; font-size: 10px; cursor: pointer; }
-.console-clear:hover { background: #21262d; color: #c9d1d9; }
-.console-body { flex: 1; overflow-y: auto; padding: 4px 12px; font-family: monospace; font-size: 11px; line-height: 1.5; }
-.console-hint { color: #484f58; font-style: italic; padding: 8px 0; }
-.log-line { display: flex; gap: 8px; padding: 1px 0; }
+.console-header:hover {
+  background: rgba(33, 38, 45, 0.9);
+}
+.console-badge {
+  font-size: 10px;
+  background: #30363d;
+  color: #8b949e;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: auto;
+}
+.console-toggle {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 4px;
+}
+.console-toggle:hover { color: #e6edf3; }
+.console-clear {
+  padding: 1px 6px;
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #8b949e;
+  font-size: 10px;
+  cursor: pointer;
+}
+.console-clear:hover {
+  background: #21262d;
+  color: #c9d1d9;
+}
+
+.console-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 10px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 11px;
+  color: #c9d1d9;
+  max-height: 250px;
+  line-height: 1.5;
+}
+
+.console-hint {
+  color: #484f58;
+  font-style: italic;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+}
 .log-time { color: #484f58; flex-shrink: 0; }
 .log-text { word-break: break-all; }
 .log-line.info { color: #8b949e; }
 .log-line.error { color: #f85149; }
 .log-line.warn { color: #d29922; }
 .log-line.success { color: #3fb950; }
+</style>
 
-/* Preview */
-.preview-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.3); pointer-events: auto; }
-.preview-popup { position: fixed; background: #161b22; border: 1px solid #30363d; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; min-width: 320px; min-height: 200px; }
-.preview-popup-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: #21262d; border-bottom: 1px solid #30363d; cursor: move; font-size: 12px; font-weight: 600; color: #c9d1d9; flex-shrink: 0; user-select: none; }
-.preview-popup-actions button { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
-.preview-popup-actions button:hover { background: #30363d; color: #f85149; }
-.preview-popup-body { flex: 1; overflow: auto; padding: 0; }
-.preview-resize-handle { position: absolute; bottom: 0; right: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, #30363d 50%); border-radius: 0 0 8px 0; }
+<!-- v4.0: 容器节点 action picker（非 scoped — Teleport to body） -->
+<style>
+.action-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+.action-picker-popup {
+  position: fixed;
+  z-index: 10001;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  min-width: 240px;
+  max-height: 360px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.action-picker-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  border-bottom: 1px solid #21262d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.action-picker-list {
+  padding: 4px;
+}
+.action-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.action-picker-item:hover {
+  background: #1f6feb;
+}
+.action-picker-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.action-picker-label {
+  font-size: 13px;
+  color: #e6edf3;
+  font-weight: 500;
+}
+.action-picker-desc {
+  font-size: 11px;
+  color: #8b949e;
+  margin-top: 1px;
+}
+
+/* ─── v4.0: Action 参数编辑面板 ─── */
+.action-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+}
+.action-editor-panel {
+  position: fixed;
+  z-index: 10003;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  width: 260px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.ae-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b949e;
+  border-bottom: 1px solid #21262d;
+}
+.ae-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.ae-close:hover { color: #e6edf3; }
+.ae-body {
+  padding: 8px 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.ae-field {
+  margin-bottom: 8px;
+}
+.ae-label {
+  display: block;
+  font-size: 11px;
+  color: #8b949e;
+  margin-bottom: 3px;
+}
+.ae-input, .ae-select {
+  width: 100%;
+  padding: 5px 8px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #e6edf3;
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+.ae-input:focus, .ae-select:focus {
+  border-color: #58a6ff;
+}
+.ae-select {
+  cursor: pointer;
+}
+.ae-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.ae-toggle input[type="checkbox"] {
+  accent-color: #1f6feb;
+  width: 14px;
+  height: 14px;
+}
+.ae-empty {
+  font-size: 12px;
+  color: #484f58;
+  text-align: center;
+  padding: 8px;
+}
+.ae-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #21262d;
+}
+.ae-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  transition: all 0.12s;
+}
+.ae-btn-save {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #388bfd;
+}
+.ae-btn-save:hover { background: #388bfd; }
+.ae-btn-del {
+  background: transparent;
+  color: #f85149;
+  border-color: #30363d;
+}
+.ae-btn-del:hover {
+  background: #da3633;
+  color: #fff;
+  border-color: #f85149;
+}
 </style>
 
 <script setup lang="ts">
@@ -259,30 +579,16 @@ import { useFlowStore } from '../stores/flowStore'
 import { useTabStore } from '../stores/tabStore'
 import { useUndo } from '../composables/useUndo'
 import { useAutoSave } from '../composables/useAutoSave'
-import NodePalette from '../components/flow/NodePalette.vue'
-import PropertyPanel from '../components/flow/PropertyPanel.vue'
 import PreviewPanel from '../components/flow/PreviewPanel.vue'
-import SideToolbar from '../components/SideToolbar.vue'
-import TopMenuSection from '../components/TopMenuSection.vue'
-import WorkflowTabs from '../components/WorkflowTabs.vue'
-import FloatingPanel from '../components/FloatingPanel.vue'
-import ScheduleSection from '../components/ScheduleSection.vue'
-import ScheduleDialog from '../components/ScheduleDialog.vue'
-import Dashboard from './Dashboard.vue'
-import Settings from './Settings.vue'
-import RunHistory from './RunHistory.vue'
-import DebugPanel from '../components/DebugPanel.vue'
-import MiniMap from '../components/MiniMap.vue'
 import CanvasContextMenu from '../components/CanvasContextMenu.vue'
 import CanvasSearchPopover from '../components/CanvasSearchPopover.vue'
 import type { ContextMenuItem } from '../components/CanvasContextMenu.vue'
-import { registerAllNodes } from '../nodes/litegraph-nodes'
+import { registerAllNodes, BROWSER_ACTIONS, WORD_ACTIONS, EXCEL_ACTIONS } from '../nodes/litegraph-nodes'
 import type { NodeStatus, NodeDefinition } from '../components/flow/pinTypes'
 
 // ─── Props ───
 const props = defineProps<{
   initialWorkflowId?: string
-  initialTemplate?: { id: string; name: string; nodes: unknown[]; edges: unknown[] } | null
 }>()
 
 const emit = defineEmits<{
@@ -307,131 +613,183 @@ let _resizeObserver: ResizeObserver | null = null
 // ─── 本地状态 ───
 const selectedLgNode = ref<LGraphNode | null>(null)
 const isRunning = ref(false)
-const recording = ref(false)  // 浏览器录制状态
-const widgetVersion = ref(0)  // 递增触发 PropertyPanel 重渲染
-const importInputRef = ref<HTMLInputElement | null>(null)
-const previewVisible = ref(false)  // 预览弹窗
+const widgetVersion = ref(0)  // 递增触发 PropertyPanel 重渲染（保留给 PreviewPanel 使用）
 const breakpoints = ref(new Set<string>())  // v3: 断点集合
-const previewPopupRef = ref<HTMLDivElement | null>(null)
-const previewPos = ref({ x: 100, y: 100 })
-const previewSize = ref({ w: 560, h: 420 })
-const previewTitle = ref('预览')
-let previewDragging = false, previewDragOff = { x: 0, y: 0 }
-let previewResizing = false, previewResizeStart = { x: 0, y: 0, w: 0, h: 0 }
 
-const previewStyle = computed(() => ({
-  left: `${previewPos.value.x}px`,
-  top: `${previewPos.value.y}px`,
-  width: `${previewSize.value.w}px`,
-  height: `${previewSize.value.h}px`,
-}))
-
-function onPreviewDragStart(e: MouseEvent) {
-  previewDragging = true
-  previewDragOff = { x: e.clientX - previewPos.value.x, y: e.clientY - previewPos.value.y }
-  document.addEventListener('mousemove', onPreviewDrag)
-  document.addEventListener('mouseup', onPreviewDragEnd)
-}
-function onPreviewDrag(e: MouseEvent) {
-  if (!previewDragging) return
-  previewPos.value = { x: e.clientX - previewDragOff.x, y: e.clientY - previewDragOff.y }
-}
-function onPreviewDragEnd() {
-  previewDragging = false
-  document.removeEventListener('mousemove', onPreviewDrag)
-  document.removeEventListener('mouseup', onPreviewDragEnd)
-}
-
-function onPreviewResizeStart(e: MouseEvent) {
-  e.preventDefault()
-  e.stopPropagation()
-  previewResizing = true
-  previewResizeStart = { x: e.clientX, y: e.clientY, w: previewSize.value.w, h: previewSize.value.h }
-  document.addEventListener('mousemove', onPreviewResize)
-  document.addEventListener('mouseup', onPreviewResizeEnd)
-}
-function onPreviewResize(e: MouseEvent) {
-  if (!previewResizing) return
-  previewSize.value = {
-    w: Math.max(320, previewResizeStart.w + e.clientX - previewResizeStart.x),
-    h: Math.max(200, previewResizeStart.h + e.clientY - previewResizeStart.y),
-  }
-}
-function onPreviewResizeEnd() {
-  previewResizing = false
-  document.removeEventListener('mousemove', onPreviewResize)
-  document.removeEventListener('mouseup', onPreviewResizeEnd)
-}
-
-// 选中文件/浏览器节点时自动弹出预览
-const previewTypes = new Set(['browser_navigate', 'browser_click', 'browser_extract', 'browser_screenshot',
-  'browser_evaluate', 'browser', 'excel', 'excel_read', 'excel_write', 'excel_filter', 'excel_sort',
-  'word', 'word_read', 'word_write', 'word_replace',
-  'file', 'file_save', 'http', 'web_scrape'])
-watch(selectedLgNode, (node) => {
-  if (node && previewTypes.has(node.type)) {
-    previewTitle.value = node.title || node.type
-    // v3: 弹窗定位到节点右下角
-    const rect = canvasRef.value?.getBoundingClientRect()
-    if (rect && canvas) {
-      const [nx, ny] = node.pos || [0, 0]
-      const [nw, nh] = node.size || [200, 60]
-      const ds = (canvas as any).ds
-      const scale = ds?.scale || 1
-      const offset = ds?.offset || [0, 0]
-      previewPos.value = {
-        x: Math.min(rect.right - 580, Math.max(rect.left, rect.left + nx * scale + offset[0] + nw * scale + 16)),
-        y: Math.min(rect.bottom - 440, Math.max(rect.top, rect.top + ny * scale + offset[1])),
-      }
-    }
-    previewVisible.value = true
-  }
-})
-
-// 标签页切换：保存当前 → 加载目标
-watch(() => tabStore.activeTabId, (newId, oldId) => {
-  if (!newId || newId === oldId || !graph) return
-  if (oldId) saveCurrentTab()
-  loadTabData(newId)
-})
-
-// 名称变化同步到 tab
-watch(() => store.workflowName, (name) => {
-  tabStore.renameTab(tabStore.activeTabId || '', name)
-})
-
-// dirty 状态同步到 tab
-watch(() => store.dirty, (d) => {
-  tabStore.setDirty(tabStore.activeTabId || '', d)
-})
-
-// 标签关闭时清理缓存
-watch(() => tabStore.tabs.length, (len, oldLen) => {
-  if (len < (oldLen ?? 0)) {
-    // 有标签被删除，清理不在 store 中的缓存
-    const activeIds = new Set(tabStore.tabs.map(t => t.id))
-    for (const key of tabDataCache.keys()) {
-      if (!activeIds.has(key)) tabDataCache.delete(key)
-    }
-  }
-})
-const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
-
-// ─── 鼠标位置追踪（供 ghost placement 用） ───
+// ─── 鼠标位置追踪（供搜索弹窗 placement 用） ───
 let _lastMousePos = { x: 0, y: 0 }
 
 // ─── 面板状态 ───
-const showConsole = ref(false)
-const showPalette = ref(true)
-const showDashboard = ref(false)
-const showSettings = ref(false)
-const showHistory = ref(false)
-const showSchedule = ref(false)
-const showDebug = ref(false)
+const consoleCollapsed = ref(false)  // 控制台折叠状态（默认展开）
 
-// ─── P0：MiniMap / 右键菜单 / 搜索弹窗 ───
-const canvasReady = ref(false)  // initCanvasReal 完成后设为 true
-const showMiniMap = ref(true)
+// ─── 容器节点 action 选择器 ───
+const actionPickerVisible = ref(false)
+const actionPickerPos = ref({ x: 0, y: 0 })
+const actionPickerNodeId = ref<string | null>(null)
+// 存储容器节点的 action 区域（用于点击检测）
+const _containerActionRects = new WeakMap<object, { type: 'action'; actionId: string } | { type: 'add'; nodeId: string }>()
+
+// ─── v4.0: Action 参数编辑器 ───
+const actionEditorVisible = ref(false)
+const actionEditorPos = ref({ x: 0, y: 0 })
+const actionEditorNodeId = ref<string | null>(null)
+const actionEditorActionId = ref<string | null>(null)
+const actionEditorForm = ref<Record<string, any>>({})
+
+// 参数 schema：每个 action type → 可编辑的参数字段
+const ACTION_PARAMS: Record<string, Array<{ key: string; label: string; type: 'text'|'select'|'number'|'toggle'; ph?: string; vals?: string[]; def?: any }>> = {
+  navigate: [
+    { key: 'url', label: 'URL', type: 'text', ph: 'https://...' },
+    { key: 'wait_until', label: '等待策略', type: 'select', vals: ['load','domcontentloaded','networkidle'] },
+  ],
+  wait: [
+    { key: 'selector', label: '选择器', type: 'text', ph: '#element' },
+    { key: 'timeout', label: '超时(ms)', type: 'number', def: 5000 },
+  ],
+  input: [
+    { key: 'selector', label: '选择器', type: 'text', ph: '#input' },
+    { key: 'value', label: '填写值', type: 'text', ph: '留空=从连线传入' },
+    { key: 'clear', label: '先清空', type: 'toggle', def: true },
+  ],
+  fill: [
+    { key: 'selector', label: '选择器', type: 'text', ph: '#input' },
+    { key: 'value', label: '填写值', type: 'text', ph: '留空=从连线传入' },
+    { key: 'clear', label: '先清空', type: 'toggle', def: true },
+  ],
+  click: [
+    { key: 'selector', label: '选择器', type: 'text', ph: '#button' },
+  ],
+  extract: [
+    { key: 'selector', label: '选择器', type: 'text', ph: 'body' },
+    { key: 'mode', label: '提取模式', type: 'select', vals: ['text','html','attribute:value'] },
+  ],
+  screenshot: [
+    { key: 'full_page', label: '全页截图', type: 'toggle' },
+  ],
+  evaluate: [
+    { key: 'script', label: 'JS 代码', type: 'text', ph: 'document.title' },
+  ],
+  scroll: [
+    { key: 'x', label: 'X 偏移', type: 'number', def: 0 },
+    { key: 'y', label: 'Y 偏移', type: 'number', def: 0 },
+  ],
+  get_title: [],
+  pdf: [],
+  read: [
+    { key: 'range', label: '范围(Excel)', type: 'text', ph: 'A1:B10 (仅 Excel)' },
+  ],
+  write: [
+    { key: 'range', label: '范围', type: 'text', ph: 'A1 或 A1:B10' },
+    { key: 'value', label: '值', type: 'text', ph: '留空=从连线传入' },
+  ],
+  filter: [
+    { key: 'column', label: '列', type: 'text', ph: 'A' },
+    { key: 'op', label: '操作', type: 'select', vals: ['contains','equals','gt','gte','lt','lte','is_empty','not_empty'] },
+    { key: 'value', label: '筛选值', type: 'text', ph: '留空=从连线传入' },
+  ],
+  sort: [
+    { key: 'column', label: '列', type: 'text', ph: 'A' },
+    { key: 'order', label: '排序', type: 'select', vals: ['asc','desc'] },
+  ],
+  create: [
+    { key: 'headers', label: '表头(Excel)', type: 'text', ph: '列A,列B' },
+    { key: 'title', label: '标题(Word)', type: 'text', ph: '文档标题' },
+  ],
+  append: [
+    { key: 'value', label: '追加数据', type: 'text', ph: '留空=从连线传入' },
+  ],
+  formula: [
+    { key: 'cell', label: '单元格', type: 'text', ph: 'A1' },
+    { key: 'formula', label: '公式', type: 'text', ph: 'SUM(B1:B10)' },
+  ],
+  replace: [
+    { key: 'old_text', label: '查找文本', type: 'text' },
+    { key: 'new_text', label: '替换为', type: 'text', ph: '留空=从连线传入' },
+  ],
+  merge: [
+    { key: 'files', label: '文件列表', type: 'text', ph: '留空=从连线传入' },
+  ],
+  insert_table: [
+    { key: 'data', label: '表格数据', type: 'text', ph: '留空=从连线传入' },
+  ],
+  csv: [
+    { key: 'direction', label: '方向', type: 'select', vals: ['csv_to_xlsx', 'xlsx_to_csv'] },
+    { key: 'output', label: '输出路径', type: 'text', ph: 'output.csv 或 output.xlsx' },
+    { key: 'delimiter', label: '分隔符', type: 'select', vals: [',', ';', '\\t'] },
+  ],
+}
+
+function openActionEditor(node: any, actionId: string, clientX: number, clientY: number) {
+  const actions = (node.properties as any)?.actions || []
+  const action = actions.find((a: any) => a.id === actionId)
+  if (!action) return
+  actionEditorNodeId.value = String(node.id)
+  actionEditorActionId.value = actionId
+  actionEditorPos.value = { x: clientX, y: clientY }
+  // 初始化表单为当前 action.config 的值
+  const form: Record<string, any> = {}
+  const params = ACTION_PARAMS[action.type] || []
+  for (const p of params) {
+    form[p.key] = action.config?.[p.key] !== undefined ? action.config[p.key] : (p.def ?? (p.type === 'toggle' ? false : ''))
+  }
+  actionEditorForm.value = form
+  actionEditorVisible.value = true
+}
+
+function saveActionEditor() {
+  if (!actionEditorNodeId.value || !actionEditorActionId.value || !graph) return
+  const node = graph._nodes?.find((n: any) => String(n.id) === actionEditorNodeId.value)
+  if (!node) return
+  const actions = (node.properties as any)?.actions || []
+  const action = actions.find((a: any) => a.id === actionEditorActionId.value)
+  if (!action) return
+  action.config = { ...(action.config || {}), ...actionEditorForm.value }
+  ;(node as any).rebuildPorts?.()
+  graph.setDirtyCanvas(true, true)
+  actionEditorVisible.value = false
+}
+
+function deleteActionFromEditor() {
+  if (!actionEditorNodeId.value || !actionEditorActionId.value || !graph) return
+  const node = graph._nodes?.find((n: any) => String(n.id) === actionEditorNodeId.value)
+  if (!node) return
+  ;(node as any).removeAction?.(actionEditorActionId.value)
+  actionEditorVisible.value = false
+}
+
+// 根据选中容器节点类型返回可用动作列表
+const availableActions = computed(() => {
+  if (!actionPickerNodeId.value || !graph) return []
+  const node = graph._nodes?.find((n: any) => String(n.id) === actionPickerNodeId.value)
+  if (!node) return []
+  const t = (node as any).type || ''
+  if (t === 'browser_container') return BROWSER_ACTIONS
+  if (t === 'excel_container') return EXCEL_ACTIONS
+  if (t === 'word_container') return WORD_ACTIONS
+  return []
+})
+
+function onAddContainerAction(actionDef: { type: string; label: string; icon: string }) {
+  if (!actionPickerNodeId.value || !graph) return
+  const node = graph._nodes?.find((n: any) => String(n.id) === actionPickerNodeId.value)
+  if (!node) return
+  ;(node as any).addAction?.(actionDef.type, actionDef.label)
+  actionPickerVisible.value = false
+  addLog(`➕ ${actionDef.label} → ${node.title}`, 'info')
+}
+
+// 当前编辑 action 的参数列表
+const actionEditorParams = computed(() => {
+  if (!actionEditorNodeId.value || !actionEditorActionId.value || !graph) return []
+  const node = graph._nodes?.find((n: any) => String(n.id) === actionEditorNodeId.value)
+  if (!node) return []
+  const actions = (node.properties as any)?.actions || []
+  const action = actions.find((a: any) => a.id === actionEditorActionId.value)
+  if (!action) return []
+  return ACTION_PARAMS[action.type] || []
+})
+
+// ─── 右键菜单 / 搜索弹窗 ───
 const contextMenuVisible = ref(false)
 const contextMenuPos = ref({ x: 0, y: 0 })
 const searchVisible = ref(false)
@@ -446,12 +804,10 @@ const contextMenuItems = computed<ContextMenuItem[]>(() => {
     }},
     { label: 'separator', action: () => {}, divider: true },
     { label: '📋 复制', action: () => {
-      // TODO: 复制选中节点
       canvas?.copyToClipboard?.()
       addLog('📋 已复制', 'info')
     }, disabled: !selectedLgNode.value },
     { label: '📌 粘贴', action: () => {
-      // paste at menu position
       const rect = canvasRef.value?.getBoundingClientRect()
       if (!rect) return
       const worldPos = canvas?.convertOffsetToCanvas?.(
@@ -479,237 +835,25 @@ const contextMenuItems = computed<ContextMenuItem[]>(() => {
       addLog(breakpoints.value.has(id) ? `🔴 断点: ${selectedLgNode.value.title}` : `🔵 取消断点: ${selectedLgNode.value.title}`)
     }, disabled: !selectedLgNode.value },
     { label: 'separator', action: () => {}, divider: true },
+    { label: '📟 控制台', action: () => { consoleCollapsed.value = !consoleCollapsed.value } },
+    { label: 'separator', action: () => {}, divider: true },
     { label: '📐 适应视图', action: () => { fitView() }},
     { label: '🗑 清空画布', action: () => { clearCanvas() }},
   ]
   return items
 })
 
-// ─── 标签页数据缓存 ───
-const tabDataCache = new Map<string, { nodes: any[]; edges: any[]; name: string }>()
-
-/** 保存当前画布到标签页缓存 */
-function saveCurrentTab() {
-  const tid = tabStore.activeTabId
-  if (!tid) return
-  tabDataCache.set(tid, {
-    nodes: store.nodes.map(n => ({ ...n })),
-    edges: store.edges.map(e => ({ ...e })),
-    name: store.workflowName,
-  })
-}
-
-/** 从标签页缓存加载到画布 */
-function loadTabData(tabId: string) {
-  const data = tabDataCache.get(tabId)
-  if (data) {
-    store.$patch({
-      workflowName: data.name,
-      nodes: data.nodes,
-      edges: data.edges,
-    })
-  } else {
-    store.$patch({ workflowName: '未命名', nodes: [], edges: [] })
-  }
-  // 重新渲染画布
-  loadFromStore()
-  undoManager.init()  // 重置撤销历史
-}
-
-function onTabAdd() {
-  saveCurrentTab()
-  const newId = tabStore.addTab('工作流 ' + tabStore.tabCount)
-  tabDataCache.set(newId, { nodes: [], edges: [], name: '工作流 ' + tabStore.tabCount })
-  loadTabData(newId)
-}
-
-// ─── Dashboard 浮层事件处理 ───
-
-/** 加载已有工作流到画布 */
-async function onOpenWorkflow(id?: string) {
-  showDashboard.value = false
-  if (!id) {
-    // 新建空工作流
-    saveCurrentTab()
-    const newId = tabStore.addTab('工作流 ' + tabStore.tabCount)
-    tabDataCache.set(newId, { nodes: [], edges: [], name: '工作流 ' + tabStore.tabCount })
-    loadTabData(newId)
-    return
-  }
-  // 加载已有工作流：workflow_get → YAML → import_workflow → JSON
-  try {
-    const meta = await safeInvoke<any>('workflow_get', { id })
-    if (!meta) { addLog(`❌ 工作流 ${id} 不存在`, 'error'); return }
-    const parsed = await safeInvoke<any>('import_workflow', { yamlContent: meta.yaml })
-    if (!parsed?.nodes) { addLog(`❌ 工作流 ${id} 解析失败`, 'error'); return }
-    store.load({
-      name: meta.name || '未命名',
-      nodes: parsed.nodes,
-      edges: parsed.edges || [],
-    })
-    store.setWorkflowId(id)
-    loadFromStore()
-    undoManager.init()
-    addLog(`📂 已加载「${meta.name || id}」`)
-  } catch (e: unknown) {
-    addLog(`❌ 加载失败: ${(e as Error).message || e}`, 'error')
-  }
-}
-
-/** 从模板创建工作流 */
-function onCreateFromTemplate(tpl: { id: string; name: string; nodes: unknown[]; edges: unknown[] }) {
-  showDashboard.value = false
-  store.load({
-    name: tpl.name,
-    nodes: tpl.nodes as any[],
-    edges: tpl.edges as any[],
-  })
-  store.templateSource = tpl.id
-  loadFromStore()
-  undoManager.init()
-}
-
-/** Dashboard 内导航请求（历史/设置）→ 关闭 Dashboard 打开对应面板 */
-function onDashboardNavigate(path: string) {
-  showDashboard.value = false
-  if (path === '/history') { showHistory.value = true }
-  if (path === '/settings') { showSettings.value = true }
-}
-
-// ─── 定时计划 ───
-const scheduleList = ref<any[]>([])
-const scheduleLoading = ref(false)
-const scheduleDialogRef = ref<InstanceType<typeof ScheduleDialog> | null>(null)
-const workflowListForSchedule = ref<{ id: string; name: string }[]>([])
-
-async function loadSchedules() {
-  scheduleLoading.value = true
-  try {
-    scheduleList.value = await safeInvoke<any[]>('schedule_list')
-  } catch (e) {
-    console.warn('加载计划失败:', e)
-  } finally { scheduleLoading.value = false }
-}
-
-async function onToggleSchedule(s: any) {
-  try {
-    await safeInvoke('schedule_update', { id: s.id, enabled: !s.enabled })
-    s.enabled = !s.enabled
-    addLog(`计划已${s.enabled ? '启用' : '禁用'}`, 'info')
-  } catch (e: unknown) {
-    addLog(`❌ ${(e as Error).message || e}`, 'error')
-  }
-}
-
-async function onDeleteSchedule(s: any) {
-  if (!confirm(`确定删除此定时计划？`)) return
-  try {
-    await safeInvoke('schedule_delete', { id: s.id })
-    scheduleList.value = scheduleList.value.filter(x => x.id !== s.id)
-    addLog('计划已删除', 'info')
-  } catch (e: unknown) {
-    addLog(`❌ ${(e as Error).message || e}`, 'error')
-  }
-}
-
-// 监听 schedule 面板打开时加载数据
-watch(showSchedule, (v) => {
-  if (v) {
-    loadSchedules()
-    // 加载工作流列表供 schedule dialog 用
-    safeInvoke<any[]>('workflow_list').then(list => {
-      workflowListForSchedule.value = (list || []).map((w: any) => ({ id: w.id, name: w.name }))
-    }).catch(() => {})
-  }
-})
-
-// ─── 保存工作流 ───
-async function onSaveWorkflow() {
-  if (store.nodes.length === 0) {
-    addLog('⚠ 画布为空，无需保存', 'warn')
-    return
-  }
-  try {
-    const id = store.workflowId
-    if (id) {
-      // 更新已有工作流
-      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
-      await safeInvoke('workflow_save_yaml', { id, yaml })
-      addLog(`💾 已保存「${store.workflowName}」`)
-    } else {
-      // 新建工作流
-      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
-      const newId = await safeInvoke<string>('workflow_create', { name: store.workflowName, description: '' })
-      if (newId) {
-        await safeInvoke('workflow_save_yaml', { id: newId, yaml })
-        store.setWorkflowId(newId)
-        addLog(`💾 已保存「${store.workflowName}」`)
-      }
-    }
-    store.dirty = false
-  } catch (e: unknown) {
-    addLog(`❌ 保存失败: ${(e as Error).message || e}`, 'error')
-  }
-}
-
-// ─── ID 映射：store 用 String(lgId)，通过 find 直接查找 ───
-/** 浅比较两个 record 的键值是否不同 */
-function shallowDiff(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-  const keysA = Object.keys(a)
-  const keysB = Object.keys(b)
-  if (keysA.length !== keysB.length) return true
-  for (const k of keysA) {
-    if (a[k] !== b[k]) return true
-  }
-  return false
-}
-
-// ─── 标记：是否正在从 store 同步到 graph（避免循环更新） ───
-let syncingFromStore = false
-let lastSyncTime = 0
-let pendingRaf = false  // 防止 raf 堆叠
-const SYNC_THROTTLE_MS = 100
-
-function throttledSync() {
-  if (syncingFromStore) return
-  const now = Date.now()
-  if (now - lastSyncTime < SYNC_THROTTLE_MS) {
-    // 只排一个 raf，避免堆叠
-    if (!pendingRaf) {
-      pendingRaf = true
-      requestAnimationFrame(() => {
-        pendingRaf = false
-        if (!_canvasMounted) return
-        if (!syncingFromStore) {
-          syncGraphToStore()
-          undoManager.pushState()
-        }
-      })
-    }
-    return
-  }
-  lastSyncTime = now
-  syncGraphToStore()
-  undoManager.pushState()
-}
-
-// ─── 日志 ───
-function addLog(text: string, level = 'info') {
-  const now = new Date()
-  const time = now.toLocaleTimeString('zh-CN', { hour12: false })
-  logs.value.push({ id: Date.now(), time, text, level })
-  if (logs.value.length > 100) logs.value.shift()
-}
+const logs = ref<{ id: number; time: string; text: string; level: string }[]>([])
 
 // ─── 节点状态可视化：同步 flowStore.nodeStatuses 到 LiteGraph 节点渲染 ───
 const STATUS_COLORS: Record<string, string> = {
-  idle:    '#2a3040',   // 深灰
-  queued:  '#d29922',   // 橙色
-  running: '#58a6ff',   // 蓝色
-  success: '#3fb950',   // 绿色
-  error:   '#f85149',   // 红色
-  warning: '#d29922',   // 橙色
-  paused:  '#8b949e',   // 灰色
+  idle:    '#2a3040',
+  queued:  '#d29922',
+  running: '#58a6ff',
+  success: '#3fb950',
+  error:   '#f85149',
+  warning: '#d29922',
+  paused:  '#8b949e',
 }
 
 function syncNodeStatuses() {
@@ -719,7 +863,6 @@ function syncNodeStatuses() {
     if (!lgNode || !lgNode.id) continue
     const status = store.nodeStatuses[String(lgNode.id)] || 'idle'
     lgNode.color = STATUS_COLORS[status] || STATUS_COLORS.idle
-    // 执行中：闪烁（通过 boxcolor 表达）
     if (status === 'running') {
       lgNode.boxcolor = '#1f6feb'
     } else if (status === 'error') {
@@ -729,7 +872,6 @@ function syncNodeStatuses() {
     } else {
       lgNode.boxcolor = '#2a3040'
     }
-    // v3: 断点指示 — 有断点的节点在左上角显示红点
     ;(lgNode as any)._hasBreakpoint = breakpoints.value.has(String(lgNode.id))
   }
   graph.setDirtyCanvas?.(true)
@@ -738,13 +880,11 @@ function syncNodeStatuses() {
 // 监听状态变化 → 更新节点外观
 watch(() => store.nodeStatuses, () => {
   syncNodeStatuses()
-  // v3: 节点成功后触发数据流动画
   const lgNodes = graph?._nodes || []
   for (const lgNode of lgNodes) {
     if (!lgNode?.id) continue
     const status = store.nodeStatuses[String(lgNode.id)]
     if (status === 'success') {
-      // 找到所有从此节点出发的连线
       const outLinks = (lgNode.outputs || []).flatMap((_o: any, slotIdx: number) => 
         lgNode.getOutputLinks?.(slotIdx) || []
       )
@@ -771,7 +911,7 @@ function startDataFlowAnimation(link: any) {
     link,
     progress: 0,
     startTime: performance.now(),
-    duration: 600, // ms to cross the link
+    duration: 600,
   })
   if (!flowAnimFrame) {
     flowAnimFrame = requestAnimationFrame(renderFlowParticles)
@@ -780,29 +920,23 @@ function startDataFlowAnimation(link: any) {
 
 function renderFlowParticles(now: number) {
   if (!canvas) return
-
-  // 过滤已完成的粒子
   const active = flowParticles.filter(p => {
     p.progress = Math.min(1, (now - p.startTime) / p.duration)
     return p.progress < 1
   })
-
   if (active.length === 0) {
     flowParticles.length = 0
     flowAnimFrame = null
     return
   }
-
   flowParticles.length = 0
   flowParticles.push(...active)
-
   const ctx = canvas.ctx
   const ds = (canvas as any).ds
   if (!ctx || !ds) {
     flowAnimFrame = requestAnimationFrame(renderFlowParticles)
     return
   }
-
   for (const p of flowParticles) {
     const alpha = 1 - p.progress
     const size = 4 + (1 - p.progress) * 3
@@ -810,7 +944,6 @@ function renderFlowParticles(now: number) {
     const [ex, ey] = p.link._pos_end || [0, 0]
     const x = sx + (ex - sx) * p.progress
     const y = sy + (ey - sy) * p.progress
-
     ctx.save()
     ctx.globalAlpha = alpha * 0.8
     ctx.fillStyle = '#3fb950'
@@ -821,7 +954,6 @@ function renderFlowParticles(now: number) {
     ctx.fill()
     ctx.restore()
   }
-
   canvas.setDirty?.(true, false)
   flowAnimFrame = requestAnimationFrame(renderFlowParticles)
 }
@@ -834,7 +966,6 @@ watch(() => store.stepOutputs, () => {
     if (!lgNode || !lgNode.id) continue
     const output = store.stepOutputs[String(lgNode.id)]
     if (output) {
-      // 在节点上加一个小旗标显示输出摘要
       ;(lgNode as any)._outputBadge = summarizeOutput(output)
     }
   }
@@ -870,13 +1001,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 // ─── Canvas 初始化 ───
 onMounted(() => {
-  // 注册所有自定义 LiteGraph 节点
   registerAllNodes()
-
-  // 创建 graph
   graph = new LGraph()
 
-  // ⚠️ 等待 DOM 就绪后初始化 — 全视口 canvas，无需 wrapper 尺寸
   nextTick(() => {
     requestAnimationFrame(() => {
       if (!canvasRef.value) return
@@ -886,11 +1013,9 @@ onMounted(() => {
 
   function initCanvas() {
     const c = canvasRef.value!
-    // 全视口：先清固定分辨率 → 取 CSS 实际尺寸 → DPI 缩放
     c.width = c.height = NaN as unknown as number
     const width = c.offsetWidth, height = c.offsetHeight
     if (width === 0 || height === 0) {
-      // 极端 case：再等一帧
       requestAnimationFrame(() => {
         if (!canvasRef.value) return
         const b = canvasRef.value
@@ -905,16 +1030,13 @@ onMounted(() => {
 
   function initCanvasReal(w: number, h: number) {
     const c = canvasRef.value!
-    // 设置 canvas 分辨率（DPI 缩放）
     const dpr = Math.max(window.devicePixelRatio || 1, 1)
     c.width = Math.round(w * dpr)
     c.height = Math.round(h * dpr)
     c.getContext('2d')?.scale(dpr, dpr)
 
-    // 创建 LGraphCanvas
     canvas = new LGraphCanvas(c, graph)
 
-    // 配置 canvas 外观（暗色主题 + 网格线）
     canvas.background_image = ''
     canvas.clear_background = true
     canvas.clear_background_color = '#0d1117'
@@ -922,22 +1044,18 @@ onMounted(() => {
     canvas.render_border = false
     canvas.node_title_color = '#e6edf3'
 
-    // 画布网格背景
     canvas.onDrawBackground = (ctx: CanvasRenderingContext2D) => {
       const ds = (canvas as any).ds
       const scale = ds?.scale || 1
       const offset = ds?.offset || [0, 0]
       const gridSize = 40 * scale
       const alpha = Math.max(0.08, Math.min(0.15, scale * 0.06))
-
       ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`
       ctx.lineWidth = 1
-
       const startX = Math.floor(-offset[0] / gridSize) * gridSize
       const startY = Math.floor(-offset[1] / gridSize) * gridSize
       const endX = offset[0] + canvasRef.value!.width / scale + gridSize
       const endY = offset[1] + canvasRef.value!.height / scale + gridSize
-
       ctx.beginPath()
       for (let x = startX; x <= endX; x += gridSize) {
         ctx.moveTo(x, startY)
@@ -950,18 +1068,24 @@ onMounted(() => {
       ctx.stroke()
     }
 
-    // 显式开启节点拖拽（WebView2 中默认可能不生效）
     canvas.allow_dragnodes = true
     canvas.allow_dragcanvas = true
     canvas.allow_interaction = true
-    // 防止 WebView2 手势冲突
     canvasRef.value!.style.touchAction = 'none'
 
-    // Canvas resize — 采用 ComfyUI 方式：先清 NaN → 取 CSS 尺寸 → 设 DPI 缩放分辨率
+    const _origShowSearchBox = canvas.showSearchBox.bind(canvas)
+    canvas.showSearchBox = (e: MouseEvent, opts?: any) => {
+      if (opts) return _origShowSearchBox(e, opts)
+    }
+    const _origProcessContextMenu = canvas.processContextMenu.bind(canvas)
+    canvas.processContextMenu = (node: any, event: MouseEvent) => {
+      if (node) return _origProcessContextMenu(node, event)
+    }
+
     const resizeHandler = () => {
       if (!canvasRef.value || !canvas) return
       const c = canvasRef.value
-      c.width = c.height = NaN as unknown as number  // 清固定分辨率，让 CSS 100% 生效
+      c.width = c.height = NaN as unknown as number
       const width = c.offsetWidth, height = c.offsetHeight
       if (width === 0 || height === 0) return
       const dpr = Math.max(window.devicePixelRatio || 1, 1)
@@ -972,23 +1096,19 @@ onMounted(() => {
     }
     _resizeObserver = new ResizeObserver(resizeHandler)
     _resizeObserver.observe(canvasRef.value!)
-    // 初始化时立即触发一次（确保尺寸正确）
     resizeHandler()
 
-    // 监听 graph 变化 → 同步到 store
     graph.on_change = () => throttledSync()
     graph.onAfterChange = () => throttledSync()
 
-    // 监听选中变化 → 更新属性面板
     canvas.onSelectionChange = (selectedDict: Record<string, LGraphNode>) => {
       const selected = Object.values(selectedDict)[0]
       selectedLgNode.value = selected instanceof LGraphNode ? selected : null
     }
 
-    // 监听连线变化
     graph.onConnectionChange = () => throttledSync()
 
-    // v3: 断点指示器 — 有断点的节点绘制红点和红色边框
+    // v3: 断点指示器 + 输出徽章
     const origDraw = canvas.draw.bind(canvas)
     canvas.draw = function(force: boolean, skipLinks: boolean) {
       origDraw(force, skipLinks)
@@ -1004,8 +1124,6 @@ onMounted(() => {
         const sy = ny * scale + offset[1]
         const sw = nw * scale
         const sh = nh * scale
-
-        // v3: 断点指示器
         if ((node as any)._hasBreakpoint) {
           ctx2.save()
           ctx2.strokeStyle = 'rgba(248, 81, 73, 0.5)'
@@ -1021,8 +1139,6 @@ onMounted(() => {
           ctx2.fill()
           ctx2.restore()
         }
-
-        // v3: 输出徽章 — 已执行节点右下角显示数据摘要
         const badge = (node as any)._outputBadge as string | undefined
         if (badge) {
           const fontSize = Math.max(9, Math.min(11, 11 * scale))
@@ -1045,6 +1161,74 @@ onMounted(() => {
           ctx2.fillText(badge, bx + padX, by + bh / 2)
           ctx2.restore()
         }
+
+        // v4.0: 容器节点 action 列表 + "+" 按钮
+        const nodeType = (node as any).type || ''
+        if (nodeType === 'browser_container' || nodeType === 'excel_container' || nodeType === 'word_container') {
+          const actions = ((node as any).properties?.actions || []) as any[]
+          const actionH = Math.max(14, 16 * scale)
+          const actionGap = 4 * scale
+          const startY = sy + sh + 6 * scale
+
+          // 重置该节点所有区域标记
+          const oldRects = (node as any)._actionRects || []
+          for (const r of oldRects) _containerActionRects.delete(r)
+
+          // 渲染每个 action pill
+          ctx2.save()
+          let ay = startY
+          for (const action of actions) {
+            const label = (action.label || action.type || '?') as string
+            const fontSize2 = Math.max(9, Math.min(11, 11 * scale))
+            ctx2.font = `${fontSize2}px sans-serif`
+            const textW = ctx2.measureText(label).width
+            const pillW = textW + 16 * scale
+            const pillH = actionH
+            // 背景
+            ctx2.fillStyle = 'rgba(22, 27, 34, 0.9)'
+            ctx2.strokeStyle = '#30363d'
+            ctx2.lineWidth = 1
+            roundRect(ctx2, sx + 4, ay, pillW, pillH, 3)
+            ctx2.fill()
+            ctx2.stroke()
+            // 图标 + 文本
+            ctx2.fillStyle = '#8b949e'
+            ctx2.fillText('▸ ' + label, sx + 8, ay + pillH * 0.7)
+            // 存储点击区域
+            const rectKey = {}
+            ;(node as any)._actionRects = [...((node as any)._actionRects || []), rectKey]
+            _containerActionRects.set(rectKey, { type: 'action', actionId: action.id })
+            // 存储像素位置用于 hit test
+            ;(rectKey as any)._pos = { x: sx + 4, y: ay, w: pillW, h: pillH }
+            ay += pillH + actionGap
+          }
+
+          // "+" 按钮
+          const plusSize = Math.max(14, 16 * scale)
+          const plusX = sx + 4
+          const plusY = ay
+          ctx2.fillStyle = 'rgba(31, 111, 235, 0.25)'
+          ctx2.strokeStyle = '#1f6feb'
+          ctx2.lineWidth = 1.5
+          roundRect(ctx2, plusX, plusY, plusSize, plusSize, 3)
+          ctx2.fill()
+          ctx2.stroke()
+          // "+" 文字
+          const plusFontSize = Math.max(10, Math.min(14, 14 * scale))
+          ctx2.font = `bold ${plusFontSize}px sans-serif`
+          ctx2.fillStyle = '#58a6ff'
+          ctx2.textAlign = 'center'
+          ctx2.textBaseline = 'middle'
+          ctx2.fillText('+', plusX + plusSize / 2, plusY + plusSize / 2)
+          ctx2.textAlign = 'left'
+          ctx2.restore()
+
+          // 存储 "+" 点击区域
+          const plusKey = {}
+          ;(node as any)._actionRects = [...((node as any)._actionRects || []), plusKey]
+          _containerActionRects.set(plusKey, { type: 'add', nodeId: String(node.id) })
+          ;(plusKey as any)._pos = { x: plusX, y: plusY, w: plusSize, h: plusSize }
+        }
       }
     }
 
@@ -1053,16 +1237,7 @@ onMounted(() => {
       loadFromStore()
       addLog(`📋 已加载「${store.workflowName}」(${store.nodeCount} 节点)`, 'info')
       document.title = `${store.workflowName} — Workflow Engine`
-    } else if (props.initialTemplate) {
-      // v3: 从模板创建
-      const tpl = props.initialTemplate
-      store.load({ name: tpl.name, nodes: tpl.nodes as any, edges: tpl.edges as any, variables: {} })
-      loadFromStore()
-      addLog(`📋 从模板「${tpl.name}」创建 (${store.nodeCount} 节点)`, 'info')
-      document.title = `${tpl.name} — Workflow Engine`
-      fitView()
     } else if (props.initialWorkflowId) {
-      // v3: 打开已有工作流
       loadWorkflowById(props.initialWorkflowId)
     } else {
       const restored = autoSave.loadAutoSave()
@@ -1072,28 +1247,21 @@ onMounted(() => {
       }
     }
 
-    // 初始化撤销系统
     undoManager.init()
-    // 启动自动保存
     autoSave.start()
-    // 键盘快捷键
     document.addEventListener('keydown', onKeyDown)
     _canvasMounted = true
-    canvasReady.value = true
 
-    // Canvas mousemove — 追踪鼠标位置供 ghost placement 使用
     canvasRef.value!.addEventListener('mousemove', (e) => {
       _lastMousePos = { x: e.clientX, y: e.clientY }
     })
 
-    // 右键菜单
     canvasRef.value!.addEventListener('contextmenu', (e: MouseEvent) => {
       e.preventDefault()
       contextMenuPos.value = { x: e.clientX, y: e.clientY }
       contextMenuVisible.value = true
     })
 
-    // 双击空白画布 — 搜索弹窗
     canvasRef.value!.addEventListener('dblclick', (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (target.tagName !== 'CANVAS') return
@@ -1105,11 +1273,44 @@ onMounted(() => {
       }, 10)
     })
 
-    // 初始化第一个标签页
-    const tid = tabStore.ensureTab()
-    if (!tabDataCache.has(tid)) {
-      tabDataCache.set(tid, { nodes: [], edges: [], name: store.workflowName || '工作流 1' })
-    }
+    // v4.0: 容器节点 action 点击检测
+    canvasRef.value!.addEventListener('click', (e: MouseEvent) => {
+      if (!canvas || !graph) return
+      const rect = canvasRef.value?.getBoundingClientRect()
+      if (!rect) return
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const ds = (canvas as any).ds
+      const scale = ds?.scale || 1
+      const offset = ds?.offset || [0, 0]
+      for (const node of graph._nodes || []) {
+        const ra = (node as any)._actionRects as any[] | undefined
+        if (!ra) continue
+        for (const rk of ra) {
+          const hit = (rk as any)._pos as { x: number; y: number; w: number; h: number } | undefined
+          if (!hit) continue
+          if (mx >= hit.x && mx <= hit.x + hit.w && my >= hit.y && my <= hit.y + hit.h) {
+            const meta = _containerActionRects.get(rk)
+            if (meta?.type === 'add') {
+              actionPickerNodeId.value = meta.nodeId
+              actionPickerPos.value = { x: hit.x + rect.left, y: hit.y + hit.h + 4 + rect.top }
+              actionPickerVisible.value = true
+              e.stopPropagation()
+              e.preventDefault()
+            } else if (meta?.type === 'action') {
+              // 点击 action pill → 弹出参数编辑面板
+              openActionEditor(node, meta.actionId, e.clientX, e.clientY)
+              e.stopPropagation()
+              e.preventDefault()
+            }
+            return
+          }
+        }
+      }
+    })
+
+    // 初始化标签页
+    tabStore.ensureTab()
   }
 })
 
@@ -1121,7 +1322,6 @@ onUnmounted(() => {
     _resizeObserver.disconnect()
     _resizeObserver = null
   }
-  // 清理 graph/canvas 回调
   if (graph) {
     graph.on_change = undefined
     graph.onAfterChange = undefined
@@ -1131,14 +1331,48 @@ onUnmounted(() => {
     canvas.onSelectionChange = undefined
     canvas.onDrawBackground = undefined
   }
-  // 清理 DAG 事件监听器
   cleanupDagListeners()
 })
+
+// ─── 标记：是否正在从 store 同步到 graph（避免循环更新） ───
+let syncingFromStore = false
+let lastSyncTime = 0
+let pendingRaf = false
+const SYNC_THROTTLE_MS = 100
+
+function throttledSync() {
+  if (syncingFromStore) return
+  const now = Date.now()
+  if (now - lastSyncTime < SYNC_THROTTLE_MS) {
+    if (!pendingRaf) {
+      pendingRaf = true
+      requestAnimationFrame(() => {
+        pendingRaf = false
+        if (!_canvasMounted) return
+        if (!syncingFromStore) {
+          syncGraphToStore()
+          undoManager.pushState()
+        }
+      })
+    }
+    return
+  }
+  lastSyncTime = now
+  syncGraphToStore()
+  undoManager.pushState()
+}
+
+// ─── 日志 ───
+function addLog(text: string, level = 'info') {
+  const now = new Date()
+  const time = now.toLocaleTimeString('zh-CN', { hour12: false })
+  logs.value.push({ id: Date.now(), time, text, level })
+  if (logs.value.length > 100) logs.value.shift()
+}
 
 // ─── 从 LiteGraph graph 同步节点到 store ───
 function syncGraphToStore() {
   syncingFromStore = true
-
   const lgNodes = graph._nodes || []
   const storeNodeIds = new Set(store.nodes.map(n => n.id))
 
@@ -1146,38 +1380,23 @@ function syncGraphToStore() {
     const ln = lgNodes[i]
     if (!ln) continue
     const nodeId = String(ln.id)
-
-    // 收集 widgets 的值为 config
     const config: Record<string, unknown> = {}
     if (ln.widgets) {
       for (const w of ln.widgets) {
         config[w.name] = w.value
       }
     }
-
     if (storeNodeIds.has(nodeId)) {
-      // 更新已有节点
       const existing = store.getNode(nodeId)
       if (existing) {
-        const posChanged =
-          existing.position.x !== ln.pos[0] ||
-          existing.position.y !== ln.pos[1]
+        const posChanged = existing.position.x !== ln.pos[0] || existing.position.y !== ln.pos[1]
         const labelChanged = existing.label !== (ln.title || ln.type || '')
-        // 浅比较 config 键值（避免 JSON.stringify 大对象性能问题）
         const configChanged = shallowDiff(existing.config, config)
-
-        if (posChanged) {
-          store.updateNodePosition(nodeId, { x: ln.pos[0], y: ln.pos[1] })
-        }
-        if (labelChanged) {
-          store.updateNodeLabel(nodeId, ln.title || ln.type || '')
-        }
-        if (configChanged) {
-          store.updateNodeConfig(nodeId, config)
-        }
+        if (posChanged) store.updateNodePosition(nodeId, { x: ln.pos[0], y: ln.pos[1] })
+        if (labelChanged) store.updateNodeLabel(nodeId, ln.title || ln.type || '')
+        if (configChanged) store.updateNodeConfig(nodeId, config)
       }
     } else {
-      // 新增节点
       store.addNode({
         id: nodeId,
         type: ln.type || '',
@@ -1188,49 +1407,47 @@ function syncGraphToStore() {
     }
   }
 
-  // 删除在 store 中但不在 graph 中的节点
   const graphNodeIds = new Set(lgNodes.map((n: LGraphNode) => String(n.id)))
   for (const sn of store.nodes) {
-    if (!graphNodeIds.has(sn.id)) {
-      store.removeNode(sn.id)
-    }
+    if (!graphNodeIds.has(sn.id)) store.removeNode(sn.id)
   }
 
-  // 同步连线
   syncEdgesToStore()
-
   syncingFromStore = false
+}
+
+function shallowDiff(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keysA = Object.keys(a)
+  const keysB = Object.keys(b)
+  if (keysA.length !== keysB.length) return true
+  for (const k of keysA) {
+    if (a[k] !== b[k]) return true
+  }
+  return false
 }
 
 // ─── 同步连线到 store ───
 function syncEdgesToStore() {
   const linkValues = [...((graph as any)._links?.values() || [])]
   if (linkValues.length === 0) {
-    // 快速路径：无 link 时只清理 store 中的旧边
     if (store.edges.length > 0) store.edges.forEach(e => store.removeEdge(e.id))
     return
   }
-
-  // 预建 nodeById 索引，后续 O(1) 查找替代 O(n)
   const nodeById = new Map<string, LGraphNode>()
   for (const n of (graph._nodes || [])) {
     if (n) nodeById.set(String(n.id), n)
   }
-
   const storeEdgeIds = new Set(store.edges.map(e => e.id))
   const linkIds = new Set<string>()
-
   for (const link of linkValues) {
     const sourceId = String(link.origin_id)
     const targetId = String(link.target_id)
     const srcNode = nodeById.get(sourceId)
     const tgtNode = nodeById.get(targetId)
-
     const sourceHandle = srcNode?.outputs?.[link.origin_slot]?.name || `out_${link.origin_slot}`
     const targetHandle = tgtNode?.inputs?.[link.target_slot]?.name || `in_${link.target_slot}`
     const edgeId = `e_${sourceId}_${sourceHandle}_${targetId}_${targetHandle}`
     linkIds.add(edgeId)
-
     if (!storeEdgeIds.has(edgeId)) {
       store.addEdge({
         id: edgeId,
@@ -1241,8 +1458,6 @@ function syncEdgesToStore() {
       })
     }
   }
-
-  // 删除不在 graph 中的连线
   for (const edge of store.edges) {
     if (!linkIds.has(edge.id)) store.removeEdge(edge.id)
   }
@@ -1252,11 +1467,7 @@ function syncEdgesToStore() {
 function loadFromStore() {
   syncingFromStore = true
   graph.clear()
-
-  // 旧 store ID → 新 LiteGraph 节点的映射（LiteGraph 会分配新整数 ID）
   const oldToNew = new Map<string, LGraphNode>()
-
-  // 添加节点
   for (const sn of store.nodes) {
     const node = LiteGraph.createNode(sn.type)
     if (!node) {
@@ -1266,19 +1477,17 @@ function loadFromStore() {
     oldToNew.set(sn.id, node)
     node.pos = [sn.position.x, sn.position.y]
     node.title = sn.label
-    // 设置 widget 值
     if (sn.config && node.widgets) {
       for (const w of node.widgets) {
-        if (sn.config[w.name] !== undefined) {
-          w.value = sn.config[w.name]
-        }
+        if (sn.config[w.name] !== undefined) w.value = sn.config[w.name]
       }
+    }
+    if ((sn as any).actions && sn.type?.endsWith('_container')) {
+      (node.properties as any).actions = (sn as any).actions
+      ;(node as any).rebuildPorts?.()
     }
     graph.add(node)
   }
-
-  // 添加连线（使用 ID 映射）
-  // 兼容端口名不匹配：先精确匹配，失败则回退到第一个输出/输入端口
   for (const edge of store.edges) {
     const sourceNode = oldToNew.get(edge.source)
     const targetNode = oldToNew.get(edge.target)
@@ -1286,18 +1495,10 @@ function loadFromStore() {
       addLog(`⚠ 连线跳过: 节点 ${edge.source}→${edge.target} 不存在`, 'warn')
       continue
     }
-
     let sourceSlot = sourceNode.outputs?.findIndex((o: any) => o.name === edge.sourceHandle)
     let targetSlot = targetNode.inputs?.findIndex((i: any) => i.name === edge.targetHandle)
-
-    // fallback: 端口名不匹配时用第一个可用端口（LiteGraph 节点通常只有一个）
-    if (sourceSlot < 0 && sourceNode.outputs && sourceNode.outputs.length > 0) {
-      sourceSlot = 0
-    }
-    if (targetSlot < 0 && targetNode.inputs && targetNode.inputs.length > 0) {
-      targetSlot = 0
-    }
-
+    if (sourceSlot < 0 && sourceNode.outputs && sourceNode.outputs.length > 0) sourceSlot = 0
+    if (targetSlot < 0 && targetNode.inputs && targetNode.inputs.length > 0) targetSlot = 0
     if (sourceSlot >= 0 && targetSlot >= 0) {
       sourceNode.connect(sourceSlot, targetNode, targetSlot)
     } else {
@@ -1309,12 +1510,13 @@ function loadFromStore() {
 // ─── v3: 按 ID 加载工作流 ───
 async function loadWorkflowById(id: string) {
   try {
-    const result = await safeInvoke<{ name: string; nodes: unknown[]; edges: unknown[]; variables?: Record<string, unknown> }>('workflow_get', { id })
-    if (result && result.nodes) {
-      store.load({ name: result.name, nodes: result.nodes as any, edges: result.edges as any, variables: result.variables || {} })
+    const result = await safeInvoke<{ name: string; yaml: string }>('workflow_get', { id })
+    if (result && result.yaml) {
+      const data = JSON.parse(result.yaml)
+      store.load({ name: data.name || result.name, nodes: data.nodes || [], edges: data.edges || [], variables: data.variables || {} })
       store.setWorkflowId(id)
       loadFromStore()
-      addLog(`📋 已打开「${result.name}」(${store.nodeCount} 节点)`, 'info')
+      addLog(`📋 已打开「${data.name || result.name}」(${store.nodeCount} 节点)`, 'info')
       fitView()
     }
   } catch (e: any) {
@@ -1322,64 +1524,23 @@ async function loadWorkflowById(id: string) {
   }
 }
 
-// ─── Ghost placement（对齐 ComfyUI：双击节点库 → 创建 ghost 节点跟随鼠标 → 点击落位） ───
-function onAddNodeFromPalette(def: NodeDefinition) {
-  showPalette.value = false
-  if (!canvasRef.value || !canvas) return
-
-  const node = LiteGraph.createNode(def.type)
-  if (!node) {
-    addLog(`⚠ 无法创建节点: ${def.label}`, 'error')
-    return
-  }
-
-  node.title = def.label
-  // 设置默认 config 到 widgets
-  if (def.defaultConfig && node.widgets) {
-    for (const w of node.widgets) {
-      if (def.defaultConfig[w.name] !== undefined) {
-        w.value = def.defaultConfig[w.name]
-      }
-    }
-  }
-
-  // 直接用鼠标位置算世界坐标放置（不用 ghost 模式——Grid 下坐标转换不可靠）
-  const rect = canvasRef.value.getBoundingClientRect()
-  const worldPos = canvas.convertOffsetToCanvas(
-    [_lastMousePos.x - rect.left, _lastMousePos.y - rect.top],
-    [0, 0]
-  )
-  if (worldPos) {
-    node.pos = [worldPos[0], worldPos[1]]
-  }
-  graph.add(node)
-  addLog(`✅ 添加节点: ${def.label}`)
-}
-
 // ─── 搜索弹窗添加节点 ───
 function onSearchNodeAdded(def: NodeDefinition) {
   if (!canvasRef.value || !canvas) return
-
   const node = LiteGraph.createNode(def.type)
   if (!node) {
     addLog(`⚠ 无法创建节点: ${def.label}`, 'error')
     return
   }
-
   node.title = def.label
   if (def.defaultConfig && node.widgets) {
     for (const w of node.widgets) {
-      if (def.defaultConfig[w.name] !== undefined) {
-        w.value = def.defaultConfig[w.name]
-      }
+      if (def.defaultConfig[w.name] !== undefined) w.value = def.defaultConfig[w.name]
     }
   }
-
-  // 非 ghost 模式：直接放到搜索弹窗位置（双击位置）
   const rect = canvasRef.value.getBoundingClientRect()
   const worldPos = canvas.convertOffsetToCanvas?.(
-    [searchPos.value.x - rect.left, searchPos.value.y - rect.top],
-    [0, 0]
+    [searchPos.value.x - rect.left, searchPos.value.y - rect.top], [0, 0]
   )
   if (worldPos) {
     node.pos = [worldPos[0], worldPos[1]]
@@ -1397,7 +1558,6 @@ function onUpdateLabel(node: LGraphNode, label: string) {
 }
 
 function onUpdateWidget(node: LGraphNode, widgetName: string, value: unknown) {
-  // toRaw 绕过 Vue reactive proxy，ComfyUI LiteGraph 用 ES private 字段
   const raw = toRaw(node)
   const widget = raw.widgets?.find(w => w.name === widgetName)
   if (widget) {
@@ -1408,11 +1568,20 @@ function onUpdateWidget(node: LGraphNode, widgetName: string, value: unknown) {
   widgetVersion.value++
 }
 
+function onContainerUpdate() {
+  if (!selectedLgNode.value) return
+  const raw = toRaw(selectedLgNode.value)
+  const actions = (raw.properties as any)?.actions
+  if (actions) {
+    store.updateNodeConfig(String(raw.id), { actions: [...actions] })
+    graph.setDirtyCanvas(true)
+  }
+  widgetVersion.value++
+}
+
 function onDeleteNode(node: LGraphNode) {
   graph.remove(node)
-  if (selectedLgNode.value === node) {
-    selectedLgNode.value = null
-  }
+  if (selectedLgNode.value === node) selectedLgNode.value = null
   store.removeNode(String(node.id))
   addLog(`🗑 删除节点: ${node.title || node.type}`)
   undoManager.pushState()
@@ -1427,7 +1596,7 @@ function onDeselectNode() {
 function runAll() {
   if (store.nodes.length === 0) return
   isRunning.value = true
-  showConsole.value = true
+  consoleCollapsed.value = false
   store.resetAllStatuses()
   addLog('▶ DAG 执行开始...', 'info')
   runDagFlow(false)
@@ -1436,7 +1605,7 @@ function runAll() {
 function runSingle() {
   if (store.nodes.length === 0) return
   isRunning.value = true
-  showConsole.value = true
+  consoleCollapsed.value = false
   store.resetAllStatuses()
   addLog('⏯ 单步调试模式启动...', 'info')
   runDagFlow(true)
@@ -1444,7 +1613,6 @@ function runSingle() {
 
 async function runFromNode(nodeId: string) {
   syncGraphToStore()
-  // 计算从选定节点出发的所有下游节点（BFS）
   const reachable = new Set<string>()
   const queue = [nodeId]
   reachable.add(nodeId)
@@ -1464,7 +1632,7 @@ async function runFromNode(nodeId: string) {
     return
   }
   isRunning.value = true
-  showConsole.value = true
+  consoleCollapsed.value = false
   store.resetAllStatuses()
   addLog(`▶ 从节点 [${nodeId}] 开始执行 (${filteredNodes.length} 节点)...`, 'info')
 
@@ -1472,18 +1640,10 @@ async function runFromNode(nodeId: string) {
     name: store.workflowName || '未命名',
     description: '',
     nodes: filteredNodes.map(n => ({
-      id: n.id,
-      type: n.type,
-      label: n.label,
-      position: n.position,
-      config: n.config,
+      id: n.id, type: n.type, label: n.label, position: n.position, config: n.config,
     })),
     edges: filteredEdges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
+      id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
     })),
     variables: {},
     breakpoints: Array.from(breakpoints.value),
@@ -1517,30 +1677,21 @@ async function stopRun() {
 // ─── 真实 DAG 执行 ───
 const currentRunId = ref<string | null>(null)
 let dagEventUnlisteners: UnlistenFn[] = []
-const stepStartTimes = new Map<string, number>()  // v3: 耗时追踪
+const stepStartTimes = new Map<string, number>()
 
 async function runDagFlow(stepMode: boolean) {
   syncGraphToStore()
-
   const workflowJson = {
     name: store.workflowName || '未命名',
     description: '',
     nodes: store.nodes.map(n => ({
-      id: n.id,
-      type: n.type,
-      label: n.label,
-      position: n.position,
-      config: n.config,
+      id: n.id, type: n.type, label: n.label, position: n.position, config: n.config,
     })),
     edges: store.edges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
+      id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
     })),
     variables: {},
-    breakpoints: Array.from(breakpoints.value),  // v3: 断点列表
+    breakpoints: Array.from(breakpoints.value),
   }
 
   try {
@@ -1577,12 +1728,9 @@ async function setupDagListeners() {
   )
   dagEventUnlisteners.push(u1)
 
-  // v3: 步骤输出事件
   const u1b = await safeListen<{ step_id: string; output: unknown }>(
     'step-output',
-    (event) => {
-      store.setNodeOutput(event.payload.step_id, event.payload.output)
-    }
+    (event) => { store.setNodeOutput(event.payload.step_id, event.payload.output) }
   )
   dagEventUnlisteners.push(u1b)
 
@@ -1611,7 +1759,6 @@ async function setupDagListeners() {
   )
   dagEventUnlisteners.push(u3)
 
-  // v3: 步骤错误事件（含耗时）
   const u4 = await safeListen<{ step_id: string; step_name: string; error?: string }>(
     'step-error',
     (event) => {
@@ -1634,8 +1781,6 @@ function cleanupDagListeners() {
 function fitView() {
   const lgNodes = graph._nodes
   if (!canvas || !lgNodes || lgNodes.length === 0) return
-
-  // 计算所有节点的包围盒
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const node of lgNodes) {
     if (!node) continue
@@ -1646,7 +1791,6 @@ function fitView() {
     maxX = Math.max(maxX, pos[0] + (size[0] || 200))
     maxY = Math.max(maxY, pos[1] + (size[1] || 100))
   }
-
   canvas.animateToBounds(
     { x: minX - 20, y: minY - 20, width: maxX - minX + 40, height: maxY - minY + 40 },
     { zoom: 0.9 }
@@ -1662,103 +1806,40 @@ function clearCanvas() {
   undoManager.pushState()
 }
 
-// ─── v3: 重命名工作流 ───
-function onRenameWorkflow(name: string) {
-  if (!name.trim()) return
-  store.workflowName = name.trim()
-  document.title = `${name.trim()} — Workflow Engine`
-  addLog(`✏ 已重命名为「${name.trim()}」`)
-}
-
-// ─── 导入导出 ───
-function importWorkflow() {
-  importInputRef.value?.click()
-}
-
-async function onImportFile(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
+// ─── 保存工作流 ───
+async function onSaveWorkflow() {
+  if (store.nodes.length === 0) {
+    addLog('⚠ 画布为空，无需保存', 'warn')
+    return
+  }
   try {
-    const text = await file.text()
-    const data = JSON.parse(text)
-    store.load(data)
-    loadFromStore()
-    addLog(`📥 已导入: ${data.name || file.name}`, 'info')
-    fitView()
-  } catch (e: any) {
-    addLog(`❌ 导入失败: ${e.message}`, 'error')
-  } finally {
-    input.value = ''  // 允许重复导入同一文件
+    const id = store.workflowId
+    if (id) {
+      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
+      await safeInvoke('workflow_save_yaml', { id, yaml })
+      addLog(`💾 已保存「${store.workflowName}」`)
+    } else {
+      const yaml = JSON.stringify({ name: store.workflowName, nodes: store.nodes, edges: store.edges })
+      const newId = await safeInvoke<string>('workflow_create', { name: store.workflowName, description: '' })
+      if (newId) {
+        await safeInvoke('workflow_save_yaml', { id: newId, yaml })
+        store.setWorkflowId(newId)
+        addLog(`💾 已保存「${store.workflowName}」`)
+      }
+    }
+    store.dirty = false
+  } catch (e: unknown) {
+    addLog(`❌ 保存失败: ${(e as Error).message || e}`, 'error')
   }
 }
 
-function exportWorkflow() {
-  syncGraphToStore()
-  const json = JSON.stringify(store.toJSON(), null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${store.workflowName || 'workflow'}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  addLog('📤 工作流已导出')
-}
-
-// ─── 浏览器录制 ───
-
-async function toggleRecording() {
-  if (recording.value) {
-    // 停止录制
-    try {
-      const result = await safeInvoke<{ name: string; nodes: unknown[]; edges: unknown[] }>('browser_recording_stop')
-      recording.value = false
-      if (result && result.nodes && result.nodes.length > 0) {
-        store.load(result)
-        loadFromStore()
-        addLog(`🎬 录制已停止，生成 ${result.nodes.length} 个节点`)
-        fitView()
-      } else {
-        addLog('🎬 录制已停止，未捕获到操作')
-      }
-    } catch (e: any) {
-      recording.value = false
-      addLog(`❌ 停止录制失败: ${e}`, 'error')
-    }
-  } else {
-    try {
-      await safeInvoke('browser_recording_start')
-      recording.value = true
-      showConsole.value = true
-      addLog('🔴 录制已开始 — 请在浏览器中操作')
-    } catch (e: any) {
-      addLog(`❌ 开始录制失败: ${e}`, 'error')
-    }
-  }
-}
-
-async function pickElement() {
-  try {
-    showConsole.value = true
-    const result = await safeInvoke<{ selector?: string }>('browser_pick_element')
-    if (result?.selector) {
-      // 如果选中了节点且有 selector widget，自动填入
-      if (selectedLgNode.value) {
-        const selWidget = selectedLgNode.value.widgets?.find(
-          w => w.name === 'selector'
-        )
-        if (selWidget) {
-          selWidget.value = result.selector
-          graph.setDirtyCanvas(true)
-          store.updateNodeConfig(String(selectedLgNode.value.id), { selector: result.selector })
-        }
-      }
-      addLog(`🎯 已拾取元素: ${result.selector}`)
-    }
-  } catch (e: any) {
-    addLog(`❌ 元素拾取失败: ${e}`, 'error')
+// ─── 重命名工作流 ───
+function onRenameWorkflow() {
+  const name = prompt('输入工作流名称', store.workflowName || '未命名工作流')
+  if (name && name.trim()) {
+    store.workflowName = name.trim()
+    document.title = `${name.trim()} — Workflow Engine`
+    addLog(`✏ 已重命名为「${name.trim()}」`)
   }
 }
 
@@ -1768,7 +1849,6 @@ function onKeyDown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
     e.preventDefault()
     if (undoManager.undo()) {
-      // 撤销后同步到 LiteGraph
       loadFromStore()
       addLog('↩ 撤销')
     }
@@ -1840,7 +1920,6 @@ function onKeyDown(e: KeyboardEvent) {
   }
   // Delete / Backspace — 删除选中节点
   if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLgNode.value) {
-    // 排除输入框内的按键
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
     e.preventDefault()
     onDeleteNode(selectedLgNode.value)
@@ -1860,278 +1939,11 @@ function onKeyDown(e: KeyboardEvent) {
     emit('back')
     return
   }
-  // P — 切换节点库面板
-  if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault()
-    showPalette.value = !showPalette.value
-    return
-  }
-  // ` — 切换控制台
+  // ` — 折叠/展开控制台
   if (e.key === '`') {
     e.preventDefault()
-    showConsole.value = !showConsole.value
+    consoleCollapsed.value = !consoleCollapsed.value
     return
   }
 }
 </script>
-
-<style scoped>
-/* ═══════════ 叠加层架构（对齐 ComfyUI LiteGraphCanvasSplitterOverlay） ═══════════ */
-
-/* 层 0：全屏容器 */
-.editor-app {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--color-bg);
-}
-
-/* 层 0：Canvas 全视口背景 */
-.editor-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  display: block;
-  background: var(--color-bg);
-  touch-action: none;
-  user-select: none;
-  outline: none;
-}
-
-/* 层 999：UI 浮层 — 默认穿透事件到 canvas */
-.ui-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ─── 各 UI 区域：pointer-events: auto 恢复交互 ─── */
-.overlay-top {
-  pointer-events: auto;
-  flex-shrink: 0;
-}
-
-.overlay-main {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
-.overlay-left {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: row;
-  flex-shrink: 0;
-}
-
-.overlay-center {
-  flex: 1;
-  pointer-events: none;  /* 穿透到 canvas */
-  min-width: 0;
-}
-
-/* ─── 空画布提示（浮在 canvas 上方，z-index 在 ui-overlay 之下） ─── */
-.empty-canvas {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 10;
-  pointer-events: none;
-  user-select: none;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  opacity: 0.4;
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #8b949e;
-  margin-bottom: 6px;
-}
-
-.empty-hint {
-  font-size: 13px;
-  color: #484f58;
-}
-
-.empty-hint kbd {
-  display: inline-block;
-  padding: 2px 6px;
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 11px;
-}
-
-.hint-spacer {
-  margin: 0 8px;
-  color: #30363d;
-}
-
-.empty-shortcuts {
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  justify-content: center;
-}
-
-.shortcut-row {
-  font-size: 12px;
-  color: #6e7681;
-}
-
-.shortcut-row kbd {
-  display: inline-block;
-  padding: 2px 6px;
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 11px;
-  margin-right: 4px;
-}
-
-/* ─── 底部控制台 ─── */
-.overlay-bottom {
-  pointer-events: auto;
-  height: 140px;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.console-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 12px;
-  border-bottom: 1px solid #21262d;
-  font-size: 11px;
-  font-weight: 600;
-  color: #8b949e;
-  flex-shrink: 0;
-}
-
-.console-clear {
-  padding: 1px 8px;
-  background: none;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #8b949e;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.console-clear:hover {
-  background: #21262d;
-  color: #c9d1d9;
-}
-
-.console-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 12px;
-  font-family: 'SF Mono', 'Cascadia Code', monospace;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.log-line {
-  display: flex;
-  gap: 8px;
-  padding: 1px 0;
-}
-
-.log-time {
-  color: #484f58;
-  flex-shrink: 0;
-}
-
-.log-text {
-  word-break: break-all;
-}
-
-.log-line.info { color: #8b949e; }
-.log-line.error { color: #f85149; }
-.log-line.warn { color: #d29922; }
-.log-line.success { color: #3fb950; }
-
-/* ═══════════ 预览弹窗 ═══════ */
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0, 0, 0, 0.3);
-  pointer-events: auto;
-}
-
-.preview-popup {
-  position: fixed;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 320px;
-  min-height: 200px;
-}
-
-.preview-popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: #21262d;
-  border-bottom: 1px solid #30363d;
-  cursor: move;
-  font-size: 12px;
-  font-weight: 600;
-  color: #c9d1d9;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.preview-popup-actions button {
-  background: none;
-  border: none;
-  color: #8b949e;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.preview-popup-actions button:hover { background: #30363d; color: #f85149; }
-
-.preview-popup-body {
-  flex: 1;
-  overflow: auto;
-  padding: 0;
-}
-
-.preview-resize-handle {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, #30363d 50%);
-  border-radius: 0 0 8px 0;
-}
-</style>

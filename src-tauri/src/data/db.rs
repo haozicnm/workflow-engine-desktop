@@ -5,7 +5,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use std::time::Instant;
 use anyhow::{Result, Context};
 use tracing::{info, debug};
-use crate::data::models::{WorkflowMeta, RunInfo, StepRunInfo, RunHistoryItem, RunDetail, ScheduleInfo};
+use crate::data::models::{WorkflowMeta, RunInfo, StepRunInfo, RunHistoryItem, RunDetail, ScheduleInfo, StepLogEntry};
 use crate::commands::workflow::WorkflowListItem;
 
 pub struct Database {
@@ -361,6 +361,40 @@ impl Database {
                 finished_at: row.get(5)?,
                 output,
                 error: row.get(7)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    // ─── v4.1: 步骤执行日志持久化 ───
+
+    pub fn insert_step_log(&self, step_run_id: &str, level: &str, message: &str, timestamp: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "INSERT INTO step_logs (step_run_id, level, message, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            params![step_run_id, level, message, timestamp],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_step_logs(&self, run_id: &str) -> Result<Vec<StepLogEntry>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT sl.id, sl.step_run_id, sr.run_id, sr.step_id, sl.level, sl.message, sl.timestamp
+             FROM step_logs sl
+             JOIN step_runs sr ON sl.step_run_id = sr.id
+             WHERE sr.run_id = ?1
+             ORDER BY sl.timestamp, sl.id"
+        )?;
+        let rows = stmt.query_map(params![run_id], |row| {
+            Ok(StepLogEntry {
+                id: row.get(0)?,
+                step_run_id: row.get(1)?,
+                run_id: row.get(2)?,
+                step_id: row.get(3)?,
+                level: row.get(4)?,
+                message: row.get(5)?,
+                timestamp: row.get(6)?,
             })
         })?;
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)

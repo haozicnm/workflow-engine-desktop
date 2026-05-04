@@ -105,6 +105,11 @@ impl StepExecutor {
         register!(executors, "browser_scroll", crate::nodes::browser::BrowserScrollNode);
         register!(executors, "browser_wait", crate::nodes::browser::BrowserWaitNode);
         register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
+        register!(executors, "browser_container", crate::nodes::browser_container::BrowserContainerNode);
+        register!(executors, "word_container", crate::nodes::word_container::WordContainerNode);
+        register!(executors, "excel_container", crate::nodes::excel_container::ExcelContainerNode);
+        register!(executors, "logic_container", crate::nodes::condition::ConditionNode);
+        register!(executors, "condition", crate::nodes::condition::ConditionNode);  // 向后兼容旧格式
 
         // ── 其他节点 ──
         register!(executors, "notify", crate::nodes::notify::NotifyNode);

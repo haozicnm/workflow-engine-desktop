@@ -1,72 +1,64 @@
 {
   "name": "JSON数据 → 条件分流 Word/Excel",
-  "description": "读取JSON文件 → 解析数据 → 条件判断 → 正常数据写入Excel / 异常生成Word报告并通知",
+  "description": "Excel读取数据 → 逻辑判断 → Excel写报表 / Word写报告",
   "nodes": [
     {
       "id": "n1",
-      "type": "file_read",
-      "label": "读取订单数据",
+      "type": "excel_container",
+      "label": "数据源",
       "position": { "x": 60, "y": 120 },
-      "config": { "path": "templates/data/订单数据.json", "encoding": "utf-8" }
+      "config": {
+        "file_path": "templates/data/订单数据.xlsx",
+        "sheet": "Sheet1",
+        "actions": [
+          { "id": "a1", "type": "read", "label": "读取数据", "config": {} }
+        ]
+      }
     },
     {
       "id": "n2",
-      "type": "json_parse",
-      "label": "解析订单列表",
-      "position": { "x": 360, "y": 120 },
-      "config": { "expression": "$.data.items[*]", "target_field": "orders" }
+      "type": "logic_container",
+      "label": "有数据?",
+      "position": { "x": 380, "y": 40 },
+      "config": {
+        "actions": [
+          { "id": "l1", "type": "not_empty", "label": "不为空", "config": {} }
+        ]
+      }
     },
     {
       "id": "n3",
-      "type": "condition",
-      "label": "有订单数据?",
-      "position": { "x": 660, "y": 40 },
-      "config": { "left": "{{n2.result}}", "op": "not_empty", "true_next": "n4", "false_next": "n6" }
+      "type": "excel_container",
+      "label": "订单报表",
+      "position": { "x": 700, "y": -60 },
+      "config": {
+        "file_path": "templates/data/output/订单报表.xlsx",
+        "sheet": "已完成订单",
+        "actions": [
+          { "id": "e1", "type": "filter", "label": "筛选已完成", "config": { "column": "status", "op": "equals", "value": "completed" } },
+          { "id": "e2", "type": "write", "label": "写入报表", "config": { "range": "A1" } }
+        ]
+      }
     },
     {
       "id": "n4",
-      "type": "array_filter",
-      "label": "筛选已完成订单",
-      "position": { "x": 960, "y": -40 },
-      "config": { "field": "status", "op": "==", "value": "completed" }
-    },
-    {
-      "id": "n5",
-      "type": "excel_write",
-      "label": "写入订单Excel报表",
-      "position": { "x": 1260, "y": -40 },
-      "config": { "path": "templates/data/output/订单报表_{{now}}.xlsx", "sheet": "已完成订单", "data": "{{n4.result}}" }
-    },
-    {
-      "id": "n6",
-      "type": "word_create",
-      "label": "创建异常报告",
-      "position": { "x": 960, "y": 160 },
-      "config": { "path": "templates/data/output/异常报告_{{now}}.docx" }
-    },
-    {
-      "id": "n7",
-      "type": "word_write",
-      "label": "填写异常详情",
-      "position": { "x": 960, "y": 320 },
-      "config": { "content": "⚠️ 数据异常报告\n\n时间: {{now}}\n数据文件: templates/data/订单数据.json\n解析结果: {{n2.result}}" }
-    },
-    {
-      "id": "n8",
-      "type": "notify",
-      "label": "异常推送通知",
-      "position": { "x": 1260, "y": 240 },
-      "config": { "title": "⚠️ 订单数据异常", "message": "订单数据为空，已生成Word报告" }
+      "type": "word_container",
+      "label": "异常报告",
+      "position": { "x": 700, "y": 180 },
+      "config": {
+        "file_path": "templates/data/output/异常报告.docx",
+        "actions": [
+          { "id": "wa1", "type": "create", "label": "创建报告", "config": {} },
+          { "id": "wa2", "type": "write", "label": "填写详情", "config": {} }
+        ]
+      }
     }
   ],
   "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "content", "targetHandle": "input" },
-    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "input" },
-    { "id": "e3", "source": "n3", "target": "n4", "sourceHandle": "result", "targetHandle": "input" },
-    { "id": "e4", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "data" },
-    { "id": "e5", "source": "n3", "target": "n6", "sourceHandle": "result", "targetHandle": "input" },
-    { "id": "e6", "source": "n6", "target": "n7", "sourceHandle": "result", "targetHandle": "data" },
-    { "id": "e7", "source": "n1", "target": "n7", "sourceHandle": "content", "targetHandle": "data" },
-    { "id": "e8", "source": "n7", "target": "n8", "sourceHandle": "result", "targetHandle": "input" }
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "a1_out", "targetHandle": "输入" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "true出口", "targetHandle": "e2_in" },
+    { "id": "e3", "source": "n1", "target": "n3", "sourceHandle": "a1_out", "targetHandle": "e1_in" },
+    { "id": "e4", "source": "n2", "target": "n4", "sourceHandle": "false出口", "targetHandle": "wa2_in" },
+    { "id": "e5", "source": "n1", "target": "n4", "sourceHandle": "a1_out", "targetHandle": "wa2_in" }
   ]
 }

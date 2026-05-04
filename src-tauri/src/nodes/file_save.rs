@@ -63,10 +63,11 @@ impl NodeExecutor for FileSaveNode {
                         // 简单对象转 YAML（无外部依赖）
                         json_to_simple_yaml(data)
                     }
-                    "txt" | "text" | _ => match data {
+                    "txt" | "text" => match data {
                         serde_json::Value::String(s) => s.clone(),
                         other => other.to_string(),
                     },
+                    _ => data.to_string(),
                 };
                 tokio::fs::write(path, &content).await
                     .map_err(|e| anyhow!("写入文件失败 [{}]: {}", path, e))?;

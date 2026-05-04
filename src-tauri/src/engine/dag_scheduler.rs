@@ -4,14 +4,14 @@
 //   1. run_dag(plan)         — P2 新增：按 ExecutionPlan 拓扑顺序执行
 //   2. run_dag_workflow(dag) — 旧版：DAGWorkflow → 自动构建计划并执行
 
-use crate::engine::dag::{DAGWorkflow, ExecutionPlan, ExecStep};
+use crate::engine::dag::{DAGWorkflow, ExecutionPlan, ExecStep, FlowEdge};
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::{Step, ErrorStrategy, Workflow};
 use crate::engine::state::RunState;
 use crate::engine::scheduler::RunControl;
 use crate::data::db::Database;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use anyhow::Result;
@@ -63,7 +63,9 @@ pub async fn run_dag(
 
     if total_steps == 0 {
         state.mark_completed();
-        let _ = db.update_run_status(run_id, "completed", None);
+        if let Err(e) = db.update_run_status(run_id, "completed", None) {
+            warn!("[DAG] 更新运行状态失败: {}", e);
+        }
         emit_run_update(app_handle, run_id, workflow_name, "completed");
         return Ok(state);
     }
@@ -80,6 +82,7 @@ pub async fn run_dag(
     };
 
     let mut step_index = 0;
+    let mut skipped_nodes: HashSet<String> = HashSet::new();
     while step_index < total_steps {
         // ── 检查取消 ──
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
@@ -120,11 +123,13 @@ pub async fn run_dag(
             let group = &plan.parallel_groups[group_id];
             info!("[DAG] 并行组 #{}: {:?} ({} 节点)", group_id, group, group.len());
 
+            let mut ctx_clone = ctx.clone();
             let parallel_results = run_parallel_group(
                 &executor,
                 group,
                 &plan.ordered_steps,
-                &mut ctx,
+                &ctx,
+                &mut ctx_clone,
                 app_handle,
                 db,
                 run_id,
@@ -140,7 +145,9 @@ pub async fn run_dag(
                     Ok(output) => {
                         ctx.set_output(&exec_step.node_id, output.clone());
                         state.mark_step_completed(&exec_step.node_id);
-                        let _ = db.complete_step_run(run_id, &exec_step.node_id, Some(&output), None);
+                        if let Err(e) = db.complete_step_run(run_id, &exec_step.node_id, Some(&output), None) {
+                            warn!("[DAG] 更新步骤运行状态失败: {}", e);
+                        }
                         emit_step_update(
                             app_handle, run_id, &exec_step.node_id, &exec_step.step.name,
                             total_steps, "completed", Some(&output),
@@ -152,7 +159,9 @@ pub async fn run_dag(
                         let err_msg = e.to_string();
                         warn!("[DAG] 并行节点失败: {} - {}", exec_step.step.name, err_msg);
                         state.mark_step_failed(&exec_step.node_id);
-                        let _ = db.complete_step_run(run_id, &exec_step.node_id, None, Some(&err_msg));
+                        if let Err(e) = db.complete_step_run(run_id, &exec_step.node_id, None, Some(&err_msg)) {
+                            warn!("[DAG] 更新步骤运行状态失败: {}", e);
+                        }
                         emit_step_update_with_error(
                             app_handle, run_id, &exec_step.node_id, &exec_step.step.name, &err_msg,
                         );
@@ -191,6 +200,15 @@ pub async fn run_dag(
         // ── 单步：顺序执行 ──
         let exec_step = &plan.ordered_steps[step_index];
         let step = &exec_step.step;
+
+        // 逻辑判断排除：跳过被分叉路由排除的节点
+        if skipped_nodes.contains(&exec_step.node_id) {
+            info!("[DAG] 跳过节点: {} (已被逻辑判断分支排除)", step.name);
+            state.mark_step_completed(&step.id);
+            emit_step_update(app_handle, run_id, &step.id, &step.name, total_steps, "skipped", None);
+            step_index += 1;
+            continue;
+        }
 
         // 断点 / 单步检查
         if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
@@ -245,22 +263,91 @@ pub async fn run_dag(
         // 执行
         info!("[DAG] 步骤执行: {} (类型: {})", step.name, step.step_type);
         state.mark_step_running(&step.id);
-        let _ = db.create_step_run(run_id, &step.id);
+        if let Err(e) = db.create_step_run(run_id, &step.id) {
+            warn!("[DAG] 创建步骤运行记录失败: {}", e);
+        }
+        // v4.1: 持久化日志 — 步骤开始
+        let step_run_id = format!("{}:{}", run_id, step.id);
+        let now = chrono::Utc::now().to_rfc3339();
+        if let Err(e) = db.insert_step_log(&step_run_id, "info", &format!("▶ 开始执行: {} ({})", step.name, step.step_type), &now) {
+            warn!("[DAG] 插入步骤日志失败: {}", e);
+        }
         emit_step_update(app_handle, run_id, &step.id, &step.name, total_steps, "running", None);
 
-        let result = execute_with_retry(&executor, step, &mut ctx).await;
+        // v4.1: 容器节点 → 打开 session
+        let is_container = step.step_type.ends_with("_container");
+        if is_container {
+            let session = ctx.open_session(&exec_step.node_id, &step.step_type);
+            info!("[SESSION] 打开 {} session={}", step.step_type, session.session_id);
+        }
+
+        // 容器/IF 节点：注入上游连线数据
+        inject_input_ports(&mut ctx, &step.step_type, &exec_step.node_id, &plan.edges);
+
+        // 逻辑判断容器：把上游数据注入到 config.value（作为 left 操作数透传）
+        let mut if_step = step.clone();
+        if step.step_type == "logic_container" {
+            for edge in &plan.edges {
+                if edge.target == exec_step.node_id && edge.target_handle == "输入" {
+                    if let Some(source_output) = ctx.step_outputs.get(&edge.source) {
+                        let value = if !edge.source_handle.is_empty() {
+                            source_output.get(&edge.source_handle).cloned()
+                                .unwrap_or_else(|| source_output.clone())
+                        } else {
+                            source_output.clone()
+                        };
+                        if let Some(obj) = if_step.config.as_object_mut() {
+                            obj.insert("value".to_string(), value.clone());
+                            info!("[DAG] 逻辑判断 {} — 注入 value={}", exec_step.node_id, value);
+                        }
+                    }
+                }
+            }
+        }
+
+        let result = execute_with_retry(&executor, &if_step, &mut ctx).await;
 
         match result {
             Ok(output) => {
                 ctx.set_output(&step.id, output.clone());
                 state.mark_step_completed(&step.id);
-                let _ = db.complete_step_run(run_id, &step.id, Some(&output), None);
+                if let Err(e) = db.complete_step_run(run_id, &step.id, Some(&output), None) {
+                    warn!("[DAG] 更新步骤运行状态失败: {}", e);
+                }
+                // v4.1: 持久化日志 — 步骤成功
+                let now2 = chrono::Utc::now().to_rfc3339();
+                if let Err(e) = db.insert_step_log(&step_run_id, "success", &format!("✅ 完成: {}，输出 {} bytes", step.name, output.to_string().len()), &now2) {
+                    warn!("[DAG] 插入步骤日志失败: {}", e);
+                }
                 emit_step_update(
                     app_handle, run_id, &step.id, &step.name,
                     total_steps, "completed", Some(&output),
                 );
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
                 emit_variable_snapshot(app_handle, run_id, &ctx);
+
+                // 逻辑判断容器：输出为 Null → 条件不通过，跳过所有下游
+                if step.step_type == "logic_container" && output.is_null() {
+                    info!("[DAG] 逻辑判断 {} 条件不通过，跳过所有下游", exec_step.node_id);
+                    let mut queue: Vec<String> = Vec::new();
+                    // 收集直接下游
+                    for edge in &plan.edges {
+                        if edge.source == exec_step.node_id {
+                            queue.push(edge.target.clone());
+                        }
+                    }
+                    // BFS 跳过所有下游节点
+                    while let Some(node) = queue.pop() {
+                        if skipped_nodes.insert(node.clone()) {
+                            info!("[DAG] 跳过节点: {}", node);
+                            for edge in &plan.edges {
+                                if edge.source == node && !skipped_nodes.contains(&edge.target) {
+                                    queue.push(edge.target.clone());
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
@@ -280,7 +367,14 @@ pub async fn run_dag(
                 let err_msg = e.to_string();
                 warn!("[DAG] 步骤失败: {} - {}", step.name, err_msg);
                 state.mark_step_failed(&step.id);
-                let _ = db.complete_step_run(run_id, &step.id, None, Some(&err_msg));
+                if let Err(e) = db.complete_step_run(run_id, &step.id, None, Some(&err_msg)) {
+                    warn!("[DAG] 更新步骤运行状态失败: {}", e);
+                }
+                // v4.1: 持久化日志 — 步骤失败
+                let now3 = chrono::Utc::now().to_rfc3339();
+                if let Err(e) = db.insert_step_log(&step_run_id, "error", &format!("❌ 失败: {} - {}", step.name, err_msg), &now3) {
+                    warn!("[DAG] 插入步骤日志失败: {}", e);
+                }
                 emit_step_update_with_error(app_handle, run_id, &step.id, &step.name, &err_msg);
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
@@ -294,13 +388,21 @@ pub async fn run_dag(
             }
         }
 
+        // v4.1: 容器 session 关闭
+        if is_container {
+            ctx.close_session(&exec_step.node_id);
+            info!("[SESSION] 关闭 {} node={}", step.step_type, exec_step.node_id);
+        }
+
         step_index += 1;
     }
 
     // 全部完成
     info!("[DAG] 工作流完成: {} (run_id: {})", workflow_name, run_id);
     state.mark_completed();
-    let _ = db.update_run_status(run_id, "completed", None);
+    if let Err(e) = db.update_run_status(run_id, "completed", None) {
+        warn!("[DAG] 更新运行状态失败: {}", e);
+    }
     emit_run_update(app_handle, run_id, workflow_name, "completed");
     Ok(state)
 }
@@ -314,6 +416,7 @@ async fn run_parallel_group(
     executor: &Arc<StepExecutor>,
     indices: &[usize],
     ordered_steps: &[ExecStep],
+    main_ctx: &ExecutionContext,
     _ctx: &mut ExecutionContext,
     app_handle: &tauri::AppHandle,
     db: &Arc<Database>,
@@ -324,10 +427,12 @@ async fn run_parallel_group(
 ) -> Vec<(usize, Result<serde_json::Value>)> {
     // 并发执行组内所有步骤
     let mut handles = Vec::new();
+    let main_step_outputs = main_ctx.step_outputs.clone();
 
     for &idx in indices {
         let step = &ordered_steps[idx];
         let step_owned = step.step.clone();
+        let _node_id = step.node_id.clone();
         let executor_clone = executor.clone();
         let cancel_flag_c = ctrl.cancel_flag.clone();
         let cancel_token_c = ctrl.cancel_token.clone();
@@ -336,6 +441,7 @@ async fn run_parallel_group(
         let db_c = db.clone();
         let run_id_c = run_id.to_string();
         let workflow_name_c = workflow_name.to_string();
+        let main_outputs_c = main_step_outputs.clone();
 
         handles.push(tokio::spawn(async move {
             let mut local_ctx = ExecutionContext::new(
@@ -347,6 +453,14 @@ async fn run_parallel_group(
                     variables: None,
                 },
             );
+
+            // 容器节点：从主 ctx 注入上游连线数据
+            if step_owned.step_type.ends_with("_container") {
+                // 合并主 ctx 的 step_outputs 到 local_ctx
+                local_ctx.step_outputs = main_outputs_c;
+                // 注意：input_ports 通过 step_outputs 间接传递，
+                // 实际的 input_ports 在 execute_with_retry 前的 inject 中设置
+            }
 
             // 检查取消
             if cancel_flag_c.load(Ordering::Relaxed) || cancel_token_c.is_cancelled() {
@@ -364,7 +478,9 @@ async fn run_parallel_group(
             }
 
             info!("[DAG:parallel] 执行: {} (索引 {})", step_owned.name, idx);
-            let _ = db_c.create_step_run(&run_id_c, &step_owned.id);
+            if let Err(e) = db_c.create_step_run(&run_id_c, &step_owned.id) {
+                warn!("[DAG:parallel] 创建步骤运行记录失败: {}", e);
+            }
             emit_step_update(
                 &app_handle_c, &run_id_c, &step_owned.id, &step_owned.name,
                 total_steps, "running", None,
@@ -417,7 +533,9 @@ fn handle_step_error(
         ErrorStrategy::Fail => {
             error!("[DAG] 步骤 '{}' 失败，工作流终止", step_name);
             state.mark_failed();
-            let _ = db.update_run_status(run_id, "failed", Some(err_msg));
+            if let Err(e) = db.update_run_status(run_id, "failed", Some(err_msg)) {
+                warn!("[DAG] 更新运行状态失败: {}", e);
+            }
             emit_run_update(app_handle, run_id, workflow_name, "failed");
             Err(anyhow::anyhow!("步骤 '{}' 执行失败: {}", step_name, err_msg))
         }
@@ -500,7 +618,9 @@ pub async fn run_dag_workflow(
     step_mode: bool,
 ) -> Result<DAGRunResult> {
     if dag.nodes.is_empty() {
-        let _ = db.update_run_status(run_id, "completed", None);
+        if let Err(e) = db.update_run_status(run_id, "completed", None) {
+            warn!("[DAG] 更新运行状态失败: {}", e);
+        }
         return Ok(DAGRunResult {
             completed: true,
             node_outputs: HashMap::new(),
@@ -555,6 +675,49 @@ pub async fn run_dag_workflow(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// 容器节点 input_ports 数据注入
+// ═══════════════════════════════════════════════════════════════
+
+/// 对于容器节点，从上游节点收集输入数据注入 ctx
+///
+/// 连线语义：
+///   edge.source → edge.target
+///   edge.source_handle = 上游节点的输出 port 名
+///   edge.target_handle = 当前容器节点的 action id（接收端口）
+fn inject_input_ports(
+    ctx: &mut ExecutionContext,
+    step_type: &str,
+    node_id: &str,
+    edges: &[FlowEdge],
+) {
+    let is_container = step_type == "browser_container" || step_type == "word_container" || step_type == "excel_container" || step_type == "logic_container";
+    if !is_container {
+        return;
+    }
+
+    ctx.input_ports.clear();
+
+    for edge in edges {
+        if edge.target != node_id {
+            continue;
+        }
+        if let Some(source_output) = ctx.step_outputs.get(&edge.source) {
+            let port_data = if !edge.source_handle.is_empty() {
+                source_output.get(&edge.source_handle).cloned()
+                    .unwrap_or_else(|| source_output.clone())
+            } else {
+                source_output.clone()
+            };
+            ctx.input_ports.insert(edge.target_handle.clone(), port_data);
+        }
+    }
+
+    if !ctx.input_ports.is_empty() {
+        info!("[DAG] 容器节点 {} — 注入 {} 个 input_ports", node_id, ctx.input_ports.len());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 事件发射辅助
 // ═══════════════════════════════════════════════════════════════
 
@@ -581,7 +744,7 @@ fn emit_step_update(
     }
 
     // v3: 同时发射 step-status-update 事件（前端状态可视化用）
-    let current_step = if status == "running" { 0 } else { 0 }; // 由前端自行计数
+    let current_step: u32 = 0; // 由前端自行计数
     let status_event = serde_json::json!({
         "step_id": step_id,
         "step_name": step_name,

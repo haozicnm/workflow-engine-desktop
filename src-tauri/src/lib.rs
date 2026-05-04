@@ -18,6 +18,41 @@ pub type RunFlags = Arc<tokio::sync::RwLock<HashMap<String, Arc<AtomicBool>>>>;
 pub type CancelTokens = Arc<tokio::sync::RwLock<HashMap<String, tokio_util::sync::CancellationToken>>>;
 
 /// 应用全局状态
+///
+/// 首次启动时将内置模板作为普通工作流写入数据库
+fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
+    use tracing::info;
+
+    let existing = db.list_workflows().unwrap_or_default();
+    if !existing.is_empty() {
+        return Ok(()); // 已有数据，跳过
+    }
+
+    info!("首次启动，正在创建 4 个内置示例工作流...");
+
+    let builtins: &[(&str, &str)] = &[
+        (include_str!("../../templates/monitor-excel-alert.json"), "网页监控 → Excel异常报告"),
+        (include_str!("../../templates/excel-to-word-batch.json"), "Excel数据 → 批量Word通知书"),
+        (include_str!("../../templates/api-excel-word-branch.json"), "JSON数据 → 条件分流 Word/Excel"),
+        (include_str!("../../templates/word-extract-excel.json"), "Word文档提取 → Excel汇总分析"),
+    ];
+
+    for (json_str, default_name) in builtins {
+        let data: serde_json::Value = serde_json::from_str(json_str)?;
+        let name = data["name"].as_str().unwrap_or(default_name);
+        let desc = data["description"].as_str().unwrap_or("");
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        db.create_workflow(&id, name, desc, &now, &now)?;
+        db.save_workflow_yaml(&id, json_str)?;
+        info!("  ✅ 已创建: {name}");
+    }
+
+    info!("内置示例工作流初始化完成");
+    Ok(())
+}
+
 pub struct App {
     pub db: Arc<data::db::Database>,
     pub config: Arc<tokio::sync::RwLock<data::config::AppConfig>>,
@@ -40,6 +75,7 @@ pub struct App {
 impl App {
     pub fn new() -> Result<Self> {
         let db = data::db::Database::open_default()?;
+        seed_builtin_workflows(&db)?;
         let config = data::config::AppConfig::load_default().unwrap_or_default();
         let max_concurrent = std::env::var("MAX_CONCURRENT_WORKFLOWS")
             .ok()

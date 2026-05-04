@@ -332,6 +332,40 @@ pub fn all_nodes() -> Vec<NodeManifest> {
             description: "将当前页面生成 PDF 文件",
             icon: "file", default_config: serde_json::json!({ "params": { "path": "output.pdf" } }),
         },
+        NodeManifest {
+            node_type: "browser_container", label: "浏览器容器",
+            description: "在一个浏览器窗口内按顺序执行多个操作（导航/点击/填写/提取/截图等），支持端口连线数据传递",
+            icon: "container", default_config: serde_json::json!({
+                "browser": "chromium",
+                "headless": false,
+                "timeout": 30000,
+                "actions": []
+            }),
+        },
+        NodeManifest {
+            node_type: "excel_container", label: "Excel容器",
+            description: "在一个 Excel 文件内按顺序执行多个操作（读取/写入/筛选/排序等），支持端口连线数据传递",
+            icon: "container", default_config: serde_json::json!({
+                "file_path": "",
+                "sheet": "Sheet1",
+                "actions": []
+            }),
+        },
+        NodeManifest {
+            node_type: "word_container", label: "Word容器",
+            description: "在一个 Word 文件内按顺序执行多个操作（读取/写入/替换/合并等），支持端口连线数据传递",
+            icon: "container", default_config: serde_json::json!({
+                "file_path": "",
+                "actions": []
+            }),
+        },
+        NodeManifest {
+            node_type: "logic_container", label: "🔀 逻辑判断",
+            description: "逻辑判断容器：加判断动作后原值透传到 true/false 出口",
+            icon: "git-branch", default_config: serde_json::json!({
+                "actions": []
+            }),
+        },
 
         // ── 其他节点 ──
         NodeManifest {

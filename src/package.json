@@ -1,7 +1,7 @@
 {
   "name": "workflow-engine-frontend",
   "private": true,
-  "version": "3.4.0",
+  "version": "4.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,6 +27,7 @@
     "@vue/test-utils": "^2.4.9",
     "autoprefixer": "^10.4.0",
     "jsdom": "^29.1.0",
+    "playwright": "^1.59.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.0",
     "vite": "^6.0.0",

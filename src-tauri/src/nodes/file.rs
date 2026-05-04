@@ -154,9 +154,8 @@ async fn collect_entries(
         let ext = entry_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         if let Some(ref exts) = extensions {
-            if !exts.is_empty() && metadata.is_file() && !exts.contains(&ext) {
-                if !recursive || !metadata.is_dir() { continue; }
-            }
+            if !exts.is_empty() && metadata.is_file() && !exts.contains(&ext)
+                && (!recursive || !metadata.is_dir()) { continue; }
         }
 
         entries.push(serde_json::json!({

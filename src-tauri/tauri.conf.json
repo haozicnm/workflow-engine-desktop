@@ -1,12 +1,12 @@
 {
   "productName": "Workflow Engine",
-      "version": "3.4.0",
+  "version": "4.1.0",
   "identifier": "com.workflow-engine.desktop",
   "build": {
     "frontendDist": "../src/dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm --prefix ./src run dev",
-    "beforeBuildCommand": "npm --prefix ../src run build"
+    "beforeBuildCommand": ""
   },
   "app": {
     "windows": [
@@ -44,7 +44,8 @@
     "resources": {
       "sidecars/*": "sidecars/",
       "python-runtime/wheels/**/*": "wheels/",
-      "python-runtime/playwright-browsers/**/*": "playwright-browsers/"
+      "python-runtime/playwright-browsers/**/*": "playwright-browsers/",
+      "../templates/data/**/*": "templates/data/"
     }
   },
   "plugins": {}

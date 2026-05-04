@@ -326,7 +326,7 @@ pub async fn word_read(path: &str) -> Result<serde_json::Value> {
     }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
-async fn word_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn word_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let paragraphs = config.get("paragraphs").and_then(|v| v.as_array())
         .ok_or_else(|| anyhow!("write 需要 paragraphs 参数"))?.clone();
@@ -366,7 +366,7 @@ async fn word_append(path: &str, config: &serde_json::Value) -> Result<serde_jso
     }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
-async fn word_replace(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn word_replace(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let output_path = config.get("output").and_then(|v| v.as_str()).map(String::from)
         .unwrap_or_else(|| {
@@ -413,7 +413,7 @@ async fn word_replace(path: &str, config: &serde_json::Value) -> Result<serde_js
 }
 
 /// 合并多个 docx 文件
-async fn word_merge_files(paths: &[String], output: &str) -> Result<serde_json::Value> {
+pub async fn word_merge_files(paths: &[String], output: &str) -> Result<serde_json::Value> {
     let paths = paths.to_vec();
     let output = output.to_string();
 

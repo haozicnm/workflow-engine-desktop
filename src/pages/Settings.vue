@@ -4,6 +4,8 @@ import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import pkg from '../package.json'
 
+const emit = defineEmits<{ 'back': [] }>()
+
 const toast = useToast()
 const APP_VERSION = pkg.version
 
@@ -88,6 +90,7 @@ function truncatePath(path: string, maxLen: number): string {
 <template>
 <div class="settings-page">
   <header class="page-header">
+    <button class="back-btn" @click="emit('back')" title="返回">← 返回</button>
     <h1>⚙️ 设置</h1>
     <p class="page-desc">配置应用行为和浏览器节点</p>
   </header>
@@ -229,6 +232,12 @@ function truncatePath(path: string, maxLen: number): string {
 .settings-page { max-width: 640px; margin: 0 auto; padding: 24px 20px; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 20px; color: #e6edf3; margin: 0 0 4px 0; }
+.back-btn {
+  display: inline-block; padding: 4px 12px; margin-bottom: 8px;
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+  color: #8b949e; font-size: 12px; cursor: pointer; transition: all 0.15s;
+}
+.back-btn:hover { background: #30363d; color: #e6edf3; }
 .page-desc { font-size: 13px; color: #8b949e; margin: 0; }
 .loading { text-align: center; padding: 40px; color: #8b949e; }
 .settings-section {

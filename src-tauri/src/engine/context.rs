@@ -3,6 +3,7 @@ use crate::engine::workflow::Workflow;
 use std::collections::HashMap;
 use std::cmp::Reverse;
 use anyhow::Result;
+use uuid::Uuid;
 
 /// 执行上下文
 #[derive(Clone)]
@@ -14,6 +15,26 @@ pub struct ExecutionContext {
     pub browser_channel: String,
     /// 浏览器可执行文件路径（WSL 指向 Windows exe 等场景）
     pub browser_executable_path: String,
+    /// 容器节点输入端口数据（由 DAG 调度器从上游连线注入）
+    pub input_ports: HashMap<String, serde_json::Value>,
+    /// v4.1: 容器 session 管理 — node_id → session 信息
+    pub sessions: HashMap<String, ContainerSession>,
+}
+
+/// 容器 session 状态
+#[derive(Clone, Debug)]
+pub struct ContainerSession {
+    pub session_id: String,
+    pub node_id: String,
+    pub node_type: String,
+    pub status: SessionStatus,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum SessionStatus {
+    Created,
+    Running,
+    Closed,
 }
 
 impl ExecutionContext {
@@ -25,6 +46,33 @@ impl ExecutionContext {
             step_outputs: HashMap::new(),
             browser_channel: "auto".to_string(),
             browser_executable_path: String::new(),
+            input_ports: HashMap::new(),
+            sessions: HashMap::new(),
+        }
+    }
+
+    /// v4.1: 打开容器 session（幂等 — 已存在则返回已有 session）
+    pub fn open_session(&mut self, node_id: &str, node_type: &str) -> &ContainerSession {
+        if !self.sessions.contains_key(node_id) {
+            let session = ContainerSession {
+                session_id: format!("{}-{}", node_id, Uuid::new_v4()),
+                node_id: node_id.to_string(),
+                node_type: node_type.to_string(),
+                status: SessionStatus::Created,
+            };
+            self.sessions.insert(node_id.to_string(), session);
+        }
+        let s = self.sessions.get_mut(node_id).unwrap();
+        if s.status == SessionStatus::Created {
+            s.status = SessionStatus::Running;
+        }
+        self.sessions.get(node_id).unwrap()
+    }
+
+    /// v4.1: 关闭容器 session
+    pub fn close_session(&mut self, node_id: &str) {
+        if let Some(s) = self.sessions.get_mut(node_id) {
+            s.status = SessionStatus::Closed;
         }
     }
 

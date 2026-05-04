@@ -1,75 +1,49 @@
 {
   "name": "Excel数据 → 批量Word通知书",
-  "description": "读取Excel表格 → 按条件筛选 → 循环生成个性化Word文档 → 失败则通知",
+  "description": "Excel读取员工数据 → Word生成通知书 → Word合并汇总",
   "nodes": [
     {
       "id": "n1",
-      "type": "excel_read",
-      "label": "读取人员清单",
+      "type": "excel_container",
+      "label": "员工数据",
       "position": { "x": 60, "y": 120 },
-      "config": { "path": "templates/data/员工名单.xlsx", "sheet": "Sheet1" }
-    },
-    {
-      "id": "n2",
-      "type": "array_filter",
-      "label": "筛选在职人员",
-      "position": { "x": 360, "y": 120 },
-      "config": { "field": "状态", "op": "==", "value": "在职" }
-    },
-    {
-      "id": "n3",
-      "type": "loop",
-      "label": "逐人生成通知书",
-      "position": { "x": 660, "y": 120 },
       "config": {
-        "array": "{{n2.result}}",
-        "body": [
-          {
-            "id": "loop_create",
-            "type": "word_create",
-            "label": "创建文档",
-            "config": { "path": "templates/data/output/{{item.姓名}}_{{now}}.docx" }
-          },
-          {
-            "id": "loop_write",
-            "type": "word_write",
-            "label": "填写内容",
-            "config": { "content": "尊敬的{{item.姓名}}：\n\n经考核，您本季度绩效评级为：{{item.绩效}}\n\n特此通知。" }
-          },
-          {
-            "id": "loop_condition",
-            "type": "condition",
-            "label": "优秀员工?",
-            "config": { "left": "{{item.绩效}}", "op": "==", "right": "优秀", "true_next": "loop_notify", "false_next": "" }
-          },
-          {
-            "id": "loop_notify",
-            "type": "notify",
-            "label": "通知主管",
-            "config": { "title": "优秀员工通知", "message": "{{item.姓名}} 获得优秀评级 🎉" }
-          }
+        "file_path": "templates/data/员工名单.xlsx",
+        "sheet": "Sheet1",
+        "actions": [
+          { "id": "a1", "type": "read", "label": "读取名单", "config": {} },
+          { "id": "a2", "type": "filter", "label": "筛选在职", "config": { "column": "状态", "op": "equals", "value": "在职" } }
         ]
       }
     },
     {
-      "id": "n4",
-      "type": "word_merge",
-      "label": "合并所有文档",
-      "position": { "x": 1060, "y": 120 },
-      "config": { "files": "{{n3.result}}", "output": "templates/data/output/通知书汇总.docx" }
+      "id": "n2",
+      "type": "word_container",
+      "label": "生成通知书",
+      "position": { "x": 460, "y": 80 },
+      "config": {
+        "file_path": "templates/data/output/通知书.docx",
+        "actions": [
+          { "id": "wa1", "type": "create", "label": "新建", "config": {} },
+          { "id": "wa2", "type": "write", "label": "填写内容", "config": {} }
+        ]
+      }
     },
     {
-      "id": "n5",
-      "type": "notify",
-      "label": "完成通知",
-      "position": { "x": 1360, "y": 120 },
-      "config": { "title": "批量生成完成", "message": "已生成 {{count}} 份通知书" }
+      "id": "n3",
+      "type": "word_container",
+      "label": "合并汇总",
+      "position": { "x": 860, "y": 120 },
+      "config": {
+        "file_path": "templates/data/output/通知书汇总.docx",
+        "actions": [
+          { "id": "wa1", "type": "merge", "label": "合并文档", "config": {} }
+        ]
+      }
     }
   ],
   "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "data", "targetHandle": "input" },
-    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "result", "targetHandle": "input" },
-    { "id": "e3", "source": "n3", "target": "n4", "sourceHandle": "result", "targetHandle": "input" },
-    { "id": "e4", "source": "n4", "target": "n5", "sourceHandle": "result", "targetHandle": "input" }
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "a2", "targetHandle": "wa2" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "wa2", "targetHandle": "wa1" }
   ]
 }

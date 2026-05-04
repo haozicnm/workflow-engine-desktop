@@ -46,7 +46,7 @@ pub async fn run_workflow(
 
     if workflow.steps.is_empty() {
         state.mark_completed();
-        let _ = db.update_run_status(run_id, "completed", None);
+        if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
         emit_run_update(app_handle, run_id, &workflow_name, "completed");
         return Ok(state);
     }
@@ -61,7 +61,7 @@ pub async fn run_workflow(
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
             state.mark_failed();
-            let _ = db.update_run_status(run_id, "cancelled", None);
+            if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
             emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
             return Err(anyhow::anyhow!("cancelled"));
         }
@@ -71,7 +71,7 @@ pub async fn run_workflow(
             tokio::select! {
                 _ = ctrl.cancel_token.cancelled() => {
                     state.mark_failed();
-                    let _ = db.update_run_status(run_id, "cancelled", None);
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
                     emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                     return Err(anyhow::anyhow!("cancelled"));
                 }
@@ -82,7 +82,7 @@ pub async fn run_workflow(
             // 暂停期间也检查取消
             if ctrl.cancel_flag.load(Ordering::Relaxed) {
                 state.mark_failed();
-                let _ = db.update_run_status(run_id, "cancelled", None);
+                if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
                 emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                 return Err(anyhow::anyhow!("cancelled"));
             }
@@ -102,7 +102,7 @@ pub async fn run_workflow(
         // 更新状态 & 持久化
         info!("步骤执行: {} (类型: {})", step.name, step.step_type);
         state.mark_step_running(&current_id);
-        let _ = db.create_step_run(run_id, &current_id);
+        if let Err(e) = db.create_step_run(run_id, &current_id) { warn!("DB create_step failed: {}", e); }
         emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "running", None);
 
         // ─── 断点 / 单步 检查 ───
@@ -111,13 +111,13 @@ pub async fn run_workflow(
             update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
             // 通知前端：断点命中
-            let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
+            if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
                 "run_id": run_id,
                 "step_id": current_id,
                 "step_name": step.name,
                 "variables": ctx.variables,
                 "step_outputs": ctx.step_outputs,
-            }));
+            })) { warn!("emit breakpoint-hit failed: {}", e); }
 
             // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
             ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
@@ -125,7 +125,7 @@ pub async fn run_workflow(
                 tokio::select! {
                     _ = ctrl.cancel_token.cancelled() => {
                         state.mark_failed();
-                        let _ = db.update_run_status(run_id, "cancelled", None);
+                        if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
                         emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                         return Err(anyhow::anyhow!("cancelled"));
                     }
@@ -136,7 +136,7 @@ pub async fn run_workflow(
                 // 暂停期间也检查取消（AtomicBool 快速路径）
                 if ctrl.cancel_flag.load(Ordering::Relaxed) {
                     state.mark_failed();
-                    let _ = db.update_run_status(run_id, "cancelled", None);
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
                     emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                     return Err(anyhow::anyhow!("cancelled"));
                 }
@@ -162,7 +162,7 @@ pub async fn run_workflow(
             Ok(output) => {
                 ctx.set_output(&current_id, output.clone());
                 state.mark_step_completed(&current_id);
-                let _ = db.complete_step_run(run_id, &current_id, Some(&output), None);
+                if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) { warn!("DB complete_step failed: {}", e); }
                 emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
 
                 // 更新调试快照
@@ -174,21 +174,21 @@ pub async fn run_workflow(
                 // 单步模式：执行完暂停
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-                    let _ = app_handle.emit("breakpoint-hit", serde_json::json!({
+                    if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
                         "run_id": run_id,
                         "step_id": current_id,
                         "step_name": step.name,
                         "reason": "step_mode",
                         "variables": ctx.variables,
                         "step_outputs": ctx.step_outputs,
-                    }));
+                    })) { warn!("emit breakpoint-hit failed: {}", e); }
                 }
             }
             Err(e) => {
                 let err_msg = e.to_string();
                 warn!("步骤失败: {} - {}", step.name, err_msg);
                 state.mark_step_failed(&current_id);
-                let _ = db.complete_step_run(run_id, &current_id, None, Some(&err_msg));
+                if let Err(e) = db.complete_step_run(run_id, &current_id, None, Some(&err_msg)) { warn!("DB complete_step failed: {}", e); }
                 emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
 
                 // 更新调试快照（含错误信息）
@@ -239,7 +239,7 @@ pub async fn run_workflow(
                 // 没有下一步，工作流完成
                 info!("工作流完成: {} (run_id: {})", workflow_name, run_id);
                 state.mark_completed();
-                let _ = db.update_run_status(run_id, "completed", None);
+                if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
                 emit_run_update(app_handle, run_id, &workflow_name, "completed");
                 return Ok(state);
             }
@@ -330,7 +330,7 @@ fn emit_step_update(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_na
         "output": output,
         "error": null,
     });
-    let _ = app.emit("step-update", event);
+    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
 
 /// 执行后推送变量快照，供前端实时监视
@@ -340,7 +340,7 @@ fn emit_variable_snapshot(app: &tauri::AppHandle, run_id: &str, ctx: &ExecutionC
         "variables": ctx.variables,
         "step_outputs": ctx.step_outputs,
     });
-    let _ = app.emit("variable-update", event);
+    if let Err(e) = app.emit("variable-update", event) { warn!("emit failed: {}", e); }
 }
 
 fn emit_step_update_with_error(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_name: &str, error: &str) {
@@ -352,7 +352,7 @@ fn emit_step_update_with_error(app: &tauri::AppHandle, run_id: &str, step_id: &s
         "output": null,
         "error": error,
     });
-    let _ = app.emit("step-update", event);
+    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
 
 /// 错误被忽略时的事件（status = ignored, 区别于 failed）
@@ -366,7 +366,7 @@ fn emit_step_update_ignored(app: &tauri::AppHandle, run_id: &str, step_id: &str,
         "output": null,
         "error": error,
     });
-    let _ = app.emit("step-update", event);
+    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
 
 fn emit_run_update(app: &tauri::AppHandle, run_id: &str, workflow_name: &str, status: &str) {
@@ -375,7 +375,7 @@ fn emit_run_update(app: &tauri::AppHandle, run_id: &str, workflow_name: &str, st
         "workflow_name": workflow_name,
         "status": status,
     });
-    let _ = app.emit("run-update", event);
+    if let Err(e) = app.emit("run-update", event) { warn!("emit failed: {}", e); }
 }
 
 fn emit_approval_required(app: &tauri::AppHandle, run_id: &str, step: &Step) {

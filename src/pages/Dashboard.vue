@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
-import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from '../composables/useToast'
-import WorkflowGrid from '../components/WorkflowGrid.vue'
-import TemplateSection from '../components/TemplateSection.vue'
 
 interface WorkflowItem {
   id: string
@@ -15,29 +12,21 @@ interface WorkflowItem {
   updated_at: string
 }
 
-interface TemplateItem {
-  id: string
-  name: string
-  description: string
-}
-const templates = ref<TemplateItem[]>([])
-
 const emit = defineEmits<{
   'open-workflow': [id?: string]
-  'create-from-template': [template: { id: string; name: string; nodes: unknown[]; edges: unknown[] }]
-  'navigate': [path: string]
+  'open-settings': []
+  'open-history': []
 }>()
-const store = useWorkflowStore()
+
 const toast = useToast()
 const workflows = ref<WorkflowItem[]>([])
 const loading = ref(false)
-const deleting = ref<string | null>(null)
-const cloning = ref<string | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
-const creatingFromTemplate = ref<string | null>(null)
+const deletingId = ref<string | null>(null)
+const exportingId = ref<string | null>(null)
 
 // ─── 搜索 ───
 const searchQuery = ref('')
+
 const filteredWorkflows = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return workflows.value
@@ -49,25 +38,17 @@ const filteredWorkflows = computed(() => {
 let unlistenRunUpdate: (() => void) | null = null
 
 onMounted(async () => {
-  await Promise.all([loadList(), loadTemplates()])
-  // 监听工作流执行结果
+  await loadList()
   try {
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
-      if (status === 'completed') {
-        toast.success('工作流执行完成 ✅')
-      } else if (status === 'failed') {
-        toast.error('工作流执行失败: ' + (error || '未知错误'))
-      }
+      if (status === 'completed') toast.success('工作流执行完成 ✅')
+      else if (status === 'failed') toast.error('工作流执行失败: ' + (error || '未知错误'))
     })
-  } catch (e) {
-    console.warn('无法监听执行事件:', e)
-  }
+  } catch (e) { console.warn('无法监听执行事件:', e) }
 })
 
-onUnmounted(() => {
-  unlistenRunUpdate?.()
-})
+onUnmounted(() => { unlistenRunUpdate?.() })
 
 async function loadList() {
   loading.value = true
@@ -75,94 +56,20 @@ async function loadList() {
     workflows.value = await safeInvoke<WorkflowItem[]>('workflow_list')
   } catch (e: unknown) {
     toast.error('获取工作流列表失败: ' + ((e as Error).message || e))
-  } finally {
-    loading.value = false
-  }
+  } finally { loading.value = false }
 }
 
-async function loadTemplates() {
-  try {
-    const result = await safeInvoke<TemplateItem[]>('template_list')
-    templates.value = result
-    if (!result || result.length === 0) {
-      toast.error('未找到内置模板')
-    }
-  } catch (e) {
-    // Dev mode fallback: 浏览器环境无 Tauri，fetch 模板 API
-    console.warn('Tauri invoke 不可用，使用 fetch 模板 fallback:', e)
-    try {
-      const res = await fetch('/api/templates')
-      const list = await res.json() as TemplateItem[]
-      templates.value = list
-      if (!list || list.length === 0) {
-        toast.error('未找到内置模板')
-      }
-    } catch (fe) {
-      console.error('加载内置模板失败:', fe)
-      toast.error('加载模板失败')
-    }
-  }
+// ─── 操作 ───
+
+function onEdit(item: WorkflowItem) {
+  emit('open-workflow', item.id)
 }
 
-// ─── 业务操作 ───
-
-function openEditor(id?: string) {
-  emit('open-workflow', id)
+function onNewWorkflow() {
+  emit('open-workflow', undefined)
 }
 
-async function createFromTemplate(tpl: TemplateItem) {
-  creatingFromTemplate.value = tpl.id
-  try {
-    let data: { name?: string; nodes?: unknown[]; edges?: unknown[] }
-
-    try {
-      const jsonStr = await safeInvoke<string | null>('template_get_json', { id: tpl.id })
-      if (!jsonStr) { toast.error('模板数据为空'); return }
-      data = JSON.parse(jsonStr)
-    } catch {
-      // Dev mode fallback: 浏览器环境无 Tauri，fetch 模板 JSON
-      const res = await fetch(`/api/templates/${tpl.id}`)
-      if (!res.ok) { toast.error('模板数据为空'); return }
-      data = await res.json()
-    }
-
-    emit('create-from-template', {
-      id: tpl.id,
-      name: data.name || tpl.name,
-      nodes: (data.nodes || []) as unknown[],
-      edges: (data.edges || []) as unknown[],
-    })
-    toast.success(`已从模板创建「${tpl.name}」`)
-  } catch (e: unknown) {
-    toast.error('创建失败: ' + ((e as Error).message || e))
-  } finally {
-    creatingFromTemplate.value = null
-  }
-}
-
-async function toggleEnabled(item: WorkflowItem) {
-  try {
-    await safeInvoke('workflow_update', { id: item.id, enabled: !item.enabled })
-    item.enabled = !item.enabled
-    toast.success(`已${item.enabled ? '启用' : '禁用'}「${item.name}」`)
-  } catch (e: unknown) {
-    toast.error('更新状态失败: ' + ((e as Error).message || e))
-  }
-}
-
-async function deleteWorkflow(item: WorkflowItem) {
-  if (!confirm(`确定删除「${item.name}」？此操作不可撤销。`)) return
-  deleting.value = item.id
-  try {
-    await safeInvoke('workflow_delete', { id: item.id })
-    workflows.value = workflows.value.filter(w => w.id !== item.id)
-    toast.success(`已删除「${item.name}」`)
-  } catch (e: unknown) {
-    toast.error('删除失败: ' + ((e as Error).message || e))
-  } finally { deleting.value = null }
-}
-
-async function runWorkflow(item: WorkflowItem) {
+async function onRun(item: WorkflowItem) {
   try {
     await safeInvoke<string>('run_start', { workflowId: item.id })
     toast.info(`「${item.name}」已启动`)
@@ -171,120 +78,269 @@ async function runWorkflow(item: WorkflowItem) {
   }
 }
 
-async function cloneWorkflow(item: WorkflowItem) {
-  cloning.value = item.id
+async function onDelete(item: WorkflowItem) {
+  if (!confirm(`确定删除「${item.name}」？此操作不可撤销。`)) return
+  deletingId.value = item.id
   try {
-    const newId = await store.cloneWorkflow(item.id)
-    if (newId) {
-      toast.success(`已克隆「${item.name}」`)
-      await loadList()
-    } else { toast.error('克隆失败') }
+    await safeInvoke('workflow_delete', { id: item.id })
+    workflows.value = workflows.value.filter(w => w.id !== item.id)
+    toast.success(`已删除「${item.name}」`)
   } catch (e: unknown) {
-    toast.error('克隆失败: ' + ((e as Error).message || e))
-  } finally { cloning.value = null }
+    toast.error('删除失败: ' + ((e as Error).message || e))
+  } finally { deletingId.value = null }
 }
 
-async function exportWorkflow(item: WorkflowItem) {
+async function onExport(item: WorkflowItem) {
+  exportingId.value = item.id
   try {
     const wf = await safeInvoke<{ yaml: string | null }>('workflow_get', { id: item.id })
     if (wf?.yaml) {
-      const blob = new Blob([wf.yaml], { type: 'text/yaml' })
+      const blob = new Blob([wf.yaml], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = item.name + '.yaml'; a.click()
+      a.href = url; a.download = item.name + '.json'; a.click()
       URL.revokeObjectURL(url)
       toast.success(`已导出「${item.name}」`)
     }
   } catch (e: unknown) {
     toast.error('导出失败: ' + ((e as Error).message || e))
-  }
+  } finally { exportingId.value = null }
 }
 
-function triggerImport() { fileInput.value?.click() }
-
-async function handleImport(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  input.value = ''
-  try {
-    const result = await store.importYaml(file)
-    if (!result) { toast.error('导入失败: 无效的工作流 YAML'); return }
-    const id = await safeInvoke<string>('workflow_create', { name: result.name, description: '从文件导入' })
-    await safeInvoke('workflow_save_yaml', { id, yaml: result.yaml })
-    toast.success(`已导入「${result.name}」`)
-    await loadList()
-  } catch (e: unknown) {
-    toast.error('导入失败: ' + ((e as Error).message || e))
-  }
+function formatDate(d: string) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('zh-CN')
 }
 
-// ─── 定时计划 ───
+function onSettings() {
+  emit('open-settings')
+}
+
+function onHistory() {
+  emit('open-history')
+}
 </script>
 
 <template>
-  <div class="dashboard">
-    <!-- 顶部 -->
-    <div class="dash-header">
-      <div class="dash-title">
-        <h2>📋 工作流</h2>
-        <span class="wf-count" v-if="!loading">{{ workflows.length }} 个</span>
+  <div class="dashboard-v4">
+    <!-- 顶栏 -->
+    <div class="dash-topbar">
+      <div class="dash-brand">
+        <span class="dash-logo">WorkFlow</span>
       </div>
-      <div class="dash-actions">
-        <button class="btn btn-sm" @click="triggerImport">📥 导入 YAML</button>
-        <button class="btn btn-primary" @click="openEditor()">＋ 新建工作流</button>
-        <input ref="fileInput" type="file" accept=".yaml,.yml" style="display:none" @change="handleImport" />
+      <div class="dash-search-wrap">
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="搜索工作流..."
+          class="dash-search-input"
+        />
+      </div>
+      <div class="dash-top-actions">
+        <button class="dash-btn dash-btn-ghost" @click="onHistory">📋 历史</button>
+        <button class="dash-btn dash-btn-ghost" @click="onSettings">⚙️ 设置</button>
+        <button class="dash-btn dash-btn-primary" @click="onNewWorkflow">＋ 新建</button>
       </div>
     </div>
 
-    <!-- 搜索 -->
-    <div class="dash-search" v-if="!loading && workflows.length > 0">
-      <input type="text" v-model="searchQuery" placeholder="🔍 搜索工作流名称或描述..." class="search-input" />
-      <span class="search-count" v-if="searchQuery.trim()">{{ filteredWorkflows.length }}/{{ workflows.length }}</span>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="dash-loading">加载中...</div>
+
+    <!-- 空状态 -->
+    <div v-else-if="filteredWorkflows.length === 0" class="dash-empty">
+      <p v-if="searchQuery">未找到匹配的工作流</p>
+      <p v-else>还没有工作流，点击「＋ 新建」创建</p>
     </div>
 
-    <!-- 工作流网格 -->
-    <WorkflowGrid
-      :workflows="filteredWorkflows"
-      :loading="loading"
-      :deleting="deleting"
-      :cloning="cloning"
-      :search-query="searchQuery"
-      @open-editor="openEditor"
-      @toggle-enabled="toggleEnabled"
-      @delete-workflow="deleteWorkflow"
-      @run-workflow="runWorkflow"
-      @clone-workflow="cloneWorkflow"
-      @export-workflow="exportWorkflow"
-      @show-history="(wfId: string) => emit('navigate', '/history')"
-    />
-
-    <!-- 内置模板 -->
-    <TemplateSection
-      :templates="templates"
-      :creating-from-template="creatingFromTemplate"
-      @create-from-template="createFromTemplate"
-    />
+    <!-- 卡片列表 -->
+    <div v-else class="dash-cards">
+      <div
+        v-for="item in filteredWorkflows"
+        :key="item.id"
+        class="dash-card"
+      >
+        <div class="card-header">
+          <span class="card-name">{{ item.name }}</span>
+        </div>
+        <div class="card-desc" v-if="item.description">{{ item.description }}</div>
+        <div class="card-meta">
+          <span>{{ formatDate(item.updated_at) }}</span>
+          <span :class="item.enabled ? 'status-on' : 'status-off'">
+            {{ item.enabled ? '启用' : '禁用' }}
+          </span>
+        </div>
+        <div class="card-actions">
+          <button class="card-btn" @click="onRun(item)" title="运行">▶ 运行</button>
+          <button class="card-btn" @click="onEdit(item)" title="编辑">✏️ 编辑</button>
+          <button class="card-btn" @click="onExport(item)" :disabled="exportingId === item.id" title="导出">
+            💾 {{ exportingId === item.id ? '导出中...' : '导出' }}
+          </button>
+          <button class="card-btn card-btn-danger" @click="onDelete(item)" :disabled="deletingId === item.id" title="删除">
+            🗑 {{ deletingId === item.id ? '删除中...' : '删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.dashboard { padding: 24px; height: 100%; overflow-y: auto; }
-.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.dash-title { display: flex; align-items: center; gap: 10px; }
-.dash-title h2 { margin: 0; font-size: 20px; color: #e1e4e8; }
-.wf-count { font-size: 12px; color: #6e7681; background: #21262d; padding: 2px 8px; border-radius: 10px; }
-.dash-actions { display: flex; gap: 8px; }
+.dashboard-v4 {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+}
 
-.btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; transition: all 0.15s; }
-.btn:hover { background: #30363d; }
-.btn-sm { padding: 5px 12px; font-size: 12px; }
-.btn-primary { background: #1f6feb; border-color: #388bfd; color: #fff; }
-.btn-primary:hover { background: #388bfd; }
+/* ─── 顶栏 ─── */
+.dash-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+.dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dash-logo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #58a6ff;
+  letter-spacing: -0.5px;
+}
+.dash-search-wrap {
+  flex: 1;
+  max-width: 400px;
+}
+.dash-search-input {
+  width: 100%;
+  padding: 6px 12px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 13px;
+  outline: none;
+}
+.dash-search-input:focus {
+  border-color: #58a6ff;
+}
+.dash-search-input::placeholder {
+  color: #484f58;
+}
+.dash-top-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
 
-.dash-search { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.search-input { flex: 1; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e1e4e8; font-size: 13px; outline: none; transition: border-color 0.2s; }
-.search-input:focus { border-color: #58a6ff; }
-.search-input::placeholder { color: #6e7681; }
-.search-count { font-size: 12px; color: #8b949e; white-space: nowrap; }
+/* ─── 按钮 ─── */
+.dash-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.dash-btn-primary {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #388bfd;
+}
+.dash-btn-primary:hover {
+  background: #388bfd;
+}
+.dash-btn-ghost {
+  background: transparent;
+  color: #8b949e;
+  border-color: #30363d;
+}
+.dash-btn-ghost:hover {
+  background: #21262d;
+  color: #e6edf3;
+}
+
+/* ─── 状态 ─── */
+.dash-loading, .dash-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b949e;
+  font-size: 14px;
+}
+
+/* ─── 卡片列表 ─── */
+.dash-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dash-card {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 14px 18px;
+  transition: border-color 0.15s;
+}
+.dash-card:hover {
+  border-color: #30363d;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+.card-desc {
+  font-size: 12px;
+  color: #8b949e;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+.card-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #484f58;
+  margin-bottom: 8px;
+}
+.status-on { color: #3fb950; }
+.status-off { color: #f85149; }
+
+/* ─── 卡片操作按钮 ─── */
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+.card-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #c9d1d9;
+  transition: all 0.12s;
+}
+.card-btn:hover:not(:disabled) {
+  background: #30363d;
+}
 </style>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
+// v4.1: RunHistory — 带日志查看 + 返回按钮
 import { ref, computed, onMounted } from 'vue'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 
 const toast = useToast()
+const emit = defineEmits<{ 'back': [] }>()
 
-// ─── 筛选（浮动面板模式下无 URL query，默认不限） ───
+// ─── 筛选 ───
 const filterWorkflowId = ref<string | null>(null)
 
 interface RunHistoryItem {
@@ -35,13 +37,23 @@ interface RunDetail {
   steps: StepRunInfo[]
 }
 
+interface StepLogEntry {
+  id: number
+  step_run_id: string
+  run_id: string
+  step_id: string
+  level: string
+  message: string
+  timestamp: string
+}
+
 const runs = ref<RunHistoryItem[]>([])
 const loading = ref(false)
 const expandedId = ref<string | null>(null)
 const detailCache = ref<Record<string, RunDetail>>({})
+const logCache = ref<Record<string, StepLogEntry[]>>({})
 const loadingDetail = ref<string | null>(null)
-
-// 筛选
+const detailTab = ref<'steps' | 'logs'>('steps')
 const workflowList = ref<{ id: string; name: string }[]>([])
 
 onMounted(async () => {
@@ -74,9 +86,11 @@ async function loadRuns() {
 async function toggleExpand(runId: string) {
   if (expandedId.value === runId) {
     expandedId.value = null
+    detailTab.value = 'steps'
     return
   }
   expandedId.value = runId
+  detailTab.value = 'steps'
   if (!detailCache.value[runId]) {
     loadingDetail.value = runId
     try {
@@ -87,6 +101,23 @@ async function toggleExpand(runId: string) {
     } finally {
       loadingDetail.value = null
     }
+  }
+}
+
+async function loadLogs(runId: string) {
+  if (logCache.value[runId]) return
+  try {
+    logCache.value[runId] = await safeInvoke<StepLogEntry[]>('run_step_logs', { runId })
+  } catch (e: any) {
+    toast.error('加载日志失败: ' + (e.message || e))
+    logCache.value[runId] = []
+  }
+}
+
+function switchTab(tab: 'steps' | 'logs') {
+  detailTab.value = tab
+  if (tab === 'logs' && expandedId.value) {
+    loadLogs(expandedId.value)
   }
 }
 
@@ -135,13 +166,21 @@ function statusBadge(status: string): { icon: string; color: string; bg: string 
   }
 }
 
+function logLevelColor(level: string): string {
+  switch (level) {
+    case 'error': return '#f85149'
+    case 'warn': return '#d29922'
+    case 'success': return '#3fb950'
+    default: return '#8b949e'
+  }
+}
+
 function formatOutput(output: any): string {
   if (!output) return ''
   const s = typeof output === 'string' ? output : JSON.stringify(output, null, 2)
   return s.length > 200 ? s.substring(0, 200) + '...' : s
 }
 
-// 统计
 const stats = computed(() => {
   const total = runs.value.length
   const completed = runs.value.filter(r => r.status === 'completed').length
@@ -156,11 +195,11 @@ const stats = computed(() => {
     <!-- 顶部 -->
     <div class="rh-header">
       <div class="rh-title">
+        <button class="back-btn" @click="emit('back')">← 返回</button>
         <h2>📊 运行历史</h2>
         <span class="rh-count" v-if="!loading">{{ runs.length }} 条</span>
       </div>
       <div class="rh-actions">
-        <!-- 工作流筛选 -->
         <select class="filter-select" v-model="filterWorkflowId" @change="onFilterChange">
           <option :value="null">全部工作流</option>
           <option v-for="wf in workflowList" :key="wf.id" :value="wf.id">{{ wf.name }}</option>
@@ -198,15 +237,11 @@ const stats = computed(() => {
         class="run-card"
         :class="{ expanded: expandedId === run.id }"
       >
-        <!-- 运行摘要（可点击展开） -->
         <div class="run-summary" @click="toggleExpand(run.id)">
           <div class="run-status">
-            <span
-              class="status-badge"
+            <span class="status-badge"
               :style="{ color: statusBadge(run.status).color, background: statusBadge(run.status).bg }"
-            >
-              {{ statusBadge(run.status).icon }} {{ run.status }}
-            </span>
+            >{{ statusBadge(run.status).icon }} {{ run.status }}</span>
           </div>
           <div class="run-info">
             <div class="run-wf-name">{{ run.workflow_name }}</div>
@@ -220,38 +255,49 @@ const stats = computed(() => {
           </div>
         </div>
 
-        <!-- 错误信息 -->
-        <div v-if="run.error" class="run-error-bar">
-          ❌ {{ run.error }}
-        </div>
+        <div v-if="run.error" class="run-error-bar">❌ {{ run.error }}</div>
 
         <!-- 展开详情 -->
         <div v-if="expandedId === run.id" class="run-detail">
           <div v-if="loadingDetail === run.id" class="detail-loading">
             <div class="spinner small"></div> 加载步骤详情...
           </div>
-          <div v-else-if="detailCache[run.id]" class="step-list">
-            <div class="detail-header">
-              <span>步骤执行记录</span>
-              <span class="step-count">{{ detailCache[run.id].steps.length }} 步</span>
+          <div v-else-if="detailCache[run.id]" class="detail-content">
+            <!-- Tab 切换: 步骤 / 日志 -->
+            <div class="detail-tabs">
+              <button class="tab-btn" :class="{ active: detailTab === 'steps' }" @click="switchTab('steps')">
+                📋 步骤 ({{ detailCache[run.id].steps.length }})
+              </button>
+              <button class="tab-btn" :class="{ active: detailTab === 'logs' }" @click="switchTab('logs')">
+                📟 日志{{ logCache[run.id] ? ' (' + logCache[run.id].length + ')' : '' }}
+              </button>
             </div>
-            <div
-              v-for="(step, idx) in detailCache[run.id].steps"
-              :key="step.id"
-              class="step-row"
-              :class="'status-' + step.status"
-            >
-              <div class="step-idx">{{ idx + 1 }}</div>
-              <div class="step-icon">{{ statusBadge(step.status).icon }}</div>
-              <div class="step-name">{{ step.step_id }}</div>
-              <div class="step-duration">{{ calcDuration(step.started_at, step.finished_at) }}</div>
-              <div v-if="step.error" class="step-error">{{ step.error }}</div>
-              <div v-if="step.output" class="step-output">
-                <pre>{{ formatOutput(step.output) }}</pre>
+
+            <!-- 步骤列表 -->
+            <div v-if="detailTab === 'steps'" class="step-list">
+              <div v-for="(step, idx) in detailCache[run.id].steps" :key="step.id"
+                class="step-row" :class="'status-' + step.status">
+                <div class="step-idx">{{ idx + 1 }}</div>
+                <div class="step-icon">{{ statusBadge(step.status).icon }}</div>
+                <div class="step-name">{{ step.step_id }}</div>
+                <div class="step-duration">{{ calcDuration(step.started_at, step.finished_at) }}</div>
+                <div v-if="step.error" class="step-error">{{ step.error }}</div>
+                <div v-if="step.output" class="step-output"><pre>{{ formatOutput(step.output) }}</pre></div>
               </div>
+              <div v-if="detailCache[run.id].steps.length === 0" class="no-steps">暂无步骤记录</div>
             </div>
-            <div v-if="detailCache[run.id].steps.length === 0" class="no-steps">
-              暂无步骤记录
+
+            <!-- 日志列表 -->
+            <div v-else class="log-list">
+              <div v-if="!logCache[run.id]" class="detail-loading">
+                <div class="spinner small"></div> 加载日志...
+              </div>
+              <div v-else-if="logCache[run.id].length === 0" class="no-steps">暂无执行日志</div>
+              <div v-else v-for="log in logCache[run.id]" :key="log.id" class="log-line"
+                :style="{ color: logLevelColor(log.level) }">
+                <span class="log-time">{{ formatTime(log.timestamp) }}</span>
+                <span class="log-msg">{{ log.message }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -262,6 +308,13 @@ const stats = computed(() => {
 
 <style scoped>
 .run-history { padding: 24px; height: 100%; overflow-y: auto; }
+
+.back-btn {
+  background: none; border: 1px solid #30363d; color: #8b949e;
+  padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  transition: all 0.15s;
+}
+.back-btn:hover { color: #e1e4e8; border-color: #58a6ff; }
 
 .rh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
 .rh-title { display: flex; align-items: center; gap: 12px; }
@@ -292,79 +345,55 @@ const stats = computed(() => {
 .empty-hint { font-size: 13px; }
 
 .run-list { display: flex; flex-direction: column; gap: 8px; }
-
-.run-card {
-  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
-  overflow: hidden; transition: border-color 0.15s;
-}
+.run-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
 .run-card:hover { border-color: #484f58; }
 .run-card.expanded { border-color: #58a6ff44; }
 
-.run-summary {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px; cursor: pointer; transition: background 0.15s;
-}
+.run-summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
 .run-summary:hover { background: #1c2128; }
-
 .run-status { flex-shrink: 0; }
-.status-badge {
-  font-size: 12px; font-weight: 600; padding: 3px 10px;
-  border-radius: 6px; white-space: nowrap;
-}
-
+.status-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; white-space: nowrap; }
 .run-info { flex: 1; min-width: 0; }
 .run-wf-name { font-size: 14px; font-weight: 600; color: #e1e4e8; }
 .run-meta { display: flex; gap: 16px; margin-top: 4px; font-size: 12px; color: #6e7681; }
-
 .run-expand { flex-shrink: 0; }
 .expand-arrow { font-size: 14px; color: #484f58; transition: transform 0.2s; display: inline-block; }
 .expand-arrow.open { transform: rotate(90deg); }
 
-.run-error-bar {
-  padding: 8px 16px; background: #da363315; color: #f85149;
-  font-size: 12px; border-top: 1px solid #da363333;
-  font-family: 'Cascadia Code', 'Fira Code', monospace;
-}
+.run-error-bar { padding: 8px 16px; background: #da363315; color: #f85149; font-size: 12px; border-top: 1px solid #da363333; font-family: monospace; }
 
 .run-detail { border-top: 1px solid #21262d; }
 .detail-loading { display: flex; align-items: center; gap: 8px; padding: 16px; color: #8b949e; font-size: 13px; }
+.detail-content { padding: 0 16px 16px; }
 
-.step-list { padding: 12px 16px; }
-.detail-header {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 12px; color: #6e7681; margin-bottom: 10px;
-  text-transform: uppercase; letter-spacing: 0.5px;
+.detail-tabs { display: flex; gap: 0; margin: 12px 0; border-bottom: 1px solid #21262d; }
+.tab-btn {
+  padding: 6px 16px; font-size: 13px; cursor: pointer;
+  background: none; border: none; color: #6e7681;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
 }
-.step-count { font-size: 11px; background: #21262d; padding: 1px 6px; border-radius: 4px; }
+.tab-btn:hover { color: #c9d1d9; }
+.tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
 
-.step-row {
-  display: grid; grid-template-columns: 28px 22px 1fr auto;
-  align-items: center; gap: 8px; padding: 8px 10px;
-  border-radius: 6px; margin-bottom: 4px;
-}
+.step-list { padding: 8px 0; }
+.step-row { display: grid; grid-template-columns: 28px 22px 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; }
 .step-row:hover { background: #1c2128; }
 .step-row.status-running { border-left: 2px solid #58a6ff; }
 .step-row.status-completed { border-left: 2px solid #238636; }
 .step-row.status-failed { border-left: 2px solid #da3633; }
-
 .step-idx { font-size: 11px; color: #484f58; text-align: center; }
 .step-icon { font-size: 13px; }
-.step-name { font-size: 13px; color: #c9d1d9; font-family: 'Cascadia Code', monospace; }
+.step-name { font-size: 13px; color: #c9d1d9; font-family: monospace; }
 .step-duration { font-size: 11px; color: #6e7681; }
+.step-error { grid-column: 2 / -1; font-size: 11px; color: #f85149; font-family: monospace; }
+.step-output { grid-column: 2 / -1; margin-top: 4px; }
+.step-output pre { font-size: 11px; color: #8b949e; background: #0d1117; padding: 6px 8px; border-radius: 4px; margin: 0; overflow-x: auto; font-family: monospace; max-height: 120px; overflow-y: auto; }
 
-.step-error {
-  grid-column: 2 / -1; font-size: 11px; color: #f85149;
-  font-family: 'Cascadia Code', monospace;
-}
-.step-output {
-  grid-column: 2 / -1; margin-top: 4px;
-}
-.step-output pre {
-  font-size: 11px; color: #8b949e; background: #0d1117;
-  padding: 6px 8px; border-radius: 4px; margin: 0;
-  overflow-x: auto; font-family: 'Cascadia Code', monospace;
-  max-height: 120px; overflow-y: auto;
-}
+.log-list { padding: 8px 0; max-height: 400px; overflow-y: auto; }
+.log-line { display: flex; gap: 10px; padding: 3px 8px; font-size: 12px; font-family: monospace; border-radius: 3px; }
+.log-line:hover { background: #1c2128; }
+.log-time { color: #484f58; white-space: nowrap; flex-shrink: 0; }
+.log-msg { word-break: break-all; }
 
 .no-steps { text-align: center; color: #484f58; font-size: 13px; padding: 12px; }
 

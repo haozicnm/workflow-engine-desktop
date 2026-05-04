@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{State, AppHandle, Emitter};
 use crate::App;
-use crate::data::models::{RunHistoryItem, RunDetail};
-use tracing::{info, error};
+use crate::data::models::{RunHistoryItem, RunDetail, StepLogEntry};
+use tracing::{info, warn, error};
 
 
 #[derive(Debug, Serialize)]
@@ -65,12 +65,14 @@ pub async fn run_start(
     app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
 
     // 6. 发射 run 启动事件（workflow_name 已在步骤 3 获取）
-    let _ = app_handle.emit("run-update", serde_json::json!({
+    if let Err(e) = app_handle.emit("run-update", serde_json::json!({
         "run_id": run_id,
         "workflow_id": workflow_id,
         "workflow_name": workflow_name,
         "status": "running",
-    }));
+    })) {
+        warn!("发送 run-update 事件失败: {}", e);
+    }
 
     // 8. 后台异步执行
     let db = app.db.clone();
@@ -115,12 +117,14 @@ pub async fn run_start(
                 // 取消不算真正失败
                 let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
-                let _ = app_handle.emit("run-update", serde_json::json!({
+                if let Err(e) = app_handle.emit("run-update", serde_json::json!({
                     "run_id": run_id_clone,
                     "workflow_name": wf_name,
                     "status": status,
                     "error": err_msg,
-                }));
+                })) {
+                    warn!("发送 run-update 事件失败: {}", e);
+                }
             }
         }
     });
@@ -162,10 +166,12 @@ pub async fn run_pause(
     let flags = app.pause_flags.read().await;
     if let Some(flag) = flags.get(&run_id) {
         flag.store(true, Ordering::Relaxed);
-        let _ = app_handle.emit("run-update", serde_json::json!({
+        if let Err(e) = app_handle.emit("run-update", serde_json::json!({
             "run_id": run_id,
             "status": "paused",
-        }));
+        })) {
+            warn!("发送 run-update 事件失败: {}", e);
+        }
         Ok(())
     } else {
         Err("运行不存在或已结束".to_string())
@@ -182,10 +188,12 @@ pub async fn run_resume(
     let flags = app.pause_flags.read().await;
     if let Some(flag) = flags.get(&run_id) {
         flag.store(false, Ordering::Relaxed);
-        let _ = app_handle.emit("run-update", serde_json::json!({
+        if let Err(e) = app_handle.emit("run-update", serde_json::json!({
             "run_id": run_id,
             "status": "running",
-        }));
+        })) {
+            warn!("发送 run-update 事件失败: {}", e);
+        }
         Ok(())
     } else {
         Err("运行不存在或已结束".to_string())
@@ -272,6 +280,15 @@ pub async fn run_detail(
         .ok_or_else(|| "运行记录不存在".to_string())
 }
 
+/// v4.1: 查询某次运行的全部步骤执行日志（持久化日志行）
+#[tauri::command]
+pub async fn run_step_logs(
+    app: State<'_, App>,
+    run_id: String,
+) -> Result<Vec<StepLogEntry>, String> {
+    app.db.get_step_logs(&run_id).map_err(|e| e.to_string())
+}
+
 // ═══════════════════════════════════════════
 // 调试命令
 // ═══════════════════════════════════════════
@@ -290,10 +307,12 @@ pub async fn debug_step(
         if let Some(bp) = app.breakpoint_flags.read().await.get(&run_id) {
             bp.store(false, Ordering::Relaxed);
         }
-        let _ = app_handle.emit("run-update", serde_json::json!({
+        if let Err(e) = app_handle.emit("run-update", serde_json::json!({
             "run_id": run_id,
             "status": "running",
-        }));
+        })) {
+            warn!("发送 run-update 事件失败: {}", e);
+        }
         Ok(())
     } else {
         Err("运行不存在或已结束".to_string())
@@ -314,10 +333,12 @@ pub async fn debug_continue(
     if let Some(sm) = app.step_mode_flags.read().await.get(&run_id) {
         sm.store(false, Ordering::Relaxed);
     }
-    let _ = app_handle.emit("run-update", serde_json::json!({
+    if let Err(e) = app_handle.emit("run-update", serde_json::json!({
         "run_id": run_id,
         "status": "running",
-    }));
+    })) {
+        warn!("发送 run-update 事件失败: {}", e);
+    }
     Ok(())
 }
 
@@ -493,12 +514,14 @@ pub async fn run_dag_start(
     app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
 
     // 6. 发射开始事件
-    let _ = app_handle.emit("dag-run-start", serde_json::json!({
+    if let Err(e) = app_handle.emit("dag-run-start", serde_json::json!({
         "run_id": run_id,
         "workflow_name": workflow_name,
         "node_count": plan.ordered_steps.len(),
         "edge_count": edges.len(),
-    }));
+    })) {
+        warn!("发送 dag-run-start 事件失败: {}", e);
+    }
 
     // 7. 后台异步执行
     let db = app.db.clone();
@@ -550,12 +573,14 @@ pub async fn run_dag_start(
                 let err_msg = e.to_string();
                 let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
                 error!("[DAG] 工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
-                let _ = app_handle.emit("run-update", serde_json::json!({
+                if let Err(e) = app_handle.emit("run-update", serde_json::json!({
                     "run_id": run_id_clone,
                     "workflow_name": wf_name,
                     "status": status,
                     "error": err_msg,
-                }));
+                })) {
+                    warn!("发送 run-update 事件失败: {}", e);
+                }
             }
         }
     });

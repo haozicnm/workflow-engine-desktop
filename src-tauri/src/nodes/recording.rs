@@ -21,6 +21,7 @@ use tracing::{info, warn};
 /// Windows: 禁止子进程弹出 cmd 窗口
 #[cfg(target_os = "windows")]
 fn hide_console(cmd: &mut tokio::process::Command) {
+    #[allow(unused_imports)]
     use std::os::windows::process::CommandExt;
     cmd.creation_flags(0x08000000);
 }

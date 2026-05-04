@@ -99,21 +99,13 @@ async fn test_word_replace() {
 // ═══════════════════════════════════════════════════
 
 #[tokio::test]
-async fn test_data_node_set_get() {
-    let executor = StepExecutor::new();
+async fn test_variable_set_get() {
     let mut ctx = ExecutionContext::new("test-data", &Default::default());
 
-    // 设置变量
-    let step = make_step("data1", "设置变量", "data", json!({
-        "action": "set",
-        "key": "greeting",
-        "value": "Hello, 小夏!"
-    }));
-    executor.execute(&step, &mut ctx).await.unwrap();
-
-    // 验证
+    // v4.1: data 节点已移除，用 context 直接操作变量
+    ctx.set_var("greeting".to_string(), json!("Hello, 小夏!"));
     assert_eq!(ctx.variables.get("greeting").and_then(|v| v.as_str()), Some("Hello, 小夏!"));
-    println!("✅ Data node set/get OK");
+    println!("✅ Variable set/get OK");
 }
 
 // ═══════════════════════════════════════════════════
@@ -121,42 +113,42 @@ async fn test_data_node_set_get() {
 // ═══════════════════════════════════════════════════
 
 #[tokio::test]
-async fn test_condition_equal() {
+async fn test_logic_equals() {
     let executor = StepExecutor::new();
-    let mut ctx = ExecutionContext::new("test-cond", &Default::default());
+    let mut ctx = ExecutionContext::new("test-logic-eq", &Default::default());
 
     ctx.set_var("a".to_string(), json!(42));
-    ctx.set_var("b".to_string(), json!(42));
 
-    let step = make_step("cond1", "判断相等", "condition", json!({
-        "left": "{{a}}",
-        "op": "==",
-        "right": "{{b}}"
+    // v4.1: logic_container 用 actions 格式
+    let step = make_step("lc1", "判断等于", "logic_container", json!({
+        "value": "{{a}}",
+        "actions": [
+            {"id": "l1", "type": "equals", "label": "等于42", "config": {"right": 42}}
+        ]
     }));
 
     let result = executor.execute(&step, &mut ctx).await.unwrap();
-    assert_eq!(result["result"].as_bool(), Some(true));
     assert_eq!(result["branch"].as_str(), Some("true"));
-    println!("✅ Condition equal OK: {:?}", result);
+    println!("✅ Logic equals OK: {:?}", result);
 }
 
 #[tokio::test]
-async fn test_condition_not_equal() {
+async fn test_logic_not_empty() {
     let executor = StepExecutor::new();
-    let mut ctx = ExecutionContext::new("test-cond-ne", &Default::default());
+    let mut ctx = ExecutionContext::new("test-logic-ne", &Default::default());
 
-    ctx.set_var("a".to_string(), json!(10));
-    ctx.set_var("b".to_string(), json!(20));
+    ctx.set_var("x".to_string(), json!("hello"));
 
-    let step = make_step("cond2", "判断不等", "condition", json!({
-        "left": "{{a}}",
-        "op": "!=",
-        "right": "{{b}}"
+    let step = make_step("lc2", "判断不为空", "logic_container", json!({
+        "value": "{{x}}",
+        "actions": [
+            {"id": "l1", "type": "not_empty", "label": "不为空", "config": {}}
+        ]
     }));
 
     let result = executor.execute(&step, &mut ctx).await.unwrap();
-    assert_eq!(result["result"].as_bool(), Some(true));
-    println!("✅ Condition not-equal OK");
+    assert_eq!(result["branch"].as_str(), Some("true"));
+    println!("✅ Logic not_empty OK: {:?}", result);
 }
 
 // ═══════════════════════════════════════════════════
@@ -469,14 +461,8 @@ async fn test_full_pipeline() {
     println!("[2/3] Processed {} items", labels.len());
     assert!(!labels.is_empty(), "Should have processed items");
 
-    // Step 3: 用 data 节点保存结果
-    ctx.set_var("processed_count".to_string(), json!(labels.len() as i64));
-    let step3 = make_step("save_result", "保存结果", "data", json!({
-        "action": "set",
-        "key": "final_count",
-        "value": "{{processed_count}}"
-    }));
-    executor.execute(&step3, &mut ctx).await.unwrap();
+    // Step 3: 保存结果（v4.1: data 节点已移除）
+    ctx.set_var("final_count".to_string(), json!(labels.len() as i64));
     println!("[3/3] Saved final count: {}", ctx.variables.get("final_count").unwrap());
 
     println!("\n✅ Full pipeline completed!");

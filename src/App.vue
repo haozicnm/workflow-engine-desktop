@@ -1,83 +1,81 @@
 <script setup lang="ts">
-// App.vue — v3.0: Dashboard 为默认入口
+// App.vue — v4.0: Dashboard 为默认入口
 import { ref, provide } from 'vue'
 import LiteGraphEditor from './pages/LiteGraphEditor.vue'
 import Dashboard from './pages/Dashboard.vue'
+import Settings from './pages/Settings.vue'
+import RunHistory from './pages/RunHistory.vue'
 import Toast from './components/Toast.vue'
-import StatusBar from './components/StatusBar.vue'
 import { useToast } from './composables/useToast'
 
 const { toasts, remove } = useToast()
 
-type AppView = 'dashboard' | 'editor'
+type AppView = 'dashboard' | 'editor' | 'settings' | 'history'
 
 const currentView = ref<AppView>('dashboard')
 const editorWorkflowId = ref<string | undefined>(undefined)
-const editorTemplate = ref<{ id: string; name: string; nodes: unknown[]; edges: unknown[] } | null>(null)
 
 provide('app:openEditor', (id?: string) => {
   editorWorkflowId.value = id
-  editorTemplate.value = null
-  currentView.value = 'editor'
-})
-
-provide('app:openFromTemplate', (template: { id: string; name: string; nodes: unknown[]; edges: unknown[] }) => {
-  editorTemplate.value = template
-  editorWorkflowId.value = undefined
   currentView.value = 'editor'
 })
 
 provide('app:backToDashboard', () => {
   currentView.value = 'dashboard'
   editorWorkflowId.value = undefined
-  editorTemplate.value = null
 })
 
 function onOpenWorkflow(id?: string) {
   editorWorkflowId.value = id
-  editorTemplate.value = null
   currentView.value = 'editor'
 }
 
-function onCreateFromTemplate(template: { id: string; name: string; nodes: unknown[]; edges: unknown[] }) {
-  editorTemplate.value = template
-  editorWorkflowId.value = undefined
-  currentView.value = 'editor'
+function onOpenSettings() {
+  currentView.value = 'settings'
+}
+
+function onOpenHistory() {
+  currentView.value = 'history'
 }
 
 function onBackToDashboard() {
   currentView.value = 'dashboard'
   editorWorkflowId.value = undefined
-  editorTemplate.value = null
 }
 </script>
 
 <template>
   <div class="app-shell">
-    <!-- Dashboard 首页 -->
     <Transition name="page-fade">
       <Dashboard
         v-if="currentView === 'dashboard'"
         @open-workflow="onOpenWorkflow"
-        @create-from-template="onCreateFromTemplate"
-        @navigate="(path: string) => {}"
+        @open-settings="onOpenSettings"
+        @open-history="onOpenHistory"
       />
     </Transition>
 
-    <!-- 编辑器 -->
     <Transition name="page-fade">
       <LiteGraphEditor
         v-if="currentView === 'editor'"
         :initial-workflow-id="editorWorkflowId"
-        :initial-template="editorTemplate"
         @back="onBackToDashboard"
       />
     </Transition>
 
-    <!-- 全局底栏 -->
-    <div class="status-bar-wrapper">
-      <StatusBar :page="currentView" />
-    </div>
+    <Transition name="page-fade">
+      <Settings
+        v-if="currentView === 'settings'"
+        @back="onBackToDashboard"
+      />
+    </Transition>
+
+    <Transition name="page-fade">
+      <RunHistory
+        v-if="currentView === 'history'"
+        @back="onBackToDashboard"
+      />
+    </Transition>
 
     <Toast
       v-for="t in toasts"
@@ -95,30 +93,15 @@ function onBackToDashboard() {
   height: 100vh;
   background: #0f1117;
   color: #e1e4e8;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
-.status-bar-wrapper {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 10000;
-}
-
-/* 页面过渡动画 */
 .page-fade-enter-active,
 .page-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.15s ease;
 }
-
-.page-fade-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
+.page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
 }
 </style>

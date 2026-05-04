@@ -2,6 +2,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{State, AppHandle, Emitter};
+use tracing::warn;
 use crate::App;
 use crate::engine::dag::DAGWorkflow;
 
@@ -46,12 +47,14 @@ pub async fn dag_run_start(
     app.pause_flags.write().await.insert(run_id.clone(), pause_flag.clone());
 
     // 6. 发射开始事件
-    let _ = app_handle.emit("dag-run-start", serde_json::json!({
+    if let Err(e) = app_handle.emit("dag-run-start", serde_json::json!({
         "run_id": run_id,
         "workflow_name": workflow_name,
         "node_count": dag.nodes.len(),
         "edge_count": dag.edges.len(),
-    }));
+    })) {
+        warn!("发送 dag-run-start 事件失败: {}", e);
+    }
 
     // 7. 后台执行
     let db = app.db.clone();

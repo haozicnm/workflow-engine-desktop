@@ -246,7 +246,7 @@ async fn excel_extract_column(path: &str, config: &serde_json::Value) -> Result<
 }
 
 /// 写入 Excel（创建新文件或覆盖）
-async fn excel_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn excel_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
     let data = config.get("data").and_then(|v| v.as_array())
@@ -271,7 +271,7 @@ async fn excel_write(path: &str, config: &serde_json::Value) -> Result<serde_jso
 }
 
 /// 创建新 Excel（写空文件或带表头）
-async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
     let headers = config.get("headers").and_then(|v| v.as_str()).map(String::from);
@@ -308,7 +308,7 @@ async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serde_js
 }
 
 /// 追加行到 Excel
-async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
     let data = config.get("data").and_then(|v| v.as_array())
@@ -430,10 +430,10 @@ fn excel_filter_in_memory(data: &serde_json::Value, column: &str, op: &str, valu
                 match op {
                     "==" => cell_str == value,
                     "!=" => cell_str != value,
-                    ">" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).map_or(false, |(a, b)| a > b),
-                    "<" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).map_or(false, |(a, b)| a < b),
-                    ">=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).map_or(false, |(a, b)| a >= b),
-                    "<=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).map_or(false, |(a, b)| a <= b),
+                    ">" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a > b),
+                    "<" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a < b),
+                    ">=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a >= b),
+                    "<=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a <= b),
                     "contains" => cell_str.contains(value),
                     "starts_with" => cell_str.starts_with(value),
                     _ => false,

@@ -97,13 +97,13 @@ async fn start_scheduled_run(
     db.create_run(&run_id, workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
-    let _ = app_handle.emit("run-update", serde_json::json!({
+    if let Err(e) = app_handle.emit("run-update", serde_json::json!({
         "run_id": run_id,
         "workflow_id": workflow_id,
         "workflow_name": workflow_name,
         "status": "running",
         "trigger": "schedule",
-    }));
+    })) { warn!("emit run-update failed: {}", e); }
 
     // 读取浏览器通道设置
     use tauri::Manager;
@@ -131,11 +131,11 @@ async fn start_scheduled_run(
             Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 error!("定时工作流执行失败: {} - {}", run_id_clone, e);
-                let _ = handle_clone.emit("run-update", serde_json::json!({
+                if let Err(e) = handle_clone.emit("run-update", serde_json::json!({
                     "run_id": run_id_clone,
                     "status": "failed",
                     "error": e.to_string(),
-                }));
+                })) { warn!("emit run-update failed: {}", e); }
             }
         }
     });

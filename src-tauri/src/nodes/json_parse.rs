@@ -21,8 +21,8 @@ impl NodeExecutor for JsonParseNode {
         let expression = config.get("expression").and_then(|v| v.as_str()).unwrap_or("$");
 
         // 先将 input 解析为 JSON（如果已经是对象则直接使用）
-        let root: serde_json::Value = if data.is_string() {
-            serde_json::from_str(data.as_str().unwrap()).unwrap_or_else(|_| data.clone())
+        let root: serde_json::Value = if let Some(s) = data.as_str() {
+            serde_json::from_str(s).unwrap_or_else(|_| data.clone())
         } else {
             data.clone()
         };

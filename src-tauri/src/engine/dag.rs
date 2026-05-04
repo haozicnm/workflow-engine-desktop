@@ -80,6 +80,8 @@ pub struct ExecutionPlan {
     pub predecessors: HashMap<String, Vec<String>>,
     /// 拓扑排序顺序（仅节点 ID，向后兼容）
     pub order: Vec<String>,
+    /// 连线列表（容器节点端口数据传递用）
+    pub edges: Vec<FlowEdge>,
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -243,6 +245,7 @@ pub fn build_dag(
         successors,
         predecessors,
         order,
+        edges: edges.to_vec(),
     })
 }
 
@@ -400,7 +403,8 @@ impl DAGWorkflow {
         let ordered_steps: Vec<ExecStep> = order
             .iter()
             .map(|node_id| {
-                let node = node_map.get(node_id.as_str())
+                let node = node_map
+                    .get(node_id.as_str())
                     .expect("DAG node_id 应在 node_map 中存在");
                 let deps = predecessors.get(node_id).cloned().unwrap_or_default();
                 ExecStep {
@@ -422,6 +426,15 @@ impl DAGWorkflow {
                 }
             })
             .collect();
+
+        // DAGEdge → FlowEdge 转换
+        let flow_edges: Vec<FlowEdge> = self.edges.iter().map(|e| FlowEdge {
+            id: e.id.clone(),
+            source: e.source.clone(),
+            target: e.target.clone(),
+            source_handle: e.source_handle.clone(),
+            target_handle: e.target_handle.clone(),
+        }).collect();
 
         let mut by_index: HashMap<String, usize> = HashMap::new();
         for (i, id) in order.iter().enumerate() {
@@ -464,6 +477,7 @@ impl DAGWorkflow {
             successors,
             predecessors,
             order,
+            edges: flow_edges,
         })
     }
 

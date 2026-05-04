@@ -55,6 +55,18 @@ pub struct RunDetail {
     pub steps: Vec<StepRunInfo>,
 }
 
+/// v4.1: 步骤日志条目（持久化执行日志）
+#[derive(Debug, Clone, Serialize)]
+pub struct StepLogEntry {
+    pub id: i64,
+    pub step_run_id: String,
+    pub run_id: String,
+    pub step_id: String,
+    pub level: String,
+    pub message: String,
+    pub timestamp: String,
+}
+
 /// 定时计划
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleInfo {

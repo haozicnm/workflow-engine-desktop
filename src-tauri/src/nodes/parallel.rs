@@ -6,6 +6,7 @@ use crate::engine::context::ExecutionContext;
 use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
 use std::sync::Arc;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Result, anyhow};
 use futures::future::join_all;
@@ -46,6 +47,8 @@ impl NodeExecutor for ParallelNode {
                     step_outputs: ctx.step_outputs.clone(),
                     browser_channel: ctx.browser_channel.clone(),
                     browser_executable_path: ctx.browser_executable_path.clone(),
+                    input_ports: ctx.input_ports.clone(),
+                    sessions: HashMap::new(),
                 };
                 let executor = Arc::clone(executor);
                 let failed = Arc::clone(&failed);
