@@ -340,164 +340,14 @@ async fn is_sidecar_healthy(sidecar: &Arc<BrowserSidecar>) -> bool {
     }
 }
 
-/// 查找内置 wheels 目录（pip 离线安装包）
-fn find_bundled_wheels() -> Option<std::path::PathBuf> {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let wheels = dir.join("wheels");
-            if wheels.exists() && wheels.read_dir().ok()
-                .map(|mut d| d.any(|e| e.ok().map(|f| f.path().extension()
-                    .map(|ext| ext == "whl").unwrap_or(false)).unwrap_or(false)))
-                .unwrap_or(false)
-            {
-                return Some(wheels);
-            }
-        }
+/// 检查 Playwright Python 包是否已安装
+async fn check_playwright_installed(python: &std::path::Path) -> bool {
+    let mut cmd = tokio::process::Command::new(python);
+    hide_console(&mut cmd);
+    match cmd.args(["-c", "import playwright; print('ok')"]).output().await {
+        Ok(o) => o.status.success(),
+        Err(_) => false,
     }
-    None
-}
-
-async fn preflight_check() -> Result<()> {
-    let python = find_python()?;
-    info!("使用 Python: {:?}", python);
-
-    // 1. 检查 Python 版本
-    let mut cmd = tokio::process::Command::new(&python);
-        hide_console(&mut cmd);
-        let output = cmd.arg("--version")
-        .output()
-        .await
-        .map_err(|e| anyhow!("执行 Python 失败: {}", e))?;
-
-    let version_str = String::from_utf8_lossy(&output.stdout);
-    let version_str = version_str.trim();
-    if let Some(ver) = version_str.strip_prefix("Python ") {
-        let major: u32 = ver.split('.').next().unwrap_or("0").parse().unwrap_or(0);
-        if major < 3 {
-            return Err(anyhow!("Python 版本过低: {}。需要 Python 3.8+", version_str));
-        }
-        info!("Python 版本: {}", version_str);
-    }
-
-    // 2. 检查 Playwright — 优先离线安装（内置 wheels），其次在线安装
-    let mut cmd = tokio::process::Command::new(&python);
-        hide_console(&mut cmd);
-        let output = cmd.args(["-c", "import playwright; print('ok')"])
-        .output()
-        .await
-        .map_err(|e| anyhow!("检查 Playwright 失败: {}", e))?;
-
-    if !output.status.success() {
-        // 优先尝试离线安装（内置 wheels）
-        if let Some(wheels_dir) = find_bundled_wheels() {
-            info!("使用内置 wheels 离线安装 Playwright: {:?}", wheels_dir);
-            let mut cmd = tokio::process::Command::new(&python);
-                hide_console(&mut cmd);
-                let install = cmd.args([
-                    "-m", "pip", "install", "playwright", "-q",
-                    "--no-index",
-                    "--find-links", &wheels_dir.to_string_lossy(),
-                ])
-                .output()
-                .await
-                .map_err(|e| anyhow!("离线安装 Playwright 失败: {}", e))?;
-
-            if install.status.success() {
-                info!("Playwright 离线安装完成 ✓");
-            } else {
-                let stderr = String::from_utf8_lossy(&install.stderr);
-                warn!("离线安装失败，回退在线安装: {}", stderr);
-                // Fallback to online install
-                return install_playwright_online(&python).await;
-            }
-        } else {
-            // No bundled wheels → online install
-            install_playwright_online(&python).await?;
-        }
-    }
-
-    // 3. 检查浏览器 — 优先内置（Full 包自带），其次系统浏览器
-    let has_bundled_chromium = {
-        let exe_dir = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-        if let Some(ref dir) = exe_dir {
-            let browsers_path = dir.join("playwright-browsers");
-            if browsers_path.exists() {
-                info!("检测到内置 playwright-browsers: {:?}", browsers_path);
-                true
-            } else { false }
-        } else { false }
-    };
-
-    if has_bundled_chromium {
-        info!("使用内置 Chromium ✓");
-    } else {
-        // 检查系统 Edge/Chrome
-        let has_system_browser = {
-            #[cfg(target_os = "windows")]
-            {
-                let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
-                let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
-                let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
-                let edge1 = std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe");
-                let edge2 = std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe");
-                let chrome1 = std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe");
-                let chrome2 = std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe");
-                let chrome3 = std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe");
-                let found = edge1.exists() || edge2.exists() || chrome1.exists() || chrome2.exists() || chrome3.exists();
-                if found {
-                    let which = if edge1.exists() || edge2.exists() { "Edge" } else { "Chrome" };
-                    info!("检测到系统浏览器: {}", which);
-                }
-                found
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                let found = which::which("microsoft-edge").is_ok()
-                    || which::which("google-chrome-stable").is_ok()
-                    || which::which("google-chrome").is_ok()
-                    || which::which("chromium-browser").is_ok()
-                    || which::which("chromium").is_ok();
-                if found { info!("检测到系统浏览器 (Linux) ✓"); }
-                found
-            }
-        };
-
-        if has_system_browser {
-            info!("检测到系统浏览器 ✓");
-        } else {
-            // 检查 ms-playwright 缓存
-            let mut cmd = tokio::process::Command::new(&python);
-                hide_console(&mut cmd);
-                let output = cmd.args(["-c", r#"
-import os, sys
-home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
-    os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
-    else os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
-chromium_dir = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
-print('ok' if chromium_dir else 'missing')
-"#])
-                .output()
-                .await;
-
-            let has_cache = match output {
-                Ok(o) => String::from_utf8_lossy(&o.stdout).trim() == "ok",
-                Err(_) => false,
-            };
-
-            if !has_cache {
-                return Err(anyhow!(
-                    "未找到 Chromium 浏览器。\n\
-                     Full 安装包应内置 playwright-browsers/，请检查安装是否完整。\n\
-                     或安装 Edge/Chrome 浏览器。"
-                ));
-            }
-        }
-    }
-
-    info!("浏览器节点预检通过 ✓");
-    Ok(())
 }
 
 /// 在线安装 Playwright（PyPI → 清华镜像 fallback）
@@ -535,6 +385,134 @@ async fn install_playwright_online(python: &std::path::Path) -> Result<()> {
         }
     }
     info!("Playwright 在线安装完成 ✓");
+    Ok(())
+}
+
+/// 下载 Playwright Chromium 浏览器
+async fn install_playwright_chromium(python: &std::path::Path) -> Result<()> {
+    info!("下载 Playwright Chromium（可能需要几分钟）...");
+    let mut cmd = tokio::process::Command::new(python);
+    hide_console(&mut cmd);
+    let install = cmd.args(["-m", "playwright", "install", "chromium"])
+        .output()
+        .await
+        .map_err(|e| anyhow!("执行 playwright install 失败: {}", e))?;
+
+    if !install.status.success() {
+        let stderr = String::from_utf8_lossy(&install.stderr);
+        return Err(anyhow!(
+            "下载 Chromium 浏览器失败。\n\
+             请手动执行: playwright install chromium\n\n\
+             错误: {}",
+            stderr
+        ));
+    }
+    info!("Playwright Chromium 下载完成 ✓");
+    Ok(())
+}
+
+/// 检测是否有系统浏览器可用（Edge / Chrome）
+fn has_system_browser() -> Option<&'static str> {
+    #[cfg(target_os = "windows")]
+    {
+        let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
+        let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
+        let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+
+        let edge_paths = [
+            format!("{}/Microsoft/Edge/Application/msedge.exe", pf_x86),
+            format!("{}/Microsoft/Edge/Application/msedge.exe", pf),
+            format!("{}/Microsoft/Edge/Application/msedge.exe", local),
+        ];
+        for p in &edge_paths {
+            if std::path::Path::new(p).exists() { return Some("Edge"); }
+        }
+
+        let chrome_paths = [
+            format!("{}/Google/Chrome/Application/chrome.exe", pf),
+            format!("{}/Google/Chrome/Application/chrome.exe", pf_x86),
+            format!("{}/Google/Chrome/Application/chrome.exe", local),
+        ];
+        for p in &chrome_paths {
+            if std::path::Path::new(p).exists() { return Some("Chrome"); }
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if which::which("microsoft-edge").is_ok() { return Some("Edge"); }
+        if which::which("google-chrome-stable").is_ok() || which::which("google-chrome").is_ok() { return Some("Chrome"); }
+        if which::which("chromium-browser").is_ok() || which::which("chromium").is_ok() { return Some("Chromium"); }
+        None
+    }
+}
+
+/// 检测 Playwright 缓存中是否有 Chromium
+async fn has_playwright_cache_chromium(python: &std::path::Path) -> bool {
+    let mut cmd = tokio::process::Command::new(python);
+    hide_console(&mut cmd);
+    match cmd.args(["-c", r#"
+import os, sys
+home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
+    os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
+    else os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
+chromium_dir = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
+print('ok' if chromium_dir else 'missing')
+"#]).output().await {
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim() == "ok",
+        Err(_) => false,
+    }
+}
+
+/// 检测内置 playwright-browsers（安装包附带的 Chromium）
+fn has_bundled_chromium() -> bool {
+    std::env::current_exe().ok()
+        .and_then(|p| p.parent().map(|d| d.join("playwright-browsers")))
+        .map(|p| p.exists())
+        .unwrap_or(false)
+}
+
+async fn preflight_check() -> Result<()> {
+    let python = find_python()?;
+    info!("使用 Python: {:?}", python);
+
+    // 1. 检查 Python 版本
+    let mut cmd = tokio::process::Command::new(&python);
+        hide_console(&mut cmd);
+        let output = cmd.arg("--version")
+        .output()
+        .await
+        .map_err(|e| anyhow!("执行 Python 失败: {}", e))?;
+
+    let version_str = String::from_utf8_lossy(&output.stdout);
+    let version_str = version_str.trim();
+    if let Some(ver) = version_str.strip_prefix("Python ") {
+        let major: u32 = ver.split('.').next().unwrap_or("0").parse().unwrap_or(0);
+        if major < 3 {
+            return Err(anyhow!("Python 版本过低: {}。需要 Python 3.8+", version_str));
+        }
+        info!("Python 版本: {}", version_str);
+    }
+
+    // 2. 检查 Playwright Python 包 — 缺失则在线安装
+    if !check_playwright_installed(&python).await {
+        info!("Playwright 未安装，尝试自动安装...");
+        install_playwright_online(&python).await?;
+    }
+
+    // 3. 检查浏览器 — 优先级：系统 Edge/Chrome > 内置 > Playwright 缓存 > 自动下载
+    if let Some(browser_name) = has_system_browser() {
+        info!("检测到系统浏览器: {} ✓（首选，无需下载）", browser_name);
+    } else if has_bundled_chromium() {
+        info!("使用内置 Chromium ✓");
+    } else if has_playwright_cache_chromium(&python).await {
+        info!("检测到 Playwright Chromium 缓存 ✓");
+    } else {
+        info!("未检测到浏览器，尝试自动下载 Chromium...");
+        install_playwright_chromium(&python).await?;
+    }
+
+    info!("浏览器节点预检通过 ✓");
     Ok(())
 }
 

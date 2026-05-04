@@ -43,7 +43,6 @@
     ],
     "resources": {
       "sidecars/*": "sidecars/",
-      "python-runtime/wheels/**/*": "wheels/",
       "python-runtime/playwright-browsers/**/*": "playwright-browsers/",
       "../templates/data/**/*": "templates/data/"
     }

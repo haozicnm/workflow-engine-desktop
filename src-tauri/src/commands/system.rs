@@ -20,26 +20,21 @@ pub struct AppSettings {
 #[tauri::command]
 pub async fn system_check_browser() -> Result<serde_json::Value, String> {
     // ─── Python 检测 ───
-    // 1. 系统 PATH 中的 Python
     let system_python = which::which("python3")
         .or_else(|_| which::which("python"))
         .ok()
         .map(|p| p.to_string_lossy().to_string());
 
-    // 3. Windows 目录扫描（不依赖 PATH，始终执行）
     #[cfg(target_os = "windows")]
     let scanned_python: Option<String> = {
         use std::path::PathBuf;
-        let candidates: [(String, PathBuf); 3] = [
-            (std::env::var("LOCALAPPDATA").unwrap_or_default(),
-             PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Programs").join("Python")),
-            (std::env::var("PROGRAMFILES").unwrap_or_default(),
-             PathBuf::from(std::env::var("PROGRAMFILES").unwrap_or_default()).join("Python")),
-            ("C:\\".into(),
-             PathBuf::from("C:\\Python")),
+        let candidates: [PathBuf; 3] = [
+            PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Programs").join("Python"),
+            PathBuf::from(std::env::var("PROGRAMFILES").unwrap_or_default()).join("Python"),
+            PathBuf::from("C:\\Python"),
         ];
         let mut found: Vec<PathBuf> = Vec::new();
-        for (_label, base) in &candidates {
+        for base in &candidates {
             if !base.exists() { continue }
             if let Ok(entries) = std::fs::read_dir(base) {
                 for e in entries.flatten() {
@@ -51,13 +46,12 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
                 }
             }
         }
-        found.sort_by(|a, b| b.cmp(a)); // 降序取最新版本
+        found.sort_by(|a, b| b.cmp(a));
         found.into_iter().next().map(|p| p.to_string_lossy().to_string())
     };
     #[cfg(not(target_os = "windows"))]
     let scanned_python: Option<String> = None;
 
-    // 取最优 Python
     let best_python = scanned_python.or(system_python);
 
     // ─── 浏览器检测 ───
@@ -96,8 +90,18 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
     };
 
     let python_available = best_python.is_some();
+    let has_system_browser = has_edge || has_chrome;
 
-    // ─── Playwright Chromium 检测（Full 包内置） ───
+    // ─── Playwright Python 包检测 ───
+    let has_playwright_pkg = if let Some(ref py) = best_python {
+        std::process::Command::new(py)
+            .args(["-c", "import playwright; print('ok')"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    } else { false };
+
+    // ─── Playwright Chromium 检测 ───
     let has_playwright_chromium = if let Ok(exe) = std::env::current_exe() {
         exe.parent()
             .map(|d| d.join("playwright-browsers"))
@@ -109,26 +113,37 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
             .unwrap_or(false)
     } else { false };
 
-    // ─── 内置 wheels 检测（pip 离线安装包） ───
-    let has_wheels = if let Ok(exe) = std::env::current_exe() {
-        exe.parent()
-            .map(|d| d.join("wheels"))
-            .map(|p| p.exists() && p.read_dir().ok()
-                .map(|mut entries| entries.any(|e| e.ok()
-                    .map(|f| f.path().extension()
-                        .map(|ext| ext == "whl").unwrap_or(false))
-                    .unwrap_or(false)))
-                .unwrap_or(false))
+    // 通过系统 Python 检查 Playwright 缓存
+    let has_playwright_cache = if let Some(ref py) = best_python {
+        std::process::Command::new(py)
+            .args(["-c", r#"
+import os, sys
+home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
+    os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
+    else os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
+dirs = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
+print('ok' if dirs else 'missing')
+"#])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "ok")
             .unwrap_or(false)
     } else { false };
+
+    // 综合就绪状态
+    let has_browser = has_system_browser || has_playwright_chromium || has_playwright_cache;
+    let ready = python_available && has_playwright_pkg && has_browser;
 
     Ok(serde_json::json!({
         "python_available": python_available,
         "system_python": best_python,
+        "has_playwright_pkg": has_playwright_pkg,
         "has_playwright_chromium": has_playwright_chromium,
-        "has_wheels": has_wheels,
+        "has_playwright_cache": has_playwright_cache,
         "has_edge": has_edge,
         "has_chrome": has_chrome,
+        "has_system_browser": has_system_browser,
+        "has_browser": has_browser,
+        "ready": ready,
     }))
 }
 
