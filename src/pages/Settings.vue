@@ -119,41 +119,56 @@ function truncatePath(path: string, maxLen: number): string {
 
       <!-- 系统检测 -->
       <div v-if="sysInfo" class="sys-info">
-        <h3>系统检测</h3>
+        <h3>环境检测
+          <span :class="sysInfo.ready ? 'badge-ready' : 'badge-warn'">
+            {{ sysInfo.ready ? '✅ 就绪' : '⚠️ 待配置' }}
+          </span>
+        </h3>
         <div class="info-grid">
+          <!-- Python -->
           <div class="info-item">
             <span class="info-label">Python 环境</span>
-            <span :class="sysInfo.python_available ? 'tag-ok' : 'tag-miss'">
+            <span :class="sysInfo.python_available ? 'tag-ok' : 'tag-err'">
               {{ sysInfo.python_available ? '✅ 已检测到' : '❌ 未检测到' }}
             </span>
           </div>
           <div class="info-item" v-if="sysInfo.system_python">
-            <span class="info-label">　↳ 系统 Python</span>
+            <span class="info-label">　↳ 路径</span>
             <span class="tag-ok" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
           </div>
+          <div class="info-item" v-if="!sysInfo.python_available">
+            <span class="info-label" style="color: #f85149">　→ 请安装 Python 3.8+</span>
+            <a href="https://www.python.org/downloads/" target="_blank" class="link-hint">下载 →</a>
+          </div>
+
+          <!-- Playwright pip 包 -->
           <div class="info-item">
-            <span class="info-label">pip 离线安装包</span>
-            <span :class="sysInfo.has_wheels ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_wheels ? '✅ 已内置（离线可用）' : '—（需联网安装）' }}
+            <span class="info-label">Playwright 包</span>
+            <span :class="sysInfo.has_playwright_pkg ? 'tag-ok' : 'tag-miss'">
+              {{ sysInfo.has_playwright_pkg ? '✅ 已安装' : '⏳ 首次使用自动安装' }}
             </span>
           </div>
+
+          <!-- 浏览器 -->
           <div class="info-item">
-            <span class="info-label">Playwright Chromium</span>
-            <span :class="sysInfo.has_playwright_chromium ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_playwright_chromium ? '✅ 已内置（离线可用）' : '⚠ 需手动安装' }}
+            <span class="info-label">浏览器</span>
+            <span :class="sysInfo.has_browser ? 'tag-ok' : 'tag-miss'">
+              {{ sysInfo.has_browser ? '✅ 可用' : '—（首次使用自动下载）' }}
             </span>
           </div>
-          <div class="info-item">
-            <span class="info-label">　↳ 备用: Edge</span>
-            <span :class="sysInfo.has_edge ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_edge ? '✅ 可用' : '—' }}
+          <div class="info-item" v-if="sysInfo.has_system_browser">
+            <span class="info-label">　↳ 系统浏览器</span>
+            <span class="tag-ok">
+              {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }} （首选）
             </span>
           </div>
-          <div class="info-item">
-            <span class="info-label">　↳ 备用: Chrome</span>
-            <span :class="sysInfo.has_chrome ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_chrome ? '✅ 可用' : '—' }}
-            </span>
+          <div class="info-item" v-if="sysInfo.has_playwright_chromium">
+            <span class="info-label">　↳ 内置 Chromium</span>
+            <span class="tag-ok">✅ 安装包附带</span>
+          </div>
+          <div class="info-item" v-if="sysInfo.has_playwright_cache">
+            <span class="info-label">　↳ Playwright 缓存</span>
+            <span class="tag-ok">✅ 已下载</span>
           </div>
         </div>
       </div>
@@ -268,6 +283,19 @@ function truncatePath(path: string, maxLen: number): string {
 .info-label { font-size: 12px; color: #e6edf3; }
 .tag-ok { font-size: 11px; color: #3fb950; }
 .tag-miss { font-size: 11px; color: #8b949e; }
+.tag-err { font-size: 11px; color: #f85149; }
+.badge-ready {
+  display: inline-block; padding: 2px 8px; margin-left: 8px;
+  background: #23863622; border: 1px solid #238636; border-radius: 10px;
+  font-size: 11px; color: #3fb950; font-weight: 600;
+}
+.badge-warn {
+  display: inline-block; padding: 2px 8px; margin-left: 8px;
+  background: #d2992222; border: 1px solid #d29922; border-radius: 10px;
+  font-size: 11px; color: #d29922; font-weight: 600;
+}
+.link-hint { font-size: 11px; color: #58a6ff; text-decoration: none; }
+.link-hint:hover { text-decoration: underline; }
 
 .input-field, .select-field {
   width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d;
