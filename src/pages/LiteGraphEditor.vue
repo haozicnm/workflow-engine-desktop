@@ -1162,72 +1162,92 @@ onMounted(() => {
           ctx2.restore()
         }
 
-        // v4.0: 容器节点 action 列表 + "+" 按钮
+        // v4.1: 容器节点内部动作行 + "增加动作"按钮
         const nodeType = (node as any).type || ''
-        if (nodeType === 'browser_container' || nodeType === 'excel_container' || nodeType === 'word_container') {
+        if (nodeType === 'browser_container' || nodeType === 'excel_container' || nodeType === 'word_container' || nodeType === 'logic_container') {
           const actions = ((node as any).properties?.actions || []) as any[]
-          const actionH = Math.max(14, 16 * scale)
-          const actionGap = 4 * scale
-          const startY = sy + sh + 6 * scale
 
-          // 重置该节点所有区域标记
+          // 清除旧点击区域
           const oldRects = (node as any)._actionRects || []
           for (const r of oldRects) _containerActionRects.delete(r)
+          ;(node as any)._actionRects = []
 
-          // 渲染每个 action pill
+          // 动作区起始：widget 区结束
+          const widgetCount = (node.widgets || []).length
+          const widgetAreaH = widgetCount > 0 ? widgetCount * 20 + 6 : 0
+          const actionAreaY = sy + 30 + widgetAreaH + 4
+          const rowH = 20 * scale
+          const gap = 3 * scale
+          const padX = 8 * scale
+
           ctx2.save()
-          let ay = startY
-          for (const action of actions) {
-            const label = (action.label || action.type || '?') as string
-            const fontSize2 = Math.max(9, Math.min(11, 11 * scale))
-            ctx2.font = `${fontSize2}px sans-serif`
-            const textW = ctx2.measureText(label).width
-            const pillW = textW + 16 * scale
-            const pillH = actionH
-            // 背景
-            ctx2.fillStyle = 'rgba(22, 27, 34, 0.9)'
+
+          // 渲染每个动作行
+          for (let i = 0; i < actions.length; i++) {
+            const action = actions[i]
+            const ry = actionAreaY + i * (rowH + gap)
+            const rw = sw - padX * 2
+            const rx = sx + padX
+
+            // 行背景
+            ctx2.fillStyle = 'rgba(13, 17, 23, 0.7)'
             ctx2.strokeStyle = '#30363d'
-            ctx2.lineWidth = 1
-            roundRect(ctx2, sx + 4, ay, pillW, pillH, 3)
+            ctx2.lineWidth = 0.5
+            roundRect(ctx2, rx, ry, rw, rowH, 4)
             ctx2.fill()
             ctx2.stroke()
-            // 图标 + 文本
-            ctx2.fillStyle = '#8b949e'
-            ctx2.fillText('▸ ' + label, sx + 8, ay + pillH * 0.7)
-            // 存储点击区域
-            const rectKey = {}
-            ;(node as any)._actionRects = [...((node as any)._actionRects || []), rectKey]
-            _containerActionRects.set(rectKey, { type: 'action', actionId: action.id })
-            // 存储像素位置用于 hit test
-            ;(rectKey as any)._pos = { x: sx + 4, y: ay, w: pillW, h: pillH }
-            ay += pillH + actionGap
+
+            // 左端口圆点
+            ctx2.fillStyle = '#58a6ff'
+            ctx2.beginPath()
+            ctx2.arc(rx + 6, ry + rowH / 2, 3 * scale, 0, Math.PI * 2)
+            ctx2.fill()
+
+            // 动作名称
+            const fs2 = Math.max(9, Math.min(11, 11 * scale))
+            ctx2.font = `${fs2}px sans-serif`
+            ctx2.fillStyle = '#e6edf3'
+            ctx2.textBaseline = 'middle'
+            ctx2.fillText(`${action.label || action.type || '?'}`, rx + 14, ry + rowH / 2)
+
+            // 右端口圆点
+            ctx2.fillStyle = '#3fb950'
+            ctx2.beginPath()
+            ctx2.arc(rx + rw - 6, ry + rowH / 2, 3 * scale, 0, Math.PI * 2)
+            ctx2.fill()
+
+            const rk = {}
+            ;(node as any)._actionRects.push(rk)
+            _containerActionRects.set(rk, { type: 'action', actionId: action.id })
+            ;(rk as any)._pos = { x: rx, y: ry, w: rw, h: rowH }
           }
 
-          // "+" 按钮
-          const plusSize = Math.max(14, 16 * scale)
-          const plusX = sx + 4
-          const plusY = ay
-          ctx2.fillStyle = 'rgba(31, 111, 235, 0.25)'
+          // "增加动作" 按钮
+          const btnY = actionAreaY + actions.length * (rowH + gap) + 2 * scale
+          const btnH = Math.max(16, 18 * scale)
+          const btnW = sw - padX * 2
+          const btnX = sx + padX
+
+          ctx2.fillStyle = 'rgba(31, 111, 235, 0.15)'
           ctx2.strokeStyle = '#1f6feb'
-          ctx2.lineWidth = 1.5
-          roundRect(ctx2, plusX, plusY, plusSize, plusSize, 3)
+          ctx2.lineWidth = 1
+          roundRect(ctx2, btnX, btnY, btnW, btnH, 4)
           ctx2.fill()
           ctx2.stroke()
-          // "+" 文字
-          const plusFontSize = Math.max(10, Math.min(14, 14 * scale))
-          ctx2.font = `bold ${plusFontSize}px sans-serif`
+
+          const bfs = Math.max(10, Math.min(12, 12 * scale))
+          ctx2.font = `${bfs}px sans-serif`
           ctx2.fillStyle = '#58a6ff'
           ctx2.textAlign = 'center'
           ctx2.textBaseline = 'middle'
-          ctx2.fillText('+', plusX + plusSize / 2, plusY + plusSize / 2)
+          ctx2.fillText('＋ 增加动作', btnX + btnW / 2, btnY + btnH / 2)
           ctx2.textAlign = 'left'
           ctx2.restore()
 
-          // 存储 "+" 点击区域
-          const plusKey = {}
-          ;(node as any)._actionRects = [...((node as any)._actionRects || []), plusKey]
-          _containerActionRects.set(plusKey, { type: 'add', nodeId: String(node.id) })
-          ;(plusKey as any)._pos = { x: plusX, y: plusY, w: plusSize, h: plusSize }
+          const bk = {}
+          ;(node as any)._actionRects.push(bk)
+          _containerActionRects.set(bk, { type: 'add', nodeId: String(node.id) })
+          ;(bk as any)._pos = { x: btnX, y: btnY, w: btnW, h: btnH }
         }
       }
     }
@@ -1485,6 +1505,7 @@ function loadFromStore() {
     if ((sn as any).actions && sn.type?.endsWith('_container')) {
       (node.properties as any).actions = (sn as any).actions
       ;(node as any).rebuildPorts?.()
+      ;(node as any).updateNodeSize?.()
     }
     graph.add(node)
   }

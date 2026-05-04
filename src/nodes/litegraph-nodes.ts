@@ -74,14 +74,22 @@ function isTypeCompatible(sourceType: string, targetType: string): boolean {
 
 // ═══════════════════════════════════════════
 // 容器节点基类 — 容器本身无端口，actions 各有 {id}_in {id}_out
+// v4.1: 动作行在容器内部渲染，节点高度随 actions 动态增长
 // ═══════════════════════════════════════════
 class ContainerNode extends WorkflowNode {
+  // 布局常量
+  static ACTION_ROW_H = 22
+  static ACTION_GAP = 3
+  static BTN_H = 20
+  static PADDING_X = 8
+
   constructor(title: string, type: string) {
     super(title, type)
     this.properties = this.properties || {}
     if (!(this.properties as any).actions) {
       (this.properties as any).actions = []
     }
+    this.updateNodeSize()
   }
 
   get actions(): ContainerAction[] {
@@ -98,6 +106,7 @@ class ContainerNode extends WorkflowNode {
     }
     actions.push(action)
     this.rebuildPorts()
+    this.updateNodeSize()
     this.setDirtyCanvas(true, true)
   }
 
@@ -107,8 +116,22 @@ class ContainerNode extends WorkflowNode {
     if (idx >= 0) {
       actions.splice(idx, 1)
       this.rebuildPorts()
+      this.updateNodeSize()
       this.setDirtyCanvas(true, true)
     }
+  }
+
+  // 计算并设置节点高度（widget 区 + 动作区）
+  updateNodeSize() {
+    const widgetH = (this.widgets?.length || 0) * 20 + 8   // widget 区高
+    const titleH = 30                                         // 标题栏
+    const actions = (this.properties as any).actions || []
+    const actionAreaH = actions.length > 0
+      ? actions.length * (ContainerNode.ACTION_ROW_H + ContainerNode.ACTION_GAP) + ContainerNode.BTN_H + 12
+      : ContainerNode.BTN_H + 12  // 空容器：只显示按钮
+
+    const baseW = this.size?.[0] || 200
+    this.size = [Math.max(baseW, 180), titleH + widgetH + actionAreaH]
   }
 
   // v4.1: 每个 action 生成一对端口：左入 {id}_in ，右出 {id}_out
@@ -126,6 +149,7 @@ class ContainerNode extends WorkflowNode {
   protected onAdded(graph: LGraph): void {
     super.onAdded?.(graph)
     this.rebuildPorts()
+    this.updateNodeSize()
   }
 }
 

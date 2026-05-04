@@ -19,43 +19,14 @@ pub type CancelTokens = Arc<tokio::sync::RwLock<HashMap<String, tokio_util::sync
 
 /// 应用全局状态
 ///
-/// 首次启动时将内置模板作为普通工作流写入数据库
-/// 如果已有数据包含 v3.x 旧原子节点类型，自动清除并重新 seed
+/// 每次启动都覆盖写入 4 个内置示例工作流，确保安装 = 初始状态
 fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
     use tracing::info;
 
+    // 清除所有已有工作流（安装覆盖 = 回到初始状态）
     let existing = db.list_workflows().unwrap_or_default();
-    let has_any = !existing.is_empty();
-
-    // 检测是否包含 v3.x 旧节点类型（已被 v4.0 容器替代）
-    let legacy_types = ["file_read", "file_write", "json_parse", "notify", "print",
-        "http", "loop", "condition", "regex_extract", "regex_replace", "regex_match",
-        "if_branch", "browser_navigate", "browser_click", "browser_fill",
-        "browser_extract", "browser_screenshot", "browser_evaluate",
-        "browser_scroll", "browser_wait", "browser_pdf", "browser",
-        "clipboard_read", "clipboard_write", "data_set", "data_get",
-        "convert_to_text", "convert_to_json", "array_filter", "delay",
-        "sub_workflow", "script", "recording"];
-
-    let mut has_legacy = false;
-    if has_any {
-        for w in &existing {
-            if let Ok(Some(yaml)) = db.get_workflow_yaml(&w.id) {
-                if legacy_types.iter().any(|t| yaml.contains(t)) {
-                    has_legacy = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    if has_legacy {
-        info!("检测到 v3.x 旧格式工作流，正在升级为 v4.0 容器格式...");
-        for w in &existing {
-            let _ = db.delete_workflow(&w.id);
-        }
-    } else if has_any {
-        return Ok(()); // 已是 v4.0 格式，跳过
+    for w in &existing {
+        let _ = db.delete_workflow(&w.id);
     }
 
     info!("正在创建 4 个内置示例工作流...");
