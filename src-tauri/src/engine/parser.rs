@@ -77,11 +77,16 @@ fn convert_step(step: &Step) -> Result<Step> {
             map.insert("actions".to_string(), Value::Array(converted_actions));
         }
 
-        // logic 容器：把 condition 放入 config
+        // logic 容器：把 condition 和 conditionGroup 放入 config
         if step.step_type == "logic" {
             if let Some(ref cond) = step.condition {
                 if let Value::Object(ref mut map) = config {
                     map.insert("condition".to_string(), Value::String(cond.clone()));
+                }
+            }
+            if let Some(ref cg) = step.condition_group {
+                if let Value::Object(ref mut map) = config {
+                    map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
                 }
             }
         }
@@ -115,7 +120,7 @@ fn convert_step(step: &Step) -> Result<Step> {
         actions: None, // 已移入 config
         expanded: None,
         condition: step.condition.clone(),
-        condition_group: None,
+        condition_group: step.condition_group.clone(),
         then_steps,
         else_steps,
         run_condition: None,

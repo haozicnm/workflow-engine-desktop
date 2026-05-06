@@ -165,7 +165,7 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
         <div v-if="idx > 0" class="flex items-center justify-center py-0.5">
           <button
             class="text-[10px] font-bold px-2 py-0.5 rounded transition-colors"
-            :class="combinator === 'and' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'"
+            :class="combinator === 'and' ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'"
             @click="toggleCombinator"
           >
             {{ combinator === 'and' ? 'AND' : 'OR' }}
@@ -201,7 +201,7 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
                 >
                   <span class="shrink-0">{{ ref.icon }}</span>
                   <span class="flex-1 truncate" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
-                  <span class="text-[10px] text-muted-foreground font-mono">.output</span>
+                  <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
                 </div>
               </div>
             </div>
@@ -243,7 +243,7 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
                 >
                   <span class="shrink-0">{{ ref.icon }}</span>
                   <span class="flex-1 truncate" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
-                  <span class="text-[10px] text-muted-foreground font-mono">.output</span>
+                  <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
                 </div>
               </div>
             </div>

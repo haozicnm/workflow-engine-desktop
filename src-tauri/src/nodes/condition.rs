@@ -31,7 +31,13 @@ impl NodeExecutor for ConditionNode {
         let original_value = config.get("value").cloned().unwrap_or(serde_json::Value::Null);
 
         // ── 新格式：conditionGroup（可视化条件构建器） ──
-        if let Some(ref group) = step.condition_group {
+        // 优先从 step.condition_group 读，回退到 config.condition_group
+        let condition_group_owned: Option<crate::engine::workflow::LogicConditionGroup> =
+            step.condition_group.clone().or_else(|| {
+                config.get("condition_group")
+                    .and_then(|cg| serde_json::from_value(cg.clone()).ok())
+            });
+        if let Some(ref group) = condition_group_owned {
             if !group.conditions.is_empty() {
                 let results: Vec<bool> = group.conditions.iter().map(|cond| {
                     let left = ctx.resolve_config(&serde_json::json!(cond.left));
