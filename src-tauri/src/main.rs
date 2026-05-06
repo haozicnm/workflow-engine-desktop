@@ -82,11 +82,6 @@ fn main() {
             // Workflow import/export (P4)
             workflow_engine::commands::workflow::export_workflow,
             workflow_engine::commands::workflow::import_workflow,
-            // DAG execution (flow editor → direct node/edge input)
-            workflow_engine::commands::run::run_dag_start,
-            // DAG execution (JSON workflow format)
-            workflow_engine::commands::dag_run::dag_run_start,
-            workflow_engine::commands::dag_run::dag_run_cancel,
             // Browser recording
             workflow_engine::commands::browser_recording::browser_recording_start,
             workflow_engine::commands::browser_recording::browser_recording_stop,
