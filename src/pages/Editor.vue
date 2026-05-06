@@ -473,7 +473,7 @@ onUnmounted(() => {
         <div class="flex flex-1 overflow-hidden min-h-0">
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-8 pt-6 pb-12 space-y-4 min-h-0">
-            <div v-if="!workflow?.steps.length" class="text-center py-16 text-muted-foreground">
+            <div v-if="!workflow?.steps?.length" class="text-center py-16 text-muted-foreground">
               <div class="text-4xl mb-3">⚙️</div>
               <div class="text-lg text-foreground mb-2">还没有步骤</div>
               <div class="text-sm">点击下方「增加步骤」开始构建工作流</div>

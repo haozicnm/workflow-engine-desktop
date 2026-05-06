@@ -80,10 +80,11 @@ async function loadWorkflowList() {
 async function loadRuns() {
   loading.value = true
   try {
-    runs.value = await safeInvoke<RunHistoryItem[]>('run_list', {
+    const result = await safeInvoke<RunHistoryItem[]>('run_list', {
       workflowId: filterWorkflowId.value,
       limit: 100,
     })
+    runs.value = Array.isArray(result) ? result : []
   } catch (e: any) {
     toast.error('加载运行历史失败: ' + (e.message || e))
   } finally {
