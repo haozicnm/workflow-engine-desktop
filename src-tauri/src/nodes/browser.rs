@@ -138,20 +138,31 @@ impl BrowserSidecar {
         }
     }
 
-    /// 从 stdout 读取一行 JSON 响应
+    /// 从 stdout 读取一行 JSON 响应（跳过中间的任何 CDP 事件行）
     async fn read_response(&self) -> Result<serde_json::Value> {
         let mut stdout = self.stdout.lock().await;
-        let mut line = String::new();
-        let n = stdout.read_line(&mut line).await?;
-        if n == 0 {
-            self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
-            return Err(anyhow!("Sidecar 进程已退出"));
+        loop {
+            let mut line = String::new();
+            let n = stdout.read_line(&mut line).await?;
+            if n == 0 {
+                self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
+                return Err(anyhow!("Sidecar 进程已退出"));
+            }
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let parsed: serde_json::Value = serde_json::from_str(line)
+                .map_err(|e| anyhow!("Sidecar 响应解析失败: {} — {}", e, line))?;
+
+            // CDP 事件行（无 "id" 字段，有 "type": "event"）— 跳过，等下一个响应行
+            if parsed.get("id").is_none() && parsed.get("type").and_then(|v| v.as_str()) == Some("event") {
+                // 事件行 — 未来会路由到事件通道，目前先跳过
+                continue;
+            }
+
+            return Ok(parsed);
         }
-        let line = line.trim();
-        if line.is_empty() {
-            return Err(anyhow!("收到空响应"));
-        }
-        serde_json::from_str(line).map_err(|e| anyhow!("Sidecar 响应解析失败: {}", e))
     }
 
     /// 关闭 sidecar

@@ -56,12 +56,18 @@ try:
 except ImportError:
     async_playwright = None
 
+import collections
+
 # 全局浏览器状态
 _context = None  # PersistentContext（launch_persistent_context，管理 cookies/登录态/headers）
 _pages = []      # 所有打开的页面
 _current_page_idx = 0
 _playwright = None
 _extra_headers = {}
+
+# CDP 事件管道
+_cdp_session = None
+_cdp_queue = collections.deque()
 
 
 def _detect_browser_channel() -> str:
@@ -286,6 +292,8 @@ async def _launch(params: dict) -> dict:
         await _context.add_cookies(cookies)
 
     used = channel or "playwright-bundled"
+    # 启动 CDP 事件监听
+    asyncio.create_task(_start_cdp_listener())
     return {"success": True, "data": {"message": "浏览器已启动", "browser": browser_type, "channel": used, "user_data_dir": user_data_dir}}
 
 
@@ -461,6 +469,9 @@ async def _check(params: dict) -> dict:
 
 async def _close() -> dict:
     global _pages, _playwright, _context, _extra_headers
+
+    # 停止 CDP 监听
+    await _stop_cdp_listener()
 
     for p in _pages:
         try:
@@ -1481,6 +1492,83 @@ async def _recording_stop() -> dict:
     return {"success": True, "data": {"message": f"录制已停止，共 {len(actions)} 个操作", "actions": actions}}
 
 
+
+# ═══════════════════════════════════════════
+# CDP 事件管道 — 浏览器事件 → stdout NDJSON
+# ═══════════════════════════════════════════
+
+async def _start_cdp_listener():
+    """启动 CDP 会话，订阅浏览器关键事件"""
+    global _cdp_session
+    page = _get_page()
+    if page is None or async_playwright is None:
+        return
+
+    try:
+        _cdp_session = await page.context.new_cdp_session(page)
+    except Exception as e:
+        print(json.dumps({"type": "event", "event": "cdp.error",
+                          "data": {"error": f"CDP 会话创建失败: {e}"}}), flush=True)
+        return
+
+    # 订阅事件列表
+    event_names = [
+        "Network.responseReceived",
+        "Network.requestWillBeSent",
+        "Network.loadingFinished",
+        "Network.loadingFailed",
+        "Runtime.exceptionThrown",
+        "Runtime.consoleAPICalled",
+        "Page.frameNavigated",
+        "Page.loadEventFired",
+        "Page.frameStoppedLoading",
+        "Page.domContentEventFired",
+    ]
+
+    for name in event_names:
+        domain = name.split(".")[0]
+        try:
+            await _cdp_session.send(f"{domain}.enable")
+        except Exception:
+            pass
+        _cdp_session.on(name, lambda params, n=name: _on_cdp_event(n, params))
+
+    print(json.dumps({"type": "event", "event": "cdp.ready",
+                      "data": {"subscribed": len(event_names)}}), flush=True)
+
+
+def _on_cdp_event(event_name: str, params: dict):
+    """CDP 事件回调 → 全局队列（CPython GIL 保证 deque 操作线程安全）"""
+    global _cdp_queue
+    _cdp_queue.append(json.dumps({
+        "type": "event",
+        "event": event_name,
+        "data": params,
+    }))
+
+
+async def _drain_cdp_events():
+    """排空事件队列到 stdout（main 循环每次处理后调用）"""
+    global _cdp_queue
+    while _cdp_queue:
+        try:
+            msg = _cdp_queue.popleft()
+        except IndexError:
+            break
+        print(msg, flush=True)
+
+
+async def _stop_cdp_listener():
+    """停止 CDP 监听"""
+    global _cdp_session
+    if _cdp_session:
+        try:
+            await _cdp_session.detach()
+        except Exception:
+            pass
+        _cdp_session = None
+
+
 async def main():
     """主循环：从 stdin 读取 JSON 请求，处理后写入 stdout"""
     print(json.dumps({"type": "ready"}), flush=True)
@@ -1510,6 +1598,7 @@ async def main():
                 break
 
             result = await handle_action(action, params)
+            await _drain_cdp_events()
             response = {"id": req_id, **result}
         except json.JSONDecodeError as e:
             response = {
