@@ -128,6 +128,13 @@ impl BrowserSidecar {
         let response = self.read_response().await?;
 
         let success = response.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+
+        // 提取 CDP 事件（ActionGuard 用 — 当前通过 verify action 显式检查）
+        let _cdp_events = response.get("events")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
         if success {
             Ok(response.get("data").cloned().unwrap_or(serde_json::Value::Null))
         } else {

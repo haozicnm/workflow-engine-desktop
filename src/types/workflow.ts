@@ -180,6 +180,8 @@ export const BROWSER_ACTIONS: ActionDef[] = [
     { key: 'substring', label: 'URL 包含', type: 'text', placeholder: '/dashboard' },
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
   ]},
+  // ─── 动作验证 ───
+  { type: 'verify', label: '验证健康', icon: '🩺', params: [] },
 ]
 
 // Excel 动作（与后端 excel_container.rs 对齐）

@@ -434,6 +434,20 @@ pub async fn execute_browser_container(
                     .map_err(|e| anyhow!("等待URL失败: {}", e))?;
             }
 
+            // ─── 动作验证 (v2) ───
+
+            "verify" => {
+                let resp = crate::nodes::browser::send_sidecar_action("verify", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("验证失败: {}", e))?;
+                let data = resp.clone();
+                let clean = data.get("clean").and_then(|v| v.as_bool()).unwrap_or(true);
+                if !clean {
+                    let count = data.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
+                    tracing::warn!("ActionGuard: action '{}' 后检测到 {} 个问题", action.label, count);
+                }
+                output_ports.insert(action.label.clone(), data);
+            }
+
             _ => {
                 tracing::warn!(
                     "BrowserContainer — 未知 action 类型: {}",

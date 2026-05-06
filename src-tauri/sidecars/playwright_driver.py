@@ -143,6 +143,9 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _wait_load_state(params)
             case "wait_url_contains":
                 return await _wait_url_contains(params)
+            # 动作验证
+            case "verify":
+                return await _verify(params)
             case "select":
                 return await _select(params)
             case "check":
@@ -483,6 +486,58 @@ async def _wait_url_contains(params: dict) -> dict:
             return {"success": True, "data": {"url": page.url, "matched": substring}}
         await asyncio.sleep(0.2)
     return {"success": False, "error": f"等待 URL 包含 '{substring}' 超时 (当前: {page.url})"}
+
+
+async def _verify(params: dict) -> dict:
+    """验证最近操作的健康状态（检查 CDP 事件队列中的错误）"""
+    global _cdp_queue
+    issues = []
+    events_snapshot = list(_cdp_queue)
+    _cdp_queue.clear()
+
+    for event_str in events_snapshot:
+        try:
+            event = json.loads(event_str) if isinstance(event_str, str) else event_str
+        except (json.JSONDecodeError, TypeError):
+            continue
+        method = event.get("event", "")
+        data = event.get("data", {})
+
+        if method == "Network.loadingFailed":
+            issues.append({
+                "type": "network_error",
+                "url": data.get("url", ""),
+                "error": data.get("errorText", ""),
+            })
+        elif method == "Network.responseReceived":
+            resp = data.get("response", {})
+            status = resp.get("status", 0)
+            if status >= 400:
+                issues.append({
+                    "type": "http_error",
+                    "url": resp.get("url", ""),
+                    "status": status,
+                    "statusText": resp.get("statusText", ""),
+                })
+        elif method == "Runtime.exceptionThrown":
+            exc = data.get("exceptionDetails", {})
+            issues.append({
+                "type": "js_exception",
+                "text": exc.get("text", ""),
+                "url": exc.get("url", ""),
+            })
+
+    if issues:
+        return {
+            "success": True,
+            "data": {
+                "clean": False,
+                "issues": issues,
+                "count": len(issues),
+                "message": f"发现 {len(issues)} 个问题",
+            },
+        }
+    return {"success": True, "data": {"clean": True, "issues": [], "message": "无异常"}}
 
 
 async def _select(params: dict) -> dict:
@@ -1649,8 +1704,14 @@ async def main():
                 break
 
             result = await handle_action(action, params)
-            await _drain_cdp_events()
-            response = {"id": req_id, **result}
+            # 收集 CDP 事件（不再 drain 到 stdout，而是嵌入响应）
+            cdp_events = []
+            while _cdp_queue:
+                try:
+                    cdp_events.append(json.loads(_cdp_queue.popleft()))
+                except (IndexError, json.JSONDecodeError):
+                    break
+            response = {"id": req_id, "events": cdp_events, **result}
         except json.JSONDecodeError as e:
             response = {
                 "id": "",
