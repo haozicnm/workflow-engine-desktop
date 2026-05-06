@@ -368,7 +368,7 @@ function colorAt15(color: string): string {
     </div>
 
     <!-- Body (expandable) -->
-    <div v-show="step.expanded" class="px-3 py-2 bg-card border-t border-border">
+    <div v-show="step.expanded" class="px-4 py-3 bg-card border-t border-border">
       <!-- Simple step type -->
       <template v-if="!isContainer && step.type !== 'logic'">
         <div
@@ -377,8 +377,8 @@ function colorAt15(color: string): string {
           class="mb-2"
         >
           <Label class="text-[11px] text-muted-foreground block mb-1">{{ param.label }}</Label>
-          <Input v-if="param.type === 'text'" type="text" :model-value="(step.config[param.key] as string) ?? (param.default as string) ?? ''" :placeholder="param.placeholder" class="h-7 text-xs" @input="onConfigInput(param.key, $event)" />
-          <Input v-else-if="param.type === 'number'" type="number" :model-value="(step.config[param.key] as string) ?? (param.default as string) ?? ''" :placeholder="param.placeholder" class="h-7 text-xs" @input="onConfigNumber(param.key, $event)" />
+          <Input v-if="param.type === 'text'" type="text" :model-value="(step.config[param.key] as string) ?? (param.default as string) ?? ''" :placeholder="param.placeholder" class="h-8 text-xs" @input="onConfigInput(param.key, $event)" />
+          <Input v-else-if="param.type === 'number'" type="number" :model-value="(step.config[param.key] as string) ?? (param.default as string) ?? ''" :placeholder="param.placeholder" class="h-8 text-xs" @input="onConfigNumber(param.key, $event)" />
           <Select v-else-if="param.type === 'select'" :model-value="(step.config[param.key] as string) ?? (param.default as string) ?? ''" :options="param.options" @update:model-value="v => onConfigParamChange(param.key, v)" />
           <div v-else-if="param.type === 'checkbox'" class="flex items-center gap-2">
             <Checkbox :model-value="!!(step.config[param.key] ?? param.default)" @update:model-value="(v) => onConfigCheckbox(param.key, v)" />

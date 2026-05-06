@@ -187,7 +187,7 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
   >
     <!-- Header row -->
     <CardContent
-      class="flex items-center h-8 px-3 py-0 gap-2"
+      class="flex items-center h-9 px-4 py-0 gap-2"
       :class="hasParams ? 'cursor-pointer' : ''"
       @click="hasParams ? emit('toggle-expand') : emit('click')"
     >
@@ -260,14 +260,14 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
             type="text"
             :model-value="(localParams[param.key] as string) ?? (param.default as string) ?? ''"
             :placeholder="param.placeholder"
-            class="flex-1 h-7 text-xs"
+            class="flex-1 h-8 text-xs"
             @input="onTextInput(param.key, $event)"
           />
           <Button
             v-if="containerType === 'browser' && (param.key === 'selector' || param.key.includes('selector'))"
             variant="outline"
             size="sm"
-            class="h-7 w-7 p-0 shrink-0"
+            class="h-8 w-8 p-0 shrink-0"
             :class="pickingElement ? 'text-warning' : ''"
             :title="pickingElement ? '选择中...' : '🎯 从页面选择元素'"
             @click="onPickElement(param.key)"
@@ -280,7 +280,7 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
           type="number"
           :model-value="(localParams[param.key] as string) ?? (param.default as string) ?? ''"
           :placeholder="param.placeholder"
-          class="h-7 text-xs"
+          class="h-8 text-xs"
           @input="onNumberInput(param.key, $event)"
         />
 
