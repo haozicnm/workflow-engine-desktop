@@ -1,10 +1,12 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { pinia } from './stores'
-import router from './router'
+import { useTheme } from './composables/useTheme'
 import './style.css'
+
+// Initialize theme before mount
+useTheme()
 
 const app = createApp(App)
 app.use(pinia)
-app.use(router)
 app.mount('#app')

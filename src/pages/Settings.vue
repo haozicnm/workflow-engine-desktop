@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { safeInvoke, safeListen } from '../utils/tauri'
+import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
+import { useTheme, type Theme } from '../composables/useTheme'
 import pkg from '../package.json'
+import Button from '../components/ui/button/Button.vue'
+import Input from '../components/ui/input/Input.vue'
+import Label from '../components/ui/label/Label.vue'
+import Switch from '../components/ui/switch/Switch.vue'
+import Badge from '../components/ui/badge/Badge.vue'
+import Card from '../components/ui/card/Card.vue'
+import Select from '../components/ui/select/Select.vue'
+import Separator from '../components/ui/separator/Separator.vue'
+import { cn } from '@/lib/utils'
 
 const emit = defineEmits<{ 'back': [] }>()
 
 const toast = useToast()
 const APP_VERSION = pkg.version
+const { theme: currentTheme, setTheme } = useTheme()
 
 const settings = ref({
   theme: 'system',
@@ -34,6 +45,12 @@ const logLevelOptions = [
   { value: 'info', label: 'Info' },
   { value: 'warn', label: 'Warn' },
   { value: 'error', label: 'Error' },
+]
+
+const themeOptions: { value: Theme; label: string; icon: string; desc: string }[] = [
+  { value: 'light', label: '浅色', icon: '☀️', desc: '浅色主题，适合明亮环境' },
+  { value: 'dark', label: '深色', icon: '🌙', desc: '深色主题，护眼舒适' },
+  { value: 'system', label: '跟随系统', icon: '💻', desc: '自动匹配系统设置' },
 ]
 
 onMounted(async () => {
@@ -88,255 +105,209 @@ function truncatePath(path: string, maxLen: number): string {
 </script>
 
 <template>
-<div class="settings-page">
-  <header class="page-header">
-    <button class="back-btn" @click="emit('back')" title="返回">← 返回</button>
-    <h1>⚙️ 设置</h1>
-    <p class="page-desc">配置应用行为和浏览器节点</p>
-  </header>
+  <div class="max-w-[640px] mx-auto px-5 py-6">
+    <!-- Header -->
+    <header class="mb-6">
+      <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← 返回</Button>
+      <h1 class="text-xl font-bold text-foreground">⚙️ 设置</h1>
+      <p class="text-sm text-muted-foreground">配置应用行为和浏览器节点</p>
+    </header>
 
-  <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="text-center py-10 text-muted-foreground">加载中...</div>
 
-  <div v-else class="settings-content">
-    <!-- 浏览器设置 -->
-    <section class="settings-section">
-      <h2>🌐 浏览器节点</h2>
-      <p class="section-desc">选择浏览器自动化使用的浏览器。内网环境建议选择 Edge。</p>
+    <div v-else class="space-y-4">
+      <!-- Theme settings -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🎨 外观</h2>
+          <p class="text-xs text-muted-foreground mb-4">选择界面主题风格。</p>
+          <div class="grid grid-cols-3 gap-3">
+            <Button
+              v-for="opt in themeOptions"
+              :key="opt.value"
+              variant="outline"
+              :class="cn(
+                'flex flex-col items-center gap-2 p-4 h-auto border-2',
+                currentTheme === opt.value
+                  ? 'border-primary bg-primary/5 shadow-sm'
+                  : 'border-border hover:border-primary/50',
+              )"
+              @click="setTheme(opt.value)"
+            >
+              <span class="text-2xl">{{ opt.icon }}</span>
+              <span class="text-sm font-semibold text-foreground">{{ opt.label }}</span>
+              <span class="text-[10px] text-muted-foreground text-center leading-tight">{{ opt.desc }}</span>
+            </Button>
+          </div>
+        </div>
+      </Card>
 
-      <div class="form-group">
-        <label>浏览器通道</label>
-        <div class="radio-group">
-          <label v-for="opt in browserOptions" :key="opt.value"
-            class="radio-option" :class="{ active: settings.browser_channel === opt.value }">
-            <input type="radio" v-model="settings.browser_channel" :value="opt.value" />
-            <div class="radio-content">
-              <span class="radio-label">{{ opt.label }}</span>
-              <span class="radio-desc">{{ opt.desc }}</span>
+      <!-- Browser settings -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 浏览器节点</h2>
+          <p class="text-xs text-muted-foreground mb-4">选择浏览器自动化使用的浏览器。内网环境建议选择 Edge。</p>
+
+          <div class="space-y-2 mb-4">
+            <Label class="text-xs text-muted-foreground font-semibold">浏览器通道</Label>
+            <div class="flex flex-col gap-2">
+              <label
+                v-for="opt in browserOptions"
+                :key="opt.value"
+                :class="cn(
+                  'flex items-start gap-2.5 px-3 py-2.5 border rounded-md cursor-pointer transition-colors',
+                  settings.browser_channel === opt.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary',
+                )"
+              >
+                <div :class="cn('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0', settings.browser_channel === opt.value ? 'border-primary bg-primary' : 'border-muted-foreground/40')">
+                  <div v-if="settings.browser_channel === opt.value" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-sm text-foreground font-semibold">{{ opt.label }}</span>
+                  <span class="text-[11px] text-muted-foreground">{{ opt.desc }}</span>
+                </div>
+              </label>
             </div>
-          </label>
+          </div>
+
+          <!-- System check -->
+          <div v-if="sysInfo" class="mt-4 p-3 bg-background rounded-md">
+            <h3 class="text-xs text-muted-foreground mb-2.5 flex items-center gap-2">
+              环境检测
+              <Badge :variant="sysInfo.ready ? 'success' : 'warning'" class="text-[10px]">
+                {{ sysInfo.ready ? '✅ 就绪' : '⚠️ 待配置' }}
+              </Badge>
+            </h3>
+            <div class="flex flex-col gap-1.5">
+              <!-- Python -->
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-foreground">Python 环境</span>
+                <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
+                  {{ sysInfo.python_available ? '✅ 已检测到' : '❌ 未检测到' }}
+                </span>
+              </div>
+              <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
+                <span class="text-foreground pl-3">↳ 路径</span>
+                <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
+              </div>
+              <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
+                → 请安装 Python 3.8+
+                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">下载 →</a>
+              </div>
+
+              <!-- Playwright -->
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-foreground">Playwright 包</span>
+                <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
+                  {{ sysInfo.has_playwright_pkg ? '✅ 已安装' : '⏳ 首次使用自动安装' }}
+                </span>
+              </div>
+
+              <!-- Browser -->
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-foreground">浏览器</span>
+                <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
+                  {{ sysInfo.has_browser ? '✅ 可用' : '—（首次使用自动下载）' }}
+                </span>
+              </div>
+              <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
+                <span class="text-foreground pl-3">↳ 系统浏览器</span>
+                <span class="text-success text-[11px]">
+                  {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }} （首选）
+                </span>
+              </div>
+              <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
+                <span class="text-foreground pl-3">↳ 内置 Chromium</span>
+                <span class="text-success text-[11px]">✅ 安装包附带</span>
+              </div>
+              <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
+                <span class="text-foreground pl-3">↳ Playwright 缓存</span>
+                <span class="text-success text-[11px]">✅ 已下载</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      <!-- 系统检测 -->
-      <div v-if="sysInfo" class="sys-info">
-        <h3>环境检测
-          <span :class="sysInfo.ready ? 'badge-ready' : 'badge-warn'">
-            {{ sysInfo.ready ? '✅ 就绪' : '⚠️ 待配置' }}
-          </span>
-        </h3>
-        <div class="info-grid">
-          <!-- Python -->
-          <div class="info-item">
-            <span class="info-label">Python 环境</span>
-            <span :class="sysInfo.python_available ? 'tag-ok' : 'tag-err'">
-              {{ sysInfo.python_available ? '✅ 已检测到' : '❌ 未检测到' }}
-            </span>
-          </div>
-          <div class="info-item" v-if="sysInfo.system_python">
-            <span class="info-label">　↳ 路径</span>
-            <span class="tag-ok" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
-          </div>
-          <div class="info-item" v-if="!sysInfo.python_available">
-            <span class="info-label" style="color: #f85149">　→ 请安装 Python 3.8+</span>
-            <a href="https://www.python.org/downloads/" target="_blank" class="link-hint">下载 →</a>
-          </div>
+      <!-- Advanced settings -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-4">🔧 高级</h2>
 
-          <!-- Playwright pip 包 -->
-          <div class="info-item">
-            <span class="info-label">Playwright 包</span>
-            <span :class="sysInfo.has_playwright_pkg ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_playwright_pkg ? '✅ 已安装' : '⏳ 首次使用自动安装' }}
-            </span>
-          </div>
+          <div class="space-y-4">
+            <div class="space-y-1.5">
+              <Label class="text-xs text-muted-foreground font-semibold">Python 路径 (可选)</Label>
+              <Input v-model="settings.python_path" placeholder="留空使用自动检测" class="h-8 text-xs" />
+              <p class="text-[11px] text-muted-foreground/60">指定 Python 可执行文件完整路径。留空则自动检测。</p>
+            </div>
 
-          <!-- 浏览器 -->
-          <div class="info-item">
-            <span class="info-label">浏览器</span>
-            <span :class="sysInfo.has_browser ? 'tag-ok' : 'tag-miss'">
-              {{ sysInfo.has_browser ? '✅ 可用' : '—（首次使用自动下载）' }}
-            </span>
-          </div>
-          <div class="info-item" v-if="sysInfo.has_system_browser">
-            <span class="info-label">　↳ 系统浏览器</span>
-            <span class="tag-ok">
-              {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }} （首选）
-            </span>
-          </div>
-          <div class="info-item" v-if="sysInfo.has_playwright_chromium">
-            <span class="info-label">　↳ 内置 Chromium</span>
-            <span class="tag-ok">✅ 安装包附带</span>
-          </div>
-          <div class="info-item" v-if="sysInfo.has_playwright_cache">
-            <span class="info-label">　↳ Playwright 缓存</span>
-            <span class="tag-ok">✅ 已下载</span>
+            <div class="space-y-1.5">
+              <Label class="text-xs text-muted-foreground font-semibold">日志级别</Label>
+              <Select
+                :model-value="settings.log_level"
+                @update:model-value="v => settings.log_level = v"
+                :options="logLevelOptions"
+              />
+            </div>
+
+            <div class="flex items-center gap-2.5">
+              <Switch v-model="settings.auto_start" />
+              <Label class="text-sm text-foreground cursor-pointer">开机自启</Label>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </Card>
 
-    <!-- 高级设置 -->
-    <section class="settings-section">
-      <h2>🔧 高级</h2>
+      <!-- Log management -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">📄 日志</h2>
+          <p class="text-xs text-muted-foreground mb-4">查看和清理应用运行日志。</p>
+          <div class="flex gap-2.5 flex-wrap">
+            <Button variant="outline" size="sm" @click="openLogDir">📂 查看日志文件</Button>
+            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">🗑 清空日志</Button>
+          </div>
+        </div>
+      </Card>
 
-      <div class="form-group">
-        <label>Python 路径 (可选)</label>
-        <input type="text" v-model="settings.python_path"
-          placeholder="留空使用自动检测" class="input-field" />
-        <p class="field-hint">指定 Python 可执行文件完整路径。留空则自动检测。</p>
-      </div>
+      <!-- Version info -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">📦 版本信息</h2>
+          <p class="text-xs text-muted-foreground mb-4">当前版本及更新记录。</p>
+          <div class="mb-4">
+            <Badge variant="default" class="text-sm px-3 py-1">v{{ APP_VERSION }}</Badge>
+          </div>
+          <h3 class="text-sm text-foreground mb-2">更新明细</h3>
+          <div class="space-y-0">
+            <div v-for="(item, i) in [
+              { version: 'v5.1.1', desc: 'shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计 · 滚轮/下拉修复 · 设置/历史右侧面板' },
+              { version: 'v5.1.0', desc: 'v5 步骤编辑器正式版 · shadcn-vue 组件体系 · 容器模板系统 · 多容器类型' },
+              { version: 'v5.0', desc: '去掉 LiteGraph · 自研步骤编辑器 · Steps→Actions 模型 · Vue Draggable' },
+              { version: 'v2.x', desc: 'Grid 布局 · LiteGraph 画布 · 模板系统 · 浏览器自动化' },
+              { version: 'v1.x', desc: 'YAML 工作流引擎原型 · Web 前端 · Playwright 自动化' },
+            ]" :key="item.version"
+              class="text-xs text-muted-foreground py-1.5"
+              :class="i < 4 ? 'border-b border-border' : ''"
+            >
+              <strong class="text-foreground">{{ item.version }}</strong> — {{ item.desc }}
+            </div>
+          </div>
+        </div>
+      </Card>
 
-      <div class="form-group">
-        <label>日志级别</label>
-        <select v-model="settings.log_level" class="select-field">
-          <option v-for="opt in logLevelOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
+      <!-- Save bar -->
+      <div class="text-right">
+        <Button
+          class="bg-[#238636] hover:bg-[#2ea043] text-white font-semibold"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ saving ? '保存中...' : '💾 保存设置' }}
+        </Button>
       </div>
-
-      <div class="form-group">
-        <label class="toggle">
-          <input type="checkbox" v-model="settings.auto_start" />
-          <span class="toggle-slider"></span>
-          <span class="toggle-label">开机自启</span>
-        </label>
-      </div>
-    </section>
-
-    <!-- 日志管理 -->
-    <section class="settings-section">
-      <h2>📄 日志</h2>
-      <p class="section-desc">查看和清理应用运行日志。</p>
-      <div class="log-actions">
-        <button class="btn-log" @click="openLogDir">
-          📂 查看日志文件
-        </button>
-        <button class="btn-log btn-log-danger" @click="clearLogs">
-          🗑 清空日志
-        </button>
-      </div>
-    </section>
-
-    <!-- 版本信息 -->
-    <section class="settings-section">
-      <h2>📦 版本信息</h2>
-      <p class="section-desc">当前版本及更新记录。</p>
-      <div class="version-info">
-        <span class="version-tag">v{{ APP_VERSION }}</span>
-      </div>
-      <div class="changelog">
-        <h3>更新明细</h3>
-        <div class="changelog-item"><strong>v2.3</strong> — Grid 布局 · MiniMap · 右键菜单 · 画布搜索 · 预览面板 · 交互式元素选择</div>
-        <div class="changelog-item"><strong>v2.2</strong> — 单窗口统一架构 · FloatingPanel · Widget 属性面板 · 浏览器自动化 v2</div>
-        <div class="changelog-item"><strong>v2.1</strong> — LiteGraph 画布迁移 · 叠加层架构 · 统一设计令牌 · 模板系统</div>
-        <div class="changelog-item"><strong>v2.0</strong> — Rust DAG 引擎重写 · Tauri 2.0 桌面应用 · 25+ 节点类型</div>
-        <div class="changelog-item"><strong>v1.x</strong> — YAML 工作流引擎原型 · Web 前端 · Playwright 自动化</div>
-      </div>
-    </section>
-
-    <div class="save-bar">
-      <button class="btn-save" @click="save" :disabled="saving">
-        {{ saving ? '保存中...' : '💾 保存设置' }}
-      </button>
     </div>
   </div>
-</div>
 </template>
-
-<style scoped>
-.settings-page { max-width: 640px; margin: 0 auto; padding: 24px 20px; }
-.page-header { margin-bottom: 24px; }
-.page-header h1 { font-size: 20px; color: #e6edf3; margin: 0 0 4px 0; }
-.back-btn {
-  display: inline-block; padding: 4px 12px; margin-bottom: 8px;
-  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-  color: #8b949e; font-size: 12px; cursor: pointer; transition: all 0.15s;
-}
-.back-btn:hover { background: #30363d; color: #e6edf3; }
-.page-desc { font-size: 13px; color: #8b949e; margin: 0; }
-.loading { text-align: center; padding: 40px; color: #8b949e; }
-.settings-section {
-  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-  padding: 20px; margin-bottom: 16px;
-}
-.settings-section h2 { font-size: 15px; color: #e6edf3; margin: 0 0 6px 0; }
-.section-desc { font-size: 12px; color: #8b949e; margin: 0 0 16px 0; }
-.form-group { margin-bottom: 16px; }
-.form-group > label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600; }
-
-.radio-group { display: flex; flex-direction: column; gap: 8px; }
-.radio-option {
-  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
-  border: 1px solid #30363d; border-radius: 6px; cursor: pointer; transition: all 0.15s;
-}
-.radio-option:hover { border-color: #58a6ff; }
-.radio-option.active { border-color: #58a6ff; background: rgba(88,166,255,0.08); }
-.radio-option input { margin-top: 3px; accent-color: #58a6ff; }
-.radio-content { display: flex; flex-direction: column; gap: 2px; }
-.radio-label { font-size: 13px; color: #e6edf3; font-weight: 600; }
-.radio-desc { font-size: 11px; color: #8b949e; }
-
-.sys-info { margin-top: 16px; padding: 12px; background: #0d1117; border-radius: 6px; }
-.sys-info h3 { font-size: 12px; color: #8b949e; margin: 0 0 10px 0; }
-.info-grid { display: flex; flex-direction: column; gap: 6px; }
-.info-item { display: flex; justify-content: space-between; align-items: center; }
-.info-label { font-size: 12px; color: #e6edf3; }
-.tag-ok { font-size: 11px; color: #3fb950; }
-.tag-miss { font-size: 11px; color: #8b949e; }
-.tag-err { font-size: 11px; color: #f85149; }
-.badge-ready {
-  display: inline-block; padding: 2px 8px; margin-left: 8px;
-  background: #23863622; border: 1px solid #238636; border-radius: 10px;
-  font-size: 11px; color: #3fb950; font-weight: 600;
-}
-.badge-warn {
-  display: inline-block; padding: 2px 8px; margin-left: 8px;
-  background: #d2992222; border: 1px solid #d29922; border-radius: 10px;
-  font-size: 11px; color: #d29922; font-weight: 600;
-}
-.link-hint { font-size: 11px; color: #58a6ff; text-decoration: none; }
-.link-hint:hover { text-decoration: underline; }
-
-.input-field, .select-field {
-  width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d;
-  border-radius: 6px; color: #e6edf3; font-size: 13px; outline: none;
-}
-.input-field:focus, .select-field:focus { border-color: #58a6ff; }
-.field-hint { font-size: 11px; color: #6e7681; margin: 4px 0 0 0; }
-
-.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.toggle input { accent-color: #58a6ff; }
-.toggle-slider { display: none; }
-.toggle-label { font-size: 13px; color: #e6edf3; }
-
-.save-bar { text-align: right; margin-top: 8px; }
-.btn-save {
-  padding: 8px 20px; background: #238636; border: none; border-radius: 6px;
-  color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.btn-save:hover { background: #2ea043; }
-.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.log-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.btn-log {
-  padding: 8px 16px; background: #21262d; border: 1px solid #30363d;
-  border-radius: 6px; color: #e6edf3; font-size: 13px; cursor: pointer;
-  transition: all 0.15s;
-}
-.btn-log:hover { border-color: #58a6ff; background: #1f2a37; }
-.btn-log-danger:hover { border-color: #f85149; background: #2a1215; color: #f85149; }
-
-.version-info { margin-bottom: 16px; }
-.version-tag {
-  display: inline-block; padding: 4px 12px; background: #1f6feb22;
-  border: 1px solid #1f6feb; border-radius: 20px;
-  color: #58a6ff; font-size: 14px; font-weight: 700;
-}
-.changelog h3 { font-size: 13px; color: #e6edf3; margin: 0 0 8px 0; }
-.changelog-item {
-  font-size: 12px; color: #8b949e; padding: 6px 0;
-  border-bottom: 1px solid #21262d;
-}
-.changelog-item:last-child { border-bottom: none; }
-.changelog-item strong { color: #e6edf3; }
-</style>

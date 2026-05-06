@@ -395,11 +395,16 @@ impl ExecutionContext {
         let parts: Vec<&str> = key.split('.').collect();
         let root_key = parts[0];
 
-        let root = if let Some(step_id) = root_key.strip_prefix("step_") {
-            self.step_outputs.get(step_id)
-        } else {
-            self.variables.get(root_key)
-        };
+        // 查找根值：按优先级依次尝试
+        //   1. 完整 key 查 step_outputs（模板引用：{{step_abc123.actionLabel}}）
+        //   2. 完整 key 查 variables（工作流变量：{{myVar.field}}）
+        //   3. strip step_ 前缀查 step_outputs（Rhai 兼容：step_xxx → xxx）
+        let root = self.step_outputs.get(root_key)
+            .or_else(|| self.variables.get(root_key))
+            .or_else(|| {
+                root_key.strip_prefix("step_")
+                    .and_then(|stripped| self.step_outputs.get(stripped))
+            });
 
         let mut current = root?;
         for part in &parts[1..] {

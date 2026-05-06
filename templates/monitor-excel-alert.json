@@ -1,50 +1,75 @@
 {
   "name": "网页监控 → Excel异常报告",
-  "description": "浏览器打开状态页 → 提取内容 → 逻辑判断 → Excel写入报告",
-  "nodes": [
+  "description": "浏览器打开状态页 → 提取标题 → 条件判断 → Excel写入报告",
+  "steps": [
     {
-      "id": "n1",
-      "type": "browser_container",
+      "id": "step1",
+      "type": "browser",
       "label": "状态监控",
-      "position": { "x": 60, "y": 120 },
+      "expanded": true,
       "config": {
         "browser": "chromium",
         "headless": false,
-        "timeout": 30000,
-        "actions": [
-          { "id": "a1", "type": "navigate", "label": "打开监控页", "config": { "url": "file:///templates/data/status-page.html" } },
-          { "id": "a2", "type": "get_title", "label": "获取标题", "config": {} }
-        ]
-      }
+        "timeout": 30000
+      },
+      "actions": [
+        {
+          "id": "a1",
+          "type": "navigate",
+          "params": { "url": "file:///templates/data/status-page.html" }
+        },
+        {
+          "id": "a2",
+          "type": "evaluate",
+          "params": { "script": "return document.title" }
+        }
+      ]
     },
     {
-      "id": "n2",
-      "type": "logic_container",
+      "id": "step2",
+      "type": "logic",
       "label": "包含异常?",
-      "position": { "x": 380, "y": 120 },
+      "expanded": true,
       "config": {
-        "actions": [
-          { "id": "l1", "type": "contains", "label": "包含异常", "config": { "right": "异常" } }
-        ]
-      }
-    },
-    {
-      "id": "n3",
-      "type": "excel_container",
-      "label": "异常报告",
-      "position": { "x": 700, "y": 120 },
-      "config": {
-        "file_path": "templates/data/output/异常报告.xlsx",
-        "sheet": "Sheet1",
-        "actions": [
-          { "id": "e1", "type": "write", "label": "写入异常", "config": { "range": "A1" } }
-        ]
-      }
+        "condition": "{{step1.output}} contains 异常"
+      },
+      "actions": [
+        {
+          "id": "l1",
+          "type": "contains",
+          "params": { "text": "{{step1.output}}", "keyword": "异常" }
+        }
+      ],
+      "thenSteps": [
+        {
+          "id": "step3",
+          "type": "excel",
+          "label": "异常报告",
+          "expanded": true,
+          "config": {
+            "file_path": "templates/data/output/异常报告.xlsx",
+            "sheet": "Sheet1"
+          },
+          "actions": [
+            {
+              "id": "e1",
+              "type": "write_cell",
+              "params": { "ref": "A1", "value": "异常状态报告" }
+            },
+            {
+              "id": "e2",
+              "type": "write_cell",
+              "params": { "ref": "A2", "value": "{{step1.output}}" }
+            },
+            {
+              "id": "e3",
+              "type": "save",
+              "params": { "path": "templates/data/output/异常报告.xlsx" }
+            }
+          ]
+        }
+      ],
+      "elseSteps": []
     }
-  ],
-  "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "a2_out", "targetHandle": "输入" },
-    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "true出口", "targetHandle": "e1_in" },
-    { "id": "e3", "source": "n1", "target": "n3", "sourceHandle": "a2_out", "targetHandle": "e1_in" }
   ]
 }

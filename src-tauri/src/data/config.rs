@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub browser_channel: String,
     /// 浏览器可执行文件路径（留空=自动检测）
     pub browser_executable_path: String,
+    /// 软件工作目录（模板、导出文件等存储位置）
+    pub working_dir: String,
     /// 临时存储（断点等运行时数据，不持久化）
     #[serde(skip)]
     pub temp: std::collections::HashMap<String, serde_json::Value>,
@@ -30,6 +32,7 @@ impl Default for AppConfig {
             python_path: None,
             browser_channel: "auto".to_string(),
             browser_executable_path: String::new(),
+            working_dir: String::new(),
             temp: std::collections::HashMap::new(),
         }
     }

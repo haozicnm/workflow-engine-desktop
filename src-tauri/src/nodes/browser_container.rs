@@ -151,7 +151,7 @@ pub async fn execute_browser_container(
                     .unwrap_or("");
                 // 优先从 input_ports（连线传入）获取值，其次从 config.value
                 let value = input_ports
-                    .get(&format!("{}_in", &action.id))
+                    .get(&format!("{}_in", &action.label))
                     .and_then(|v| v.as_str())
                     .or_else(|| action.config.get("value").and_then(|v| v.as_str()))
                     .unwrap_or("");
@@ -194,7 +194,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(format!("{}_out", &action.id), data);
+                output_ports.insert(action.label.clone(), data);
             }
 
             "screenshot" => {
@@ -215,7 +215,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("screenshot"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(format!("{}_out", &action.id), data);
+                output_ports.insert(action.label.clone(), data);
             }
 
             "evaluate" => {
@@ -236,7 +236,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(format!("{}_out", &action.id), data);
+                output_ports.insert(action.label.clone(), data);
             }
 
             "get_title" => {
@@ -251,7 +251,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::String("".to_string()));
-                output_ports.insert(format!("{}_out", &action.id), title);
+                output_ports.insert(action.label.clone(), title);
             }
 
             _ => {

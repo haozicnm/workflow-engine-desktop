@@ -57,8 +57,7 @@ except ImportError:
     async_playwright = None
 
 # 全局浏览器状态
-_browser = None
-_context = None  # BrowserContext（管理 cookies、headers）
+_context = None  # PersistentContext（launch_persistent_context，管理 cookies/登录态/headers）
 _pages = []      # 所有打开的页面
 _current_page_idx = 0
 _playwright = None
@@ -108,7 +107,7 @@ def _random_ua() -> str:
 
 async def handle_action(action: str, params: dict) -> dict:
     """处理单个浏览器操作"""
-    global _browser, _playwright
+    global _playwright
 
     try:
         match action:
@@ -191,6 +190,13 @@ async def handle_action(action: str, params: dict) -> dict:
             # v1.4 元素选择器
             case "pick":
                 return await _pick(params)
+            # v1.5 连续拾取
+            case "pick_start":
+                return await _pick_start(params)
+            case "pick_next":
+                return await _pick_next()
+            case "pick_stop":
+                return await _pick_stop()
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -198,12 +204,12 @@ async def handle_action(action: str, params: dict) -> dict:
 
 
 async def _launch(params: dict) -> dict:
-    global _browser, _pages, _playwright, _context, _extra_headers
+    global _pages, _playwright, _context, _extra_headers
 
     if async_playwright is None:
         return {"success": False, "error": "Playwright 未安装。请运行: pip install playwright"}
 
-    if _browser is not None:
+    if _context is not None:
         return {"success": True, "data": {"message": "浏览器已在运行"}}
 
     headless = params.get("headless", True)
@@ -232,23 +238,27 @@ async def _launch(params: dict) -> dict:
     if browser_obj is None:
         return {"success": False, "error": f"不支持的浏览器类型: {browser_type}"}
 
-    launch_opts = {"headless": headless}
+
+    # 计算 user_data_dir（持久化登录态/cookies/localStorage）
+    user_data_dir = params.get("user_data_dir")
+    if not user_data_dir:
+        # 默认放在 exe 旁的 browser-data/ 目录
+        import pathlib
+        try:
+            exe_dir = pathlib.Path(__file__).resolve().parent.parent
+            user_data_dir = str(exe_dir / "browser-data")
+        except Exception:
+            user_data_dir = os.path.join(os.path.expanduser("~"), ".workflow-engine", "browser-data")
+    os.makedirs(user_data_dir, exist_ok=True)
+
+    # launch_persistent_context：浏览器+上下文合一，登录态自动持久化
+    context_opts = {"headless": headless}
     if channel:
-        launch_opts["channel"] = channel
+        context_opts["channel"] = channel
     if params.get("executable_path"):
-        launch_opts["executable_path"] = params["executable_path"]
+        context_opts["executable_path"] = params["executable_path"]
     if proxy_opts:
-        launch_opts["proxy"] = proxy_opts
-
-    _browser = await browser_obj.launch(**launch_opts)
-
-    # 创建 BrowserContext（管理 cookies、headers）
-    context_opts = {}
-    # 随机 User-Agent
-    if params.get("random_ua", True):
-        context_opts["user_agent"] = _random_ua()
-    elif params.get("user_agent"):
-        context_opts["user_agent"] = params["user_agent"]
+        context_opts["proxy"] = proxy_opts
 
     # 视口
     viewport = params.get("viewport")
@@ -263,19 +273,20 @@ async def _launch(params: dict) -> dict:
     if extra:
         context_opts["extra_http_headers"] = extra
 
-    _context = await _browser.new_context(**context_opts)
+    _context = await browser_obj.launch_persistent_context(user_data_dir, **context_opts)
 
-    # 设置 cookies
+    # 确保至少有一个页面
+    if not _context.pages:
+        await _context.new_page()
+    _pages = list(_context.pages)
+
+    # 设置 cookies（如果传入了额外的 cookies）
     cookies = params.get("cookies")
     if cookies and isinstance(cookies, list):
         await _context.add_cookies(cookies)
 
-    page = await _context.new_page()
-    _pages = [page]
-    _current_page_idx = 0
-
     used = channel or "playwright-bundled"
-    return {"success": True, "data": {"message": "浏览器已启动", "browser": browser_type, "channel": used}}
+    return {"success": True, "data": {"message": "浏览器已启动", "browser": browser_type, "channel": used, "user_data_dir": user_data_dir}}
 
 
 async def _navigate(params: dict) -> dict:
@@ -449,7 +460,7 @@ async def _check(params: dict) -> dict:
 
 
 async def _close() -> dict:
-    global _browser, _pages, _playwright, _context, _extra_headers
+    global _pages, _playwright, _context, _extra_headers
 
     for p in _pages:
         try:
@@ -461,12 +472,9 @@ async def _close() -> dict:
             await _context.close()
         except:
             pass
-    if _browser:
-        await _browser.close()
     if _playwright:
         await _playwright.stop()
 
-    _browser = None
     _context = None
     _pages = []
     _current_page_idx = 0
@@ -1038,10 +1046,30 @@ async def _pick(params: dict) -> dict:
     """元素选择器：hover 时蓝色高亮，点击返回最佳 CSS 选择器
 
     选择器优先级：id > data-testid/data-id/data-key > 唯一 class > nth-child 路径
+
+    params:
+      url: 可选，先导航到此 URL 再开始选择（避免空白页）
     """
     page = _get_page()
     if page is None:
-        return {"success": False, "error": "浏览器未启动"}
+        # 如果没有页面，先启动浏览器
+        await _launch({"headless": False})
+        page = _get_page()
+        if page is None:
+            return {"success": False, "error": "浏览器未启动"}
+
+    # 如果传了 URL，先导航过去并等待加载完成
+    url = params.get("url")
+    if url:
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # 额外等待网络空闲（最多 5 秒，不阻塞）
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                pass  # networkidle 超时不影响，domcontentloaded 已够用
+        except Exception as e:
+            return {"success": False, "error": f"导航失败: {e}"}
 
     try:
         await page.evaluate("""
@@ -1148,6 +1176,172 @@ async def _pick(params: dict) -> dict:
 
     except Exception as e:
         return {"success": False, "error": f"pick 失败: {e}"}
+
+
+# ─── v1.5 连续拾取 ───
+_pick_session_active = False
+
+async def _inject_picker_js(page) -> None:
+    """注入元素选择器 JS（共享逻辑）"""
+    await page.evaluate("""
+    (() => {
+        if (window.__wfPickActive) {
+            try { window.__wfPickCleanup(); } catch(e) {}
+        }
+        window.__wfPickActive = true;
+        window.__wfPickResult = null;
+
+        const style = document.createElement('style');
+        style.id = '__wf-pick-style';
+        style.textContent = `
+            .wf-pick-hover { outline: 2px solid #58a6ff !important; outline-offset: 1px; }
+            .wf-pick-selected { outline: 2px solid #3fb950 !important; outline-offset: 1px; }
+        `;
+        document.head.appendChild(style);
+
+        let _hovered = null;
+
+        function buildSelector(el) {
+            if (el.id) return '#' + CSS.escape(el.id);
+            const testId = el.getAttribute('data-testid');
+            if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
+            const dataId = el.getAttribute('data-id');
+            if (dataId) return '[data-id="' + CSS.escape(dataId) + '"]';
+            const dataKey = el.getAttribute('data-key');
+            if (dataKey) return '[data-key="' + CSS.escape(dataKey) + '"]';
+            const tag = el.tagName.toLowerCase();
+            if (typeof el.className === 'string' && el.className.trim()) {
+                const classes = el.className.trim().split(/\\s+/);
+                for (const cls of classes) {
+                    if (!cls) continue;
+                    const sel = tag + '.' + CSS.escape(cls);
+                    if (document.querySelectorAll(sel).length === 1) return sel;
+                }
+            }
+            const path = [];
+            let cur = el;
+            while (cur && cur !== document.body && cur !== document.documentElement) {
+                const parent = cur.parentElement;
+                if (!parent) break;
+                const siblings = Array.from(parent.children).filter(c => c.tagName === cur.tagName);
+                if (siblings.length > 1) {
+                    const idx = siblings.indexOf(cur) + 1;
+                    path.unshift(cur.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
+                } else {
+                    path.unshift(cur.tagName.toLowerCase());
+                }
+                cur = parent;
+            }
+            return path.join(' > ');
+        }
+
+        window.__wfPickMouseover = function(e) {
+            if (_hovered) _hovered.classList.remove('wf-pick-hover');
+            _hovered = e.target;
+            _hovered.classList.add('wf-pick-hover');
+        };
+
+        window.__wfPickClick = function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            if (_hovered) _hovered.classList.remove('wf-pick-hover');
+            const sel = buildSelector(e.target);
+            e.target.classList.add('wf-pick-selected');
+            setTimeout(() => e.target.classList.remove('wf-pick-selected'), 600);
+            window.__wfPickResult = sel;
+            // 不调用 cleanup，保持拾取模式
+        };
+
+        window.__wfPickCleanup = function() {
+            document.removeEventListener('mouseover', window.__wfPickMouseover, true);
+            document.removeEventListener('click', window.__wfPickClick, true);
+            const s = document.getElementById('__wf-pick-style');
+            if (s) s.remove();
+            if (_hovered) _hovered.classList.remove('wf-pick-hover');
+            window.__wfPickActive = false;
+            window.__wfPickResult = null;
+        };
+
+        document.addEventListener('mouseover', window.__wfPickMouseover, true);
+        document.addEventListener('click', window.__wfPickClick, true);
+    })()
+    """)
+
+
+async def _pick_start(params: dict) -> dict:
+    """开始连续拾取：打开浏览器 + 注入选择器"""
+    global _pick_session_active
+
+    page = _get_page()
+    if page is None:
+        await _launch({"headless": False})
+        page = _get_page()
+        if page is None:
+            return {"success": False, "error": "浏览器未启动"}
+
+    url = params.get("url")
+    if url:
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                pass
+        except Exception as e:
+            return {"success": False, "error": f"导航失败: {e}"}
+
+    try:
+        await _inject_picker_js(page)
+        _pick_session_active = True
+        return {"success": True, "data": {"message": "连续拾取已开始"}}
+    except Exception as e:
+        return {"success": False, "error": f"pick_start 失败: {e}"}
+
+
+async def _pick_next() -> dict:
+    """等待用户点选下一个元素，返回 selector"""
+    global _pick_session_active
+
+    page = _get_page()
+    if page is None:
+        _pick_session_active = False
+        return {"success": False, "error": "浏览器未启动"}
+
+    if not _pick_session_active:
+        return {"success": False, "error": "未在拾取模式，请先调用 pick_start"}
+
+    try:
+        # 清除上次结果
+        await page.evaluate("window.__wfPickResult = null")
+
+        # 轮询等待点击
+        for _ in range(300):
+            await asyncio.sleep(0.1)
+            result = await page.evaluate("window.__wfPickResult")
+            if result:
+                return {"success": True, "data": {"selector": result}}
+
+        # 超时
+        await _pick_stop()
+        return {"success": False, "error": "拾取超时（30 秒）"}
+    except Exception as e:
+        _pick_session_active = False
+        return {"success": False, "error": f"pick_next 失败: {e}"}
+
+
+async def _pick_stop() -> dict:
+    """结束连续拾取，清理 JS"""
+    global _pick_session_active
+    _pick_session_active = False
+
+    page = _get_page()
+    if page:
+        try:
+            await page.evaluate("window.__wfPickCleanup && window.__wfPickCleanup()")
+        except Exception:
+            pass
+
+    return {"success": True, "data": {"message": "连续拾取已结束"}}
 
 
 # ═══════════════════════════════════════════

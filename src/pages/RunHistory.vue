@@ -1,13 +1,21 @@
 <script setup lang="ts">
-// v4.1: RunHistory — 带日志查看 + 返回按钮
 import { ref, computed, onMounted } from 'vue'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
+import Button from '../components/ui/button/Button.vue'
+import Badge from '../components/ui/badge/Badge.vue'
+import Card from '../components/ui/card/Card.vue'
+import Select from '../components/ui/select/Select.vue'
+import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
+import Tabs from '../components/ui/tabs/Tabs.vue'
+import TabsList from '../components/ui/tabs/TabsList.vue'
+import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
+import TabsContent from '../components/ui/tabs/TabsContent.vue'
+import { cn } from '@/lib/utils'
 
 const toast = useToast()
 const emit = defineEmits<{ 'back': [] }>()
 
-// ─── 筛选 ───
 const filterWorkflowId = ref<string | null>(null)
 
 interface RunHistoryItem {
@@ -114,8 +122,8 @@ async function loadLogs(runId: string) {
   }
 }
 
-function switchTab(tab: 'steps' | 'logs') {
-  detailTab.value = tab
+function onTabChange(tab: string) {
+  detailTab.value = tab as 'steps' | 'logs'
   if (tab === 'logs' && expandedId.value) {
     loadLogs(expandedId.value)
   }
@@ -129,8 +137,10 @@ function clearFilter() {
   filterWorkflowId.value = null
   onFilterChange()
 }
-
-// ─── 工具函数 ───
+const filterOptions = computed(() => [
+  { value: '__all__', label: '全部工作流' },
+  ...workflowList.value.map(wf => ({ value: wf.id, label: wf.name })),
+])
 
 function formatTime(iso: string): string {
   try {
@@ -156,22 +166,21 @@ function calcDuration(started: string, finished: string | null): string {
   }
 }
 
-function statusBadge(status: string): { icon: string; color: string; bg: string } {
+function statusBadge(status: string): { icon: string; variant: 'success' | 'destructive' | 'default' | 'secondary' } {
   switch (status) {
-    case 'completed': return { icon: '✅', color: '#3fb950', bg: '#23863622' }
-    case 'failed': return { icon: '❌', color: '#f85149', bg: '#da363322' }
-    case 'running': return { icon: '⏳', color: '#58a6ff', bg: '#1f6feb22' }
-    case 'pending': return { icon: '⏸', color: '#8b949e', bg: '#21262d' }
-    default: return { icon: '❓', color: '#8b949e', bg: '#21262d' }
+    case 'completed': return { icon: '✅', variant: 'success' }
+    case 'failed': return { icon: '❌', variant: 'destructive' }
+    case 'running': return { icon: '⏳', variant: 'default' }
+    default: return { icon: '⏸', variant: 'secondary' }
   }
 }
 
 function logLevelColor(level: string): string {
   switch (level) {
-    case 'error': return '#f85149'
-    case 'warn': return '#d29922'
-    case 'success': return '#3fb950'
-    default: return '#8b949e'
+    case 'error': return 'text-danger'
+    case 'warn': return 'text-warning'
+    case 'success': return 'text-success'
+    default: return 'text-muted-foreground'
   }
 }
 
@@ -191,214 +200,140 @@ const stats = computed(() => {
 </script>
 
 <template>
-  <div class="run-history">
-    <!-- 顶部 -->
-    <div class="rh-header">
-      <div class="rh-title">
-        <button class="back-btn" @click="emit('back')">← 返回</button>
-        <h2>📊 运行历史</h2>
-        <span class="rh-count" v-if="!loading">{{ runs.length }} 条</span>
+  <div class="h-full overflow-y-auto p-6 space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">← 返回</Button>
+        <h2 class="text-3xl font-bold tracking-tight">📊 运行历史</h2>
+        <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ runs.length }} 条</Badge>
       </div>
-      <div class="rh-actions">
-        <select class="filter-select" v-model="filterWorkflowId" @change="onFilterChange">
-          <option :value="null">全部工作流</option>
-          <option v-for="wf in workflowList" :key="wf.id" :value="wf.id">{{ wf.name }}</option>
-        </select>
-        <button v-if="filterWorkflowId" class="btn btn-xs" @click="clearFilter">✕ 清除筛选</button>
+      <div class="flex items-center gap-2">
+        <Select
+          :model-value="filterWorkflowId ?? '__all__'"
+          @update:model-value="v => { filterWorkflowId = (v === '__all__' ? null : v); onFilterChange() }"
+          :options="filterOptions"
+          placeholder="全部工作流"
+        />
+        <Button v-if="filterWorkflowId" variant="outline" size="sm" class="text-[11px]" @click="clearFilter">✕ 清除筛选</Button>
       </div>
     </div>
 
-    <!-- 统计 -->
-    <div v-if="runs.length > 0" class="stats-bar">
-      <span class="stat-item">共 {{ stats.total }}</span>
-      <span class="stat-item success">✅ {{ stats.completed }}</span>
-      <span class="stat-item danger">❌ {{ stats.failed }}</span>
-      <span v-if="stats.running > 0" class="stat-item info">⏳ {{ stats.running }}</span>
+    <!-- Stats -->
+    <div v-if="runs.length > 0" class="flex gap-4">
+      <span class="text-sm text-muted-foreground">共 {{ stats.total }}</span>
+      <span class="text-sm text-success">✅ {{ stats.completed }}</span>
+      <span class="text-sm text-danger">❌ {{ stats.failed }}</span>
+      <span v-if="stats.running > 0" class="text-sm text-primary">⏳ {{ stats.running }}</span>
     </div>
 
-    <!-- 加载中 -->
-    <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
+    <!-- Loading -->
+    <div v-if="loading" class="flex items-center justify-center gap-2.5 h-[200px] text-muted-foreground">
+      <div class="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
       <span>加载中...</span>
     </div>
 
-    <!-- 空状态 -->
-    <div v-else-if="runs.length === 0" class="empty-state">
-      <div class="empty-icon">📭</div>
-      <div class="empty-text">暂无运行记录</div>
-      <div class="empty-hint">执行工作流后，运行记录会出现在这里</div>
+    <!-- Empty -->
+    <div v-else-if="runs.length === 0" class="flex flex-col items-center justify-center h-[300px] gap-3 text-muted-foreground">
+      <div class="text-5xl">📭</div>
+      <div class="text-base text-foreground">暂无运行记录</div>
+      <div class="text-sm">执行工作流后，运行记录会出现在这里</div>
     </div>
 
-    <!-- 运行列表 -->
-    <div v-else class="run-list">
-      <div
+    <!-- Run list -->
+    <div v-else class="flex flex-col gap-2">
+      <Card
         v-for="run in runs"
         :key="run.id"
-        class="run-card"
-        :class="{ expanded: expandedId === run.id }"
+        :class="cn(
+          'overflow-hidden transition-colors',
+          expandedId === run.id ? 'border-primary/25' : 'hover:border-foreground/20',
+        )"
       >
-        <div class="run-summary" @click="toggleExpand(run.id)">
-          <div class="run-status">
-            <span class="status-badge"
-              :style="{ color: statusBadge(run.status).color, background: statusBadge(run.status).bg }"
-            >{{ statusBadge(run.status).icon }} {{ run.status }}</span>
+        <div
+          class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-secondary"
+          @click="toggleExpand(run.id)"
+        >
+          <div class="shrink-0">
+            <Badge :variant="statusBadge(run.status).variant" class="text-xs whitespace-nowrap">
+              {{ statusBadge(run.status).icon }} {{ run.status }}
+            </Badge>
           </div>
-          <div class="run-info">
-            <div class="run-wf-name">{{ run.workflow_name }}</div>
-            <div class="run-meta">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-foreground">{{ run.workflow_name }}</div>
+            <div class="flex gap-4 mt-1 text-xs text-muted-foreground">
               <span>🕐 {{ formatTime(run.started_at) }}</span>
               <span>⏱ {{ calcDuration(run.started_at, run.finished_at) }}</span>
             </div>
           </div>
-          <div class="run-expand">
-            <span class="expand-arrow" :class="{ open: expandedId === run.id }">▸</span>
+          <div class="shrink-0">
+            <span :class="cn('text-sm text-muted-foreground/50 transition-transform inline-block', expandedId === run.id ? 'rotate-90' : '')">▸</span>
           </div>
         </div>
 
-        <div v-if="run.error" class="run-error-bar">❌ {{ run.error }}</div>
+        <div v-if="run.error" class="px-4 py-2 bg-destructive/5 text-destructive text-xs font-mono border-t border-destructive/20">
+          ❌ {{ run.error }}
+        </div>
 
-        <!-- 展开详情 -->
-        <div v-if="expandedId === run.id" class="run-detail">
-          <div v-if="loadingDetail === run.id" class="detail-loading">
-            <div class="spinner small"></div> 加载步骤详情...
+        <!-- Expanded detail -->
+        <div v-if="expandedId === run.id" class="border-t border-border">
+          <div v-if="loadingDetail === run.id" class="flex items-center gap-2 px-4 py-4 text-muted-foreground text-sm">
+            <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+            加载步骤详情...
           </div>
-          <div v-else-if="detailCache[run.id]" class="detail-content">
-            <!-- Tab 切换: 步骤 / 日志 -->
-            <div class="detail-tabs">
-              <button class="tab-btn" :class="{ active: detailTab === 'steps' }" @click="switchTab('steps')">
-                📋 步骤 ({{ detailCache[run.id].steps.length }})
-              </button>
-              <button class="tab-btn" :class="{ active: detailTab === 'logs' }" @click="switchTab('logs')">
-                📟 日志{{ logCache[run.id] ? ' (' + logCache[run.id].length + ')' : '' }}
-              </button>
-            </div>
+          <div v-else-if="detailCache[run.id]" class="px-4 pb-4">
+            <!-- Tabs -->
+            <Tabs :model-value="detailTab" @update:model-value="onTabChange" class="mt-3">
+              <TabsList>
+                <TabsTrigger value="steps">📋 步骤 ({{ detailCache[run.id].steps.length }})</TabsTrigger>
+                <TabsTrigger value="logs">📟 日志{{ logCache[run.id] ? ' (' + logCache[run.id].length + ')' : '' }}</TabsTrigger>
+              </TabsList>
 
-            <!-- 步骤列表 -->
-            <div v-if="detailTab === 'steps'" class="step-list">
-              <div v-for="(step, idx) in detailCache[run.id].steps" :key="step.id"
-                class="step-row" :class="'status-' + step.status">
-                <div class="step-idx">{{ idx + 1 }}</div>
-                <div class="step-icon">{{ statusBadge(step.status).icon }}</div>
-                <div class="step-name">{{ step.step_id }}</div>
-                <div class="step-duration">{{ calcDuration(step.started_at, step.finished_at) }}</div>
-                <div v-if="step.error" class="step-error">{{ step.error }}</div>
-                <div v-if="step.output" class="step-output"><pre>{{ formatOutput(step.output) }}</pre></div>
-              </div>
-              <div v-if="detailCache[run.id].steps.length === 0" class="no-steps">暂无步骤记录</div>
-            </div>
+              <TabsContent value="steps">
+                <div
+                  v-for="(step, idx) in detailCache[run.id].steps"
+                  :key="step.id"
+                  :class="cn(
+                    'grid items-center gap-2 px-2.5 py-2 rounded-md mb-1 hover:bg-secondary',
+                    step.status === 'running' && 'border-l-2 border-primary',
+                    step.status === 'completed' && 'border-l-2 border-[#238636]',
+                    step.status === 'failed' && 'border-l-2 border-danger',
+                  )"
+                  style="grid-template-columns: 28px 22px 1fr auto;"
+                >
+                  <div class="text-[11px] text-muted-foreground/50 text-center">{{ idx + 1 }}</div>
+                  <div class="text-sm">{{ statusBadge(step.status).icon }}</div>
+                  <div class="text-sm text-foreground font-mono">{{ step.step_id }}</div>
+                  <div class="text-[11px] text-muted-foreground">{{ calcDuration(step.started_at, step.finished_at) }}</div>
+                  <div v-if="step.error" class="col-start-2 col-end-[-1] text-[11px] text-destructive font-mono">{{ step.error }}</div>
+                  <div v-if="step.output" class="col-start-2 col-end-[-1] mt-1">
+                    <pre class="text-[11px] text-muted-foreground bg-background p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
+                  </div>
+                </div>
+                <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">暂无步骤记录</div>
+              </TabsContent>
 
-            <!-- 日志列表 -->
-            <div v-else class="log-list">
-              <div v-if="!logCache[run.id]" class="detail-loading">
-                <div class="spinner small"></div> 加载日志...
-              </div>
-              <div v-else-if="logCache[run.id].length === 0" class="no-steps">暂无执行日志</div>
-              <div v-else v-for="log in logCache[run.id]" :key="log.id" class="log-line"
-                :style="{ color: logLevelColor(log.level) }">
-                <span class="log-time">{{ formatTime(log.timestamp) }}</span>
-                <span class="log-msg">{{ log.message }}</span>
-              </div>
-            </div>
+              <!-- Logs list -->
+              <TabsContent value="logs" class="max-h-[400px] overflow-y-auto">
+                <div v-if="!logCache[run.id]" class="flex items-center gap-2 px-2 py-4 text-muted-foreground text-sm">
+                  <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+                  加载日志...
+                </div>
+                <div v-else-if="logCache[run.id].length === 0" class="text-center text-muted-foreground/50 text-sm py-3">暂无执行日志</div>
+                <div
+                  v-else
+                  v-for="log in logCache[run.id]"
+                  :key="log.id"
+                  :class="cn('flex gap-2.5 px-2 py-0.5 text-xs font-mono rounded-sm hover:bg-secondary transition-colors', logLevelColor(log.level))"
+                >
+                  <span class="text-muted-foreground/50 whitespace-nowrap shrink-0">{{ formatTime(log.timestamp) }}</span>
+                  <span class="break-all">{{ log.message }}</span>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   </div>
 </template>
-
-<style scoped>
-.run-history { padding: 24px; height: 100%; overflow-y: auto; }
-
-.back-btn {
-  background: none; border: 1px solid #30363d; color: #8b949e;
-  padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
-  transition: all 0.15s;
-}
-.back-btn:hover { color: #e1e4e8; border-color: #58a6ff; }
-
-.rh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
-.rh-title { display: flex; align-items: center; gap: 12px; }
-.rh-title h2 { margin: 0; font-size: 20px; color: #e1e4e8; }
-.rh-count { font-size: 12px; color: #6e7681; background: #21262d; padding: 2px 8px; border-radius: 10px; }
-.rh-actions { display: flex; align-items: center; gap: 8px; }
-
-.filter-select {
-  background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
-  padding: 5px 10px; border-radius: 6px; font-size: 13px; cursor: pointer;
-}
-.filter-select:focus { outline: none; border-color: #58a6ff; }
-
-.stats-bar { display: flex; gap: 16px; margin-bottom: 16px; }
-.stat-item { font-size: 13px; color: #8b949e; }
-.stat-item.success { color: #3fb950; }
-.stat-item.danger { color: #f85149; }
-.stat-item.info { color: #58a6ff; }
-
-.loading-state { display: flex; align-items: center; justify-content: center; gap: 10px; height: 200px; color: #8b949e; }
-.spinner { width: 20px; height: 20px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-.spinner.small { width: 14px; height: 14px; border-width: 1.5px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; gap: 12px; color: #6e7681; }
-.empty-icon { font-size: 48px; }
-.empty-text { font-size: 16px; color: #8b949e; }
-.empty-hint { font-size: 13px; }
-
-.run-list { display: flex; flex-direction: column; gap: 8px; }
-.run-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
-.run-card:hover { border-color: #484f58; }
-.run-card.expanded { border-color: #58a6ff44; }
-
-.run-summary { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
-.run-summary:hover { background: #1c2128; }
-.run-status { flex-shrink: 0; }
-.status-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; white-space: nowrap; }
-.run-info { flex: 1; min-width: 0; }
-.run-wf-name { font-size: 14px; font-weight: 600; color: #e1e4e8; }
-.run-meta { display: flex; gap: 16px; margin-top: 4px; font-size: 12px; color: #6e7681; }
-.run-expand { flex-shrink: 0; }
-.expand-arrow { font-size: 14px; color: #484f58; transition: transform 0.2s; display: inline-block; }
-.expand-arrow.open { transform: rotate(90deg); }
-
-.run-error-bar { padding: 8px 16px; background: #da363315; color: #f85149; font-size: 12px; border-top: 1px solid #da363333; font-family: monospace; }
-
-.run-detail { border-top: 1px solid #21262d; }
-.detail-loading { display: flex; align-items: center; gap: 8px; padding: 16px; color: #8b949e; font-size: 13px; }
-.detail-content { padding: 0 16px 16px; }
-
-.detail-tabs { display: flex; gap: 0; margin: 12px 0; border-bottom: 1px solid #21262d; }
-.tab-btn {
-  padding: 6px 16px; font-size: 13px; cursor: pointer;
-  background: none; border: none; color: #6e7681;
-  border-bottom: 2px solid transparent; transition: all 0.15s;
-}
-.tab-btn:hover { color: #c9d1d9; }
-.tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
-
-.step-list { padding: 8px 0; }
-.step-row { display: grid; grid-template-columns: 28px 22px 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; }
-.step-row:hover { background: #1c2128; }
-.step-row.status-running { border-left: 2px solid #58a6ff; }
-.step-row.status-completed { border-left: 2px solid #238636; }
-.step-row.status-failed { border-left: 2px solid #da3633; }
-.step-idx { font-size: 11px; color: #484f58; text-align: center; }
-.step-icon { font-size: 13px; }
-.step-name { font-size: 13px; color: #c9d1d9; font-family: monospace; }
-.step-duration { font-size: 11px; color: #6e7681; }
-.step-error { grid-column: 2 / -1; font-size: 11px; color: #f85149; font-family: monospace; }
-.step-output { grid-column: 2 / -1; margin-top: 4px; }
-.step-output pre { font-size: 11px; color: #8b949e; background: #0d1117; padding: 6px 8px; border-radius: 4px; margin: 0; overflow-x: auto; font-family: monospace; max-height: 120px; overflow-y: auto; }
-
-.log-list { padding: 8px 0; max-height: 400px; overflow-y: auto; }
-.log-line { display: flex; gap: 10px; padding: 3px 8px; font-size: 12px; font-family: monospace; border-radius: 3px; }
-.log-line:hover { background: #1c2128; }
-.log-time { color: #484f58; white-space: nowrap; flex-shrink: 0; }
-.log-msg { word-break: break-all; }
-
-.no-steps { text-align: center; color: #484f58; font-size: 13px; padding: 12px; }
-
-.btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; transition: all 0.15s; }
-.btn:hover { background: #30363d; }
-.btn-sm { padding: 5px 12px; font-size: 12px; }
-.btn-xs { padding: 3px 8px; font-size: 11px; }
-</style>

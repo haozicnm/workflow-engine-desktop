@@ -30,18 +30,42 @@ impl NodeExecutor for ConditionNode {
         // 上游注入的原始值（将透传到输出）
         let original_value = config.get("value").cloned().unwrap_or(serde_json::Value::Null);
 
-        // ── 新格式：actions 数组 ──
-        if let Some(actions) = config.get("actions").and_then(|v| v.as_array()) {
-            if actions.is_empty() {
-                // 没有判断动作 → 默认走 true
+        // ── 新格式：conditionGroup（可视化条件构建器） ──
+        if let Some(ref group) = step.condition_group {
+            if !group.conditions.is_empty() {
+                let results: Vec<bool> = group.conditions.iter().map(|cond| {
+                    let left = ctx.resolve_config(&serde_json::json!(cond.left));
+                    let right = ctx.resolve_config(&serde_json::json!(cond.right));
+                    eval_condition(&left, &cond.op, &right)
+                }).collect();
+
+                let pass = if group.combinator == "or" {
+                    results.iter().any(|&r| r)
+                } else {
+                    results.iter().all(|&r| r)
+                };
+
+                info!(
+                    "[逻辑判断] conditionGroup combinator={} conditions={} → {}",
+                    group.combinator, results.len(), if pass { "✓ true" } else { "✗ false" }
+                );
+
+                let branch_str = if pass { "true" } else { "false" };
+                let output_value = resolve_output_template(&step.config, &original_value, branch_str, pass, ctx);
                 return Ok(serde_json::json!({
-                    "branch": "true",
-                    "value": original_value,
+                    "branch": branch_str,
+                    "value": output_value,
+                    "result": pass,
                 }));
             }
+        }
 
+        // ── actions 数组（从 step.actions 读取） ──
+        let step_actions = step.actions.as_deref().unwrap_or(&[]);
+        if !step_actions.is_empty() {
+            let resolved_left = ctx.resolve_config(&original_value);
             let mut all_pass = true;
-            for (i, action) in actions.iter().enumerate() {
+            for (i, action) in step_actions.iter().enumerate() {
                 let op = action.get("type")
                     .or_else(|| action.get("op"))
                     .and_then(|v| v.as_str())
@@ -51,10 +75,10 @@ impl NodeExecutor for ConditionNode {
                     .and_then(|c| c.get("right"))
                     .unwrap_or(&serde_json::Value::Null);
 
-                let pass = eval_condition(&original_value, op, right);
+                let pass = eval_condition(&resolved_left, op, right);
                 info!(
                     "[逻辑判断] action[{}] op={} left={} right={} → {}",
-                    i, op, original_value, right, if pass { "✓" } else { "✗" }
+                    i, op, resolved_left, right, if pass { "✓" } else { "✗" }
                 );
 
                 if !pass {
@@ -63,18 +87,16 @@ impl NodeExecutor for ConditionNode {
                 }
             }
 
-            if all_pass {
-                return Ok(serde_json::json!({
-                    "branch": "true",
-                    "value": original_value,
-                }));
-            } else {
+            let branch_str = if all_pass { "true" } else { "false" };
+            if !all_pass {
                 info!("[逻辑判断] 条件不通过，走 false 出口");
-                return Ok(serde_json::json!({
-                    "branch": "false",
-                    "value": original_value,
-                }));
             }
+            let output_value = resolve_output_template(&step.config, &original_value, branch_str, all_pass, ctx);
+            return Ok(serde_json::json!({
+                "branch": branch_str,
+                "value": output_value,
+                "result": all_pass,
+            }));
         }
 
         // ── 旧格式兼容：left/op/right（声明式） ──
@@ -106,16 +128,46 @@ impl NodeExecutor for ConditionNode {
     }
 }
 
+/// 解析 output_template：如果有 output_template 配置则渲染模板，否则返回原始值
+fn resolve_output_template(
+    config: &serde_json::Value,
+    original_value: &serde_json::Value,
+    branch: &str,
+    result: bool,
+    ctx: &ExecutionContext,
+) -> serde_json::Value {
+    if let Some(template) = config.get("output_template").and_then(|v| v.as_str()) {
+        if !template.is_empty() {
+            // 构建模板变量上下文
+            let mut template_ctx = serde_json::json!({
+                "left": original_value,
+                "branch": branch,
+                "result": result,
+            });
+            // 注入 right 值（如果存在）
+            if let Some(right) = config.get("right") {
+                if let Some(obj) = template_ctx.as_object_mut() {
+                    obj.insert("right".to_string(), right.clone());
+                }
+            }
+            // 尝试用 ctx 的变量解析模板
+            let resolved = ctx.resolve_config(&serde_json::json!(template));
+            return resolved;
+        }
+    }
+    original_value.clone()
+}
+
 // ─── 条件求值 ───
 
 fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_json::Value) -> bool {
     match op {
         "==" | "equals" => left == right,
         "!=" | "not_equals" => left != right,
-        ">" | "gt" => compare_values(left, right) > 0,
-        "<" | "lt" => compare_values(left, right) < 0,
-        ">=" | "gte" => compare_values(left, right) >= 0,
-        "<=" | "lte" => compare_values(left, right) <= 0,
+        ">" | "gt" | "greater_than" => compare_values(left, right) > 0,
+        "<" | "lt" | "less_than" => compare_values(left, right) < 0,
+        ">=" | "gte" | "greater_equal" => compare_values(left, right) >= 0,
+        "<=" | "lte" | "less_equal" => compare_values(left, right) <= 0,
         "contains" => match (left, right) {
             (serde_json::Value::String(l), serde_json::Value::String(r)) => l.contains(r.as_str()),
             (serde_json::Value::Array(arr), _) => arr.iter().any(|v| v == right),
@@ -126,11 +178,11 @@ fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_json::Value)
             (serde_json::Value::Array(arr), _) => arr.iter().any(|v| v == right),
             _ => false,
         },
-        "starts_with" => match (left, right) {
+        "starts_with" | "start_with" => match (left, right) {
             (serde_json::Value::String(l), serde_json::Value::String(r)) => l.starts_with(r.as_str()),
             _ => false,
         },
-        "ends_with" => match (left, right) {
+        "ends_with" | "end_with" => match (left, right) {
             (serde_json::Value::String(l), serde_json::Value::String(r)) => l.ends_with(r.as_str()),
             _ => false,
         },

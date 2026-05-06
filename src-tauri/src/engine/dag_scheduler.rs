@@ -82,7 +82,8 @@ pub async fn run_dag(
     };
 
     let mut step_index = 0;
-    let mut skipped_nodes: HashSet<String> = HashSet::new();
+    let skipped_nodes: HashSet<String> = HashSet::new();
+
     while step_index < total_steps {
         // ── 检查取消 ──
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
@@ -200,6 +201,28 @@ pub async fn run_dag(
         // ── 单步：顺序执行 ──
         let exec_step = &plan.ordered_steps[step_index];
         let step = &exec_step.step;
+
+        // 条件执行：检查 run_condition
+        if let Some(ref cond) = step.run_condition {
+            if cond.is_merge() {
+                // merge 模式：等待所有分支完成后执行一次
+                // 当前线性模型下等价于 both（总是执行），后续 DAG 并行分支时会做真正的 merge 等待
+                info!("[DAG] merge 模式，执行: {} (引用: {})", step.name, cond.ref_step);
+            } else {
+                let logic_output = ctx.step_outputs.get(&cond.ref_step);
+                let branch = logic_output
+                    .and_then(|o| o.get("branch"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("true");
+                if !cond.should_run(branch) {
+                    info!("[DAG] 条件不满足 ({}={})，跳过: {}", cond.ref_step, branch, step.name);
+                    state.mark_step_completed(&step.id);
+                    emit_step_update(app_handle, run_id, &step.id, &step.name, total_steps, "skipped", None);
+                    step_index += 1;
+                    continue;
+                }
+            }
+        }
 
         // 逻辑判断排除：跳过被分叉路由排除的节点
         if skipped_nodes.contains(&exec_step.node_id) {
@@ -326,27 +349,10 @@ pub async fn run_dag(
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
                 emit_variable_snapshot(app_handle, run_id, &ctx);
 
-                // 逻辑判断容器：输出为 Null → 条件不通过，跳过所有下游
-                if step.step_type == "logic_container" && output.is_null() {
-                    info!("[DAG] 逻辑判断 {} 条件不通过，跳过所有下游", exec_step.node_id);
-                    let mut queue: Vec<String> = Vec::new();
-                    // 收集直接下游
-                    for edge in &plan.edges {
-                        if edge.source == exec_step.node_id {
-                            queue.push(edge.target.clone());
-                        }
-                    }
-                    // BFS 跳过所有下游节点
-                    while let Some(node) = queue.pop() {
-                        if skipped_nodes.insert(node.clone()) {
-                            info!("[DAG] 跳过节点: {}", node);
-                            for edge in &plan.edges {
-                                if edge.source == node && !skipped_nodes.contains(&edge.target) {
-                                    queue.push(edge.target.clone());
-                                }
-                            }
-                        }
-                    }
+                // 逻辑判断容器：记录 branch 结果到日志
+                if step.step_type == "logic_container" {
+                    let branch = output.get("branch").and_then(|v| v.as_str()).unwrap_or("true");
+                    info!("[DAG] 逻辑判断 {} → branch={}", exec_step.node_id, branch);
                 }
 
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {

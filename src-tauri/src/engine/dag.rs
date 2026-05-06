@@ -273,6 +273,13 @@ fn flow_node_to_step(node: &FlowNode) -> Step {
         breakpoint: node.breakpoint,
         delay: node.delay,
         on_error: node.on_error.clone(),
+        actions: None,
+        expanded: None,
+        condition: None,
+        condition_group: None,
+        then_steps: None,
+        else_steps: None,
+        run_condition: None,
     }
 }
 
@@ -421,6 +428,13 @@ impl DAGWorkflow {
                         breakpoint: false,
                         delay: None,
                         on_error: None,
+                        actions: None,
+                        expanded: None,
+                        condition: None,
+                        condition_group: None,
+                        then_steps: None,
+                        else_steps: None,
+                        run_condition: None,
                     },
                     dependencies: deps,
                 }

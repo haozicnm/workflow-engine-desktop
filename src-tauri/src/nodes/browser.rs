@@ -178,6 +178,17 @@ impl BrowserSidecar {
     }
 }
 
+impl Drop for BrowserSidecar {
+    fn drop(&mut self) {
+        // 应用退出时强制 kill Python 子进程，防止孤儿进程残留
+        if let Ok(mut guard) = self.child.try_lock() {
+            if let Some(ref mut child) = *guard {
+                let _ = child.start_kill();
+            }
+        }
+    }
+}
+
 /// 查找 sidecar 脚本路径
 fn find_sidecar_script() -> Result<std::path::PathBuf> {
     // 1. 相对于可执行文件

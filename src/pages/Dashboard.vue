@@ -2,6 +2,20 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
+import SchedulePanel from '../components/SchedulePanel.vue'
+import Button from '../components/ui/button/Button.vue'
+import Input from '../components/ui/input/Input.vue'
+import Badge from '../components/ui/badge/Badge.vue'
+import { inject, type Ref } from 'vue'
+import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
+import SidebarHeader from '../components/ui/sidebar/SidebarHeader.vue'
+import SidebarContent from '../components/ui/sidebar/SidebarContent.vue'
+import SidebarFooter from '../components/ui/sidebar/SidebarFooter.vue'
+import SidebarGroup from '../components/ui/sidebar/SidebarGroup.vue'
+import SidebarGroupLabel from '../components/ui/sidebar/SidebarGroupLabel.vue'
+import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
+import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
+import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 
 interface WorkflowItem {
   id: string
@@ -12,10 +26,15 @@ interface WorkflowItem {
   updated_at: string
 }
 
+const props = defineProps<{
+  selectedId: string | null
+}>()
+
 const emit = defineEmits<{
   'open-workflow': [id?: string]
   'open-settings': []
   'open-history': []
+  'workflow-created': [id: string]
 }>()
 
 const toast = useToast()
@@ -23,8 +42,12 @@ const workflows = ref<WorkflowItem[]>([])
 const loading = ref(false)
 const deletingId = ref<string | null>(null)
 const exportingId = ref<string | null>(null)
+const cloningId = ref<string | null>(null)
+const scheduleWorkflowId = ref<string | null>(null)
+const scheduleWorkflowName = ref('')
 
-// ─── 搜索 ───
+const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
+
 const searchQuery = ref('')
 
 const filteredWorkflows = computed(() => {
@@ -59,14 +82,80 @@ async function loadList() {
   } finally { loading.value = false }
 }
 
-// ─── 操作 ───
-
-function onEdit(item: WorkflowItem) {
+function selectWorkflow(item: WorkflowItem) {
   emit('open-workflow', item.id)
 }
 
 function onNewWorkflow() {
   emit('open-workflow', undefined)
+}
+
+async function onImportFile() {
+  try {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,.yaml,.yml'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const content = await file.text()
+      await importFromContent(content)
+    }
+    input.click()
+  } catch (e: unknown) {
+    toast.error('导入失败: ' + ((e as Error).message || e))
+  }
+}
+
+async function importFromContent(content: string) {
+  try {
+    let name = '导入的工作流'
+    try {
+      const parsed = JSON.parse(content)
+      if (parsed.name) name = parsed.name
+    } catch {
+      try {
+        const result = await safeInvoke<{ name?: string; step_count?: number }>('workflow_validate', { yaml: content })
+        if (result) {
+          const id = await safeInvoke<string>('workflow_create', { name: result.name || name, description: '' })
+          if (id) {
+            await safeInvoke('workflow_save_yaml', { id, yaml: content })
+            toast.success(`已导入「${result.name}」（${result.step_count} 步）`)
+            await loadList()
+            emit('workflow-created', id)
+            return
+          }
+        }
+      } catch { /* fall through */ }
+      toast.error('无法识别文件格式，请使用 JSON 或 YAML')
+      return
+    }
+    const id = await safeInvoke<string>('workflow_create', { name, description: '' })
+    if (id) {
+      await safeInvoke('workflow_save_yaml', { id, yaml: content })
+      toast.success(`已导入「${name}」`)
+      await loadList()
+      emit('workflow-created', id)
+    }
+  } catch (e: unknown) {
+    toast.error('导入失败: ' + ((e as Error).message || e))
+  }
+}
+
+async function onExportYaml(item: WorkflowItem) {
+  try {
+    const wf = await safeInvoke<{ yaml: string | null }>('workflow_get', { id: item.id })
+    if (wf?.yaml) {
+      const blob = new Blob([wf.yaml], { type: 'text/yaml' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = item.name + '.yaml'; a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`已导出「${item.name}」为 YAML`)
+    }
+  } catch (e: unknown) {
+    toast.error('导出失败: ' + ((e as Error).message || e))
+  }
 }
 
 async function onRun(item: WorkflowItem) {
@@ -107,9 +196,20 @@ async function onExport(item: WorkflowItem) {
   } finally { exportingId.value = null }
 }
 
-function formatDate(d: string) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('zh-CN')
+async function onClone(item: WorkflowItem) {
+  cloningId.value = item.id
+  try {
+    const wf = await safeInvoke<{ yaml: string | null; name: string }>('workflow_get', { id: item.id })
+    if (!wf?.yaml) { toast.error('获取工作流内容失败'); return }
+    const newId = await safeInvoke<string>('workflow_create', { name: wf.name + ' (副本)', description: '' })
+    if (!newId) { toast.error('创建工作流失败'); return }
+    await safeInvoke('workflow_save_yaml', { id: newId, yaml: wf.yaml })
+    toast.success(`已复制「${item.name}」`)
+    await loadList()
+    emit('workflow-created', newId)
+  } catch (e: unknown) {
+    toast.error('复制失败: ' + ((e as Error).message || e))
+  } finally { cloningId.value = null }
 }
 
 function onSettings() {
@@ -119,228 +219,85 @@ function onSettings() {
 function onHistory() {
   emit('open-history')
 }
+
+defineExpose({ loadList })
 </script>
 
 <template>
-  <div class="dashboard-v4">
-    <!-- 顶栏 -->
-    <div class="dash-topbar">
-      <div class="dash-brand">
-        <span class="dash-logo">WorkFlow</span>
-      </div>
-      <div class="dash-search-wrap">
-        <input
-          type="text"
-          v-model="searchQuery"
-          placeholder="搜索工作流..."
-          class="dash-search-input"
-        />
-      </div>
-      <div class="dash-top-actions">
-        <button class="dash-btn dash-btn-ghost" @click="onHistory">📋 历史</button>
-        <button class="dash-btn dash-btn-ghost" @click="onSettings">⚙️ 设置</button>
-        <button class="dash-btn dash-btn-primary" @click="onNewWorkflow">＋ 新建</button>
-      </div>
+  <SidebarHeader>
+    <div class="flex items-center" :class="sidebar?.open.value ? 'justify-between' : 'justify-center'">
+      <span v-if="sidebar?.open.value" class="text-xl font-bold tracking-tight text-primary">WorkFlow</span>
+      <SidebarTrigger />
     </div>
+    <!-- Search -->
+    <Input
+      v-if="sidebar?.open.value"
+      v-model="searchQuery"
+      placeholder="搜索工作流..."
+      class="h-8 text-xs"
+    />
+    <Button v-if="sidebar?.open.value" size="sm" class="bg-primary text-primary-foreground w-full" @click="onNewWorkflow">
+      ＋ 新建
+    </Button>
+  </SidebarHeader>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="dash-loading">加载中...</div>
-
-    <!-- 空状态 -->
-    <div v-else-if="filteredWorkflows.length === 0" class="dash-empty">
-      <p v-if="searchQuery">未找到匹配的工作流</p>
-      <p v-else>还没有工作流，点击「＋ 新建」创建</p>
-    </div>
-
-    <!-- 卡片列表 -->
-    <div v-else class="dash-cards">
-      <div
-        v-for="item in filteredWorkflows"
-        :key="item.id"
-        class="dash-card"
-      >
-        <div class="card-header">
-          <span class="card-name">{{ item.name }}</span>
-        </div>
-        <div class="card-desc" v-if="item.description">{{ item.description }}</div>
-        <div class="card-meta">
-          <span>{{ formatDate(item.updated_at) }}</span>
-          <span :class="item.enabled ? 'status-on' : 'status-off'">
-            {{ item.enabled ? '启用' : '禁用' }}
+  <SidebarContent>
+    <SidebarGroup>
+      <SidebarGroupLabel label="工作流" />
+      <SidebarMenuItem v-for="wf in filteredWorkflows" :key="wf.id">
+        <SidebarMenuButton
+          :active="selectedId === wf.id"
+          :tooltip="wf.name"
+          @click.stop="selectWorkflow(wf)"
+        >
+          <template #icon>
+            <span class="flex items-center justify-center w-5 h-5 rounded bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+              {{ wf.name.charAt(0) }}
+            </span>
+          </template>
+          <span class="truncate text-sm text-foreground">
+            {{ wf.name }}
           </span>
-        </div>
-        <div class="card-actions">
-          <button class="card-btn" @click="onRun(item)" title="运行">▶ 运行</button>
-          <button class="card-btn" @click="onEdit(item)" title="编辑">✏️ 编辑</button>
-          <button class="card-btn" @click="onExport(item)" :disabled="exportingId === item.id" title="导出">
-            💾 {{ exportingId === item.id ? '导出中...' : '导出' }}
-          </button>
-          <button class="card-btn card-btn-danger" @click="onDelete(item)" :disabled="deletingId === item.id" title="删除">
-            🗑 {{ deletingId === item.id ? '删除中...' : '删除' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarGroup>
+  </SidebarContent>
+
+  <SidebarFooter>
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip="设置" @click="onSettings">
+        <template #icon>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </template>
+        设置
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip="历史" @click="onHistory">
+        <template #icon>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M12 7v5l4 2" />
+          </svg>
+        </template>
+        历史
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip="导入" @click="onImportFile">
+        <template #icon>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </template>
+        导入
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  </SidebarFooter>
 </template>
-
-<style scoped>
-.dashboard-v4 {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #0d1117;
-}
-
-/* ─── 顶栏 ─── */
-.dash-topbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  flex-shrink: 0;
-}
-.dash-brand {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.dash-logo {
-  font-size: 18px;
-  font-weight: 700;
-  color: #58a6ff;
-  letter-spacing: -0.5px;
-}
-.dash-search-wrap {
-  flex: 1;
-  max-width: 400px;
-}
-.dash-search-input {
-  width: 100%;
-  padding: 6px 12px;
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  color: #e6edf3;
-  font-size: 13px;
-  outline: none;
-}
-.dash-search-input:focus {
-  border-color: #58a6ff;
-}
-.dash-search-input::placeholder {
-  color: #484f58;
-}
-.dash-top-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-/* ─── 按钮 ─── */
-.dash-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.dash-btn-primary {
-  background: #1f6feb;
-  color: #fff;
-  border-color: #388bfd;
-}
-.dash-btn-primary:hover {
-  background: #388bfd;
-}
-.dash-btn-ghost {
-  background: transparent;
-  color: #8b949e;
-  border-color: #30363d;
-}
-.dash-btn-ghost:hover {
-  background: #21262d;
-  color: #e6edf3;
-}
-
-/* ─── 状态 ─── */
-.dash-loading, .dash-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8b949e;
-  font-size: 14px;
-}
-
-/* ─── 卡片列表 ─── */
-.dash-cards {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.dash-card {
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 8px;
-  padding: 14px 18px;
-  transition: border-color 0.15s;
-}
-.dash-card:hover {
-  border-color: #30363d;
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.card-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #e6edf3;
-}
-.card-desc {
-  font-size: 12px;
-  color: #8b949e;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-.card-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: #484f58;
-  margin-bottom: 8px;
-}
-.status-on { color: #3fb950; }
-.status-off { color: #f85149; }
-
-/* ─── 卡片操作按钮 ─── */
-.card-actions {
-  display: flex;
-  gap: 6px;
-}
-.card-btn {
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid #30363d;
-  background: #21262d;
-  color: #c9d1d9;
-  transition: all 0.12s;
-}
-.card-btn:hover:not(:disabled) {
-  background: #30363d;
-}
-</style>

@@ -1,199 +1,104 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useGlobalStatus } from '../composables/useGlobalStatus'
 
-interface ActiveRun {
-  runId: string
-  workflowName: string
-  currentStep: string | null
-  currentStepName: string | null
-  totalSteps: number
-  stepCount: number
-  startedAt: number
+const { state } = useGlobalStatus()
+
+// Force reactivity tick every second for elapsed time
+const now = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { tickTimer = setInterval(() => { now.value = Date.now() }, 1000) })
+onUnmounted(() => { if (tickTimer) clearInterval(tickTimer) })
+
+const runningList = computed(() => {
+  // Touch now.value to ensure reactivity
+  void now.value
+  return Array.from(state.runningWorkflows.values())
+})
+const hasRunning = computed(() => runningList.value.length > 0)
+const hasScheduled = computed(() => state.scheduledWorkflows.length > 0)
+const isIdle = computed(() => !hasRunning.value && !hasScheduled.value)
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  return `${m}m${s % 60}s`
 }
 
-const activeRuns = ref<ActiveRun[]>([])
-const recentCompleted = ref(0)
-const recentFailed = ref(0)
-const elapsed = ref('')
-
-let unlisteners: (() => void)[] = []
-let elapsedTimer: ReturnType<typeof setInterval> | null = null
-let clearTimer: ReturnType<typeof setTimeout> | null = null
-
-onMounted(async () => {
-  const { listen } = await import('@tauri-apps/api/event')
-
-  unlisteners.push(
-    await listen<{ run_id: string; workflow_name: string; status: string }>('run-update', (event) => {
-      const { run_id, workflow_name, status } = event.payload
-      if (status === 'running') {
-        if (!activeRuns.value.find(r => r.runId === run_id)) {
-          activeRuns.value.push({
-            runId: run_id,
-            workflowName: workflow_name || '工作流',
-            currentStep: null,
-            currentStepName: null,
-            totalSteps: 0,
-            stepCount: 0,
-            startedAt: Date.now(),
-          })
-        }
-      } else {
-        activeRuns.value = activeRuns.value.filter(r => r.runId !== run_id)
-        if (status === 'completed') recentCompleted.value++
-        else if (status === 'failed') recentFailed.value++
-        scheduleClearRecent()
-      }
-    })
-  )
-
-  unlisteners.push(
-    await listen<{ run_id: string; step_name: string; total_steps: number; status: string }>('step-update', (event) => {
-      const { run_id, step_name, total_steps, status } = event.payload
-      const run = activeRuns.value.find(r => r.runId === run_id)
-      if (run) {
-        if (total_steps) run.totalSteps = total_steps
-        if (status === 'running') {
-          run.currentStepName = step_name || null
-          run.stepCount++
-        }
-      }
-    })
-  )
-
-  elapsedTimer = setInterval(updateElapsed, 1000)
-})
-
-onUnmounted(() => {
-  unlisteners.forEach(fn => fn())
-  if (elapsedTimer) clearInterval(elapsedTimer)
-  if (clearTimer) clearTimeout(clearTimer)
-})
-
-function updateElapsed() {
-  if (activeRuns.value.length > 0) {
-    const ms = Date.now() - activeRuns.value[0].startedAt
-    const sec = Math.floor(ms / 1000)
-    const min = Math.floor(sec / 60)
-    const hr = Math.floor(min / 60)
-    elapsed.value = hr > 0
-      ? `${hr}:${String(min % 60).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`
-      : `${min}:${String(sec % 60).padStart(2, '0')}`
-  } else {
-    elapsed.value = ''
+function formatNextRun(iso: string | null): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const now = new Date()
+  const diff = d.getTime() - now.getTime()
+  if (diff < 0) return '即将'
+  if (diff < 60_000) return `${Math.ceil(diff / 1000)}s`
+  if (diff < 3_600_000) return `${Math.ceil(diff / 60_000)}min`
+  // Show time if today, otherwise date+time
+  const today = new Date()
+  if (d.toDateString() === today.toDateString()) {
+    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
-
-function scheduleClearRecent() {
-  if (clearTimer) clearTimeout(clearTimer)
-  clearTimer = setTimeout(() => {
-    recentCompleted.value = 0
-    recentFailed.value = 0
-  }, 5000)
-}
-
-const hasActivity = computed(() =>
-  activeRuns.value.length > 0 || recentCompleted.value > 0 || recentFailed.value > 0
-)
 </script>
 
 <template>
-  <div class="status-bar">
-    <div class="status-left" v-if="hasActivity">
-      <template v-if="activeRuns.length > 0">
-        <span class="status-dot running"></span>
-        <template v-if="activeRuns.length === 1">
-          <span class="status-name">{{ activeRuns[0].workflowName }}</span>
-          <span class="status-step" v-if="activeRuns[0].currentStepName">
-            — {{ activeRuns[0].currentStepName }}
-          </span>
-          <span class="status-count" v-if="activeRuns[0].totalSteps > 0">
-            {{ activeRuns[0].stepCount }}/{{ activeRuns[0].totalSteps }}
-          </span>
-        </template>
-        <template v-else>
-          <span class="status-name">{{ activeRuns.length }} 个工作流运行中</span>
-        </template>
-      </template>
-    </div>
-    <div class="status-right">
-      <span class="status-version">v3.2.0</span>
-      <span class="status-elapsed" v-if="activeRuns.length > 0 && elapsed">⏱ {{ elapsed }}</span>
-      <span class="status-recent-ok" v-if="recentCompleted > 0">✅ {{ recentCompleted }}</span>
-      <span class="status-recent-fail" v-if="recentFailed > 0">❌ {{ recentFailed }}</span>
-    </div>
+  <div class="status-bar h-7 border-t border-border bg-card/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-muted-foreground select-none shrink-0">
+    <!-- Idle state -->
+    <template v-if="isIdle">
+      <span class="flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500/70"></span>
+        就绪
+      </span>
+    </template>
+
+    <!-- Running workflows -->
+    <template v-if="hasRunning">
+      <div
+        v-for="run in runningList"
+        :key="run.id"
+        class="flex items-center gap-1.5"
+      >
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+        </span>
+        <span class="text-foreground font-medium">{{ run.name }}</span>
+        <span v-if="run.currentStep" class="text-muted-foreground/70">
+          {{ run.currentStep }}
+        </span>
+        <span v-if="run.progress" class="text-muted-foreground/50 tabular-nums">
+          {{ run.progress.done }}/{{ run.progress.total }}
+        </span>
+        <span class="text-muted-foreground/40 tabular-nums">
+          {{ formatElapsed(Date.now() - run.startedAt) }}
+        </span>
+      </div>
+    </template>
+
+    <!-- Separator -->
+    <span v-if="hasRunning && hasScheduled" class="text-border">│</span>
+
+    <!-- Scheduled workflows -->
+    <template v-if="hasScheduled">
+      <div class="flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>{{ state.scheduledWorkflows.length }}个定时任务</span>
+        <span v-for="s in state.scheduledWorkflows.slice(0, 3)" :key="s.id" class="flex items-center gap-1 text-muted-foreground/60">
+          <span class="max-w-[100px] truncate">{{ s.workflowName }}</span>
+          <span class="text-muted-foreground/40">{{ formatNextRun(s.nextRun) }}</span>
+        </span>
+        <span v-if="state.scheduledWorkflows.length > 3" class="text-muted-foreground/40">
+          +{{ state.scheduledWorkflows.length - 3 }}
+        </span>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 28px;
-  padding: 0 16px;
-  background: #161b22;
-  border-top: 1px solid #30363d;
-  font-size: 12px;
-  color: #8b949e;
-  flex-shrink: 0;
-}
-.status-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-}
-.status-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot.running {
-  background: #3fb950;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-.status-name {
-  color: #e1e4e8;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.status-step {
-  color: #8b949e;
-  white-space: nowrap;
-}
-.status-count {
-  color: #58a6ff;
-  white-space: nowrap;
-}
-.status-version {
-  color: #484f58;
-  font-size: 11px;
-  margin-right: 12px;
-}
-
-.status-elapsed {
-  color: #58a6ff;
   font-variant-numeric: tabular-nums;
-}
-.status-recent-ok {
-  color: #3fb950;
-}
-.status-recent-fail {
-  color: #f85149;
 }
 </style>

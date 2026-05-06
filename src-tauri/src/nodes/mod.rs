@@ -26,6 +26,7 @@ pub mod recording;
 pub mod delay;
 pub mod file;
 pub mod clipboard;
+pub mod clipboard_container;
 pub mod regex;
 pub mod array;
 pub mod convert;

@@ -22,6 +22,11 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
         breakpoint: false,
         delay: None,
         on_error: None,
+        actions: None,
+        expanded: None,
+        condition: None,
+        then_steps: None,
+        else_steps: None,
     }
 }
 

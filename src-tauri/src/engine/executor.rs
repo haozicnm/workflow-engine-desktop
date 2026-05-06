@@ -51,6 +51,7 @@ impl StepExecutor {
         // ── 剪贴板节点（v3: 独立 executor） ──
         register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
         register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
+        register!(executors, "clipboard", crate::nodes::clipboard_container::ClipboardContainerNode);
 
         // ── 正则节点（v3: 独立 executor） ──
         register!(executors, "regex_extract", crate::nodes::regex::RegexExtractNode);
@@ -165,6 +166,13 @@ impl StepExecutor {
             breakpoint: step.breakpoint,
             delay: step.delay,
             on_error: step.on_error.clone(),
+            actions: step.actions.clone(),
+            expanded: step.expanded,
+            condition: step.condition.clone(),
+            condition_group: None,
+            then_steps: step.then_steps.clone(),
+            else_steps: step.else_steps.clone(),
+            run_condition: None,
         };
 
         Box::pin(async move {

@@ -19,14 +19,15 @@ pub type CancelTokens = Arc<tokio::sync::RwLock<HashMap<String, tokio_util::sync
 
 /// 应用全局状态
 ///
-/// 每次启动都覆盖写入 4 个内置示例工作流，确保安装 = 初始状态
+/// 首次启动时写入 4 个内置示例工作流；已有数据则跳过
 fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
     use tracing::info;
 
-    // 清除所有已有工作流（安装覆盖 = 回到初始状态）
+    // 已有工作流则跳过（不覆盖用户数据）
     let existing = db.list_workflows().unwrap_or_default();
-    for w in &existing {
-        let _ = db.delete_workflow(&w.id);
+    if !existing.is_empty() {
+        info!("数据库已有 {} 个工作流，跳过内置模板初始化", existing.len());
+        return Ok(());
     }
 
     info!("正在创建 4 个内置示例工作流...");

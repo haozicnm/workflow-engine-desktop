@@ -122,6 +122,17 @@ impl DesktopRecorder {
     }
 }
 
+impl Drop for DesktopRecorder {
+    fn drop(&mut self) {
+        // 应用退出时强制 kill Python 子进程，防止孤儿进程残留
+        if let Ok(mut guard) = self.child.try_lock() {
+            if let Some(ref mut child) = *guard {
+                let _ = child.start_kill();
+            }
+        }
+    }
+}
+
 fn find_desktop_recorder_python() -> Result<String> {
     // 1. 内置 Python
     if let Ok(exe) = std::env::current_exe() {

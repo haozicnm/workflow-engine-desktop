@@ -58,7 +58,7 @@ pub async fn execute_word_container(
                 // 读取文档内容
                 match crate::nodes::word::word_read(&config.file_path).await {
                     Ok(content) => {
-                        output_ports.insert(format!("{}_out", &action.id), content);
+                        output_ports.insert(action.label.clone(), content);
                     }
                     Err(e) => {
                         return Err(anyhow!("Word 读取失败: {}", e));
@@ -67,7 +67,7 @@ pub async fn execute_word_container(
             }
             "write" => {
                 let value = input_ports
-                    .get(&format!("{}_in", &action.id))
+                    .get(&format!("{}_in", &action.label))
                     .or_else(|| action.config.get("value"))
                     .cloned()
                     .unwrap_or(Value::Null);
@@ -93,7 +93,7 @@ pub async fn execute_word_container(
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 let new_text = input_ports
-                    .get(&format!("{}_in", &action.id))
+                    .get(&format!("{}_in", &action.label))
                     .and_then(|v| v.as_str())
                     .or_else(|| action.config.get("new_text").and_then(|v| v.as_str()))
                     .unwrap_or("");
@@ -134,7 +134,7 @@ pub async fn execute_word_container(
             }
             "merge" => {
                 let files_value = input_ports
-                    .get(&format!("{}_in", &action.id))
+                    .get(&format!("{}_in", &action.label))
                     .or_else(|| action.config.get("files"))
                     .cloned()
                     .unwrap_or(Value::Null);
@@ -160,7 +160,7 @@ pub async fn execute_word_container(
             }
             "insert_table" => {
                 let value = input_ports
-                    .get(&format!("{}_in", &action.id))
+                    .get(&format!("{}_in", &action.label))
                     .or_else(|| action.config.get("data"))
                     .cloned()
                     .unwrap_or(Value::Null);

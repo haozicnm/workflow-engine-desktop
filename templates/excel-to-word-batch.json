@@ -1,49 +1,63 @@
 {
   "name": "Excel数据 → 批量Word通知书",
-  "description": "Excel读取员工数据 → Word生成通知书 → Word合并汇总",
-  "nodes": [
+  "description": "Excel读取员工数据 → Word生成通知书 → 保存文件",
+  "steps": [
     {
-      "id": "n1",
-      "type": "excel_container",
+      "id": "step1",
+      "type": "excel",
       "label": "员工数据",
-      "position": { "x": 60, "y": 120 },
+      "expanded": true,
       "config": {
         "file_path": "templates/data/员工名单.xlsx",
-        "sheet": "Sheet1",
-        "actions": [
-          { "id": "a1", "type": "read", "label": "读取名单", "config": {} },
-          { "id": "a2", "type": "filter", "label": "筛选在职", "config": { "column": "状态", "op": "equals", "value": "在职" } }
-        ]
-      }
+        "sheet": "Sheet1"
+      },
+      "actions": [
+        {
+          "id": "e1",
+          "type": "read_cell",
+          "params": { "ref": "A1:D10" }
+        }
+      ]
     },
     {
-      "id": "n2",
-      "type": "word_container",
-      "label": "生成通知书",
-      "position": { "x": 460, "y": 80 },
+      "id": "step2",
+      "type": "logic",
+      "label": "有数据?",
+      "expanded": true,
       "config": {
-        "file_path": "templates/data/output/通知书.docx",
-        "actions": [
-          { "id": "wa1", "type": "create", "label": "新建", "config": {} },
-          { "id": "wa2", "type": "write", "label": "填写内容", "config": {} }
-        ]
-      }
-    },
-    {
-      "id": "n3",
-      "type": "word_container",
-      "label": "合并汇总",
-      "position": { "x": 860, "y": 120 },
-      "config": {
-        "file_path": "templates/data/output/通知书汇总.docx",
-        "actions": [
-          { "id": "wa1", "type": "merge", "label": "合并文档", "config": {} }
-        ]
-      }
+        "condition": "{{step1.output}} not_empty"
+      },
+      "actions": [
+        {
+          "id": "l1",
+          "type": "not_empty",
+          "params": { "value": "{{step1.output}}" }
+        }
+      ],
+      "thenSteps": [
+        {
+          "id": "step3",
+          "type": "word",
+          "label": "生成通知书",
+          "expanded": true,
+          "config": {
+            "file_path": "templates/data/output/通知书.docx"
+          },
+          "actions": [
+            {
+              "id": "w1",
+              "type": "write",
+              "params": { "text": "员工通知书\n\n姓名：{{step1.row1.col1}}\n部门：{{step1.row1.col2}}\n职位：{{step1.row1.col3}}" }
+            },
+            {
+              "id": "w2",
+              "type": "save",
+              "params": { "path": "templates/data/output/通知书.docx" }
+            }
+          ]
+        }
+      ],
+      "elseSteps": []
     }
-  ],
-  "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "a2", "targetHandle": "wa2" },
-    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "wa2", "targetHandle": "wa1" }
   ]
 }

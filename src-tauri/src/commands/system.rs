@@ -1,5 +1,7 @@
 // commands/system.rs — 系统操作命令
 use tauri::State;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use serde::{Deserialize, Serialize};
 use crate::App;
 use tracing::info;
@@ -15,6 +17,8 @@ pub struct AppSettings {
     pub browser_channel: String,
     /// 浏览器可执行文件路径: 留空=自动检测
     pub browser_executable_path: String,
+    /// 软件工作目录
+    pub working_dir: String,
 }
 
 #[tauri::command]
@@ -94,9 +98,11 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
 
     // ─── Playwright Python 包检测 ───
     let has_playwright_pkg = if let Some(ref py) = best_python {
-        std::process::Command::new(py)
-            .args(["-c", "import playwright; print('ok')"])
-            .output()
+        let mut cmd = std::process::Command::new(py);
+        cmd.args(["-c", "import playwright; print('ok')"]);
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.output()
             .map(|o| o.status.success())
             .unwrap_or(false)
     } else { false };
@@ -115,16 +121,18 @@ pub async fn system_check_browser() -> Result<serde_json::Value, String> {
 
     // 通过系统 Python 检查 Playwright 缓存
     let has_playwright_cache = if let Some(ref py) = best_python {
-        std::process::Command::new(py)
-            .args(["-c", r#"
+        let mut cmd = std::process::Command::new(py);
+        cmd.args(["-c", r#"
 import os, sys
 home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
     os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
     else os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
 dirs = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
 print('ok' if dirs else 'missing')
-"#])
-            .output()
+"#]);
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.output()
             .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "ok")
             .unwrap_or(false)
     } else { false };
@@ -160,6 +168,7 @@ pub async fn settings_get(
         python_path: config.python_path.clone(),
         browser_channel: config.browser_channel.clone(),
         browser_executable_path: config.browser_executable_path.clone(),
+        working_dir: config.working_dir.clone(),
     })
 }
 
@@ -176,6 +185,7 @@ pub async fn settings_update(
     config.python_path = settings.python_path;
     config.browser_channel = settings.browser_channel;
     config.browser_executable_path = settings.browser_executable_path;
+    config.working_dir = settings.working_dir;
     info!("设置已更新");
     config.save().map_err(|e| e.to_string())
 }

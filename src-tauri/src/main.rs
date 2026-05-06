@@ -91,6 +91,9 @@ fn main() {
             workflow_engine::commands::browser_recording::browser_recording_start,
             workflow_engine::commands::browser_recording::browser_recording_stop,
             workflow_engine::commands::browser_recording::browser_pick_element,
+            workflow_engine::commands::browser_recording::browser_pick_session_start,
+            workflow_engine::commands::browser_recording::browser_pick_next,
+            workflow_engine::commands::browser_recording::browser_pick_session_stop,
             // Preview
             workflow_engine::commands::preview::preview_excel,
             workflow_engine::commands::preview::preview_word,

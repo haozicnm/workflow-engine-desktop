@@ -1,50 +1,96 @@
 {
   "name": "Word文档提取 → Excel汇总分析",
-  "description": "Word读取合同内容 → 逻辑判断分类 → Excel写入不同Sheet",
-  "nodes": [
+  "description": "Word读取合同内容 → 条件判断大额 → Excel写入分析结果",
+  "steps": [
     {
-      "id": "n1",
-      "type": "word_container",
+      "id": "step1",
+      "type": "word",
       "label": "合同文档",
-      "position": { "x": 60, "y": 120 },
+      "expanded": true,
       "config": {
-        "file_path": "templates/data/合同.docx",
-        "actions": [
-          { "id": "wa1", "type": "read", "label": "读取内容", "config": {} }
-        ]
-      }
+        "file_path": "templates/data/合同.docx"
+      },
+      "actions": [
+        {
+          "id": "w1",
+          "type": "read",
+          "params": {}
+        }
+      ]
     },
     {
-      "id": "n2",
-      "type": "logic_container",
-      "label": "含大额合同?",
-      "position": { "x": 380, "y": 120 },
+      "id": "step2",
+      "type": "logic",
+      "label": "含大额条款?",
+      "expanded": true,
       "config": {
-        "actions": [
-          { "id": "l1", "type": "contains", "label": "包含150", "config": { "right": "150" } }
-        ]
-      }
-    },
-    {
-      "id": "n3",
-      "type": "excel_container",
-      "label": "合同分析",
-      "position": { "x": 700, "y": 40 },
-      "config": {
-        "file_path": "templates/data/output/合同分析.xlsx",
-        "sheet": "Sheet1",
-        "actions": [
-          { "id": "e1", "type": "write", "label": "写入大额Sheet", "config": { "range": "大额合同!A1" } },
-          { "id": "e2", "type": "write", "label": "写入普通Sheet", "config": { "range": "普通合同!A1" } }
-        ]
-      }
+        "condition": "{{step1.output}} contains 大额"
+      },
+      "actions": [
+        {
+          "id": "l1",
+          "type": "contains",
+          "params": { "text": "{{step1.output}}", "keyword": "大额" }
+        }
+      ],
+      "thenSteps": [
+        {
+          "id": "step3",
+          "type": "excel",
+          "label": "大额分析",
+          "expanded": true,
+          "config": {
+            "file_path": "templates/data/output/合同分析.xlsx",
+            "sheet": "Sheet1"
+          },
+          "actions": [
+            {
+              "id": "e1",
+              "type": "write_cell",
+              "params": { "ref": "A1", "value": "合同分析结果" }
+            },
+            {
+              "id": "e2",
+              "type": "write_cell",
+              "params": { "ref": "A2", "value": "包含大额条款" }
+            },
+            {
+              "id": "e3",
+              "type": "write_cell",
+              "params": { "ref": "B2", "value": "{{step1.output}}" }
+            },
+            {
+              "id": "e4",
+              "type": "save",
+              "params": { "path": "templates/data/output/合同分析.xlsx" }
+            }
+          ]
+        }
+      ],
+      "elseSteps": [
+        {
+          "id": "step4",
+          "type": "excel",
+          "label": "普通记录",
+          "expanded": true,
+          "config": {
+            "file_path": "templates/data/output/普通合同.xlsx",
+            "sheet": "Sheet1"
+          },
+          "actions": [
+            {
+              "id": "e5",
+              "type": "write_cell",
+              "params": { "ref": "A1", "value": "普通合同" }
+            },
+            {
+              "id": "e6",
+              "type": "save",
+              "params": { "path": "templates/data/output/普通合同.xlsx" }
+            }
+          ]
+        }
+      ]
     }
-  ],
-  "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "wa1_out", "targetHandle": "输入" },
-    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "true出口", "targetHandle": "e1_in" },
-    { "id": "e3", "source": "n2", "target": "n3", "sourceHandle": "false出口", "targetHandle": "e2_in" },
-    { "id": "e4", "source": "n1", "target": "n3", "sourceHandle": "wa1_out", "targetHandle": "e1_in" },
-    { "id": "e5", "source": "n1", "target": "n3", "sourceHandle": "wa1_out", "targetHandle": "e2_in" }
   ]
 }

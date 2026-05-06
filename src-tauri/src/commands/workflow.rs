@@ -185,6 +185,13 @@ pub async fn step_test(
         breakpoint: false,
         delay: None,
         on_error: None,
+        actions: None,
+        expanded: None,
+        condition: None,
+        condition_group: None,
+        then_steps: None,
+        else_steps: None,
+        run_condition: None,
     };
 
     let wf = Workflow {
@@ -245,6 +252,13 @@ pub async fn export_workflow(
                 breakpoint: false,
                 delay: None,
                 on_error: None,
+                actions: None,
+                expanded: None,
+                condition: None,
+                condition_group: None,
+                then_steps: None,
+                else_steps: None,
+                run_condition: None,
             }
         })
         .collect();

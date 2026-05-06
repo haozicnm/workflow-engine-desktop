@@ -1,6 +1,6 @@
 {
   "productName": "Workflow Engine",
-  "version": "4.1.0",
+  "version": "6.0.0",
   "identifier": "com.workflow-engine.desktop",
   "build": {
     "frontendDist": "../src/dist",
@@ -31,7 +31,7 @@
     ],
     "windows": {
       "webviewInstallMode": {
-        "type": "embedBootstrapper"
+        "type": "downloadBootstrapper"
       }
     },
     "icon": [
@@ -43,7 +43,6 @@
     ],
     "resources": {
       "sidecars/*": "sidecars/",
-      "python-runtime/playwright-browsers/**/*": "playwright-browsers/",
       "../templates/data/**/*": "templates/data/"
     }
   },
