@@ -120,6 +120,50 @@ export const BROWSER_ACTIONS: ActionDef[] = [
     ], default: 'text' },
   ]},
   { type: 'get_title', label: '获取标题', icon: '🏷️', params: [] },
+  // ─── v1.1+ 扩展动作 ───
+  { type: 'extract_table', label: '提取表格', icon: '📊', params: [
+    { key: 'selector', label: '选择器', type: 'text', placeholder: 'table', default: 'table' },
+  ]},
+  { type: 'extract_links', label: '提取链接', icon: '🔗', params: [
+    { key: 'selector', label: '范围选择器', type: 'text', placeholder: 'body', default: 'body' },
+  ]},
+  { type: 'select', label: '下拉选择', icon: '🔽', params: [
+    { key: 'selector', label: '选择器', type: 'text' },
+    { key: 'value', label: '值', type: 'text', placeholder: 'optionValue 或 显示文本' },
+  ]},
+  { type: 'check', label: '勾选/取消', icon: '✅', params: [
+    { key: 'selector', label: '选择器', type: 'text' },
+    { key: 'checked', label: '勾选', type: 'checkbox', default: true },
+  ]},
+  { type: 'hover', label: '鼠标悬停', icon: '🖱️', params: [
+    { key: 'selector', label: '选择器', type: 'text' },
+  ]},
+  { type: 'cookies', label: 'Cookie 管理', icon: '🍪', params: [
+    { key: 'action', label: '操作', type: 'select', options: [
+      { label: '获取', value: 'get' }, { label: '设置', value: 'set' }, { label: '清除', value: 'clear' },
+    ], default: 'get' },
+    { key: 'cookies', label: 'Cookie 数据 (JSON)', type: 'textarea', placeholder: 'set 时填写 [{name,value,domain,...}]' },
+  ]},
+  { type: 'set_headers', label: '设置请求头', icon: '📡', params: [
+    { key: 'headers', label: '请求头 (JSON)', type: 'textarea', placeholder: '{"Authorization": "Bearer xxx"}' },
+  ]},
+  { type: 'new_page', label: '新建标签页', icon: '➕', params: [
+    { key: 'url', label: '初始网址', type: 'text', placeholder: 'https://...' },
+  ]},
+  { type: 'close_page', label: '关闭标签页', icon: '❌', params: [
+    { key: 'index', label: '标签索引', type: 'number' },
+  ]},
+  { type: 'switch_page', label: '切换标签页', icon: '🔄', params: [
+    { key: 'index', label: '目标索引', type: 'number', default: 0 },
+  ]},
+  { type: 'pages', label: '标签页列表', icon: '📑', params: [] },
+  { type: 'back', label: '后退', icon: '⬅️', params: [] },
+  { type: 'forward', label: '前进', icon: '➡️', params: [] },
+  { type: 'reload', label: '刷新页面', icon: '🔄', params: [] },
+  { type: 'current_url', label: '当前网址', icon: '🔗', params: [] },
+  { type: 'pdf', label: '生成 PDF', icon: '📄', params: [
+    { key: 'path', label: '保存路径', type: 'text', default: 'output.pdf' },
+  ]},
 ]
 
 // Excel 动作（与后端 excel_container.rs 对齐）

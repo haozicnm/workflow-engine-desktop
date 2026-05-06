@@ -132,14 +132,17 @@ pub async fn execute_browser_container(
             }
 
             "scroll" => {
-                let x = action.config.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 let y = action.config.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-
+                // Py sidecar: scroll_to(to: "bottom"|"top"|pixels)
+                let to: serde_json::Value = if y > 0.0 {
+                    serde_json::json!(y)
+                } else {
+                    serde_json::json!("bottom")
+                };
                 let params = serde_json::json!({
-                    "x": x,
-                    "y": y,
+                    "to": to,
                 });
-                crate::nodes::browser::send_sidecar_action("scroll", &params).await
+                crate::nodes::browser::send_sidecar_action("scroll_to", &params).await
                     .map_err(|e| anyhow!("滚动失败: {}", e))?;
             }
 
@@ -182,11 +185,18 @@ pub async fn execute_browser_container(
                     .and_then(|v| v.as_str())
                     .unwrap_or("text");
 
-                let params = serde_json::json!({
-                    "selector": selector,
-                    "mode": mode,
-                });
-                let resp = crate::nodes::browser::send_sidecar_action("extract", &params).await
+                // Py sidecar has extract_text / extract_html / extract_attribute (no "extract")
+                let (py_action, py_params) = match mode {
+                    "html" => ("extract_html", serde_json::json!({ "selector": selector })),
+                    "attr" => {
+                        let attribute = action.config.get("attribute")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("href");
+                        ("extract_attribute", serde_json::json!({ "selector": selector, "attribute": attribute }))
+                    }
+                    _ => ("extract_text", serde_json::json!({ "selector": selector })),
+                };
+                let resp = crate::nodes::browser::send_sidecar_action(py_action, &py_params).await
                     .map_err(|e| anyhow!("提取失败: {}", e))?;
 
                 let data = resp
@@ -252,6 +262,146 @@ pub async fn execute_browser_container(
                     .cloned()
                     .unwrap_or(Value::String("".to_string()));
                 output_ports.insert(action.label.clone(), title);
+            }
+
+            // ─── v1.1+ 扩展动作 ───
+
+            "extract_table" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("table");
+                let params = serde_json::json!({ "selector": selector });
+                let resp = crate::nodes::browser::send_sidecar_action("extract_table", &params).await
+                    .map_err(|e| anyhow!("表格提取失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.label.clone(), data);
+            }
+
+            "extract_links" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("body");
+                let params = serde_json::json!({ "selector": selector });
+                let resp = crate::nodes::browser::send_sidecar_action("extract_links", &params).await
+                    .map_err(|e| anyhow!("链接提取失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.label.clone(), data);
+            }
+
+            "select" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                let value = action.config.get("value")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| input_ports.get(&format!("{}_in", &action.label))
+                        .and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                let params = serde_json::json!({ "selector": selector, "value": value });
+                crate::nodes::browser::send_sidecar_action("select", &params).await
+                    .map_err(|e| anyhow!("下拉选择失败: {}", e))?;
+            }
+
+            "check" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                let checked = action.config.get("checked")
+                    .and_then(|v| v.as_bool()).unwrap_or(true);
+                let params = serde_json::json!({ "selector": selector, "checked": checked });
+                crate::nodes::browser::send_sidecar_action("check", &params).await
+                    .map_err(|e| anyhow!("勾选失败: {}", e))?;
+            }
+
+            "hover" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                // Playwright hover via evaluate (no native hover action in sidecar)
+                let script = format!(
+                    "document.querySelector({})?.dispatchEvent(new MouseEvent('mouseover', {{bubbles:true}}))",
+                    serde_json::to_string(selector).unwrap_or_default()
+                );
+                let params = serde_json::json!({ "script": script });
+                crate::nodes::browser::send_sidecar_action("evaluate", &params).await
+                    .map_err(|e| anyhow!("悬停失败: {}", e))?;
+            }
+
+            "new_page" => {
+                let url = action.config.get("url").and_then(|v| v.as_str());
+                let params = serde_json::json!({ "url": url });
+                crate::nodes::browser::send_sidecar_action("new_page", &params).await
+                    .map_err(|e| anyhow!("新建标签页失败: {}", e))?;
+            }
+
+            "close_page" => {
+                let index = action.config.get("index").and_then(|v| v.as_u64());
+                let params = serde_json::json!({ "index": index });
+                crate::nodes::browser::send_sidecar_action("close_page", &params).await
+                    .map_err(|e| anyhow!("关闭标签页失败: {}", e))?;
+            }
+
+            "switch_page" => {
+                let index = action.config.get("index")
+                    .and_then(|v| v.as_u64()).unwrap_or(0);
+                let params = serde_json::json!({ "index": index });
+                crate::nodes::browser::send_sidecar_action("switch_page", &params).await
+                    .map_err(|e| anyhow!("切换标签页失败: {}", e))?;
+            }
+
+            "pages" => {
+                let resp = crate::nodes::browser::send_sidecar_action("pages", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.label.clone(), data);
+            }
+
+            "cookies" => {
+                let cookie_action = action.config.get("action")
+                    .and_then(|v| v.as_str()).unwrap_or("get");
+                let mut params = serde_json::json!({ "action": cookie_action });
+                if cookie_action == "set" {
+                    if let Some(cookies) = action.config.get("cookies") {
+                        params["cookies"] = cookies.clone();
+                    }
+                }
+                let resp = crate::nodes::browser::send_sidecar_action("cookies", &params).await
+                    .map_err(|e| anyhow!("Cookie 操作失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.label.clone(), data);
+            }
+
+            "set_headers" => {
+                let headers = action.config.get("headers")
+                    .cloned().unwrap_or(serde_json::json!({}));
+                let params = serde_json::json!({ "headers": headers });
+                crate::nodes::browser::send_sidecar_action("set_headers", &params).await
+                    .map_err(|e| anyhow!("设置请求头失败: {}", e))?;
+            }
+
+            "back" => {
+                crate::nodes::browser::send_sidecar_action("back", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("后退失败: {}", e))?;
+            }
+
+            "forward" => {
+                crate::nodes::browser::send_sidecar_action("forward", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("前进失败: {}", e))?;
+            }
+
+            "reload" => {
+                crate::nodes::browser::send_sidecar_action("reload", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("刷新失败: {}", e))?;
+            }
+
+            "current_url" => {
+                let resp = crate::nodes::browser::send_sidecar_action("current_url", &serde_json::json!({})).await
+                    .map_err(|e| anyhow!("获取URL失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.label.clone(), data);
+            }
+
+            "pdf" => {
+                let path = action.config.get("path")
+                    .and_then(|v| v.as_str()).unwrap_or("output.pdf");
+                let params = serde_json::json!({ "path": path });
+                crate::nodes::browser::send_sidecar_action("pdf", &params).await
+                    .map_err(|e| anyhow!("生成PDF失败: {}", e))?;
             }
 
             _ => {
