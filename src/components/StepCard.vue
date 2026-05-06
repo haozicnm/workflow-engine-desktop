@@ -34,8 +34,6 @@ const emit = defineEmits<{
   'rename-step': [stepId: string, label: string]
   'update-condition': [stepId: string, condition: string]
   'update-condition-group': [stepId: string, group: import('../types/workflow').LogicConditionGroup]
-  'add-sub-step': [stepId: string, branch: 'then' | 'else']
-  'remove-sub-step': [stepId: string, branch: 'then' | 'else', subStepId: string]
   'open-config': [stepId: string]
   'update-error-strategy': [stepId: string, strategy: ErrorStrategy]
   'start-recording': [stepId: string]
@@ -395,8 +393,7 @@ function colorAt15(color: string): string {
         :steps="steps"
         @update-condition="(id, c) => emit('update-condition', id, c)"
         @update-condition-group="(id, g) => emit('update-condition-group', id, g)"
-        @add-sub-step="(id, b) => emit('add-sub-step', id, b)"
-        @remove-sub-step="(id, b, sId) => emit('remove-sub-step', id, b, sId)"
+        @open-config="(sId) => emit('open-config', sId)"
         @add-action="(id) => emit('add-action', id)"
         @remove-action="(id, aId) => emit('remove-action', id, aId)"
         @action-click="(id, aId) => emit('action-click', id, aId)"

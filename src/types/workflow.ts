@@ -412,8 +412,6 @@ export function newStep(containerType: ContainerType): Step {
   }
   if (containerType === 'logic') {
     step.condition = ''
-    step.thenSteps = []
-    step.elseSteps = []
   }
   return step
 }
@@ -444,17 +442,6 @@ export function deserializeWorkflow(json: string): Workflow {
   if (wf.steps) {
     for (const step of wf.steps) {
       if (!step.actions) step.actions = []
-      // 递归处理 thenSteps / elseSteps
-      if (step.thenSteps) {
-        for (const s of step.thenSteps) {
-          if (!s.actions) s.actions = []
-        }
-      }
-      if (step.elseSteps) {
-        for (const s of step.elseSteps) {
-          if (!s.actions) s.actions = []
-        }
-      }
     }
   }
   return wf

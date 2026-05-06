@@ -274,33 +274,6 @@ function onErrorStrategyChange(stepId: string, strategy: import('../types/workfl
   }
 }
 
-function onAddSubStep(stepId: string, branch: 'then' | 'else') {
-  if (!workflow.value) return
-  const step = store.findStep(stepId)
-  if (!step) return
-  const sub = newStep('browser')
-  if (branch === 'then') {
-    if (!step.thenSteps) step.thenSteps = []
-    step.thenSteps.push(sub)
-  } else {
-    if (!step.elseSteps) step.elseSteps = []
-    step.elseSteps.push(sub)
-  }
-  store.dirty = true
-}
-
-function onRemoveSubStep(stepId: string, branch: 'then' | 'else', subStepId: string) {
-  if (!workflow.value) return
-  const step = store.findStep(stepId)
-  if (!step) return
-  if (branch === 'then' && step.thenSteps) {
-    step.thenSteps = step.thenSteps.filter(s => s.id !== subStepId)
-  } else if (branch === 'else' && step.elseSteps) {
-    step.elseSteps = step.elseSteps.filter(s => s.id !== subStepId)
-  }
-  store.dirty = true
-}
-
 function onDragStart(index: number, e: DragEvent) {
   dragIndex.value = index
   if (e.dataTransfer) {
@@ -516,8 +489,6 @@ onUnmounted(() => {
                 @rename-step="(sId, label) => store.renameStep(sId, label)"
                 @update-condition="onUpdateCondition"
                 @update-condition-group="(sId, g) => store.updateConditionGroup(sId, g)"
-                @add-sub-step="onAddSubStep"
-                @remove-sub-step="onRemoveSubStep"
                 @open-config="onOpenConfig"
                 @update-error-strategy="onErrorStrategyChange"
                 @start-recording="onStartRecording"

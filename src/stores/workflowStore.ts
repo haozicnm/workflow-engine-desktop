@@ -55,8 +55,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
   function normalizeSteps(steps: Step[]) {
     for (const step of steps) {
       if (!Array.isArray(step.actions)) step.actions = []
-      if (step.thenSteps) normalizeSteps(step.thenSteps)
-      if (step.elseSteps) normalizeSteps(step.elseSteps)
     }
   }
 
@@ -278,16 +276,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
   function _findStepInList(steps: Step[], stepId: string): Step | null {
     for (const step of steps) {
       if (step.id === stepId) return step
-      if (step.type === 'logic') {
-        if (step.thenSteps) {
-          const found = _findStepInList(step.thenSteps, stepId)
-          if (found) return found
-        }
-        if (step.elseSteps) {
-          const found = _findStepInList(step.elseSteps, stepId)
-          if (found) return found
-        }
-      }
     }
     return null
   }
