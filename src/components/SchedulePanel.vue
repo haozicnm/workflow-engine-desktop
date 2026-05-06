@@ -152,7 +152,7 @@ function formatDate(d: string | null): string {
           </div>
           <div class="flex gap-2 items-center">
             <Input v-model="newCron" placeholder="Cron 表达式 (分 时 日 月 周)" class="flex-1 h-8 text-xs font-mono" />
-            <Button variant="default" size="sm" class="h-8 text-xs bg-[#238636] hover:bg-[#2ea043]" @click="onCreate">创建</Button>
+            <Button variant="default" size="sm" class="h-8 text-xs bg-success hover:bg-success/90" @click="onCreate">创建</Button>
           </div>
           <p class="text-[11px] text-muted-foreground">{{ cronDescription }}</p>
         </div>

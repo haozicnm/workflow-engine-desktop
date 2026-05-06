@@ -188,7 +188,7 @@ async function browseWorkingDir() {
     <div class="px-4 py-3 border-t border-border flex justify-end shrink-0">
       <Button
         variant="default"
-        class="bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-semibold"
+        class="bg-success hover:bg-success/90 text-success-foreground text-xs font-semibold"
         :disabled="saving"
         @click="save"
       >

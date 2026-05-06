@@ -221,7 +221,7 @@ function colorAt15(color: string): string {
       <Badge
         v-if="step.runCondition"
         variant="outline"
-        class="text-[10px] px-1.5 py-0 border-[#d29922]/40 text-[#d29922] bg-[#d29922]/10 cursor-pointer hover:bg-[#d29922]/20"
+        class="text-[10px] px-1.5 py-0 border-warning/40 text-warning bg-warning/10 cursor-pointer hover:bg-warning/20"
         :title="`条件执行: ${conditionLabel}`"
         @click.stop="showConditionMenu = !showConditionMenu"
       >{{ conditionLabel }}</Badge>
@@ -265,7 +265,7 @@ function colorAt15(color: string): string {
         v-if="step.type !== 'logic' && logicSteps.length > 0"
         variant="ghost"
         size="icon"
-        class="w-5 h-5 text-muted-foreground hover:text-[#d29922] hover:bg-[#d29922]/10 opacity-0 group-hover:opacity-100"
+        class="w-5 h-5 text-muted-foreground hover:text-warning hover:bg-warning/10 opacity-0 group-hover:opacity-100"
         title="条件执行"
         @click.stop="showConditionMenu = !showConditionMenu"
       >🔀</Button>
@@ -304,7 +304,7 @@ function colorAt15(color: string): string {
         :class="cn(
           'flex flex-col gap-0.5 px-2.5 py-1.5 cursor-pointer text-sm transition-colors hover:bg-secondary',
           ((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError))
-            ? 'bg-[#1c2333] border-l-2 border-primary' : '',
+            ? 'bg-secondary border-l-2 border-primary' : '',
         )"
         @click="key === 'fail' ? setErrStrategy('fail') : key === 'ignore' ? setErrStrategy('ignore') : setErrStrategy({ branch: '' })"
       >
@@ -341,7 +341,7 @@ function colorAt15(color: string): string {
             :class="cn(
               'flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-sm transition-colors hover:bg-secondary',
               step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value
-                ? 'bg-[#1c2333] border-l-2 border-[#d29922]' : '',
+                ? 'bg-secondary border-l-2 border-warning' : '',
             )"
             @click="setCondition(ls.id, opt.value as 'true' | 'false' | 'both' | 'merge')"
           >

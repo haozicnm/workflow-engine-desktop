@@ -19,9 +19,9 @@ onMounted(() => {
 })
 
 const bgClass = {
-  success: 'bg-[#238636] border-[#2ea043]',
-  error: 'bg-danger border-danger',
-  info: 'bg-[#1f6feb] border-[#388bfd]',
+  success: 'bg-success border-success/80',
+  error: 'bg-danger border-danger/80',
+  info: 'bg-primary border-primary/80',
 }
 
 const iconMap = {

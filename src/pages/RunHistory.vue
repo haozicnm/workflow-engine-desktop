@@ -296,7 +296,7 @@ const stats = computed(() => {
                   :class="cn(
                     'grid items-center gap-2 px-2.5 py-2 rounded-md mb-1 hover:bg-secondary',
                     step.status === 'running' && 'border-l-2 border-primary',
-                    step.status === 'completed' && 'border-l-2 border-[#238636]',
+                    step.status === 'completed' && 'border-l-2 border-success',
                     step.status === 'failed' && 'border-l-2 border-danger',
                   )"
                   style="grid-template-columns: 28px 22px 1fr auto;"

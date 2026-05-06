@@ -413,7 +413,7 @@ onUnmounted(() => {
   >
     <!-- Workflow Detail Card -->
     <Card class="mx-8 mt-6 shrink-0 shadow-sm">
-      <CardHeader class="py-4 px-6">
+      <CardHeader class="pb-3 px-6">
         <div class="flex items-center gap-2">
           <div v-if="!editingName" class="flex-1 min-w-0">
             <CardTitle
@@ -438,7 +438,7 @@ onUnmounted(() => {
           </span>
 
           <div class="flex items-center gap-1.5 ml-2">
-            <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-[#238636] hover:bg-[#2ea043] text-white" @click="onRun">▶ 运行</Button>
+            <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground" @click="onRun">▶ 运行</Button>
             <Button v-else variant="destructive" size="sm" class="h-8" @click="onStop">■ 停止</Button>
             <Button variant="outline" size="sm" class="h-8" @click="onSave" title="保存">💾</Button>
             <Button variant="outline" size="sm" class="h-8" @click="onSaveAs" title="另存为">📋</Button>

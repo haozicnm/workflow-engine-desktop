@@ -25,11 +25,15 @@
   --color-input: #d1d9e0;
   --color-ring: #0969da;
   --color-success: #1a7f37;
+  --color-success-foreground: #ffffff;
   --color-danger: #cf222e;
+  --color-danger-foreground: #ffffff;
   --color-warning: #9a6700;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  --color-warning-foreground: #ffffff;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 /* ─── Dark theme（覆盖 @theme 默认值） ─── */
@@ -54,8 +58,11 @@
   --color-input: #30363d;
   --color-ring: #58a6ff;
   --color-success: #3fb950;
+  --color-success-foreground: #0d1117;
   --color-danger: #f85149;
+  --color-danger-foreground: #ffffff;
   --color-warning: #d29922;
+  --color-warning-foreground: #0d1117;
 }
 
 /* ═══════════ 全局样式（放在 @layer base 内，不覆盖 Tailwind 工具类） ═══════════ */
@@ -66,20 +73,29 @@
     overflow: hidden;
     font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     font-size: 14px;
+    line-height: 1.5;
     background: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* 滚动条 */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  /* shadcn/ui 默认: border-box */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  /* 滚动条 — shadcn 风格更细更淡 */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
 
-  /* 链接 */
-  a { color: var(--color-primary); text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  /* 选中文本高亮 */
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
 }
 
 /* Transition presets */

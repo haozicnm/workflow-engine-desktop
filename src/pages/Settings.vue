@@ -301,7 +301,7 @@ function truncatePath(path: string, maxLen: number): string {
       <!-- Save bar -->
       <div class="text-right">
         <Button
-          class="bg-[#238636] hover:bg-[#2ea043] text-white font-semibold"
+          class="bg-success hover:bg-success/90 text-success-foreground font-semibold"
           :disabled="saving"
           @click="save"
         >
