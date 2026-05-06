@@ -404,6 +404,36 @@ pub async fn execute_browser_container(
                     .map_err(|e| anyhow!("生成PDF失败: {}", e))?;
             }
 
+            // ─── 智能等待 (v2) ───
+
+            "wait_network_idle" => {
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let params = serde_json::json!({ "timeout_ms": timeout });
+                crate::nodes::browser::send_sidecar_action("wait_network_idle", &params).await
+                    .map_err(|e| anyhow!("等待网络空闲失败: {}", e))?;
+            }
+
+            "wait_load_state" => {
+                let state = action.config.get("state")
+                    .and_then(|v| v.as_str()).unwrap_or("load");
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let params = serde_json::json!({ "state": state, "timeout_ms": timeout });
+                crate::nodes::browser::send_sidecar_action("wait_load_state", &params).await
+                    .map_err(|e| anyhow!("等待加载状态失败: {}", e))?;
+            }
+
+            "wait_url_contains" => {
+                let substring = action.config.get("substring")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let params = serde_json::json!({ "substring": substring, "timeout_ms": timeout });
+                crate::nodes::browser::send_sidecar_action("wait_url_contains", &params).await
+                    .map_err(|e| anyhow!("等待URL失败: {}", e))?;
+            }
+
             _ => {
                 tracing::warn!(
                     "BrowserContainer — 未知 action 类型: {}",

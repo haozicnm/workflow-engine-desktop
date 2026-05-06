@@ -136,6 +136,13 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _evaluate(params)
             case "wait":
                 return await _wait_for(params)
+            # 智能等待
+            case "wait_network_idle":
+                return await _wait_network_idle(params)
+            case "wait_load_state":
+                return await _wait_load_state(params)
+            case "wait_url_contains":
+                return await _wait_url_contains(params)
             case "select":
                 return await _select(params)
             case "check":
@@ -432,6 +439,50 @@ async def _wait_for(params: dict) -> dict:
     element = await page.wait_for_selector(selector, timeout=timeout_ms)
 
     return {"success": True, "data": {"selector": selector, "found": element is not None}}
+
+
+async def _wait_network_idle(params: dict) -> dict:
+    """等待网络空闲（无飞行中的请求）"""
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+    timeout_ms = params.get("timeout_ms", 30000)
+    try:
+        await page.wait_for_load_state("networkidle", timeout=timeout_ms / 1000)
+        return {"success": True, "data": {"state": "networkidle"}}
+    except Exception as e:
+        return {"success": False, "error": f"等待网络空闲超时: {e}"}
+
+
+async def _wait_load_state(params: dict) -> dict:
+    """等待页面加载状态: load / domcontentloaded / networkidle"""
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+    state = params.get("state", "load")
+    timeout_ms = params.get("timeout_ms", 30000)
+    try:
+        await page.wait_for_load_state(state, timeout=timeout_ms / 1000)
+        return {"success": True, "data": {"state": state}}
+    except Exception as e:
+        return {"success": False, "error": f"等待加载状态 {state} 超时: {e}"}
+
+
+async def _wait_url_contains(params: dict) -> dict:
+    """等待 URL 包含指定字符串"""
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+    substring = params.get("substring", "")
+    if not substring:
+        return {"success": False, "error": "wait_url_contains 缺少 substring 参数"}
+    timeout_ms = params.get("timeout_ms", 30000)
+    start = asyncio.get_event_loop().time()
+    while (asyncio.get_event_loop().time() - start) * 1000 < timeout_ms:
+        if substring in page.url:
+            return {"success": True, "data": {"url": page.url, "matched": substring}}
+        await asyncio.sleep(0.2)
+    return {"success": False, "error": f"等待 URL 包含 '{substring}' 超时 (当前: {page.url})"}
 
 
 async def _select(params: dict) -> dict:

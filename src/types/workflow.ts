@@ -164,6 +164,22 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   { type: 'pdf', label: '生成 PDF', icon: '📄', params: [
     { key: 'path', label: '保存路径', type: 'text', default: 'output.pdf' },
   ]},
+  // ─── 智能等待 ───
+  { type: 'wait_network_idle', label: '等待网络空闲', icon: '🌐', params: [
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
+  ]},
+  { type: 'wait_load_state', label: '等待加载状态', icon: '⏳', params: [
+    { key: 'state', label: '状态', type: 'select', options: [
+      { label: 'load（页面加载完成）', value: 'load' },
+      { label: 'domcontentloaded（DOM就绪）', value: 'domcontentloaded' },
+      { label: 'networkidle（网络空闲）', value: 'networkidle' },
+    ], default: 'load' },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
+  ]},
+  { type: 'wait_url_contains', label: '等待 URL 变更', icon: '🔗', params: [
+    { key: 'substring', label: 'URL 包含', type: 'text', placeholder: '/dashboard' },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
+  ]},
 ]
 
 // Excel 动作（与后端 excel_container.rs 对齐）
