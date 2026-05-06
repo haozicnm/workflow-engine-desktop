@@ -103,7 +103,7 @@ pub async fn execute_excel_container(
 
                 let rows = data.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
                 let column_idx = action.config.get("column").and_then(|v| v.as_str())
-                    .map(excel_col_to_idx)
+                    .map(|c| resolve_column(c, &rows))
                     .unwrap_or(0);
                 let filter_val = input_ports
                     .get(&format!("{}_in", &action.label))
@@ -131,7 +131,7 @@ pub async fn execute_excel_container(
 
                 let mut rows = data.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
                 let column_idx = action.config.get("column").and_then(|v| v.as_str())
-                    .map(excel_col_to_idx)
+                    .map(|c| resolve_column(c, &rows))
                     .unwrap_or(0);
                 let order = action.config.get("order").and_then(|v| v.as_str()).unwrap_or("asc");
                 let ascending = order != "desc";
@@ -226,11 +226,28 @@ pub async fn execute_excel_container(
     })
 }
 
-/// 列字母→索引 (A=0, B=1, ...)
-fn excel_col_to_idx(col: &str) -> usize {
-    col.bytes().fold(0usize, |acc, b| {
+/// 列字母→索引 (A=0, B=1, ...)；如果不是纯字母，返回 0 让调用者用列名回退
+fn excel_col_to_idx(col: &str) -> Option<usize> {
+    if col.is_empty() || !col.bytes().all(|b| b.is_ascii_alphabetic()) {
+        return None;
+    }
+    Some(col.bytes().fold(0usize, |acc, b| {
         acc * 26 + (b.to_ascii_uppercase() as usize).saturating_sub(65)
-    })
+    }))
+}
+
+/// 解析列引用：先试字母 (A=0)，再试列名（查表头行）
+fn resolve_column(col: &str, rows: &[Value]) -> usize {
+    if let Some(idx) = excel_col_to_idx(col) {
+        return idx;
+    }
+    // 回退：查第一行的列名
+    if let Some(header_row) = rows.first().and_then(|r| r.as_array()) {
+        if let Some(pos) = header_row.iter().position(|c| c.as_str() == Some(col)) {
+            return pos;
+        }
+    }
+    0
 }
 
 /// 简易过滤匹配

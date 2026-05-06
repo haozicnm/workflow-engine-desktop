@@ -448,6 +448,25 @@ pub async fn execute_browser_container(
                 output_ports.insert(action.label.clone(), data);
             }
 
+            // ─── 文件下载 (v1.6) ───
+
+            "download" => {
+                let save_dir = action.config.get("save_dir")
+                    .and_then(|v| v.as_str()).unwrap_or(".");
+                let click_selector = action.config.get("click_selector")
+                    .and_then(|v| v.as_str());
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let params = serde_json::json!({
+                    "save_dir": save_dir,
+                    "click_selector": click_selector,
+                    "timeout_ms": timeout,
+                });
+                let resp = crate::nodes::browser::send_sidecar_action("download", &params).await
+                    .map_err(|e| anyhow!("下载失败: {}", e))?;
+                output_ports.insert(action.label.clone(), resp);
+            }
+
             _ => {
                 tracing::warn!(
                     "BrowserContainer — 未知 action 类型: {}",

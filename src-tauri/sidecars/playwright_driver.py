@@ -213,6 +213,9 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _pick_next()
             case "pick_stop":
                 return await _pick_stop()
+            # v1.6 文件下载
+            case "download":
+                return await _download(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -538,6 +541,67 @@ async def _verify(params: dict) -> dict:
             },
         }
     return {"success": True, "data": {"clean": True, "issues": [], "message": "无异常"}}
+
+
+# ═══════════════════════════════════════════
+# v1.6 文件下载
+# ═══════════════════════════════════════════
+
+_pending_download = None  # asyncio.Future[Download]
+
+async def _download(params: dict) -> dict:
+    """触发下载：可选点击选择器 → 等待下载完成 → 保存到指定目录
+
+    params:
+      save_dir: 保存目录（默认当前目录）
+      click_selector: 可选，在此之前点击这个元素触发下载
+      timeout_ms: 等待下载超时（默认 30000）
+    """
+    global _pending_download
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    save_dir = params.get("save_dir", ".")
+    click_selector = params.get("click_selector")
+    timeout_ms = params.get("timeout_ms", 30000)
+
+    # 设置下载监听
+    download_future = asyncio.get_event_loop().create_future()
+
+    async def _on_download(download):
+        try:
+            suggested = download.suggested_filename
+            save_path = os.path.join(save_dir, suggested)
+            os.makedirs(save_dir, exist_ok=True)
+            await download.save_as(save_path)
+            if not download_future.done():
+                download_future.set_result({
+                    "filename": suggested,
+                    "path": save_path,
+                    "url": download.url,
+                })
+        except Exception as e:
+            if not download_future.done():
+                download_future.set_result({"error": str(e)})
+
+    page.on("download", lambda d: asyncio.create_task(_on_download(d)))
+
+    # 可选：点击触发下载
+    if click_selector:
+        try:
+            await page.click(click_selector)
+        except Exception as e:
+            return {"success": False, "error": f"点击下载按钮失败: {e}"}
+
+    # 等待下载完成
+    try:
+        result = await asyncio.wait_for(download_future, timeout=timeout_ms / 1000)
+        if "error" in result:
+            return {"success": False, "error": result["error"]}
+        return {"success": True, "data": result}
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "下载超时：未检测到文件下载"}
 
 
 async def _select(params: dict) -> dict:

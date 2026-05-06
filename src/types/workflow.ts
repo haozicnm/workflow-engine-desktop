@@ -182,6 +182,12 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   ]},
   // ─── 动作验证 ───
   { type: 'verify', label: '验证健康', icon: '🩺', params: [] },
+  // ─── 文件下载 ───
+  { type: 'download', label: '下载文件', icon: '📥', params: [
+    { key: 'save_dir', label: '保存目录', type: 'text', default: '.' },
+    { key: 'click_selector', label: '点击选择器', type: 'text', placeholder: '先点这个再等下载（可选）' },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
+  ]},
 ]
 
 // Excel 动作（与后端 excel_container.rs 对齐）
@@ -234,6 +240,9 @@ export const WORD_ACTIONS: ActionDef[] = [
   ]},
   { type: 'insert_table', label: '插入表格', icon: '📊', params: [
     { key: 'data', label: '表格数据', type: 'textarea', placeholder: '[["姓名","年龄"],["张三",25]]' },
+  ]},
+  { type: 'merge', label: '合并文档', icon: '📎', params: [
+    { key: 'files', label: '文件列表 (JSON)', type: 'textarea', placeholder: '["a.docx","b.docx"]' },
   ]},
 ]
 
