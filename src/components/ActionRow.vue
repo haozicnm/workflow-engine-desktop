@@ -21,7 +21,16 @@ const props = defineProps<{
   stepLabel?: string
   steps?: Step[]
   expanded?: boolean
+  siblingActions?: Action[]
 }>()
+
+// Find the action immediately before the current one in the same container
+const prevAction = computed(() => {
+  if (!props.siblingActions?.length) return undefined
+  const idx = props.siblingActions.findIndex(a => a.id === props.action.id)
+  if (idx <= 0) return undefined
+  return props.siblingActions[idx - 1]
+})
 
 const emit = defineEmits<{
   remove: []
@@ -137,7 +146,7 @@ interface StepGroup {
   stepLabel: string
   stepIcon: string
   stepRef: string
-  actions: { id: string; label: string; ref: string }[]
+  actions: { id: string; label: string; ref: string; isSameContainer?: boolean }[]
 }
 
 const groupedRefs = computed<StepGroup[]>(() => {
@@ -160,7 +169,9 @@ const groupedRefs = computed<StepGroup[]>(() => {
       const group = groups.get(stepId)
       if (group) {
         const actionLabel = r.label.includes('›') ? r.label.split('›').pop()!.trim() : r.label
-        group.actions.push({ id: r.id, label: actionLabel, ref: r.id })
+        // Mark actions from the same container (stepId matches current action's step)
+        const isSameContainer = !!(props.stepId && stepId === props.stepId)
+        group.actions.push({ id: r.id, label: actionLabel, ref: r.id, isSameContainer })
       }
     }
   }
@@ -297,6 +308,15 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
 
     <!-- Expanded: parameter editing -->
     <div v-if="expanded && hasParams" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
+      <!-- Data flow hint -->
+      <div v-if="siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
+        <template v-if="prevAction">
+          📥 数据来自: <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
+        </template>
+        <template v-else>
+          📥 无上游输入
+        </template>
+      </div>
       <div
         v-for="param in actionDef!.params"
         :key="param.key"
@@ -411,6 +431,7 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
                     @click="selectRef(param.key, act.ref)"
                   >
                     ⚡ {{ act.label }}
+                    <span v-if="act.isSameContainer" class="text-[9px] text-primary/70 ml-0.5">🔗 容器内</span>
                   </button>
                 </div>
               </div>

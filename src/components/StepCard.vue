@@ -412,6 +412,7 @@ function colorAt15(color: string): string {
           :step-id="step.id"
           :step-label="step.label"
           :steps="steps"
+          :sibling-actions="step.actions"
           :expanded="expandedActionId === action.id"
           :status="runState?.actionStates?.[action.id] || 'idle'"
           @remove="emit('remove-action', step.id, action.id)"
