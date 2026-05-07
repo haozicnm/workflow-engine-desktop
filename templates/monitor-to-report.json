@@ -33,15 +33,15 @@
       "label": "是否异常?",
       "expanded": true,
       "config": {
-        "value": "{{step_browser.evaluate}}",
+        "value": "{{step_browser.b2}}",
         "true_next": "step_error",
         "false_next": "step_normal"
       },
       "conditionGroup": {
         "combinator": "or",
         "conditions": [
-          { "id": "c1", "left": "{{step_browser.evaluate}}", "op": "contains", "right": "异常" },
-          { "id": "c2", "left": "{{step_browser.evaluate}}", "op": "contains", "right": "error" }
+          { "id": "c1", "left": "{{step_browser.b2}}", "op": "contains", "right": "异常" },
+          { "id": "c2", "left": "{{step_browser.b2}}", "op": "contains", "right": "error" }
         ]
       }
     },
@@ -66,7 +66,7 @@
           "id": "e2",
           "type": "append",
           "label": "append",
-          "params": { "value": [["error", "{{step_browser.evaluate}}"]] }
+          "params": { "value": [["error", "{{step_browser.b2}}"]] }
         }
       ]
     },
@@ -100,7 +100,7 @@
           "id": "w2",
           "type": "write",
           "label": "write",
-          "params": { "value": "监控时间: now\n状态: 正常\n页面内容: {{step_browser.evaluate}}" }
+          "params": { "value": "监控时间: now\n状态: 正常\n页面内容: {{step_browser.b2}}" }
         }
       ]
     }

@@ -25,7 +25,7 @@ import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
 import TabsContent from '../components/ui/tabs/TabsContent.vue'
 import type { ContainerType, Step } from '../types/types'
-import { CONTAINER_DEFS, getContainerDef, getActionDefs, newStep, newAction } from '../types/node-registry'
+import { CONTAINER_DEFS, getContainerDef, getActionDefs } from '../types/node-registry'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{

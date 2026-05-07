@@ -156,7 +156,7 @@ pub async fn execute_browser_container(
                     .unwrap_or("");
                 // 优先从 input_ports（连线传入）获取值，其次从 config.value
                 let value = input_ports
-                    .get(&format!("{}_in", &action.label))
+                    .get(&format!("{}_in", &action.id))
                     .and_then(|v| v.as_str())
                     .or_else(|| action.config.get("value").and_then(|v| v.as_str()))
                     .unwrap_or("");
@@ -206,7 +206,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "screenshot" => {
@@ -227,7 +227,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("screenshot"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "evaluate" => {
@@ -248,7 +248,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "get_title" => {
@@ -263,7 +263,7 @@ pub async fn execute_browser_container(
                     .or_else(|| resp.get("result"))
                     .cloned()
                     .unwrap_or(Value::String("".to_string()));
-                output_ports.insert(action.label.clone(), title);
+                output_ports.insert(action.id.clone(), title);
             }
 
             // ─── v1.1+ 扩展动作 ───
@@ -275,7 +275,7 @@ pub async fn execute_browser_container(
                 let resp = crate::nodes::browser::send_sidecar_action("extract_table", &params).await
                     .map_err(|e| anyhow!("表格提取失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "extract_links" => {
@@ -285,7 +285,7 @@ pub async fn execute_browser_container(
                 let resp = crate::nodes::browser::send_sidecar_action("extract_links", &params).await
                     .map_err(|e| anyhow!("链接提取失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "select" => {
@@ -293,7 +293,7 @@ pub async fn execute_browser_container(
                     .and_then(|v| v.as_str()).unwrap_or("");
                 let value = action.config.get("value")
                     .and_then(|v| v.as_str())
-                    .or_else(|| input_ports.get(&format!("{}_in", &action.label))
+                    .or_else(|| input_ports.get(&format!("{}_in", &action.id))
                         .and_then(|v| v.as_str()))
                     .unwrap_or("");
                 let params = serde_json::json!({ "selector": selector, "value": value });
@@ -350,7 +350,7 @@ pub async fn execute_browser_container(
                 let resp = crate::nodes::browser::send_sidecar_action("pages", &serde_json::json!({})).await
                     .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "cookies" => {
@@ -365,7 +365,7 @@ pub async fn execute_browser_container(
                 let resp = crate::nodes::browser::send_sidecar_action("cookies", &params).await
                     .map_err(|e| anyhow!("Cookie 操作失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "set_headers" => {
@@ -395,7 +395,7 @@ pub async fn execute_browser_container(
                 let resp = crate::nodes::browser::send_sidecar_action("current_url", &serde_json::json!({})).await
                     .map_err(|e| anyhow!("获取URL失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             "pdf" => {
@@ -447,7 +447,7 @@ pub async fn execute_browser_container(
                     let count = data.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
                     tracing::warn!("ActionGuard: action '{}' 后检测到 {} 个问题", action.label, count);
                 }
-                output_ports.insert(action.label.clone(), data);
+                output_ports.insert(action.id.clone(), data);
             }
 
             // ─── 文件下载 (v1.6) ───
@@ -466,7 +466,7 @@ pub async fn execute_browser_container(
                 });
                 let resp = crate::nodes::browser::send_sidecar_action("download", &params).await
                     .map_err(|e| anyhow!("下载失败: {}", e))?;
-                output_ports.insert(action.label.clone(), resp);
+                output_ports.insert(action.id.clone(), resp);
             }
 
             _ => {

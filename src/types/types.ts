@@ -112,6 +112,56 @@ export function uid(prefix = ''): string {
   return prefix ? prefix + '_' + id : id
 }
 
+/**
+ * Generate the next sequential step ID by finding the highest existing step number.
+ * Parses existing step IDs matching `step_(\d+)` and returns `step_{max+1}`.
+ */
+export function nextStepId(steps: Step[]): string {
+  let maxNum = 0
+  const regex = /^step_(\d+)$/
+  for (const step of steps) {
+    const m = step.id.match(regex)
+    if (m) {
+      const n = parseInt(m[1], 10)
+      if (n > maxNum) maxNum = n
+    }
+    // Also check nested thenSteps / elseSteps (logic containers)
+    if (step.thenSteps) {
+      for (const sub of step.thenSteps) {
+        const m2 = sub.id.match(regex)
+        if (m2) { const n = parseInt(m2[1], 10); if (n > maxNum) maxNum = n }
+      }
+    }
+    if (step.elseSteps) {
+      for (const sub of step.elseSteps) {
+        const m2 = sub.id.match(regex)
+        if (m2) { const n = parseInt(m2[1], 10); if (n > maxNum) maxNum = n }
+      }
+    }
+  }
+  return `step_${maxNum + 1}`
+}
+
+/**
+ * Generate the next sequential action ID for a given step.
+ * Extracts the step number from stepId (e.g. `step_3` → `3`) and
+ * counts existing actions to produce `action_{stepNum}_{n+1}`.
+ */
+export function nextActionId(stepId: string, existingActions: Action[]): string {
+  const m = stepId.match(/^step_(\d+)$/)
+  const stepNum = m ? parseInt(m[1], 10) : 0
+  let maxIdx = 0
+  const regex = new RegExp(`^action_${stepNum}_(\\d+)$`)
+  for (const act of existingActions) {
+    const am = act.id.match(regex)
+    if (am) {
+      const n = parseInt(am[1], 10)
+      if (n > maxIdx) maxIdx = n
+    }
+  }
+  return `action_${stepNum}_${maxIdx + 1}`
+}
+
 export function newWorkflow(): Workflow {
   return {
     name: '未命名工作流',

@@ -125,7 +125,7 @@ const availableRefs = computed<VarRef[]>(() => {
     // 动作级引用：{{stepId.actionLabel}} → 单个动作输出
     for (const action of (step.actions || [])) {
       const actionLabel = action.label || action.type
-      refs.push({ id: `${step.id}.${actionLabel}`, label: `${step.label} › ${actionLabel}`, icon: '⚡', type: 'action' })
+      refs.push({ id: `${step.id}.${action.id}`, label: `${step.label} › ${actionLabel}`, icon: '⚡', type: 'action' })
     }
   }
   return refs

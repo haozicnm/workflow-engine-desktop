@@ -187,7 +187,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   function addStep(containerType: ContainerType) {
     if (!current.value) return
-    current.value.steps.push(newStep(containerType))
+    current.value.steps.push(newStep(containerType, current.value.steps))
     dirty.value = true
   }
 
@@ -213,7 +213,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     const step = findStep(stepId)
     if (!step) return
     if (!step.actions) step.actions = []
-    step.actions.push(newAction(actionType, step.type, step.actions))
+    step.actions.push(newAction(actionType, step.type, step.actions, stepId))
     dirty.value = true
   }
 

@@ -5,7 +5,7 @@ import type {
   ContainerType, ContainerDef, ActionDef, ActionParam,
   Action, Step,
 } from './types'
-import { uid } from './types'
+import { uid, nextStepId, nextActionId } from './types'
 
 // ─── 容器定义 ───
 
@@ -304,7 +304,7 @@ export function isContainerType(type: ContainerType): boolean {
 
 // ─── 工厂函数 ───
 
-export function newAction(type: string, containerType?: ContainerType, existingActions?: Action[]): Action {
+export function newAction(type: string, containerType?: ContainerType, existingActions?: Action[], stepId?: string): Action {
   const def = containerType ? getActionDef(containerType, type) : undefined
   let label = def?.label || type
   // 重名处理：自动加 _2, _3 后缀
@@ -316,10 +316,11 @@ export function newAction(type: string, containerType?: ContainerType, existingA
       label = `${label}_${suffix}`
     }
   }
-  return { id: uid('act'), type, label, params: {} }
+  const id = stepId ? nextActionId(stepId, existingActions || []) : uid('act')
+  return { id, type, label, params: {} }
 }
 
-export function newStep(containerType: ContainerType): Step {
+export function newStep(containerType: ContainerType, existingSteps?: Step[]): Step {
   const def = getContainerDef(containerType)
   // 从容器定义中提取默认参数
   const config: Record<string, unknown> = {}
@@ -329,7 +330,7 @@ export function newStep(containerType: ContainerType): Step {
     }
   }
   const step: Step = {
-    id: uid('step'),
+    id: nextStepId(existingSteps || []),
     type: containerType,
     label: def.label,
     expanded: true,

@@ -46,7 +46,7 @@ async fn test_exec_template1_order_to_contracts() {
     ctx.set_output(&steps[0].id, r1.clone());
     println!("  Keys: {:?}", r1.as_object().map(|o| o.keys().collect::<Vec<_>>()));
 
-    let read_data = r1.get("read").and_then(|v| v.get("data")).and_then(|v| v.as_array());
+    let read_data = r1.get("a1").and_then(|v| v.get("data")).and_then(|v| v.as_array());
     assert!(read_data.is_some(), "Excel read 应产出 data 数组");
     let rows = read_data.unwrap();
     println!("  读取 {} 行", rows.len());
@@ -91,8 +91,8 @@ async fn test_exec_template2_logic_routing() {
     // 模拟 browser 输出（含"异常"关键字 → branch=true）
     println!("=== 模拟 Browser 输出 ===");
     ctx.set_output("step_browser", json!({
-        "navigate": {"url": "file:///status-page.html"},
-        "evaluate": "系统监控 | 系统运行状态 异常 响应时间: 120ms"
+        "b1": {"url": "file:///status-page.html"},
+        "b2": "系统监控 | 系统运行状态 异常 响应时间: 120ms"
     }));
     println!("  page contains '异常' → expected branch=true");
 

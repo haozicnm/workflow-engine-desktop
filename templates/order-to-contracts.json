@@ -26,7 +26,7 @@
       "label": "逐笔迭代",
       "expanded": true,
       "config": {
-        "items": "{{step_excel.read.data}}",
+        "items": "{{step_excel.a1.data}}",
         "body": [
           {
             "id": "body_word",
