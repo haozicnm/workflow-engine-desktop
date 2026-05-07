@@ -131,6 +131,57 @@ const availableRefs = computed<VarRef[]>(() => {
   return refs
 })
 
+// ─── Grouped refs for tree dropdown ───
+interface StepGroup {
+  stepId: string
+  stepLabel: string
+  stepIcon: string
+  stepRef: string
+  actions: { id: string; label: string; ref: string }[]
+}
+
+const groupedRefs = computed<StepGroup[]>(() => {
+  const groups = new Map<string, StepGroup>()
+  for (const r of availableRefs.value) {
+    if (r.type === 'step') {
+      groups.set(r.id, {
+        stepId: r.id,
+        stepLabel: r.label,
+        stepIcon: r.icon,
+        stepRef: r.id,
+        actions: [],
+      })
+    }
+  }
+  for (const r of availableRefs.value) {
+    if (r.type === 'action') {
+      const dotIdx = r.id.indexOf('.')
+      const stepId = dotIdx > 0 ? r.id.slice(0, dotIdx) : r.id
+      const group = groups.get(stepId)
+      if (group) {
+        const actionLabel = r.label.includes('›') ? r.label.split('›').pop()!.trim() : r.label
+        group.actions.push({ id: r.id, label: actionLabel, ref: r.id })
+      }
+    }
+  }
+  return Array.from(groups.values())
+})
+
+const openParam = ref<string | null>(null)
+
+function toggleDropdown(paramKey: string) {
+  openParam.value = openParam.value === paramKey ? null : paramKey
+}
+
+function closeDropdown() {
+  openParam.value = null
+}
+
+function selectRef(fieldKey: string, refId: string) {
+  insertRef(fieldKey, refId)
+  openParam.value = null
+}
+
 function insertRef(fieldKey: string, refId: string) {
   const input = document.querySelector(`[data-field="${fieldKey}"]`) as HTMLInputElement | HTMLTextAreaElement
   if (!input) return
@@ -312,25 +363,58 @@ const hasParams = computed(() => actionDef.value && actionDef.value.params.lengt
         />
 
         <!-- Variable reference (text/textarea) -->
-        <div v-if="(param.type === 'text' || param.type === 'textarea') && availableRefs.length > 0" class="mt-1">
+        <div v-if="(param.type === 'text' || param.type === 'textarea') && groupedRefs.length > 0" class="mt-1">
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] text-muted-foreground shrink-0">🔗</span>
-            <select
-              class="flex-1 h-6 text-[11px] bg-background border border-border rounded px-1.5 text-foreground cursor-pointer hover:border-primary/50 transition-colors"
-              @change="(e: Event) => { const v = (e.target as HTMLSelectElement).value; if (v) insertRef(param.key, v); (e.target as HTMLSelectElement).value = ''; }"
-            >
-              <option value="">— 引用变量 —</option>
-              <optgroup v-if="availableRefs.some(r => r.type === 'step')" label="步骤">
-                <option v-for="ref in availableRefs.filter(r => r.type === 'step')" :key="ref.id" :value="ref.id">
-                  {{ ref.icon }} {{ ref.label }}
-                </option>
-              </optgroup>
-              <optgroup v-if="availableRefs.some(r => r.type === 'action')" label="动作">
-                <option v-for="ref in availableRefs.filter(r => r.type === 'action')" :key="ref.id" :value="ref.id">
-                  {{ ref.label }}
-                </option>
-              </optgroup>
-            </select>
+            <div class="relative flex-1">
+              <button
+                type="button"
+                class="flex-1 h-6 w-full text-[11px] bg-background border border-border rounded px-1.5 text-muted-foreground cursor-pointer hover:border-primary/50 hover:text-foreground transition-colors text-left"
+                @click="toggleDropdown(param.key)"
+              >
+                🔗 引用变量
+              </button>
+              <!-- Dropdown popover -->
+              <!-- Backdrop to catch outside clicks -->
+              <div
+                v-if="openParam === param.key"
+                class="fixed inset-0 z-40"
+                @click="closeDropdown"
+              />
+              <div
+                v-if="openParam === param.key"
+                class="absolute z-50 mt-1 left-0 w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md shadow-lg"
+              >
+                <div
+                  v-for="group in groupedRefs"
+                  :key="group.stepId"
+                >
+                  <!-- Step header -->
+                  <div class="px-2 py-1.5 text-[11px] font-semibold text-foreground bg-muted/50 border-b border-border/50 flex items-center gap-1.5 sticky top-0">
+                    <span>{{ group.stepIcon }}</span>
+                    <span>步骤{{ group.stepId.replace('step_', '') }} · {{ group.stepLabel }}</span>
+                  </div>
+                  <!-- Step-level output -->
+                  <button
+                    type="button"
+                    class="w-full text-left px-2 py-1 pl-5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    @click="selectRef(param.key, group.stepRef)"
+                  >
+                    ⚡ 整个输出
+                  </button>
+                  <!-- Actions under this step -->
+                  <button
+                    v-for="act in group.actions"
+                    :key="act.id"
+                    type="button"
+                    class="w-full text-left px-2 py-1 pl-5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    @click="selectRef(param.key, act.ref)"
+                  >
+                    ⚡ {{ act.label }}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
           <!-- 已有引用标签 -->
           <div
