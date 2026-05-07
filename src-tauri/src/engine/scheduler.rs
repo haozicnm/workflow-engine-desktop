@@ -155,6 +155,36 @@ pub async fn run_workflow(
             emit_approval_required(app_handle, run_id, step);
         }
 
+        // ─── 条件执行检查（runCondition） ───
+        if let Some(ref rc) = step.run_condition {
+            let condition_output = ctx.get_output(&rc.ref_step);
+            let branch = condition_output
+                .and_then(|o| o.get("branch"))
+                .and_then(|b| b.as_str())
+                .unwrap_or("false");
+            if !rc.should_run(branch) {
+                info!(
+                    "步骤 '{}' 条件不满足 (ref={} branch={}) → 跳过",
+                    step.name, rc.ref_step, branch
+                );
+                state.mark_step_skipped(&current_id);
+                ctx.set_output(&current_id, serde_json::json!({"skipped": true, "reason": "condition"}));
+                emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "skipped", None);
+                emit_variable_snapshot(app_handle, run_id, &ctx);
+                // 跳转到下一步
+                current_id = match determine_next_step(step, workflow, &ctx) {
+                    Some(next_id) => next_id,
+                    None => {
+                        state.mark_completed();
+                        let _ = db.update_run_status(run_id, "completed", None);
+                        emit_run_update(app_handle, run_id, &workflow_name, "completed");
+                        return Ok(state);
+                    }
+                };
+                continue;
+            }
+        }
+
         // 执行步骤（带重试 + 超时）
         let result = execute_with_retry(&executor, step, &mut ctx).await;
 

@@ -108,6 +108,7 @@ pub struct Step {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunCondition {
     /// 引用的逻辑步骤 ID
+    #[serde(alias = "ref")]
     pub ref_step: String,
     /// branch 为该值时执行
     #[serde(default = "default_when")]
