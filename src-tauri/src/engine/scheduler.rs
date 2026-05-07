@@ -334,6 +334,17 @@ fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionContext)
         }
     }
 
+    // cursor 节点：根据 done 标志决定是否继续
+    if step.step_type == "cursor" {
+        if let Some(output) = ctx.get_output(&step.id) {
+            let done = output.get("done").and_then(|v| v.as_bool()).unwrap_or(false);
+            if !done {
+                return None;  // 还有数据待处理，本次运行到此为止
+            }
+            // done == true：继续执行后续步骤（如通知）
+        }
+    }
+
     // 循环/并行节点：结束（不自动流转）
     if step.step_type == "loop" || step.step_type == "parallel" || step.step_type == "while" {
         return None;

@@ -117,6 +117,7 @@ impl StepExecutor {
         register!(executors, "approval", crate::nodes::approval::ApprovalNode);
         register!(executors, "loop", crate::nodes::loop_node::LoopNode);
         register!(executors, "while", crate::nodes::while_node::WhileNode);
+        register!(executors, "cursor", crate::nodes::cursor::CursorNode);
         register!(executors, "parallel", crate::nodes::parallel::ParallelNode);
         register!(executors, "map", crate::nodes::map::MapNode);
         register!(executors, "web_scrape", crate::nodes::web_scrape::WebScrapeNode);

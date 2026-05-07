@@ -34,3 +34,4 @@ pub mod print;
 pub mod json_parse;
 pub mod text_template;
 pub mod file_save;
+pub mod cursor;

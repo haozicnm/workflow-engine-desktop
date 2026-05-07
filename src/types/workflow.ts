@@ -3,7 +3,7 @@
 
 // ─── 容器类型 ───
 
-export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard'
+export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor'
 
 export interface ContainerDef {
   type: ContainerType
@@ -62,6 +62,9 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '读取', value: 'read' }, { label: '写入', value: 'write' },
     ], default: 'read' },
     { key: 'text', label: '写入内容', type: 'textarea' },
+  ]},
+  { type: 'cursor', label: '游标迭代', icon: '🔁', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', params: [
+    { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
   ]},
 ]
 
