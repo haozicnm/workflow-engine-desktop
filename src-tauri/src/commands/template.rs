@@ -1,5 +1,4 @@
 // commands/template.rs — 内置模板 + 文件系统模板库
-// P4 增强：list_templates 从 templates/ 目录读取，load_template 加载完整 YAML
 use serde::Serialize;
 use tracing::warn;
 
@@ -16,32 +15,18 @@ pub struct BuiltinTemplate {
 fn all_templates() -> Vec<BuiltinTemplate> {
     vec![
         BuiltinTemplate {
-            id: "monitor-excel-alert",
-            name: "网页监控 → Excel异常报告",
-            description: "浏览器打开状态页 → 提取文本 → 条件判断 → Excel写入报告",
+            id: "order-to-contracts",
+            name: "订单逐笔生成合同",
+            description: "Excel读取订单 → cursor游标逐行迭代 → Word生成合同 → 全部完成通知",
             yaml: "",
-            json_data: Some(include_str!("../../../templates/monitor-excel-alert.json")),
+            json_data: Some(include_str!("../../../templates/order-to-contracts.json")),
         },
         BuiltinTemplate {
-            id: "excel-to-word-batch",
-            name: "Excel数据 → 批量Word通知书",
-            description: "Excel读取员工数据 → 条件判断有数据 → Word生成通知书",
+            id: "monitor-to-report",
+            name: "网页监控 → 条件分流报告",
+            description: "浏览器打开状态页 → 提取文本 → 条件判断 → 异常走Excel / 正常走Word",
             yaml: "",
-            json_data: Some(include_str!("../../../templates/excel-to-word-batch.json")),
-        },
-        BuiltinTemplate {
-            id: "api-excel-word-branch",
-            name: "JSON数据 → 条件分流 Word/Excel",
-            description: "Excel读取订单 → 筛选大额订单 → 大额走Word合同，小额走Excel汇总",
-            yaml: "",
-            json_data: Some(include_str!("../../../templates/api-excel-word-branch.json")),
-        },
-        BuiltinTemplate {
-            id: "word-extract-excel",
-            name: "Word文档提取 → Excel汇总分析",
-            description: "Word读取合同 → 条件判断大额 → Excel写入分析结果",
-            yaml: "",
-            json_data: Some(include_str!("../../../templates/word-extract-excel.json")),
+            json_data: Some(include_str!("../../../templates/monitor-to-report.json")),
         },
     ]
 }
@@ -79,7 +64,7 @@ pub async fn template_get_yaml(id: String) -> Result<Option<String>, String> {
         .map(|t| t.yaml.to_string()))
 }
 
-/// 获取单个内置模板的 v2.0 JSON 数据（nodes + edges）
+/// 获取单个内置模板的 JSON 数据
 #[tauri::command]
 pub async fn template_get_json(id: String) -> Result<Option<String>, String> {
     Ok(all_templates()
@@ -90,10 +75,9 @@ pub async fn template_get_json(id: String) -> Result<Option<String>, String> {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Tauri 命令：文件系统模板（P4 新增）
+// Tauri 命令：文件系统模板
 // ═══════════════════════════════════════════════════════════
 
-/// 解析模板 YAML 文件，提取元数据（名称、描述、步骤数）
 fn parse_template_meta(path: &std::path::Path) -> Option<serde_json::Value> {
     let content = std::fs::read_to_string(path).ok()?;
     let wf: crate::engine::workflow::Workflow = serde_yaml::from_str(&content).ok()?;
@@ -111,12 +95,11 @@ fn parse_template_meta(path: &std::path::Path) -> Option<serde_json::Value> {
     }))
 }
 
-/// 列出 templates/ 目录下的所有模板文件（含内置模板 + 文件系统模板）
 #[tauri::command]
 pub async fn list_templates() -> Result<Vec<serde_json::Value>, String> {
     let mut all = Vec::new();
 
-    // ── 1. 内置模板（编译期嵌入） ──
+    // ── 1. 内置模板 ──
     for t in all_templates() {
         let step_count = count_yaml_steps(t.yaml);
         all.push(serde_json::json!({
@@ -157,7 +140,6 @@ pub async fn list_templates() -> Result<Vec<serde_json::Value>, String> {
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown");
 
-                        // 跳过已存在的内置模板（避免重复）
                         if all.iter().any(|t| {
                             t.get("id").and_then(|v| v.as_str()) == Some(filename)
                         }) {
@@ -179,10 +161,8 @@ pub async fn list_templates() -> Result<Vec<serde_json::Value>, String> {
     Ok(all)
 }
 
-/// 加载指定模板的完整 YAML 内容
 #[tauri::command]
 pub async fn load_template(id: String) -> Result<Option<String>, String> {
-    // 先查内置模板
     if let Some(yaml) = all_templates()
         .iter()
         .find(|t| t.id == id)
@@ -191,7 +171,6 @@ pub async fn load_template(id: String) -> Result<Option<String>, String> {
         return Ok(Some(yaml));
     }
 
-    // 再查文件系统模板
     let template_dirs = vec![
         std::path::PathBuf::from("templates"),
         std::env::current_dir()
@@ -223,7 +202,6 @@ pub async fn load_template(id: String) -> Result<Option<String>, String> {
     Ok(None)
 }
 
-/// 统计 YAML 字符串中的步骤数
 fn count_yaml_steps(yaml: &str) -> usize {
     let parsed: Option<serde_yaml::Value> = serde_yaml::from_str(yaml).ok();
     parsed

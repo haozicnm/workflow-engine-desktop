@@ -10,6 +10,11 @@ fn test_data(path: &str) -> String { format!("../examples/{}", path) }
 
 /// 辅助函数：构建最小 Step
 fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -> Step {
+    // 从 config 中提取 actions（如果存在），传给 step.actions 字段
+    let actions = config.get("actions")
+        .and_then(|a| a.as_array())
+        .map(|arr| arr.clone());
+
     Step {
         id: id.to_string(),
         name: name.to_string(),
@@ -22,7 +27,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
         breakpoint: false,
         delay: None,
         on_error: None,
-        actions: None,
+        actions,
         expanded: None,
         condition: None,
         condition_group: None,

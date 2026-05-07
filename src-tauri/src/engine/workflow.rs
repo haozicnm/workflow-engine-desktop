@@ -92,7 +92,7 @@ pub struct Step {
     #[serde(default)]
     pub condition: Option<String>,
     /// 可视化条件组（新格式，支持 AND/OR）
-    #[serde(default)]
+    #[serde(alias = "conditionGroup", default)]
     pub condition_group: Option<LogicConditionGroup>,
     /// 条件为真时的子步骤
     #[serde(default)]
