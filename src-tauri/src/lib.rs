@@ -30,13 +30,11 @@ fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
         return Ok(());
     }
 
-    info!("正在创建 4 个内置示例工作流...");
+    info!("正在创建 2 个内置示例工作流...");
 
     let builtins: &[(&str, &str)] = &[
-        (include_str!("../../templates/monitor-excel-alert.json"), "网页监控 → Excel异常报告"),
-        (include_str!("../../templates/excel-to-word-batch.json"), "Excel数据 → 批量Word通知书"),
-        (include_str!("../../templates/api-excel-word-branch.json"), "JSON数据 → 条件分流 Word/Excel"),
-        (include_str!("../../templates/word-extract-excel.json"), "Word文档提取 → Excel汇总分析"),
+        (include_str!("../../templates/order-to-contracts.json"), "订单逐笔生成合同"),
+        (include_str!("../../templates/monitor-to-report.json"), "网页监控 → 条件分流报告"),
     ];
 
     for (json_str, default_name) in builtins {
