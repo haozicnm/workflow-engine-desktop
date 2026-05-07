@@ -35,10 +35,15 @@ fn resolve_items(items_value: &Value, ctx: &ExecutionContext) -> Result<Vec<Valu
     Err(anyhow!("while items 必须是数组或引用"))
 }
 
-/// 解析 body 步骤
-fn parse_body_steps(config: &Value) -> Result<Vec<Step>> {
+/// 解析 body 步骤：优先 step.body_steps（编辑器 UI），回退 config.body（手写 JSON）
+fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
+    if let Some(ref body) = step.body_steps {
+        if !body.is_empty() {
+            return Ok(body.clone());
+        }
+    }
     let steps: Vec<Step> = serde_json::from_value(
-        config.get("body").cloned().unwrap_or(json!([]))
+        step.config.get("body").cloned().unwrap_or(json!([]))
     ).map_err(|e| anyhow!("while body 解析失败: {}", e))?;
     if steps.is_empty() {
         return Err(anyhow!("while body 不能为空"));
@@ -110,7 +115,7 @@ impl NodeExecutor for WhileNode {
         let items_value = step.config.get("items")
             .ok_or_else(|| anyhow!("while 节点缺少 items 参数"))?;
         let items = resolve_items(items_value, ctx)?;
-        let body_steps = parse_body_steps(&step.config)?;
+        let body_steps = parse_body_steps(step)?;
 
         // 条件配置
         let cond = step.config.get("condition").and_then(|v| v.as_object());

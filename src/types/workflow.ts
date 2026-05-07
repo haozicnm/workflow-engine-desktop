@@ -3,7 +3,7 @@
 
 // ─── 容器类型 ───
 
-export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor'
+export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor' | 'loop'
 
 export interface ContainerDef {
   type: ContainerType
@@ -65,6 +65,9 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'cursor', label: '游标迭代', icon: '🔁', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
+  ]},
+  { type: 'loop', label: '批量循环', icon: '🔄', color: '#f0883e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', params: [
+    { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
   ]},
 ]
 
