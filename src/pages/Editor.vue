@@ -18,6 +18,7 @@ import CardHeader from '../components/ui/card/CardHeader.vue'
 import CardTitle from '../components/ui/card/CardTitle.vue'
 import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
 import Separator from '../components/ui/separator/Separator.vue'
+import ApprovalDialog from '../components/ApprovalDialog.vue'
 import Textarea from '../components/ui/textarea/Textarea.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
@@ -612,6 +613,7 @@ onUnmounted(() => {
       </Transition>
     </Teleport>
   </div>
+  <ApprovalDialog />
 </template>
 
 <style scoped>

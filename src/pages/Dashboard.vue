@@ -16,6 +16,7 @@ import SidebarGroupLabel from '../components/ui/sidebar/SidebarGroupLabel.vue'
 import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
 import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
+import ApprovalDialog from '../components/ApprovalDialog.vue'
 
 interface WorkflowItem {
   id: string
@@ -300,4 +301,5 @@ defineExpose({ loadList })
       </SidebarMenuButton>
     </SidebarMenuItem>
   </SidebarFooter>
+  <ApprovalDialog />
 </template>

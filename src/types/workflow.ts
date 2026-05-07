@@ -3,7 +3,7 @@
 
 // ─── 容器类型 ───
 
-export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor' | 'loop'
+export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor' | 'loop' | 'approval'
 
 export interface ContainerDef {
   type: ContainerType
@@ -68,6 +68,16 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'loop', label: '批量循环', icon: '🔄', color: '#f0883e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
+  ]},
+  { type: 'approval', label: '人工审批', icon: '✋', color: '#f778ba', description: '暂停流程等待人工审核：查看数据后同意或拒绝', params: [
+    { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
+    { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step1.订单号}}，金额：{{step1.金额}}' },
+    { key: 'timeout', label: '超时(秒)', type: 'number', default: 300 },
+    { key: 'timeout_action', label: '超时策略', type: 'select', options: [
+      { label: '自动拒绝', value: 'reject' },
+      { label: '自动通过', value: 'approve' },
+      { label: '标记失败', value: 'fail' },
+    ], default: 'reject' },
   ]},
 ]
 
