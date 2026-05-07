@@ -64,7 +64,7 @@ fn convert_step(step: &Step) -> Result<Step> {
         let container_type = format!("{}_container", step.step_type);
 
         let actions = step.actions.clone().unwrap_or_default();
-        let converted_actions: Vec<Value> = actions.iter().map(|a| convert_action(a)).collect();
+        let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
 
         let mut config = if step.config.is_object() {
             step.config.clone()

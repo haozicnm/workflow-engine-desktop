@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { Step, StepRunState, ContainerType, ErrorStrategy } from '../types/workflow'
-import { getContainerDef, isContainerType } from '../types/workflow'
+import type { Step, StepRunState, ContainerType, ErrorStrategy } from '../types/types'
+import { getContainerDef, isContainerType } from '../types/node-registry'
 import ActionRow from './ActionRow.vue'
 import LogicBranch from './LogicBranch.vue'
 import Card from './ui/card/Card.vue'
@@ -33,7 +33,7 @@ const emit = defineEmits<{
   'remove-step': [stepId: string]
   'rename-step': [stepId: string, label: string]
   'update-condition': [stepId: string, condition: string]
-  'update-condition-group': [stepId: string, group: import('../types/workflow').LogicConditionGroup]
+  'update-condition-group': [stepId: string, group: import('../types/types').LogicConditionGroup]
   'open-config': [stepId: string]
   'update-error-strategy': [stepId: string, strategy: ErrorStrategy]
   'start-recording': [stepId: string]

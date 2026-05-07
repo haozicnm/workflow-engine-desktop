@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { useWorkflowStore } from '../stores/workflowStore'
-import type { Workflow, StepRunState } from '../types/workflow'
+import type { Workflow, StepRunState } from '../types/types'
 import { safeInvoke, safeListen } from '../utils/tauri'
 
 export function useStepRunner() {

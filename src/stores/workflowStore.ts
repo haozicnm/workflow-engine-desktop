@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { safeInvoke } from '../utils/tauri'
-import {
-  type Workflow, type Step, type ContainerType, type StepRunState,
-  newStep, newAction, newWorkflow, serializeWorkflow, deserializeWorkflow,
-} from '../types/workflow'
+import type { Workflow, Step, ContainerType, StepRunState } from '../types/types'
+import { newWorkflow, serializeWorkflow, deserializeWorkflow } from '../types/types'
+import { newStep, newAction } from '../types/node-registry'
 
 // ─── Backend response types ───
 
@@ -241,7 +240,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     dirty.value = true
   }
 
-  function updateConditionGroup(stepId: string, group: import('../types/workflow').LogicConditionGroup) {
+  function updateConditionGroup(stepId: string, group: import('../types/types').LogicConditionGroup) {
     const step = findStep(stepId)
     if (!step) return
     step.conditionGroup = group

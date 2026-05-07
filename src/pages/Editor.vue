@@ -24,11 +24,8 @@ import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
 import TabsContent from '../components/ui/tabs/TabsContent.vue'
-import {
-  type ContainerType, type Step,
-  CONTAINER_DEFS, getContainerDef, getActionDefs,
-  newStep, newAction,
-} from '../types/workflow'
+import type { ContainerType, Step } from '../types/types'
+import { CONTAINER_DEFS, getContainerDef, getActionDefs, newStep, newAction } from '../types/node-registry'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -266,7 +263,7 @@ function onUpdateCondition(stepId: string, condition: string) {
   }
 }
 
-function onErrorStrategyChange(stepId: string, strategy: import('../types/workflow').ErrorStrategy) {
+function onErrorStrategyChange(stepId: string, strategy: import('../types/types').ErrorStrategy) {
   if (!workflow.value) return
   const step = store.findStep(stepId)
   if (step) {

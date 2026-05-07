@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
-import type { Step, StepRunState, LogicCondition, LogicConditionGroup } from '../types/workflow'
-import { LOGIC_OPERATORS, uid } from '../types/workflow'
+import type { Step, StepRunState, LogicCondition, LogicConditionGroup } from '../types/types'
+import { uid } from '../types/types'
+import { LOGIC_OPERATORS } from '../types/node-registry'
 import { safeInvoke } from '../utils/tauri'
 import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'

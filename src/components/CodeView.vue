@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Workflow } from '../types/workflow'
+import type { Workflow } from '../types/types'
 import yaml from 'js-yaml'
 import Button from './ui/button/Button.vue'
 import Textarea from './ui/textarea/Textarea.vue'

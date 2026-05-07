@@ -55,6 +55,12 @@ pub async fn run_workflow(
     let mut current_id = workflow.steps[0].id.clone();
     let total_steps = workflow.steps.len();
 
+    // 预构建步骤 ID → 索引映射，避免循环中 O(n) 查找
+    let step_index: std::collections::HashMap<&str, usize> = workflow.steps.iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.as_str(), i))
+        .collect();
+
     // 步骤执行循环
     loop {
         // 检查取消（AtomicBool + CancellationToken 双重机制）
@@ -89,11 +95,11 @@ pub async fn run_workflow(
         }
 
         // 查找当前步骤（引用传递，避免循环中 clone 整个 Step）
-        let step = match workflow.steps.iter().find(|s| s.id == current_id) {
+        let step = match step_index.get(current_id.as_str()).and_then(|&i| workflow.steps.get(i)) {
             Some(s) => s,
             None => {
                 state.mark_failed();
-                let _ = db.update_run_status(run_id, "failed", Some(&format!("步骤 '{}' 不存在", current_id)));
+                if let Err(e) = db.update_run_status(run_id, "failed", Some(&format!("步骤 '{}' 不存在", current_id))) { warn!("DB update failed: {}", e); }
                 emit_run_update(app_handle, run_id, &workflow_name, "failed");
                 return Err(anyhow::anyhow!("步骤 '{}' 不存在", current_id));
             }
@@ -176,7 +182,7 @@ pub async fn run_workflow(
                     Some(next_id) => next_id,
                     None => {
                         state.mark_completed();
-                        let _ = db.update_run_status(run_id, "completed", None);
+                        if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
                         emit_run_update(app_handle, run_id, &workflow_name, "completed");
                         return Ok(state);
                     }
@@ -229,7 +235,7 @@ pub async fn run_workflow(
                 match strategy {
                     crate::engine::workflow::ErrorStrategy::Fail => {
                         state.mark_failed();
-                        let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
+                        if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) { warn!("DB update failed: {}", e); }
                         emit_run_update(app_handle, run_id, &workflow_name, "failed");
                         return Err(e);
                     }
@@ -249,7 +255,7 @@ pub async fn run_workflow(
                         if !workflow.steps.iter().any(|s| s.id == *branch_id) {
                             warn!("分支目标步骤 '{}' 不存在，回退为 fail", branch_id);
                             state.mark_failed();
-                            let _ = db.update_run_status(run_id, "failed", Some(&format!("分支目标不存在: {}", branch_id)));
+                            if let Err(e) = db.update_run_status(run_id, "failed", Some(&format!("分支目标不存在: {}", branch_id))) { warn!("DB update failed: {}", e); }
                             emit_run_update(app_handle, run_id, &workflow_name, "failed");
                             return Err(anyhow::anyhow!("分支目标步骤 '{}' 不存在", branch_id));
                         }
@@ -315,7 +321,7 @@ async fn execute_with_retry(
 }
 
 /// 确定下一个步骤 ID
-fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionContext) -> Option<String> {
+pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionContext) -> Option<String> {
     // 条件节点：根据输出选择 true_next / false_next
     if step.step_type == "condition" {
         if let Some(output) = ctx.get_output(&step.id) {
@@ -342,6 +348,15 @@ fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionContext)
                 return None;  // 还有数据待处理，本次运行到此为止
             }
             // done == true：继续执行后续步骤（如通知）
+        }
+    }
+
+    // approval 节点：awaiting_approval 时暂停，已决策则继续
+    if step.step_type == "approval" {
+        if let Some(output) = ctx.get_output(&step.id) {
+            if output.get("status").and_then(|v| v.as_str()) == Some("awaiting_approval") {
+                return None;  // 等待人工审批
+            }
         }
     }
 
@@ -428,7 +443,7 @@ fn emit_approval_required(app: &tauri::AppHandle, run_id: &str, step: &Step) {
         "message": step.config.get("message").and_then(|v| v.as_str()).unwrap_or("请审批此操作"),
         "options": step.config.get("options").cloned().unwrap_or_else(|| serde_json::json!(["approve", "reject"])),
     });
-    let _ = app.emit("approval-required", event);
+    if let Err(e) = app.emit("approval-required", event) { warn!("emit approval-required failed: {}", e); }
 
     // 审批通知增强：窗口隐藏时自动弹出
     use tauri::Manager;

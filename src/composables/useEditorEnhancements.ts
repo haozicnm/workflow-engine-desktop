@@ -1,7 +1,7 @@
 import { ref, watch, onUnmounted, computed } from 'vue'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from './useToast'
-import type { Workflow } from '../types/workflow'
+import type { Workflow } from '../types/types'
 
 export interface LogEntry {
   time: string

@@ -252,9 +252,12 @@ pub async fn run_logs(
 pub async fn approval_response(
     approval_id: String,
     approved: bool,
+    comment: Option<String>,
 ) -> Result<(), String> {
-    crate::nodes::approval::get_approval_manager().await
-        .respond(&approval_id, approved).await
+    // approval_id 格式: "approval:{step_id}"
+    let step_id = approval_id.strip_prefix("approval:")
+        .ok_or_else(|| format!("无效的 approval_id: {}", approval_id))?;
+    crate::nodes::approval::record_decision(step_id, approved, comment)
         .map_err(|e| e.to_string())
 }
 

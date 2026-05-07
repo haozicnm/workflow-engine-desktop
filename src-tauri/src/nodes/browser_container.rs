@@ -69,6 +69,8 @@ pub async fn execute_browser_container(
 ) -> Result<ContainerResult> {
     let mut output_ports: HashMap<String, Value> = HashMap::new();
 
+    // NOTE: 当前使用 match 分发 31 个 action，模式清晰但文件较长。
+    // 如果 action 数量继续增长，考虑参考 executor.rs 的注册表模式重构。
     for action in &config.actions {
         tracing::info!(
             "BrowserContainer — 执行 action: {} ({})",

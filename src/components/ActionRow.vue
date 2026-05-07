@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Action, ContainerType, ActionStatus, Step } from '../types/workflow'
-import { getActionDef, getActionLabel } from '../types/workflow'
+import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
+import { getActionDef, getActionLabel } from '../types/node-registry'
 import { safeInvoke } from '../utils/tauri'
 import { cn } from '@/lib/utils'
 import Button from './ui/button/Button.vue'

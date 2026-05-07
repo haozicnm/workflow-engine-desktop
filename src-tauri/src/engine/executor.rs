@@ -155,6 +155,9 @@ impl StepExecutor {
         };
 
         let resolved_config = ctx.resolve_config(&step.config);
+        // NOTE: Step clone necessary because execute() needs owned Step with resolved config.
+        // After parser conversion, most Option fields (actions, condition_group, etc.) are None,
+        // so actual clone cost is minimal (id/name/step_type strings + config value).
         let resolved_step = Step {
             id: step.id.clone(),
             name: step.name.clone(),

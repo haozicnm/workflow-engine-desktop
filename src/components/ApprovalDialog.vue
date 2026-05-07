@@ -2,24 +2,49 @@
 import { ref, onUnmounted } from 'vue'
 import { safeListen, safeInvoke } from '../utils/tauri'
 
-interface ApprovalEvent {
+interface ApprovalData {
   run_id: string
   step_id: string
   approval_id: string
+  title: string
   message: string
-  options: string[]
+  options?: string[]
 }
 
 const visible = ref(false)
-const approvalData = ref<ApprovalEvent | null>(null)
+const approvalData = ref<ApprovalData | null>(null)
 const deciding = ref(false)
+const comment = ref('')
 
-let unlisten: (() => void) | null = null
+let unlistenA: (() => void) | null = null
+let unlistenS: (() => void) | null = null
 
 async function init() {
-  unlisten = await safeListen<ApprovalEvent>('approval-required', (event) => {
-    approvalData.value = event.payload
+  // 监听 approval-required 事件（scheduler 触发）
+  unlistenA = await safeListen<any>('approval-required', (event) => {
+    approvalData.value = {
+      run_id: event.payload.run_id,
+      step_id: event.payload.step_id,
+      approval_id: event.payload.approval_id,
+      title: '人工审批',
+      message: event.payload.message || '请审批此操作',
+    }
     visible.value = true
+  })
+
+  // 监听 step-update，当审批步骤输出 awaiting_approval 时展示数据
+  unlistenS = await safeListen<any>('step-update', (event) => {
+    const output = event.payload?.output
+    if (output?.status === 'awaiting_approval') {
+      approvalData.value = {
+        run_id: event.payload.run_id,
+        step_id: event.payload.step_id,
+        approval_id: `approval:${event.payload.step_id}`,
+        title: output.title || '人工审批',
+        message: output.message || '请审批此操作',
+      }
+      visible.value = true
+    }
   })
 }
 
@@ -30,32 +55,43 @@ async function decide(approved: boolean) {
     await safeInvoke('approval_response', {
       approvalId: approvalData.value.approval_id,
       approved,
+      comment: comment.value || null,
     })
   } catch (e) {
     console.error('[ApprovalDialog] 审批响应失败:', e)
   }
   visible.value = false
   approvalData.value = null
+  comment.value = ''
   deciding.value = false
 }
 
 init()
 
 onUnmounted(() => {
-  unlisten?.()
+  unlistenA?.()
+  unlistenS?.()
 })
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="approval-overlay" @click.self="() => {}">
+    <div v-if="visible" class="approval-overlay">
       <div class="approval-card">
         <div class="approval-header">
           <span class="approval-icon">✋</span>
-          <span class="approval-title">人工审批</span>
+          <span class="approval-title">{{ approvalData?.title || '人工审批' }}</span>
         </div>
         <div class="approval-body">
           <div class="approval-message">{{ approvalData?.message || '请审批此操作' }}</div>
+          <div class="approval-comment">
+            <input
+              v-model="comment"
+              type="text"
+              placeholder="审批意见（可选）"
+              class="comment-input"
+            />
+          </div>
           <div class="approval-meta" v-if="approvalData">
             <span>步骤: {{ approvalData.step_id }}</span>
             <span>运行: {{ approvalData.run_id }}</span>
@@ -104,9 +140,7 @@ onUnmounted(() => {
 }
 .approval-icon { font-size: 24px; }
 .approval-title { font-size: 18px; font-weight: 600; color: #f778ba; }
-.approval-body {
-  margin-bottom: 24px;
-}
+.approval-body { margin-bottom: 24px; }
 .approval-message {
   background: #2a2a3c;
   border-radius: 8px;
@@ -117,6 +151,19 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.approval-comment { margin-top: 12px; }
+.comment-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #45475a;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-size: 13px;
+  outline: none;
+}
+.comment-input:focus { border-color: #f778ba; }
+.comment-input::placeholder { color: #585b70; }
 .approval-meta {
   display: flex;
   gap: 16px;

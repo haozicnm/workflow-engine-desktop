@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Step, ContainerType } from '../types/workflow'
-import { getContainerDef } from '../types/workflow'
+import type { Step, ContainerType } from '../types/types'
+import { getContainerDef } from '../types/node-registry'
 import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'
 import Label from './ui/label/Label.vue'
