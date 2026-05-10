@@ -307,7 +307,7 @@ pub async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serd
     }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
-/// 追加行到 Excel
+/// 追加行到 Excel（保留原文件格式）
 pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
@@ -315,83 +315,86 @@ pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serd
         .ok_or_else(|| anyhow!("append 需要 data 参数"))?.clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
-        let mut existing: calamine::Xlsx<_> = calamine::open_workbook(&path)?;
-        let next_row = if let Ok(range) = existing.worksheet_range(&sheet_name) {
-            range.height() as u32
-        } else { 0 };
+        let mut book = if std::path::Path::new(&path).exists() {
+            umya_spreadsheet::reader::xlsx::read(&path)
+                .map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?
+        } else {
+            // 文件不存在，创建新工作簿
+            let mut b = umya_spreadsheet::Spreadsheet::default();
+            b.get_sheet_by_name_mut("Sheet1")
+                .ok_or_else(|| anyhow!("创建工作表失败"))?
+                .set_name(&sheet_name);
+            b
+        };
 
-        let old_rows: Vec<Vec<serde_json::Value>> = if let Ok(range) = existing.worksheet_range(&sheet_name) {
-            range.rows().map(|row| row.iter().map(cell_to_json).collect()).collect()
-        } else { Vec::new() };
+        let sheet = book.get_sheet_by_name_mut(&sheet_name)
+            .ok_or_else(|| anyhow!("工作表 '{}' 不存在", sheet_name))?;
 
-        let mut workbook = rust_xlsxwriter::Workbook::new();
-        let worksheet = workbook.add_worksheet();
-        worksheet.set_name(&sheet_name)?;
+        // 找到最后一行（1-indexed）
+        let highest_row = sheet.get_highest_row();
+        let next_row = if highest_row > 0 { highest_row + 1 } else { 1 };
 
-        for (r, row) in old_rows.iter().enumerate() {
-            for (c, cell) in row.iter().enumerate() {
-                write_json_cell(worksheet, r as u32, c as u16, cell)?;
-            }
-        }
+        // 追加新数据
         for (r, row) in data.iter().enumerate() {
             if let Some(cells) = row.as_array() {
                 for (c, cell) in cells.iter().enumerate() {
-                    write_json_cell(worksheet, next_row + r as u32, c as u16, cell)?;
+                    let col = c as u32 + 1; // umya 是 1-indexed
+                    let row_num = next_row + r as u32;
+                    let target = sheet.get_cell_mut((col, row_num));
+                    match cell {
+                        serde_json::Value::Number(n) => {
+                            if let Some(i) = n.as_i64() { target.set_value(i.to_string()); }
+                            else if let Some(f) = n.as_f64() { target.set_value(f.to_string()); }
+                        }
+                        serde_json::Value::String(s) => { target.set_value(s.as_str()); }
+                        serde_json::Value::Bool(b) => { target.set_value(b.to_string()); }
+                        serde_json::Value::Null => { target.set_value(""); }
+                        _ => { target.set_value(cell.to_string()); }
+                    }
                 }
             }
         }
 
-        workbook.save(&path)?;
-        Ok(serde_json::json!({ "path": path, "sheet": sheet_name, "appended_rows": data.len(), "start_row": next_row }))
+        umya_spreadsheet::writer::xlsx::write(&book, &path)
+            .map_err(|e| anyhow!("保存 Excel 失败: {}", e))?;
+
+        Ok(serde_json::json!({
+            "path": path,
+            "sheet": sheet_name,
+            "appended_rows": data.len(),
+            "start_row": next_row,
+        }))
     }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
-/// 更新 Excel 单元格
-async fn excel_update(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
+/// 更新 Excel 单元格（保留原文件格式）
+pub async fn excel_update(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
     let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
     let updates = config.get("updates").and_then(|v| v.as_array())
         .ok_or_else(|| anyhow!("update 需要 updates 参数"))?.clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
-        let mut reader: calamine::Xlsx<_> = calamine::open_workbook(&path)?;
-        let range = reader.worksheet_range(&sheet_name)
-            .map_err(|e| anyhow!("读取工作表失败: {}", e))?;
-        let mut data: Vec<Vec<String>> = range.rows().map(|row| row.iter().map(|c| match c {
-            calamine::Data::String(s) => s.clone(),
-            calamine::Data::Int(i) => i.to_string(),
-            calamine::Data::Float(f) => f.to_string(),
-            calamine::Data::Bool(b) => b.to_string(),
-            _ => String::new(),
-        }).collect()).collect();
+        let mut book = umya_spreadsheet::reader::xlsx::read(&path)
+            .map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
+
+        let sheet = book.get_sheet_by_name_mut(&sheet_name)
+            .ok_or_else(|| anyhow!("工作表 '{}' 不存在", sheet_name))?;
 
         let mut updated_count = 0;
         for update in &updates {
             let cell_ref = update.get("cell").and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("update 项缺少 cell 参数"))?;
-            let value = update.get("value").map(|v| v.to_string()).unwrap_or_default();
-            let (row, col) = parse_cell_ref(cell_ref)?;
-            while data.len() <= row { data.push(Vec::new()); }
-            while data[row].len() <= col { data[row].push(String::new()); }
-            data[row][col] = value;
+            let value = update.get("value").and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("update 项缺少 value 参数（必须为字符串）"))?;
+            let (col, row) = parse_cell_ref_umya(cell_ref)?;
+            sheet.get_cell_mut((col, row)).set_value(value);
             updated_count += 1;
         }
 
-        let mut workbook = rust_xlsxwriter::Workbook::new();
-        let worksheet = workbook.add_worksheet();
-        worksheet.set_name(&sheet_name)?;
-        for (r, row) in data.iter().enumerate() {
-            for (c, val) in row.iter().enumerate() {
-                if !val.is_empty() {
-                    if let Ok(n) = val.parse::<f64>() {
-                        worksheet.write_number(r as u32, c as u16, n)?;
-                    } else {
-                        worksheet.write_string(r as u32, c as u16, val)?;
-                    }
-                }
-            }
-        }
-        workbook.save(&path)?;
+        umya_spreadsheet::writer::xlsx::write(&book, &path)
+            .map_err(|e| anyhow!("保存 Excel 失败: {}", e))?;
+
         Ok(serde_json::json!({ "path": path, "sheet": sheet_name, "updated_cells": updated_count }))
     }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
@@ -574,7 +577,10 @@ fn parse_column_index(column: &str) -> Result<usize> {
     Ok(idx - 1)
 }
 
-fn parse_cell_ref(cell_ref: &str) -> Result<(usize, usize)> {
+
+/// 解析单元格引用为 umya 坐标 (col, row)，均为 1-indexed
+/// 例: "A1" → (1, 1), "B3" → (2, 3), "AA10" → (27, 10)
+fn parse_cell_ref_umya(cell_ref: &str) -> Result<(u32, u32)> {
     let cell_ref = cell_ref.trim();
     let mut col_str = String::new();
     let mut row_str = String::new();
@@ -585,12 +591,11 @@ fn parse_cell_ref(cell_ref: &str) -> Result<(usize, usize)> {
         else { return Err(anyhow!("无效的单元格引用: {}", cell_ref)); }
     }
     if col_str.is_empty() || row_str.is_empty() { return Err(anyhow!("无效的单元格引用: {}", cell_ref)); }
-    let mut col: usize = 0;
-    for ch in col_str.chars() { col = col * 26 + (ch as usize - 'A' as usize + 1); }
-    col -= 1;
-    let row: usize = row_str.parse::<usize>()
+    let mut col: u32 = 0;
+    for ch in col_str.chars() { col = col * 26 + (ch as u32 - 'A' as u32 + 1); }
+    let row: u32 = row_str.parse::<u32>()
         .map_err(|_| anyhow!("无效的行号: {}", row_str))?;
-    Ok((row - 1, col))
+    Ok((col, row))
 }
 
 fn cell_to_json(cell: &calamine::Data) -> serde_json::Value {
