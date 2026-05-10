@@ -1,5 +1,5 @@
 # Gitee CI/CD — 手动触发构建三平台安装包
-# 触发方式：Gitee 页面手动运行 Pipeline
+# 触发方式：Gitee 页面 → CI/CD → 手动运行
 # 产出：x86_64 Linux / ARM64 Linux / Windows 安装包
 
 stages:
@@ -15,8 +15,7 @@ variables:
 build-linux-x86_64:
   stage: build
   image: ubuntu:22.04
-  only:
-    - triggers  # 仅 API/手动触发
+  when: manual  # 手动触发
   script:
     - apt-get update
     - apt-get install -y curl wget git
@@ -47,8 +46,7 @@ build-linux-x86_64:
 build-linux-arm64:
   stage: build
   image: ubuntu:22.04
-  only:
-    - triggers
+  when: manual  # 手动触发
   script:
     - apt-get update
     - apt-get install -y curl wget git
@@ -90,8 +88,7 @@ build-windows:
   stage: build
   tags:
     - windows  # 需要 Windows runner
-  only:
-    - triggers
+  when: manual  # 手动触发
   script:
     # 安装 Node.js
     - nvm install 18
@@ -117,8 +114,6 @@ build-windows:
 release:
   stage: release
   image: ubuntu:22.04
-  only:
-    - triggers
   when: manual  # 手动确认发布
   dependencies:
     - build-linux-x86_64
