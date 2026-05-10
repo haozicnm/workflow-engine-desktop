@@ -27,8 +27,14 @@
   "bundle": {
     "active": true,
     "targets": [
+      "appimage",
       "nsis"
     ],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"

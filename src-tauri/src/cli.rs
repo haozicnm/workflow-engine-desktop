@@ -99,7 +99,7 @@ async fn cmd_run(app: &App, workflow_id: &str) -> Result<(), String> {
             }
         };
         let idx = pos.unwrap();
-        let name = step.label.clone();
+        let name = step.name.clone();
 
         print!("  [{}/{}] {} ... ", idx + 1, total, name);
 
@@ -133,12 +133,12 @@ fn cmd_status(app: &App, run_id: &str) -> Result<(), String> {
         .map_err(|e| format!("查询失败: {e}"))?
         .ok_or_else(|| "运行记录不存在".to_string())?;
 
-    println!("运行 ID:   {}", detail.run_id);
+    println!("运行 ID:   {}", detail.run.id);
     println!("工作流:    {}", detail.workflow_name);
-    println!("状态:      {}", detail.status);
-    println!("开始:      {}", detail.started_at.as_deref().unwrap_or("-"));
-    println!("结束:      {}", detail.finished_at.as_deref().unwrap_or("-"));
-    if let Some(ref err) = detail.error {
+    println!("状态:      {}", detail.run.status);
+    println!("开始:      {}", detail.run.started_at);
+    println!("结束:      {}", detail.run.finished_at.as_deref().unwrap_or("-"));
+    if let Some(ref err) = detail.run.error {
         println!("错误:      {}", err);
     }
     if !detail.steps.is_empty() {
@@ -147,7 +147,7 @@ fn cmd_status(app: &App, run_id: &str) -> Result<(), String> {
             let icon = match s.status.as_str() {
                 "success" => "✓", "error" => "✗", _ => " ",
             };
-            println!("  {} {} - {}", icon, s.step_name, s.status);
+            println!("  {} {} - {}", icon, s.step_id, s.status);
         }
     }
     Ok(())
@@ -201,7 +201,7 @@ fn cmd_validate(file: &str) -> Result<(), String> {
     println!("  名称: {}", workflow.name);
     println!("  步骤数: {}", workflow.steps.len());
     for (i, s) in workflow.steps.iter().enumerate() {
-        println!("  {}. {} ({})", i + 1, s.label, s.step_type);
+        println!("  {}. {} ({})", i + 1, s.name, s.step_type);
     }
     Ok(())
 }

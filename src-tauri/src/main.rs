@@ -7,15 +7,18 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing::{info, debug};
 use std::env;
+use clap::Parser;
 
 fn main() {
     setup_logging();
+
+    let app = App::new().expect("failed to initialize application");
 
     // ── CLI 模式: workflow-engine.exe --cli <command> ──
     if env::args().any(|a| a == "--cli") {
         let mut args: Vec<String> = vec!["workflow-engine".to_string()];
         args.extend(env::args().skip_while(|a| a != "--cli").skip(1));
-        let app = App::new().expect("failed to initialize application");
+        let app = std::sync::Arc::new(app);
 
         let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
         rt.block_on(async {
@@ -26,7 +29,7 @@ fn main() {
                     std::process::exit(1);
                 }
             };
-            if let Err(e) = workflow_engine::cli::run_cli(cli, std::sync::Arc::new(app)).await {
+            if let Err(e) = workflow_engine::cli::run_cli(cli, app).await {
                 eprintln!("错误: {}", e);
                 std::process::exit(1);
             }
