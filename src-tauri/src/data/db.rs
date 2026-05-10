@@ -673,6 +673,33 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// 获取单个审批记录（按 id）
+    pub fn get_approval(&self, id: &str) -> Option<ApprovalRecord> {
+        let conn = self.conn().ok()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, run_id, step_id, title, message, item, options, recommended, timeout_secs, timeout_action, created_at, status, decided_at, decision, comment FROM approvals WHERE id = ?1"
+        ).ok()?;
+        stmt.query_row(params![id], |row| {
+            Ok(ApprovalRecord {
+                id: row.get(0)?,
+                run_id: row.get(1)?,
+                step_id: row.get(2)?,
+                title: row.get(3)?,
+                message: row.get(4)?,
+                item: row.get(5)?,
+                options: row.get(6)?,
+                recommended: row.get(7)?,
+                timeout_secs: row.get(8)?,
+                timeout_action: row.get(9)?,
+                created_at: row.get(10)?,
+                status: row.get(11)?,
+                decided_at: row.get(12)?,
+                decision: row.get(13)?,
+                comment: row.get(14)?,
+            })
+        }).ok()
+    }
+
     /// 删除已审批记录（清理用）
     pub fn delete_approval(&self, id: &str) -> Result<()> {
         let conn = self.conn()?;

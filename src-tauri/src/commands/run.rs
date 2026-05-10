@@ -256,8 +256,12 @@ pub async fn approval_response(
     comment: Option<String>,
     option: Option<String>,
 ) -> Result<(), String> {
+    let option_str = option.unwrap_or_else(|| if approved { "同意".into() } else { "拒绝".into() });
+    // 更新 SQLite
+    app.db.update_approval_decision(&approval_id, &option_str, comment.as_deref())
+        .map_err(|e| e.to_string())?;
     let decision = crate::engine::approval_store::ApprovalDecision {
-        option: option.unwrap_or_else(|| if approved { "同意".into() } else { "拒绝".into() }),
+        option: option_str,
         comment,
     };
     app.approval_store.decide(&approval_id, decision).await
@@ -265,11 +269,30 @@ pub async fn approval_response(
 }
 
 /// 查询所有待审批（供前端 ApprovalCenter 使用）
+/// 合并内存（实时等待中的）+ SQLite（重启后恢复的）
 #[tauri::command]
 pub async fn approval_list_pending(
     app: State<'_, App>,
 ) -> Result<Vec<crate::engine::approval_store::ApprovalEntry>, String> {
-    Ok(app.approval_store.pending().await)
+    let mut live = app.approval_store.pending().await;
+    let live_ids: std::collections::HashSet<String> = live.iter().map(|e| e.id.clone()).collect();
+    if let Ok(db_pending) = app.db.get_pending_approvals() {
+        for rec in db_pending {
+            if live_ids.contains(&rec.id) { continue; }
+            let options: Vec<String> = rec.options.as_deref()
+                .unwrap_or("同意,拒绝")
+                .split(',').map(|s| s.trim().to_string()).collect();
+            let item: Option<serde_json::Value> = rec.item.as_deref()
+                .and_then(|s| serde_json::from_str(s).ok());
+            live.push(crate::engine::approval_store::ApprovalEntry {
+                id: rec.id, run_id: rec.run_id, step_id: rec.step_id,
+                title: rec.title, message: rec.message, item, options,
+                recommended: rec.recommended, timeout_secs: rec.timeout_secs as u64,
+                timeout_action: rec.timeout_action, created_at: rec.created_at,
+            });
+        }
+    }
+    Ok(live)
 }
 
 /// 查询运行历史列表

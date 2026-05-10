@@ -201,7 +201,7 @@ pub async fn step_test(
     };
     let mut ctx = ExecutionContext::new("test", &wf);
 
-    let executor = StepExecutor::new(Arc::new(crate::engine::approval_store::ApprovalStore::new()));
+    let executor = StepExecutor::new(Arc::new(crate::engine::approval_store::ApprovalStore::new()), Arc::new(crate::data::db::Database::open_default().map_err(|e| e.to_string())?));
     match executor.execute(&step, &mut ctx).await {
         Ok(output) => Ok(serde_json::json!({
             "success": true,

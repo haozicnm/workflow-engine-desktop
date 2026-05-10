@@ -41,7 +41,8 @@ pub async fn run_workflow(
     ctx.browser_channel = browser_channel.to_string();
     let mut state = RunState::new(run_id, ctx.variables.clone());
     let approval_store = app_handle.state::<std::sync::Arc<crate::App>>().approval_store.clone();
-    let executor = StepExecutor::new(approval_store);
+    let db = app_handle.state::<std::sync::Arc<crate::App>>().db.clone();
+    let executor = StepExecutor::new(approval_store, db.clone());
 
     let workflow_name = workflow.name.clone();
     info!("工作流启动: {} (run_id: {})", workflow_name, run_id);
