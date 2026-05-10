@@ -50,6 +50,7 @@ scraper = "0.26.0"
 arboard = "3"
 regex = "1"
 base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
 
 [features]
 default = ["custom-protocol"]

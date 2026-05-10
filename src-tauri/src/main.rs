@@ -1,4 +1,4 @@
-// main.rs — Tauri 入口
+// main.rs — Tauri 入口 (支持 --cli 模式)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use workflow_engine::App;
@@ -6,11 +6,33 @@ use tauri::Manager;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing::{info, debug};
+use std::env;
 
 fn main() {
     setup_logging();
 
-    let app = App::new().expect("failed to initialize application");
+    // ── CLI 模式: workflow-engine.exe --cli <command> ──
+    if env::args().any(|a| a == "--cli") {
+        let mut args: Vec<String> = vec!["workflow-engine".to_string()];
+        args.extend(env::args().skip_while(|a| a != "--cli").skip(1));
+        let app = App::new().expect("failed to initialize application");
+
+        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+        rt.block_on(async {
+            let cli = match workflow_engine::cli::Cli::try_parse_from(args) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("参数错误: {}\n使用 --help 查看帮助", e);
+                    std::process::exit(1);
+                }
+            };
+            if let Err(e) = workflow_engine::cli::run_cli(cli, std::sync::Arc::new(app)).await {
+                eprintln!("错误: {}", e);
+                std::process::exit(1);
+            }
+        });
+        return;
+    }
 
     tauri::Builder::default()
         .manage(app)

@@ -1,4 +1,5 @@
 // lib.rs — 库导出
+pub mod cli;
 pub mod commands;
 pub mod data;
 pub mod engine;
