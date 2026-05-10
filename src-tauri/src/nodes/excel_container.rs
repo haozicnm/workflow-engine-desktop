@@ -67,7 +67,7 @@ pub async fn execute_excel_container(
                 });
                 match crate::nodes::excel::excel_read(&config.file_path, &read_cfg).await {
                     Ok(data) => {
-                        output_ports.insert(action.label.clone(), data);
+                        output_ports.insert(action.id.clone(), data);
                     }
                     Err(e) => {
                         return Err(anyhow!("Excel 读取失败: {}", e));
@@ -76,7 +76,7 @@ pub async fn execute_excel_container(
             }
             "write" => {
                 let value = input_ports
-                    .get(&format!("{}_in", &action.label))
+                    .get(&format!("{}_in", &action.id))
                     .or_else(|| action.config.get("value"))
                     .cloned()
                     .unwrap_or(Value::Null);
@@ -106,7 +106,7 @@ pub async fn execute_excel_container(
                     .map(|c| resolve_column(c, &rows))
                     .unwrap_or(0);
                 let filter_val = input_ports
-                    .get(&format!("{}_in", &action.label))
+                    .get(&format!("{}_in", &action.id))
                     .or_else(|| action.config.get("value"))
                     .cloned();
                 let op = action.config.get("op").and_then(|v| v.as_str()).unwrap_or("contains");
@@ -121,7 +121,7 @@ pub async fn execute_excel_container(
                     "rows": filtered.len(),
                     "data": filtered,
                 });
-                output_ports.insert(action.label.clone(), result);
+                output_ports.insert(action.id.clone(), result);
             }
             "sort" => {
                 // 读取→内存排序→产出结果
@@ -148,7 +148,7 @@ pub async fn execute_excel_container(
                     "rows": rows.len(),
                     "data": rows,
                 });
-                output_ports.insert(action.label.clone(), result);
+                output_ports.insert(action.id.clone(), result);
             }
             "create" => {
                 let headers = action
@@ -170,7 +170,7 @@ pub async fn execute_excel_container(
             }
             "append" => {
                 let value = input_ports
-                    .get(&format!("{}_in", &action.label))
+                    .get(&format!("{}_in", &action.id))
                     .or_else(|| action.config.get("value"))
                     .cloned()
                     .unwrap_or(Value::Null);
@@ -188,7 +188,7 @@ pub async fn execute_excel_container(
             }
             "update" => {
                 let updates = input_ports
-                    .get(&format!("{}_in", &action.label))
+                    .get(&format!("{}_in", &action.id))
                     .or_else(|| action.config.get("updates"))
                     .cloned()
                     .unwrap_or(Value::Null);
