@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Result;
 use tauri::Emitter;
+use tauri::Manager;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -39,7 +40,8 @@ pub async fn run_workflow(
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.browser_channel = browser_channel.to_string();
     let mut state = RunState::new(run_id, ctx.variables.clone());
-    let executor = StepExecutor::new();
+    let approval_store = app_handle.state::<std::sync::Arc<crate::App>>().approval_store.clone();
+    let executor = StepExecutor::new(approval_store);
 
     let workflow_name = workflow.name.clone();
     info!("工作流启动: {} (run_id: {})", workflow_name, run_id);
@@ -156,10 +158,6 @@ pub async fn run_workflow(
             }
         }
 
-        // 审批节点：先 emit 事件通知前端弹窗
-        if step.step_type == "approval" {
-            emit_approval_required(app_handle, run_id, step);
-        }
 
         // ─── 条件执行检查（runCondition） ───
         if let Some(ref rc) = step.run_condition {
@@ -351,15 +349,6 @@ pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionCont
         }
     }
 
-    // approval 节点：awaiting_approval 时暂停，已决策则继续
-    if step.step_type == "approval" {
-        if let Some(output) = ctx.get_output(&step.id) {
-            if output.get("status").and_then(|v| v.as_str()) == Some("awaiting_approval") {
-                return None;  // 等待人工审批
-            }
-        }
-    }
-
     // 循环/并行节点：结束（不自动流转）
     if step.step_type == "loop" || step.step_type == "parallel" || step.step_type == "while" {
         return None;
@@ -434,27 +423,6 @@ fn emit_run_update(app: &tauri::AppHandle, run_id: &str, workflow_name: &str, st
     if let Err(e) = app.emit("run-update", event) { warn!("emit failed: {}", e); }
 }
 
-fn emit_approval_required(app: &tauri::AppHandle, run_id: &str, step: &Step) {
-    let approval_id = format!("approval:{}", step.id);
-    let event = serde_json::json!({
-        "run_id": run_id,
-        "step_id": step.id,
-        "approval_id": approval_id,
-        "message": step.config.get("message").and_then(|v| v.as_str()).unwrap_or("请审批此操作"),
-        "options": step.config.get("options").cloned().unwrap_or_else(|| serde_json::json!(["approve", "reject"])),
-    });
-    if let Err(e) = app.emit("approval-required", event) { warn!("emit approval-required failed: {}", e); }
-
-    // 审批通知增强：窗口隐藏时自动弹出
-    use tauri::Manager;
-    if let Some(window) = app.get_webview_window("main") {
-        let is_visible = window.is_visible().unwrap_or(false);
-        if !is_visible {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-    }
-}
 
 /// 更新调试快照：将当前执行上下文存入共享状态
 async fn update_debug_snapshot(

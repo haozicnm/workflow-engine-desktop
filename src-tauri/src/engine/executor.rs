@@ -16,6 +16,7 @@ use tracing::{info, debug};
 
 pub struct StepExecutor {
     executors: HashMap<String, Box<dyn NodeExecutor>>,
+    pub approval_store: Arc<crate::engine::approval_store::ApprovalStore>,
 }
 
 macro_rules! register {
@@ -25,7 +26,7 @@ macro_rules! register {
 }
 
 impl StepExecutor {
-    pub fn new() -> Arc<Self> {
+    pub fn new(approval_store: Arc<crate::engine::approval_store::ApprovalStore>) -> Arc<Self> {
         let mut executors: HashMap<String, Box<dyn NodeExecutor>> = HashMap::new();
 
         // ── P0 核心节点 ──
@@ -133,7 +134,7 @@ impl StepExecutor {
             debug!("节点注册: {}", type_name);
         }
 
-        Arc::new(StepExecutor { executors })
+        Arc::new(StepExecutor { executors, approval_store })
     }
 
     /// 执行一个步骤（统一入口，所有节点类型通过 trait 分发）
@@ -174,8 +175,7 @@ impl StepExecutor {
             expanded: step.expanded,
             condition: step.condition.clone(),
             condition_group: None,
-            then_steps: step.then_steps.clone(),
-            else_steps: step.else_steps.clone(),
+
             run_condition: None,
         };
 

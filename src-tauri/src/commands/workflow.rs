@@ -3,6 +3,7 @@ use tauri::State;
 use serde::Serialize;
 use crate::App;
 use crate::data::models::WorkflowMeta;
+use std::sync::Arc;
 
 #[derive(Debug, Serialize)]
 pub struct WorkflowListItem {
@@ -189,8 +190,6 @@ pub async fn step_test(
         expanded: None,
         condition: None,
         condition_group: None,
-        then_steps: None,
-        else_steps: None,
         run_condition: None,
     };
 
@@ -202,7 +201,7 @@ pub async fn step_test(
     };
     let mut ctx = ExecutionContext::new("test", &wf);
 
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(Arc::new(crate::engine::approval_store::ApprovalStore::new()));
     match executor.execute(&step, &mut ctx).await {
         Ok(output) => Ok(serde_json::json!({
             "success": true,
@@ -256,8 +255,6 @@ pub async fn export_workflow(
                 expanded: None,
                 condition: None,
                 condition_group: None,
-                then_steps: None,
-                else_steps: None,
                 run_condition: None,
             }
         })

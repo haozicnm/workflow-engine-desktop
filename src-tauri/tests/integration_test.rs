@@ -31,8 +31,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
         expanded: None,
         condition: None,
         condition_group: None,
-        then_steps: None,
-        else_steps: None,
+
         run_condition: None,
     }
 }
@@ -43,7 +42,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
 
 #[tokio::test]
 async fn test_excel_read() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-excel-read", &Default::default());
     let step = make_step("excel1", "读取Excel", "excel", json!({
         "action": "read",
@@ -61,7 +60,7 @@ async fn test_excel_read() {
 
 #[tokio::test]
 async fn test_excel_sheets() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-excel-sheets", &Default::default());
     let step = make_step("excel2", "列出工作表", "excel", json!({
         "action": "sheets",
@@ -82,7 +81,7 @@ async fn test_excel_sheets() {
 
 #[tokio::test]
 async fn test_word_replace() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-word-replace", &Default::default());
 
     let placeholders = json!({
@@ -126,7 +125,7 @@ async fn test_variable_set_get() {
 
 #[tokio::test]
 async fn test_logic_equals() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-logic-eq", &Default::default());
 
     ctx.set_var("a".to_string(), json!(42));
@@ -146,7 +145,7 @@ async fn test_logic_equals() {
 
 #[tokio::test]
 async fn test_logic_not_empty() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-logic-ne", &Default::default());
 
     ctx.set_var("x".to_string(), json!("hello"));
@@ -169,7 +168,7 @@ async fn test_logic_not_empty() {
 
 #[tokio::test]
 async fn test_script_arithmetic() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-script", &Default::default());
 
     ctx.set_var("x".to_string(), json!(10));
@@ -191,7 +190,7 @@ async fn test_script_arithmetic() {
 
 #[tokio::test]
 async fn test_loop_simple() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-loop", &Default::default());
 
     let step = make_step("loop1", "遍历数组", "loop", json!({
@@ -214,7 +213,7 @@ async fn test_loop_simple() {
 
 #[tokio::test]
 async fn test_loop_collect() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-loop-collect", &Default::default());
 
     let step = make_step("loop2", "遍历+收集", "loop", json!({
@@ -253,7 +252,7 @@ async fn test_loop_collect() {
 
 #[tokio::test]
 async fn test_while_stops_on_empty() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-while", &Default::default());
 
     let step = make_step("while1", "While遍历", "while", json!({
@@ -279,7 +278,7 @@ async fn test_while_stops_on_empty() {
 
 #[tokio::test]
 async fn test_parallel_branches() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-parallel", &Default::default());
 
     let step = make_step("par1", "并行执行", "parallel", json!({
@@ -324,7 +323,7 @@ async fn test_parallel_branches() {
 
 #[tokio::test]
 async fn test_http_get() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-http", &Default::default());
 
     let step = make_step("http1", "HTTP请求", "http", json!({
@@ -440,7 +439,7 @@ fn test_resolve_keeps_type() {
 
 #[tokio::test]
 async fn test_full_pipeline() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("pipeline", &Default::default());
 
     // Step 1: 读取 Excel
@@ -486,7 +485,7 @@ async fn test_full_pipeline() {
 
 #[tokio::test]
 async fn test_map_node() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-map", &Default::default());
 
     let step = make_step("map1", "声明式映射", "map", json!({
@@ -505,7 +504,7 @@ async fn test_map_node() {
 
 #[tokio::test]
 async fn test_map_node_logic_operators() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-map-logic", &Default::default());
 
     let step = make_step("map_logic", "逻辑运算测试", "map", json!({
@@ -556,7 +555,7 @@ async fn test_map_node_logic_operators() {
 
 #[tokio::test]
 async fn test_delay_node() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-delay", &Default::default());
 
     let step = make_step("delay1", "延时100ms", "delay", json!({
@@ -574,7 +573,7 @@ async fn test_delay_node() {
 
 #[tokio::test]
 async fn test_delay_node_max_limit() {
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("test-delay-max", &Default::default());
 
     let step = make_step("delay2", "延时超限", "delay", json!({

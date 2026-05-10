@@ -18,7 +18,6 @@ import CardHeader from '../components/ui/card/CardHeader.vue'
 import CardTitle from '../components/ui/card/CardTitle.vue'
 import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
 import Separator from '../components/ui/separator/Separator.vue'
-import ApprovalDialog from '../components/ApprovalDialog.vue'
 import Textarea from '../components/ui/textarea/Textarea.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
@@ -47,6 +46,20 @@ const globalStatus = useGlobalStatus()
 let currentRunId: string | null = null
 
 const editingName = ref(false)
+const showCardMenu = ref(false)
+const cardMenuBtnRef = ref<InstanceType<typeof Button> | null>(null)
+const cardMenuPosStyle = ref<Record<string, string>>({})
+
+function toggleCardMenu() {
+  showCardMenu.value = !showCardMenu.value
+  if (showCardMenu.value && cardMenuBtnRef.value?.$el) {
+    const rect = (cardMenuBtnRef.value.$el as HTMLElement).getBoundingClientRect()
+    cardMenuPosStyle.value = {
+      top: `${rect.bottom + 4}px`,
+      left: `${rect.right - 176}px`, // 176px = w-44
+    }
+  }
+}
 const nameInput = ref('')
 
 const selectedStepId = ref<string | null>(null)
@@ -149,9 +162,28 @@ async function onSave() {
   const ok = await store.saveWorkflow()
   if (ok) {
     toast.show('保存成功', 'success')
+    // 显示变量引用警告
+    if (store.lastWarnings.value.length > 0) {
+      const msg = store.lastWarnings.value.slice(0, 5).join('\n')
+      const extra = store.lastWarnings.value.length > 5 ? `\n...还有 ${store.lastWarnings.value.length - 5} 条` : ''
+      toast.show(`⚠️ 变量引用警告:\n${msg}${extra}`, 'info')
+    }
     emit('workflow-updated')
   } else {
     toast.show('保存失败', 'error')
+  }
+}
+
+async function onScheduleClick() {
+  if (!workflow.value) return
+  // 未保存时先自动保存
+  if (!workflow.value.id) {
+    const ok = await store.saveWorkflow()
+    if (!ok) { toast.show('请先保存工作流', 'error'); return }
+    emit('workflow-updated')
+  }
+  if (workflow.value.id) {
+    emit('schedule', workflow.value.id)
   }
 }
 
@@ -201,9 +233,10 @@ async function onRun() {
   await runWorkflow(workflow.value)
 }
 
-function onStop() {
+async function onStop() {
   stopWorkflow()
 }
+
 
 function onAddStep(type: ContainerType) {
   store.addStep(type)
@@ -214,7 +247,6 @@ function onRemoveStep(stepId: string) {
   store.removeStep(stepId)
   if (selectedStepId.value === stepId) {
     selectedStepId.value = null
-    selectedActionId.value = null
   }
 }
 
@@ -383,53 +415,68 @@ onUnmounted(() => {
     @keydown="onKeydown"
   >
     <!-- Workflow Detail Card -->
-    <Card class="mx-8 mt-6 shrink-0 shadow-sm">
-      <CardHeader class="pb-3 px-6">
-        <div class="flex items-center gap-2">
+    <Card color="#6e7681" class="mx-8 mt-6 shrink-0">
+      <div class="px-4 py-3">
+        <!-- Row 1: Title + Actions -->
+        <div class="flex items-center gap-3">
+          <!-- Name -->
           <div v-if="!editingName" class="flex-1 min-w-0">
-            <CardTitle
-              class="text-lg cursor-text truncate"
+            <span
+              class="text-base font-semibold text-foreground cursor-text hover:text-primary transition-colors"
+              title="点击编辑名称"
               @click="onStartEditName"
             >
               {{ workflow?.name || '未命名工作流' }}
-              <span v-if="store.dirty" class="text-warning text-xs ml-1">●</span>
-            </CardTitle>
+            </span>
+            <span v-if="store.dirty" class="text-warning text-xs ml-1">●</span>
+            <span v-if="enh.lastSavedAt.value" class="text-xs text-muted-foreground ml-2">{{ enh.lastSavedAt.value }}</span>
           </div>
           <div v-else class="flex-1 min-w-0">
             <Input
+              ref="nameInputRef"
               v-model="nameInput"
-              class="h-8 max-w-[300px] text-sm font-semibold"
+              class="h-7 max-w-[300px] text-sm font-semibold"
               @blur="onFinishEditName"
               @keydown.enter="onFinishEditName"
               @keydown.escape="editingName = false"
             />
           </div>
-          <span v-if="enh.lastSavedAt.value" class="text-xs text-muted-foreground shrink-0">
-            已保存 {{ enh.lastSavedAt.value }}
-          </span>
 
-          <div class="flex items-center gap-1.5 ml-2">
-            <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground" @click="onRun">▶ 运行</Button>
-            <Button v-else variant="destructive" size="sm" class="h-8" @click="onStop">■ 停止</Button>
-            <Button variant="outline" size="sm" class="h-8" @click="onSave" title="保存">💾</Button>
-            <Button variant="outline" size="sm" class="h-8" @click="onSaveAs" title="另存为">📋</Button>
-            <Button variant="outline" size="sm" class="h-8" @click="onExport" title="导出">📤</Button>
-            <Button variant="outline" size="sm" class="h-8" @click="workflow?.id && emit('schedule', workflow.id)" title="定时">⏰</Button>
-            <Button variant="ghost" size="sm" class="h-8 text-destructive hover:text-destructive" @click="onDelete" title="删除">🗑</Button>
+          <!-- Primary action -->
+          <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground shrink-0" @click="onRun">▶ 运行</Button>
+          <Button v-else variant="destructive" size="sm" class="h-8 shrink-0" @click="onStop">■ 停止</Button>
+
+          <!-- ⋯ Menu -->
+          <div class="relative shrink-0" @click.stop>
+            <Button ref="cardMenuBtnRef" variant="ghost" size="icon" class="text-muted-foreground hover:text-foreground opacity-50 hover:opacity-100 transition-opacity" @click="toggleCardMenu">⋯</Button>
           </div>
         </div>
-      </CardHeader>
-      <Separator />
-      <CardContent class="py-3 px-6">
-        <Textarea
-          v-if="workflow"
-          :model-value="workflow.description"
-          placeholder="输入工作流描述..."
-          class="text-xs min-h-[48px] max-h-[100px] resize-none"
-          @input="workflow.description = ($event.target as HTMLTextAreaElement).value; store.dirty = true"
-        />
-      </CardContent>
+
+        <!-- Row 2: Description (inline, click to expand) -->
+        <div class="mt-1.5">
+          <input
+            v-if="workflow"
+            :value="workflow.description"
+            placeholder="输入工作流描述..."
+            class="w-full text-xs text-muted-foreground bg-transparent border-0 outline-none placeholder:text-muted-foreground/40 hover:text-foreground transition-colors"
+            @input="workflow.description = ($event.target as HTMLInputElement).value; store.dirty = true"
+          />
+        </div>
+      </div>
     </Card>
+
+    <!-- Card ⋯ Dropdown (teleported) -->
+    <Teleport to="body">
+      <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" />
+      <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">💾 保存</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">📋 另存为</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">📤 导出</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">⏰ 定时</button>
+        <div class="border-t border-border my-1" />
+        <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">🗑 删除</button>
+      </div>
+    </Teleport>
 
     <!-- Main Content -->
     <Tabs v-model="activeView" default-value="visual" class="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -440,8 +487,8 @@ onUnmounted(() => {
         </TabsList>
       </div>
 
-      <TabsContent value="visual" class="flex-1 overflow-hidden mt-0 p-0 min-h-0">
-        <div class="flex flex-1 overflow-hidden min-h-0">
+      <TabsContent value="visual" class="flex-1 overflow-visible mt-0 p-0 min-h-0">
+        <div class="flex flex-1 min-h-0">
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-8 pt-6 pb-12 space-y-4 min-h-0">
             <div v-if="!workflow?.steps?.length" class="text-center py-16 text-muted-foreground">
@@ -487,6 +534,8 @@ onUnmounted(() => {
                 @rename-step="(sId, label) => store.renameStep(sId, label)"
                 @update-condition="onUpdateCondition"
                 @update-condition-group="(sId, g) => store.updateConditionGroup(sId, g)"
+                @update-run-condition="(sId, cond) => store.updateRunCondition(sId, cond)"
+                @update-step-config="(sId, key, val) => store.updateStepConfig(sId, key, val)"
                 @open-config="onOpenConfig"
                 @update-error-strategy="onErrorStrategyChange"
                 @start-recording="onStartRecording"
@@ -610,7 +659,6 @@ onUnmounted(() => {
       </Transition>
     </Teleport>
   </div>
-  <ApprovalDialog />
 </template>
 
 <style scoped>

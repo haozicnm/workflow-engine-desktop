@@ -37,7 +37,7 @@ fn parse_template(template_file: &str) -> Vec<Step> {
 #[tokio::test]
 async fn test_exec_template1_order_to_contracts() {
     let steps = parse_template("order-to-contracts.json");
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("tmpl1", &Default::default());
 
     // Step 1: excel_container → read orders
@@ -85,7 +85,7 @@ async fn test_exec_template1_order_to_contracts() {
 #[tokio::test]
 async fn test_exec_template2_logic_routing() {
     let steps = parse_template("monitor-to-report.json");
-    let executor = StepExecutor::new();
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()));
     let mut ctx = ExecutionContext::new("tmpl2", &Default::default());
 
     // 模拟 browser 输出（含"异常"关键字 → branch=true）

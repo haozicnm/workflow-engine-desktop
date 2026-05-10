@@ -10,25 +10,25 @@ import { uid, nextStepId, nextActionId } from './types'
 // ─── 容器定义 ───
 
 export const CONTAINER_DEFS: ContainerDef[] = [
-  { type: 'browser', label: '浏览器', icon: '🌐', color: '#79c0ff', isContainer: true, description: '网页操作：导航、点击、输入、提取', params: [
+  { type: 'browser', label: '浏览器', icon: '🌐', color: '#79c0ff', isContainer: true, description: '网页操作：导航、点击、输入、提取', outputHint: '{ actionId: value, ... }', params: [
     { key: 'browser', label: '浏览器', type: 'select', options: [
       { label: 'Chromium', value: 'chromium' }, { label: 'Firefox', value: 'firefox' }, { label: 'WebKit', value: 'webkit' },
     ], default: 'chromium' },
     { key: 'headless', label: '无头模式', type: 'checkbox', default: false },
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
   ]},
-  { type: 'excel', label: 'Excel', icon: '📊', color: '#58a6ff', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', params: [
+  { type: 'excel', label: 'Excel', icon: '📊', color: '#3fb950', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', outputHint: '{ actionId: value, ... }', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './data.xlsx' },
     { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
   ]},
-  { type: 'word', label: 'Word', icon: '📄', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', params: [
+  { type: 'word', label: 'Word', icon: '📄', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: '{ actionId: value, ... }', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './document.docx' },
   ]},
-  { type: 'logic', label: '条件判断', icon: '🔀', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', params: [
+  { type: 'logic', label: '条件判断', icon: '🔀', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: '{ branch: "true"/"false", value, result }', params: [
     { key: 'condition', label: '条件表达式', type: 'text', placeholder: '{{step1.output}} == "异常"' },
   ]},
   // ─── 新增简单步骤类型（T11） ───
-  { type: 'http', label: 'HTTP 请求', icon: '🌍', color: '#a5d6ff', description: '发送 HTTP 请求：GET/POST/PUT/DELETE', params: [
+  { type: 'http', label: 'HTTP 请求', icon: '🌍', color: '#39d2c0', description: '发送 HTTP 请求：GET/POST/PUT/DELETE', outputHint: '{ status, body, headers }', params: [
     { key: 'method', label: '方法', type: 'select', options: [
       { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' }, { label: 'PUT', value: 'PUT' }, { label: 'DELETE', value: 'DELETE' },
     ], default: 'GET' },
@@ -36,11 +36,11 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'headers', label: '请求头 (JSON)', type: 'textarea', placeholder: '{"Content-Type": "application/json"}' },
     { key: 'body', label: '请求体', type: 'textarea', placeholder: '{"key": "value"}' },
   ]},
-  { type: 'delay', label: '延迟等待', icon: '⏳', color: '#d2a8ff', description: '等待指定时间后继续', params: [
+  { type: 'delay', label: '延迟等待', icon: '⏳', color: '#adbac7', description: '等待指定时间后继续', outputHint: '{ waited: ms }', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
     { key: 'max_duration_ms', label: '最大毫秒(随机)', type: 'number', default: 5000 },
   ]},
-  { type: 'notify', label: '通知', icon: '🔔', color: '#f0883e', description: '发送通知：系统通知/Webhook', params: [
+  { type: 'notify', label: '通知', icon: '🔔', color: '#f0883e', description: '发送通知：系统通知/Webhook', outputHint: '{ sent: true }', params: [
     { key: 'notify_type', label: '渠道', type: 'select', options: [
       { label: '系统通知', value: 'system' }, { label: 'Webhook', value: 'webhook' },
     ], default: 'system' },
@@ -48,35 +48,49 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'body', label: '内容', type: 'textarea' },
     { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.example.com/...' },
   ]},
-  { type: 'script', label: '脚本', icon: '📜', color: '#7ee787', description: '执行自定义脚本（Rhai）', params: [
+  { type: 'script', label: '脚本', icon: '📜', color: '#7ee787', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
     { key: 'script', label: '代码', type: 'textarea', placeholder: '// 你的 Rhai 脚本代码' },
   ]},
-  { type: 'clipboard', label: '剪贴板', icon: '📋', color: '#8b949e', description: '读写系统剪贴板', params: [
+  { type: 'clipboard', label: '剪贴板', icon: '📋', color: '#8b949e', description: '读写系统剪贴板', outputHint: '剪贴板内容', params: [
     { key: 'action', label: '操作', type: 'select', options: [
       { label: '读取', value: 'read' }, { label: '写入', value: 'write' },
     ], default: 'read' },
     { key: 'text', label: '写入内容', type: 'textarea' },
   ]},
-  { type: 'cursor', label: '游标迭代', icon: '🔁', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', params: [
+  { type: 'cursor', label: '游标迭代', icon: '🔁', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: '{ done, item, index, total }', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
   ]},
-  { type: 'loop', label: '批量循环', icon: '🔄', color: '#f0883e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', params: [
+  { type: 'loop', label: '批量循环', icon: '🔄', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: '{ count, results[] }', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
   ]},
-  { type: 'approval', label: '人工审批', icon: '✋', color: '#f778ba', description: '暂停流程等待人工审核：查看数据后同意或拒绝', params: [
+  { type: 'approval', label: '人工审批', icon: '✋', color: '#f778ba', description: '暂停流程等待人工审核：支持自定义选项和推荐', outputHint: '{ decision: "选项名", comment, item, auto? }', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
-    { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step1.订单号}}，金额：{{step1.金额}}' },
+    { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step_1.action_1_1.订单号}}' },
+    { key: 'options', label: '审批选项', type: 'text', placeholder: '同意,拒绝,需要更多信息（逗号分隔）', default: '同意,拒绝' },
+    { key: 'recommended', label: '推荐选项', type: 'text', placeholder: '同意', default: '同意' },
+    { key: 'require_review', label: '需要人工审核', type: 'select', options: [
+      { label: '是', value: 'true' }, { label: '否（自动决策）', value: 'false' },
+    ], default: 'true' },
     { key: 'timeout', label: '超时(秒)', type: 'number', default: 300 },
     { key: 'timeout_action', label: '超时策略', type: 'select', options: [
+      { label: '执行推荐选项', value: 'recommended' },
       { label: '自动拒绝', value: 'reject' },
       { label: '自动通过', value: 'approve' },
       { label: '标记失败', value: 'fail' },
-    ], default: 'reject' },
+    ], default: 'recommended' },
   ]},
 ]
 
-export function getContainerDef(type: ContainerType): ContainerDef {
-  return CONTAINER_DEFS.find(d => d.type === type) || CONTAINER_DEFS[0]
+export function getContainerDef(type: string): ContainerDef {
+  const found = CONTAINER_DEFS.find(d => d.type === type)
+  if (!found) console.warn(`getContainerDef: 未知类型 "${type}"，使用 fallback`)
+  return found || CONTAINER_DEFS[0]
+}
+
+/** 获取容器类型的主色 */
+export function getContainerColorVar(type: string): string {
+  const def = CONTAINER_DEFS.find(d => d.type === type)
+  return def?.color || '#8b949e'
 }
 
 // ─── 浏览器动作 ───
@@ -271,6 +285,33 @@ export const LOGIC_ACTIONS: ActionDef[] = LOGIC_OPERATORS.map(op => ({
       ],
 }))
 
+// ─── 迭代节点 body 步骤定义（cursor/loop 的子步骤） ───
+export const BODY_STEP_ACTIONS: ActionDef[] = [
+  { type: 'http', label: 'HTTP 请求', icon: '🌍', params: [
+    { key: 'method', label: '方法', type: 'select', options: [
+      { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },
+    ], default: 'GET' },
+    { key: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com' },
+    { key: 'body', label: '请求体', type: 'textarea' },
+  ]},
+  { type: 'script', label: '脚本', icon: '📜', params: [
+    { key: 'script', label: '代码', type: 'textarea' },
+  ]},
+  { type: 'delay', label: '延迟等待', icon: '⏳', params: [
+    { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
+  ]},
+  { type: 'notify', label: '通知', icon: '🔔', params: [
+    { key: 'title', label: '标题', type: 'text' },
+    { key: 'body', label: '内容', type: 'textarea' },
+  ]},
+  { type: 'clipboard', label: '剪贴板', icon: '📋', params: [
+    { key: 'action', label: '操作', type: 'select', options: [
+      { label: '读取', value: 'read' }, { label: '写入', value: 'write' },
+    ], default: 'read' },
+    { key: 'text', label: '写入内容', type: 'textarea' },
+  ]},
+]
+
 // ─── 注册表查询函数 ───
 
 export function getActionDefs(containerType: ContainerType): ActionDef[] {
@@ -279,6 +320,9 @@ export function getActionDefs(containerType: ContainerType): ActionDef[] {
     case 'excel': return EXCEL_ACTIONS
     case 'word': return WORD_ACTIONS
     case 'logic': return LOGIC_ACTIONS
+    case 'cursor': return BODY_STEP_ACTIONS
+    case 'loop': return BODY_STEP_ACTIONS
+    default: return []
   }
 }
 

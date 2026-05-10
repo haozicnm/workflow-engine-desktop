@@ -250,15 +250,26 @@ pub async fn run_logs(
 /// 审批响应命令 — 前端通过此命令回复审批请求
 #[tauri::command]
 pub async fn approval_response(
+    app: State<'_, App>,
     approval_id: String,
     approved: bool,
     comment: Option<String>,
+    option: Option<String>,
 ) -> Result<(), String> {
-    // approval_id 格式: "approval:{step_id}"
-    let step_id = approval_id.strip_prefix("approval:")
-        .ok_or_else(|| format!("无效的 approval_id: {}", approval_id))?;
-    crate::nodes::approval::record_decision(step_id, approved, comment)
+    let decision = crate::engine::approval_store::ApprovalDecision {
+        option: option.unwrap_or_else(|| if approved { "同意".into() } else { "拒绝".into() }),
+        comment,
+    };
+    app.approval_store.decide(&approval_id, decision).await
         .map_err(|e| e.to_string())
+}
+
+/// 查询所有待审批（供前端 ApprovalCenter 使用）
+#[tauri::command]
+pub async fn approval_list_pending(
+    app: State<'_, App>,
+) -> Result<Vec<crate::engine::approval_store::ApprovalEntry>, String> {
+    Ok(app.approval_store.pending().await)
 }
 
 /// 查询运行历史列表

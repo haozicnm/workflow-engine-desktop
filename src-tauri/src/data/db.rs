@@ -156,6 +156,34 @@ impl Database {
             debug!("[db] v3 迁移完成，耗时 {:?}", start.elapsed());
         }
 
+        // v4: 重建 approvals 表（审批系统重构）
+        if version < 4 {
+            info!("[db] 执行 v4 迁移（审批系统重构）…");
+            let start = Instant::now();
+            conn.execute_batch(r#"
+                DROP TABLE IF EXISTS approvals;
+                CREATE TABLE approvals (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    step_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    title TEXT DEFAULT '',
+                    message TEXT DEFAULT '',
+                    item TEXT,
+                    options TEXT,
+                    recommended TEXT DEFAULT '',
+                    timeout_secs INTEGER DEFAULT 300,
+                    timeout_action TEXT DEFAULT 'recommended',
+                    created_at TEXT NOT NULL,
+                    decided_at TEXT,
+                    decision TEXT,
+                    comment TEXT
+                );
+            "#)?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (4)", [])?;
+            debug!("[db] v4 迁移完成，耗时 {:?}", start.elapsed());
+        }
+
         Ok(())
     }
 
@@ -574,4 +602,101 @@ impl Database {
         )?;
         Ok(())
     }
+
+    // ─── Approval CRUD ───
+
+    /// 插入审批记录
+    pub fn insert_approval(
+        &self,
+        id: &str,
+        run_id: &str,
+        step_id: &str,
+        title: &str,
+        message: &str,
+        item: Option<&str>,
+        options: Option<&str>,
+        recommended: &str,
+        timeout_secs: i64,
+        timeout_action: &str,
+        created_at: &str,
+    ) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "INSERT INTO approvals (id, run_id, step_id, status, title, message, item, options, recommended, timeout_secs, timeout_action, created_at) VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![id, run_id, step_id, title, message, item, options, recommended, timeout_secs, timeout_action, created_at],
+        )?;
+        Ok(())
+    }
+
+    /// 更新审批决策
+    pub fn update_approval_decision(
+        &self,
+        id: &str,
+        decision: &str,
+        comment: Option<&str>,
+    ) -> Result<()> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let conn = self.conn()?;
+        conn.execute(
+           "UPDATE approvals SET status = 'decided', decision = ?1, comment = ?2, decided_at = ?3 WHERE id = ?4",
+            params![decision, comment, now, id],
+        )?;
+        Ok(())
+    }
+
+    /// 获取所有待审批
+    pub fn get_pending_approvals(&self) -> Result<Vec<ApprovalRecord>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, run_id, step_id, title, message, item, options, recommended, timeout_secs, timeout_action, created_at FROM approvals WHERE status = 'pending' ORDER BY created_at ASC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(ApprovalRecord {
+                id: row.get(0)?,
+                run_id: row.get(1)?,
+                step_id: row.get(2)?,
+                title: row.get(3)?,
+                message: row.get(4)?,
+                item: row.get(5)?,
+                options: row.get(6)?,
+                recommended: row.get(7)?,
+                timeout_secs: row.get(8)?,
+                timeout_action: row.get(9)?,
+                created_at: row.get(10)?,
+                status: "pending".to_string(),
+                decided_at: None,
+                decision: None,
+                comment: None,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    /// 删除已审批记录（清理用）
+    pub fn delete_approval(&self, id: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute("DELETE FROM approvals WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+}
+
+/// 审批记录结构
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ApprovalRecord {
+    pub id: String,
+    pub run_id: String,
+    pub step_id: String,
+    pub title: String,
+    pub message: String,
+    pub item: Option<String>,
+    pub options: Option<String>,
+    pub recommended: String,
+    pub timeout_secs: i64,
+    pub timeout_action: String,
+    pub created_at: String,
+    pub status: String,
+    pub decided_at: Option<String>,
+    pub decision: Option<String>,
+    pub comment: Option<String>,
 }

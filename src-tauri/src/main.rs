@@ -58,6 +58,7 @@ fn main() {
             workflow_engine::commands::run::run_detail,
             workflow_engine::commands::run::run_step_logs,
             workflow_engine::commands::run::approval_response,
+            workflow_engine::commands::run::approval_list_pending,
             // Debug
             workflow_engine::commands::run::debug_step,
             workflow_engine::commands::run::debug_continue,

@@ -9,6 +9,7 @@ import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
 import ErrorBoundary from "./components/ErrorBoundary.vue"
 import Toast from './components/Toast.vue'
+import ApprovalCenter from './components/ApprovalCenter.vue'
 import { useToast } from './composables/useToast'
 import { useGlobalStatus } from './composables/useGlobalStatus'
 import SidebarProvider from './components/ui/sidebar/SidebarProvider.vue'
@@ -219,6 +220,8 @@ provide('globalStatus', globalStatus)
         :duration="t.duration"
         @close="remove(t.id)"
       />
+
+      <ApprovalCenter />
     </ErrorBoundary>
   </div>
 </template>

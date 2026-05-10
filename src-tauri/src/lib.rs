@@ -70,6 +70,8 @@ pub struct App {
     pub debug_snapshots: Arc<tokio::sync::RwLock<HashMap<String, serde_json::Value>>>,
     /// 并发工作流信号量：限制同时运行的工作流数量
     pub run_semaphore: Arc<tokio::sync::Semaphore>,
+    /// 审批存储：内存 channel 实现暂停/恢复
+    pub approval_store: Arc<engine::approval_store::ApprovalStore>,
 }
 
 impl App {
@@ -92,6 +94,7 @@ impl App {
             step_mode_flags: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             debug_snapshots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             run_semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent)),
+            approval_store: Arc::new(engine::approval_store::ApprovalStore::new()),
         })
     }
 }
