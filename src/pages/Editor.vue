@@ -416,7 +416,7 @@ onUnmounted(() => {
     @keydown="onKeydown"
   >
     <!-- Workflow Detail Card -->
-    <Card color="#6e7681" class="mx-8 mt-6 shrink-0">
+    <Card color="#6e7681" class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
       <div class="px-4 py-3">
         <!-- Row 1: Title + Actions -->
         <div class="flex items-center gap-3">
@@ -481,7 +481,7 @@ onUnmounted(() => {
 
     <!-- Main Content -->
     <Tabs v-model="activeView" default-value="visual" class="flex-1 flex flex-col overflow-hidden min-h-0">
-      <div class="px-8 pt-4 pb-0 shrink-0">
+      <div class="px-[var(--spacing-section-padding-x)] pt-4 pb-0 shrink-0">
         <TabsList>
           <TabsTrigger value="visual">可视化</TabsTrigger>
           <TabsTrigger value="code">代码</TabsTrigger>
@@ -491,7 +491,7 @@ onUnmounted(() => {
       <TabsContent value="visual" class="flex-1 overflow-visible mt-0 p-0 min-h-0">
         <div class="flex flex-1 min-h-0">
           <!-- Step list area -->
-          <div class="flex-1 overflow-y-auto px-8 pt-6 pb-12 space-y-4 min-h-0">
+          <div class="flex-1 overflow-y-auto px-[var(--spacing-section-padding-x)] pt-6 pb-12 space-y-[var(--spacing-step-gap)] min-h-0">
             <div v-if="!workflow?.steps?.length" class="text-center py-16 text-muted-foreground">
               <div class="text-lg text-foreground mb-2">还没有步骤</div>
               <div class="text-sm">点击下方「增加步骤」开始构建工作流</div>

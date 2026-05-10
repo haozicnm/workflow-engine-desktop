@@ -194,7 +194,7 @@ function closeAllMenus() {
   >
     <!-- ═══ Header bar (slim) ═══ -->
     <div
-      class="h-10 px-4 flex items-center cursor-pointer gap-2 select-none transition-colors group"
+      class="h-[var(--height-step-header)] px-[var(--spacing-card-padding-x)] flex items-center cursor-pointer gap-2 select-none transition-colors group"
       :style="{ background: colorAt15(containerColorVar) }"
       @click="step.expanded = !step.expanded"
     >
@@ -375,7 +375,7 @@ function closeAllMenus() {
     </div>
 
     <!-- ═══ Body (expandable) ═══ -->
-    <div v-show="step.expanded" class="px-4 py-3 bg-card border-t border-border">
+    <div v-show="step.expanded" class="px-[var(--spacing-card-padding-x)] py-[var(--spacing-card-padding-y)] bg-card border-t border-border">
       <!-- Simple step → ParamField (with variable refs!) -->
       <template v-if="!isContainer && step.type !== 'logic'">
         <ParamField

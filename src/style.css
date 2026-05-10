@@ -49,6 +49,14 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+
+  /* 布局常量 */
+  --spacing-step-gap: 1rem;          /* 步骤卡片间距 */
+  --spacing-card-padding-x: 1rem;    /* 卡片水平内边距 */
+  --spacing-card-padding-y: 0.75rem; /* 卡片垂直内边距 */
+  --spacing-section-padding-x: 2rem; /* 页面区域水平内边距 */
+  --height-step-header: 2.5rem;      /* 步骤卡片头部高度 */
+  --height-action-row: 2.25rem;      /* 动作行头部高度 */
 }
 
 /* ─── Dark theme（覆盖 @theme 默认值） ─── */

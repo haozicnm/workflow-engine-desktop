@@ -165,7 +165,7 @@ function isSelectorField(key: string): boolean {
     <!-- Header (collapsed) -->
     <div
       :class="cn(
-        'flex items-center h-9 px-4 py-0 gap-2 cursor-pointer select-none group transition-colors hover:bg-accent/50',
+        'flex items-center h-[var(--height-action-row)] px-[var(--spacing-card-padding-x)] py-0 gap-2 cursor-pointer select-none group transition-colors hover:bg-accent/50',
       )"
       @click="emit('toggle-expand')"
     >
@@ -222,34 +222,57 @@ function isSelectorField(key: string): boolean {
     </div>
 
     <!-- Expanded: parameters or "no params" message -->
-    <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
-      <!-- No params message -->
-      <div v-if="!hasParams" class="text-[11px] text-muted-foreground/60 py-1 text-center">
-        此动作无需参数
-      </div>
+    <Transition name="action-expand">
+      <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
+        <!-- No params message -->
+        <div v-if="!hasParams" class="text-[11px] text-muted-foreground/60 py-1 text-center">
+          此动作无需参数
+        </div>
 
-      <!-- Data flow hint -->
-      <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
-        <template v-if="prevAction">
-          数据来自: <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
-        </template>
-        <template v-else>
-          无上游输入
-        </template>
-      </div>
+        <!-- Data flow hint -->
+        <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
+          <template v-if="prevAction">
+            数据来自: <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
+          </template>
+          <template v-else>
+            无上游输入
+          </template>
+        </div>
 
-      <!-- Param fields -->
-      <ParamField
-        v-for="param in actionDef!.params"
-        :key="param.key"
-        :param="param"
-        :model-value="localParams[param.key] ?? param.default"
-        :grouped-refs="groupedRefs"
-        :show-element-picker="isSelectorField(param.key)"
-        :picking-element="pickingElement"
-        @update:model-value="v => onParamChange(param.key, v)"
-        @pick-element="onPickElement(param.key)"
-      />
-    </div>
+        <!-- Param fields -->
+        <ParamField
+          v-for="param in actionDef!.params"
+          :key="param.key"
+          :param="param"
+          :model-value="localParams[param.key] ?? param.default"
+          :grouped-refs="groupedRefs"
+          :show-element-picker="isSelectorField(param.key)"
+          :picking-element="pickingElement"
+          @update:model-value="v => onParamChange(param.key, v)"
+          @pick-element="onPickElement(param.key)"
+        />
+      </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.action-expand-enter-active,
+.action-expand-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+.action-expand-enter-from,
+.action-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-width: 0;
+}
+.action-expand-enter-to,
+.action-expand-leave-from {
+  max-height: 500px;
+  opacity: 1;
+}
+</style>
