@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { Clock } from 'lucide-vue-next'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import Button from './ui/button/Button.vue'
@@ -118,14 +119,14 @@ function formatDate(d: string | null): string {
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
       <div>
-        <h2 class="text-base font-semibold text-foreground">⏰ 定时调度</h2>
+        <h2 class="text-base font-semibold text-foreground">定时调度</h2>
         <p v-if="workflowName" class="text-xs text-muted-foreground mt-0.5">{{ workflowName }}</p>
       </div>
       <div class="flex gap-1.5">
         <Button v-if="workflowId" variant="outline" size="sm" class="h-7 text-xs" @click="showCreate = !showCreate">
           {{ showCreate ? '取消' : '＋ 新建' }}
         </Button>
-        <Button variant="ghost" size="icon" class="h-7 w-7" @click="emit('close')">
+        <Button variant="ghost" size="icon" class="h-7 w-7" aria-label="关闭" @click="emit('close')">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </Button>
       </div>
@@ -165,7 +166,7 @@ function formatDate(d: string | null): string {
         <span class="text-muted-foreground text-sm">加载中...</span>
       </div>
       <div v-else-if="!schedules.length" class="flex flex-col items-center justify-center py-8 text-center">
-        <span class="text-3xl mb-2">⏰</span>
+        <Clock class="w-8 h-8 mb-2 text-muted-foreground" />
         <span class="text-muted-foreground text-sm">{{ workflowId ? '此工作流暂无定时调度' : '暂无定时调度' }}</span>
       </div>
       <div v-else class="p-4 space-y-3">
@@ -189,7 +190,8 @@ function formatDate(d: string | null): string {
                 <Button
                   variant="ghost"
                   size="icon"
-                  class="w-5 h-5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-40 hover:opacity-100 transition-opacity"
+                  aria-label="删除调度"
                   @click="onDelete(item)"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>

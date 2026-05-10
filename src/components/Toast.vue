@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import ActionIcon from './ActionIcon.vue'
 
 const props = defineProps<{
   message: string
@@ -25,22 +26,22 @@ const bgClass = {
 }
 
 const iconMap = {
-  success: '✅',
-  error: '❌',
-  info: 'ℹ️',
+  success: 'CheckCircle',
+  error: 'XCircle',
+  info: 'Info',
 }
 </script>
 
 <template>
   <div
     :class="[
-      'fixed top-4 right-4 z-[200] flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium text-white shadow-lg max-w-[400px]',
+      'fixed top-4 right-4 z-[200] flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium text-primary-foreground shadow-lg max-w-[400px]',
       'transition-transform duration-300 ease-in-out',
       visible ? 'translate-x-0' : 'translate-x-[120%]',
       bgClass[type || 'info'],
     ]"
   >
-    <span class="text-base shrink-0">{{ iconMap[type || 'info'] }}</span>
+    <ActionIcon :name="iconMap[type || 'info']" cls="w-4 h-4 shrink-0" />
     <span class="flex-1">{{ message }}</span>
   </div>
 </template>

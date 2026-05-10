@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import type { Step, ContainerType } from '../types/types'
 import { getContainerDef } from '../types/node-registry'
+import ActionIcon from './ActionIcon.vue'
 import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'
 import Label from './ui/label/Label.vue'
@@ -57,11 +58,11 @@ function onCheckboxChange(key: string, val: boolean) {
 <template>
   <Card class="max-w-[400px]">
     <CardHeader class="flex flex-row items-center gap-2 p-4 pb-3">
-      <span class="text-lg">{{ containerDef.icon }}</span>
+      <ActionIcon :name="containerDef.icon" cls="w-5 h-5" />
       <CardTitle class="flex-1 text-sm">
         {{ step.label }} - 容器参数
       </CardTitle>
-      <Button variant="ghost" size="icon" class="h-6 w-6" @click="emit('close')">
+      <Button variant="ghost" size="icon" class="h-6 w-6" aria-label="关闭" @click="emit('close')">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </Button>
     </CardHeader>

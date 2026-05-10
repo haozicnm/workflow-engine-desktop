@@ -12,7 +12,7 @@ interface Props {
       'relative overflow-auto',
       $props.class,
     )"
-    style="scrollbar-width: thin; scrollbar-color: #30363d transparent;"
+    style="scrollbar-width: thin; scrollbar-color: var(--color-border) transparent;"
   >
     <slot />
   </div>

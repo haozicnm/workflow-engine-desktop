@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
+import { Hand } from 'lucide-vue-next'
 import { safeListen, safeInvoke } from '../utils/tauri'
 import Button from '@/components/ui/button/Button.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
@@ -143,7 +144,7 @@ onUnmounted(() => {
     class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors cursor-pointer"
     @click="visible = !visible"
   >
-    <span class="text-lg">✋</span>
+    <Hand class="w-5 h-5" />
     <span class="font-medium">待审批</span>
     <Badge variant="secondary" class="ml-1">{{ pendingCount }}</Badge>
   </button>
@@ -158,7 +159,7 @@ onUnmounted(() => {
         <!-- 头部 -->
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <div class="flex items-center gap-2">
-            <span class="text-lg">✋</span>
+            <Hand class="w-5 h-5" />
             <h2 class="text-base font-semibold text-foreground">待审批</h2>
             <Badge variant="secondary">{{ pendingCount }}</Badge>
           </div>
@@ -190,7 +191,7 @@ onUnmounted(() => {
                 class="text-xs px-2 py-1 rounded"
                 :class="timeoutPercent(item) > 80 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'"
               >
-                ⏰ {{ formatTimeout(item) }}
+                {{ formatTimeout(item) }}
               </div>
             </div>
 

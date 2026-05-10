@@ -49,6 +49,19 @@ fn default_timeout() -> u64 {
     30000
 }
 
+/// 校验选择器：不能为空，返回友好错误
+fn require_selector(action: &ContainerAction) -> Result<&str> {
+    let selector = action.config.get("selector").and_then(|v| v.as_str()).unwrap_or("");
+    if selector.is_empty() {
+        Err(anyhow!(
+            "Action '{}' (type={}) 缺少 selector 参数，请在配置中指定 CSS 选择器",
+            action.label, action.action_type
+        ))
+    } else {
+        Ok(selector)
+    }
+}
+
 /// 浏览器容器执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContainerResult {
@@ -64,6 +77,29 @@ pub struct ContainerResult {
 /// - input/fill 类型优先从 input_ports（连线传入）获取值
 /// - extract/screenshot/evaluate/get_title 等产出数据存入 output_ports
 pub async fn execute_browser_container(
+    config: &BrowserContainerConfig,
+    input_ports: &HashMap<String, Value>,
+) -> Result<ContainerResult> {
+    // 整体超时保护：默认 120s，可通过 config.timeout 配置（秒）
+    let overall_timeout = if config.timeout > 1000 {
+        // 兼容旧配置：毫秒 → 秒
+        std::time::Duration::from_millis(config.timeout)
+    } else {
+        std::time::Duration::from_secs(120)
+    };
+
+    match tokio::time::timeout(overall_timeout, execute_actions(config, input_ports)).await {
+        Ok(result) => result,
+        Err(_) => Err(anyhow!(
+            "浏览器容器整体超时（{}秒），{} 个 action 未全部完成",
+            overall_timeout.as_secs(),
+            config.actions.len()
+        )),
+    }
+}
+
+/// 内部：执行所有 action（无超时包装）
+async fn execute_actions(
     config: &BrowserContainerConfig,
     input_ports: &HashMap<String, Value>,
 ) -> Result<ContainerResult> {
@@ -100,11 +136,7 @@ pub async fn execute_browser_container(
             }
 
             "wait" => {
-                let selector = action
-                    .config
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let selector = require_selector(action)?;
                 let timeout = action
                     .config
                     .get("timeout")
@@ -120,11 +152,7 @@ pub async fn execute_browser_container(
             }
 
             "click" => {
-                let selector = action
-                    .config
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let selector = require_selector(action)?;
 
                 let params = serde_json::json!({
                     "selector": selector,
@@ -149,11 +177,7 @@ pub async fn execute_browser_container(
             }
 
             "input" | "fill" => {
-                let selector = action
-                    .config
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let selector = require_selector(action)?;
                 // 优先从 input_ports（连线传入）获取值，其次从 config.value
                 let value = input_ports
                     .get(&format!("{}_in", &action.id))
@@ -289,8 +313,7 @@ pub async fn execute_browser_container(
             }
 
             "select" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("");
+                let selector = require_selector(action)?;
                 let value = action.config.get("value")
                     .and_then(|v| v.as_str())
                     .or_else(|| input_ports.get(&format!("{}_in", &action.id))
@@ -302,8 +325,7 @@ pub async fn execute_browser_container(
             }
 
             "check" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("");
+                let selector = require_selector(action)?;
                 let checked = action.config.get("checked")
                     .and_then(|v| v.as_bool()).unwrap_or(true);
                 let params = serde_json::json!({ "selector": selector, "checked": checked });
@@ -312,8 +334,7 @@ pub async fn execute_browser_container(
             }
 
             "hover" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("");
+                let selector = require_selector(action)?;
                 // Playwright hover via evaluate (no native hover action in sidecar)
                 let script = format!(
                     "document.querySelector({})?.dispatchEvent(new MouseEvent('mouseover', {{bubbles:true}}))",
@@ -469,11 +490,130 @@ pub async fn execute_browser_container(
                 output_ports.insert(action.id.clone(), resp);
             }
 
+            // ─── v1.7 办公自动化新动作 ───
+
+            "upload" => {
+                let selector = require_selector(action)?;
+                let file_paths: Vec<String> = match action.config.get("file_paths") {
+                    Some(v) if v.is_array() => v.as_array().unwrap().iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect(),
+                    Some(v) => match v.as_str() {
+                        Some(s) => vec![s.to_string()],
+                        None => return Err(anyhow!("file_paths 必须是字符串或数组")),
+                    },
+                    _ => return Err(anyhow!("upload 缺少 file_paths 参数")),
+                };
+                let params = serde_json::json!({
+                    "selector": selector,
+                    "file_paths": file_paths,
+                });
+                crate::nodes::browser::send_sidecar_action("upload", &params).await
+                    .map_err(|e| anyhow!("文件上传失败: {}", e))?;
+            }
+
+            "keyboard" => {
+                let key = action.config.get("key").and_then(|v| v.as_str()).unwrap_or("");
+                let text = action.config.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                let delay = action.config.get("delay").and_then(|v| v.as_u64()).unwrap_or(0);
+                if key.is_empty() && text.is_empty() {
+                    return Err(anyhow!("keyboard 需要 key 或 text 参数"));
+                }
+                let params = serde_json::json!({
+                    "key": key,
+                    "text": text,
+                    "delay": delay,
+                });
+                crate::nodes::browser::send_sidecar_action("keyboard", &params).await
+                    .map_err(|e| anyhow!("键盘操作失败: {}", e))?;
+            }
+
+            "double_click" => {
+                let selector = require_selector(action)?;
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(5000);
+                let params = serde_json::json!({
+                    "selector": selector,
+                    "timeout_ms": timeout,
+                });
+                crate::nodes::browser::send_sidecar_action("double_click", &params).await
+                    .map_err(|e| anyhow!("双击失败: {}", e))?;
+            }
+
+            "drag_to" => {
+                let source = action.config.get("source").and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow!("drag_to 缺少 source 参数"))?;
+                let target = action.config.get("target").and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow!("drag_to 缺少 target 参数"))?;
+                let mut params = serde_json::json!({
+                    "source": source,
+                    "target": target,
+                });
+                if let Some(sp) = action.config.get("source_position") {
+                    params["source_position"] = sp.clone();
+                }
+                if let Some(tp) = action.config.get("target_position") {
+                    params["target_position"] = tp.clone();
+                }
+                crate::nodes::browser::send_sidecar_action("drag_to", &params).await
+                    .map_err(|e| anyhow!("拖拽失败: {}", e))?;
+            }
+
+            "context_menu" => {
+                let selector = require_selector(action)?;
+                let timeout = action.config.get("timeout")
+                    .and_then(|v| v.as_u64()).unwrap_or(5000);
+                let params = serde_json::json!({
+                    "selector": selector,
+                    "timeout_ms": timeout,
+                });
+                crate::nodes::browser::send_sidecar_action("context_menu", &params).await
+                    .map_err(|e| anyhow!("右键菜单失败: {}", e))?;
+            }
+
+            "switch_frame" => {
+                let selector = action.config.get("selector")
+                    .and_then(|v| v.as_str()).unwrap_or("main");
+                let params = serde_json::json!({
+                    "selector": selector,
+                });
+                crate::nodes::browser::send_sidecar_action("switch_frame", &params).await
+                    .map_err(|e| anyhow!("iframe 切换失败: {}", e))?;
+            }
+
+            "handle_dialog" => {
+                let action_type = action.config.get("action")
+                    .and_then(|v| v.as_str()).unwrap_or("accept");
+                let prompt_text = action.config.get("prompt_text")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                let params = serde_json::json!({
+                    "action": action_type,
+                    "prompt_text": prompt_text,
+                });
+                crate::nodes::browser::send_sidecar_action("handle_dialog", &params).await
+                    .map_err(|e| anyhow!("弹窗处理设置失败: {}", e))?;
+            }
+
+            "scroll_to_element" => {
+                let selector = require_selector(action)?;
+                let behavior = action.config.get("behavior")
+                    .and_then(|v| v.as_str()).unwrap_or("instant");
+                let block = action.config.get("block")
+                    .and_then(|v| v.as_str()).unwrap_or("center");
+                let params = serde_json::json!({
+                    "selector": selector,
+                    "behavior": behavior,
+                    "block": block,
+                });
+                crate::nodes::browser::send_sidecar_action("scroll_to_element", &params).await
+                    .map_err(|e| anyhow!("滚动到元素失败: {}", e))?;
+            }
+
             _ => {
-                tracing::warn!(
-                    "BrowserContainer — 未知 action 类型: {}",
-                    action.action_type
-                );
+                return Err(anyhow!(
+                    "浏览器容器遇到未知 action 类型: '{}' (label: '{}')。支持的类型: navigate, wait, click, scroll, input, fill, extract, screenshot, evaluate, get_title, extract_table, extract_links, select, check, hover, new_page, close_page, switch_page, pages, cookies, set_headers, back, forward, reload, current_url, pdf, wait_network_idle, wait_load_state, wait_url_contains, verify, download, upload, keyboard, double_click, drag_to, context_menu, switch_frame, handle_dialog, scroll_to_element",
+                    action.action_type, action.label
+                ));
             }
         }
     }

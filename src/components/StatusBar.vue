@@ -48,7 +48,7 @@ function formatNextRun(iso: string | null): string {
     <!-- Idle state -->
     <template v-if="isIdle">
       <span class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500/70"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-success/70"></span>
         就绪
       </span>
     </template>
@@ -61,8 +61,8 @@ function formatNextRun(iso: string | null): string {
         class="flex items-center gap-1.5"
       >
         <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/70 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
         </span>
         <span class="text-foreground font-medium">{{ run.name }}</span>
         <span v-if="run.currentStep" class="text-muted-foreground/70">
@@ -83,7 +83,7 @@ function formatNextRun(iso: string | null): string {
     <!-- Scheduled workflows -->
     <template v-if="hasScheduled">
       <div class="flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>{{ state.scheduledWorkflows.length }}个定时任务</span>
         <span v-for="s in state.scheduledWorkflows.slice(0, 3)" :key="s.id" class="flex items-center gap-1 text-muted-foreground/60">
           <span class="max-w-[100px] truncate">{{ s.workflowName }}</span>

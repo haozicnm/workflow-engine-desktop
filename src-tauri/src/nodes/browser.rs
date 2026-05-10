@@ -199,10 +199,10 @@ impl BrowserSidecar {
 impl Drop for BrowserSidecar {
     fn drop(&mut self) {
         // 应用退出时强制 kill Python 子进程，防止孤儿进程残留
-        if let Ok(mut guard) = self.child.try_lock() {
-            if let Some(ref mut child) = *guard {
-                let _ = child.start_kill();
-            }
+        // 用 blocking_lock 而非 try_lock，确保 shutdown() 释放锁后仍能 kill
+        let mut guard = self.child.blocking_lock();
+        if let Some(ref mut child) = *guard {
+            let _ = child.start_kill();
         }
     }
 }
@@ -589,10 +589,11 @@ async fn get_or_start_sidecar() -> Result<Arc<BrowserSidecar>> {
 pub async fn send_sidecar_action(action: &str, params: &serde_json::Value) -> Result<serde_json::Value> {
     let sidecar = get_or_start_sidecar().await?;
 
-    // 自动 launch
-    if action != "launch" && action != "close" && action != "shutdown" && action != "ping" {
-        // 录制/拾取需要用户可见浏览器，非 headless
-        let headless = action != "recording_start" && action != "pick";
+    // 自动 launch（pick 操作由 Python 端自行管理浏览器，不自动 launch）
+    if action != "launch" && action != "close" && action != "shutdown" && action != "ping"
+       && action != "pick" && action != "pick_start" && action != "pick_next" && action != "pick_stop" {
+        // 录制需要用户可见浏览器，非 headless
+        let headless = action != "recording_start";
         let launch_params = serde_json::json!({"headless": headless});
         let _ = sidecar.send_action("launch", launch_params).await;
     }

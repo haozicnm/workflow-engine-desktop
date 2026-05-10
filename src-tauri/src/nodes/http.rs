@@ -25,8 +25,16 @@ impl NodeExecutor for HttpNode {
 
         info!("HTTP 请求: {} {}", method, url);
 
+        let connect_timeout = config.get("connect_timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(5);
+        let read_timeout = config.get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(30);
+
         let client = reqwest::Client::builder()
-            .connect_timeout(std::time::Duration::from_secs(5))
+            .connect_timeout(std::time::Duration::from_secs(connect_timeout))
+            .timeout(std::time::Duration::from_secs(read_timeout))
             .build()
             .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
         let mut req = match method.to_uppercase().as_str() {

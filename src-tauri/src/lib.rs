@@ -78,6 +78,12 @@ impl App {
     pub fn new() -> Result<Self> {
         let db = data::db::Database::open_default()?;
         seed_builtin_workflows(&db)?;
+
+        // 启动时清理 running 状态 — 标记为 crashed
+        if let Err(e) = db.cleanup_running_on_startup() {
+            tracing::warn!("清理 running 状态失败: {}", e);
+        }
+
         let config = data::config::AppConfig::load_default().unwrap_or_default();
         let max_concurrent = std::env::var("MAX_CONCURRENT_WORKFLOWS")
             .ok()

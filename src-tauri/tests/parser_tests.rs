@@ -395,34 +395,3 @@ fn parse_workflow_step_name_alias_label() {
     ]));
     assert_eq!(steps[0].name, "AliasedName");
 }
-
-// ═══════════════════════════════════════════════════
-// then_steps / else_steps 递归转换
-// ═══════════════════════════════════════════════════
-
-#[test]
-fn then_else_steps_recursively_converted() {
-    let steps = parse_steps(json!([
-        {
-            "id": "cond1",
-            "name": "Condition",
-            "type": "condition",
-            "config": {},
-            "then_steps": [
-                {"id": "b1", "name": "Browse", "type": "browser", "config": {}, "actions": []}
-            ],
-            "else_steps": [
-                {"id": "e1", "name": "Excel", "type": "excel", "config": {}, "actions": []}
-            ]
-        }
-    ]));
-
-    let then = steps[0].then_steps.as_ref().unwrap();
-    let els = steps[0].else_steps.as_ref().unwrap();
-
-    assert_eq!(then.len(), 1);
-    assert_eq!(then[0].step_type, "browser_container");
-
-    assert_eq!(els.len(), 1);
-    assert_eq!(els[0].step_type, "excel_container");
-}

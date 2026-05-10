@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 <template>
   <DialogTitle
-    :class="cn('text-lg font-semibold leading-none tracking-tight text-white', $attrs.class)"
+    :class="cn('text-lg font-semibold leading-none tracking-tight text-foreground', $attrs.class)"
   >
     <slot />
   </DialogTitle>

@@ -10,7 +10,7 @@
 //   1. 容器类型加 _container 后缀
 //   2. actions 从顶层移入 config.actions
 //   3. action.params → action.config
-//   4. 展平 then_steps/else_steps 为顺序步骤 + next 指针
+
 
 use crate::engine::workflow::{Step, Workflow};
 use anyhow::{Result, anyhow};
@@ -18,6 +18,8 @@ use serde_json::Value;
 
 // 容器类型列表
 const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic"];
+// 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
+const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 
 /// 解析工作流 JSON（支持新旧两种格式）
 pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
@@ -56,8 +58,10 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
 }
 
 /// 转换单个步骤：容器类型加 _container，actions 移入 config
+/// 迭代类型（cursor/loop）：actions 转为 body_steps
 fn convert_step(step: &Step) -> Result<Step> {
     let is_container = CONTAINER_TYPES.contains(&step.step_type.as_str());
+    let is_iteration = ITERATION_TYPES.contains(&step.step_type.as_str());
 
     let (new_type, new_config) = if is_container {
         // 容器类型：加 _container 后缀，把 actions 移入 config
@@ -97,13 +101,24 @@ fn convert_step(step: &Step) -> Result<Step> {
         (step.step_type.clone(), step.config.clone())
     };
 
-    // 递归转换子步骤
-    let then_steps = step.then_steps.as_ref().map(|steps| {
-        steps.iter().filter_map(|s| convert_step(s).ok()).collect()
-    });
-    let else_steps = step.else_steps.as_ref().map(|steps| {
-        steps.iter().filter_map(|s| convert_step(s).ok()).collect()
-    });
+    // 迭代类型：把 actions 转为 body_steps
+    let body_steps = if is_iteration {
+        let actions = step.actions.clone().unwrap_or_default();
+        if actions.is_empty() {
+            // 没有 actions，保留原有 body_steps（可能来自手动 JSON 编辑的 config.body）
+            step.body_steps.clone()
+        } else {
+            // 把前端的 Action 对象转为 Step 对象
+            let converted: Vec<Step> = actions
+                .iter()
+                .map(|a| convert_action_to_step(a))
+                .collect::<Result<Vec<_>>>()?;
+            Some(converted)
+        }
+    } else {
+        step.body_steps.clone()
+    };
+
 
     Ok(Step {
         id: step.id.clone(),
@@ -113,17 +128,52 @@ fn convert_step(step: &Step) -> Result<Step> {
         next: step.next.clone(),
         retry: step.retry.clone(),
         timeout: step.timeout,
-        body_steps: step.body_steps.clone(),
+        body_steps,
         breakpoint: step.breakpoint,
         delay: step.delay,
         on_error: step.on_error.clone(),
-        actions: None, // 已移入 config
+        actions: None, // 已移入 config 或 body_steps
         expanded: None,
         condition: step.condition.clone(),
         condition_group: step.condition_group.clone(),
-        then_steps,
-        else_steps,
         run_condition: None,
+    })
+}
+
+/// 把前端 Action 对象转为后端 Step 对象
+/// Action: { id, type, label, params }
+/// Step:   { id, name(=label), type, config(=params) }
+fn convert_action_to_step(action: &Value) -> Result<Step> {
+    let map = action.as_object()
+        .ok_or_else(|| anyhow!("action 不是对象"))?;
+
+    let id = map.get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let step_type = map.get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let name = map.get("label")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&step_type)
+        .to_string();
+
+    // params → config（与 convert_action 一致）
+    let config = map.get("params")
+        .cloned()
+        .or_else(|| map.get("config").cloned())
+        .unwrap_or(serde_json::json!({}));
+
+    Ok(Step {
+        id,
+        name,
+        step_type,
+        config,
+        ..Default::default()
     })
 }
 
@@ -153,12 +203,6 @@ fn flatten_all_steps(steps: &[Step]) -> Vec<&Step> {
     let mut result = Vec::new();
     for step in steps {
         result.push(step);
-        if let Some(ref then_steps) = step.then_steps {
-            result.extend(flatten_all_steps(then_steps));
-        }
-        if let Some(ref else_steps) = step.else_steps {
-            result.extend(flatten_all_steps(else_steps));
-        }
     }
     result
 }

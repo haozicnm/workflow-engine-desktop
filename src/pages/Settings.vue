@@ -10,6 +10,7 @@ import Label from '../components/ui/label/Label.vue'
 import Switch from '../components/ui/switch/Switch.vue'
 import Badge from '../components/ui/badge/Badge.vue'
 import Card from '../components/ui/card/Card.vue'
+import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
 import Separator from '../components/ui/separator/Separator.vue'
 import { cn } from '@/lib/utils'
@@ -48,9 +49,9 @@ const logLevelOptions = [
 ]
 
 const themeOptions: { value: Theme; label: string; icon: string; desc: string }[] = [
-  { value: 'light', label: '浅色', icon: '☀️', desc: '浅色主题，适合明亮环境' },
-  { value: 'dark', label: '深色', icon: '🌙', desc: '深色主题，护眼舒适' },
-  { value: 'system', label: '跟随系统', icon: '💻', desc: '自动匹配系统设置' },
+  { value: 'light', label: '浅色', icon: 'Sun', desc: '浅色主题，适合明亮环境' },
+  { value: 'dark', label: '深色', icon: 'Moon', desc: '深色主题，护眼舒适' },
+  { value: 'system', label: '跟随系统', icon: 'Monitor', desc: '自动匹配系统设置' },
 ]
 
 onMounted(async () => {
@@ -109,7 +110,7 @@ function truncatePath(path: string, maxLen: number): string {
     <!-- Header -->
     <header class="mb-6">
       <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← 返回</Button>
-      <h1 class="text-xl font-bold text-foreground">⚙️ 设置</h1>
+      <h1 class="text-xl font-bold text-foreground">设置</h1>
       <p class="text-sm text-muted-foreground">配置应用行为和浏览器节点</p>
     </header>
 
@@ -134,7 +135,7 @@ function truncatePath(path: string, maxLen: number): string {
               )"
               @click="setTheme(opt.value)"
             >
-              <span class="text-2xl">{{ opt.icon }}</span>
+              <ActionIcon :name="opt.icon" cls="w-6 h-6" />
               <span class="text-sm font-semibold text-foreground">{{ opt.label }}</span>
               <span class="text-[10px] text-muted-foreground text-center leading-tight">{{ opt.desc }}</span>
             </Button>
@@ -145,7 +146,7 @@ function truncatePath(path: string, maxLen: number): string {
       <!-- Browser settings -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 浏览器节点</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">浏览器节点</h2>
           <p class="text-xs text-muted-foreground mb-4">选择浏览器自动化使用的浏览器。内网环境建议选择 Edge。</p>
 
           <div class="space-y-2 mb-4">
@@ -177,7 +178,7 @@ function truncatePath(path: string, maxLen: number): string {
             <h3 class="text-xs text-muted-foreground mb-2.5 flex items-center gap-2">
               环境检测
               <Badge :variant="sysInfo.ready ? 'success' : 'warning'" class="text-[10px]">
-                {{ sysInfo.ready ? '✅ 就绪' : '⚠️ 待配置' }}
+                {{ sysInfo.ready ? '✓ 就绪' : '⊘ 待配置' }}
               </Badge>
             </h3>
             <div class="flex flex-col gap-1.5">
@@ -185,7 +186,7 @@ function truncatePath(path: string, maxLen: number): string {
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">Python 环境</span>
                 <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
-                  {{ sysInfo.python_available ? '✅ 已检测到' : '❌ 未检测到' }}
+                  {{ sysInfo.python_available ? '✓ 已检测到' : '✗ 未检测到' }}
                 </span>
               </div>
               <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
@@ -201,7 +202,7 @@ function truncatePath(path: string, maxLen: number): string {
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">Playwright 包</span>
                 <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_playwright_pkg ? '✅ 已安装' : '⏳ 首次使用自动安装' }}
+                  {{ sysInfo.has_playwright_pkg ? '✓ 已安装' : '◷ 首次使用自动安装' }}
                 </span>
               </div>
 
@@ -209,7 +210,7 @@ function truncatePath(path: string, maxLen: number): string {
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">浏览器</span>
                 <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_browser ? '✅ 可用' : '—（首次使用自动下载）' }}
+                  {{ sysInfo.has_browser ? '✓ 可用' : '—（首次使用自动下载）' }}
                 </span>
               </div>
               <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
@@ -220,11 +221,11 @@ function truncatePath(path: string, maxLen: number): string {
               </div>
               <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
                 <span class="text-foreground pl-3">↳ 内置 Chromium</span>
-                <span class="text-success text-[11px]">✅ 安装包附带</span>
+                <span class="text-success text-[11px]">✓ 安装包附带</span>
               </div>
               <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
                 <span class="text-foreground pl-3">↳ Playwright 缓存</span>
-                <span class="text-success text-[11px]">✅ 已下载</span>
+                <span class="text-success text-[11px]">✓ 已下载</span>
               </div>
             </div>
           </div>
@@ -263,11 +264,11 @@ function truncatePath(path: string, maxLen: number): string {
       <!-- Log management -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">📄 日志</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">日志</h2>
           <p class="text-xs text-muted-foreground mb-4">查看和清理应用运行日志。</p>
           <div class="flex gap-2.5 flex-wrap">
             <Button variant="outline" size="sm" @click="openLogDir">📂 查看日志文件</Button>
-            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">🗑 清空日志</Button>
+            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">清空日志</Button>
           </div>
         </div>
       </Card>
@@ -275,7 +276,7 @@ function truncatePath(path: string, maxLen: number): string {
       <!-- Version info -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">📦 版本信息</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">版本信息</h2>
           <p class="text-xs text-muted-foreground mb-4">当前版本及更新记录。</p>
           <div class="mb-4">
             <Badge variant="default" class="text-sm px-3 py-1">v{{ APP_VERSION }}</Badge>
@@ -283,14 +284,19 @@ function truncatePath(path: string, maxLen: number): string {
           <h3 class="text-sm text-foreground mb-2">更新明细</h3>
           <div class="space-y-0">
             <div v-for="(item, i) in [
-              { version: 'v5.1.1', desc: 'shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计 · 滚轮/下拉修复 · 设置/历史右侧面板' },
+              { version: 'v6.5.0', desc: '浏览器容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
+              { version: 'v6.4.0', desc: '生产风险修复：启动清理/事务保护/HTTP超时/空选择器校验/整体超时 · 帮助文档' },
+              { version: 'v6.3.0', desc: '变量选择器改版（树形分组+点击插入）· 容器内数据流可视化' },
+              { version: 'v6.2.0', desc: '引用系统简化（短ID+稳定引用+端口key统一）' },
+              { version: 'v6.1.1', desc: '审批系统重构（channel暂停/恢复+推荐选项+全局审批队列）· SQLite 持久化' },
+              { version: 'v5.1.1', desc: 'shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计' },
               { version: 'v5.1.0', desc: 'v5 步骤编辑器正式版 · shadcn-vue 组件体系 · 容器模板系统 · 多容器类型' },
               { version: 'v5.0', desc: '去掉 LiteGraph · 自研步骤编辑器 · Steps→Actions 模型 · Vue Draggable' },
               { version: 'v2.x', desc: 'Grid 布局 · LiteGraph 画布 · 模板系统 · 浏览器自动化' },
               { version: 'v1.x', desc: 'YAML 工作流引擎原型 · Web 前端 · Playwright 自动化' },
             ]" :key="item.version"
               class="text-xs text-muted-foreground py-1.5"
-              :class="i < 4 ? 'border-b border-border' : ''"
+              :class="i < 9 ? 'border-b border-border' : ''"
             >
               <strong class="text-foreground">{{ item.version }}</strong> — {{ item.desc }}
             </div>
@@ -305,7 +311,7 @@ function truncatePath(path: string, maxLen: number): string {
           :disabled="saving"
           @click="save"
         >
-          {{ saving ? '保存中...' : '💾 保存设置' }}
+          {{ saving ? '保存中...' : '保存设置' }}
         </Button>
       </div>
     </div>

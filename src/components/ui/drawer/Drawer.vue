@@ -44,7 +44,7 @@ function close() {
       <div
         v-if="isOpen"
         :class="cn(
-          'fixed z-50 bg-[#161b22] border-[#30363d] shadow-2xl flex flex-col',
+          'fixed z-50 bg-background border-border shadow-2xl flex flex-col',
           direction === 'right' && 'right-0 top-0 h-full w-[360px] border-l',
           direction === 'left' && 'left-0 top-0 h-full w-[360px] border-r',
           direction === 'top' && 'top-0 left-0 w-full h-auto border-b',
@@ -52,13 +52,13 @@ function close() {
         )"
       >
         <!-- Header -->
-        <div :class="cn('flex items-center justify-between p-4 border-b border-[#30363d]')">
+        <div :class="cn('flex items-center justify-between p-4 border-b border-border')">
           <slot name="header" />
           <button
             :class="cn(
               'ml-auto rounded-md p-1.5',
-              'text-[#8b949e] hover:text-white hover:bg-[#30363d]',
-              'transition-colors focus:outline-none focus:ring-2 focus:ring-[#58a6ff]',
+              'text-muted-foreground hover:text-foreground hover:bg-secondary',
+              'transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
             )"
             @click="close"
           >
@@ -75,7 +75,7 @@ function close() {
         </div>
 
         <!-- Footer -->
-        <div v-if="$slots.footer" :class="cn('border-t border-[#30363d] p-4')">
+        <div v-if="$slots.footer" :class="cn('border-t border-border p-4')">
           <slot name="footer" />
         </div>
       </div>

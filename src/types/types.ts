@@ -13,6 +13,7 @@ export interface ContainerDef {
   description: string
   params: ActionParam[]
   isContainer?: boolean  // true = 有 actions 列表的容器，false/undefined = 简单步骤
+  outputHint?: string    // 输出格式提示，显示在变量选择器中
 }
 
 // ─── 动作定义 ───
@@ -81,8 +82,6 @@ export interface Step {
   // logic 容器特有
   condition?: string
   conditionGroup?: LogicConditionGroup
-  thenSteps?: Step[]
-  elseSteps?: Step[]
 }
 
 export interface Workflow {
@@ -124,19 +123,6 @@ export function nextStepId(steps: Step[]): string {
     if (m) {
       const n = parseInt(m[1], 10)
       if (n > maxNum) maxNum = n
-    }
-    // Also check nested thenSteps / elseSteps (logic containers)
-    if (step.thenSteps) {
-      for (const sub of step.thenSteps) {
-        const m2 = sub.id.match(regex)
-        if (m2) { const n = parseInt(m2[1], 10); if (n > maxNum) maxNum = n }
-      }
-    }
-    if (step.elseSteps) {
-      for (const sub of step.elseSteps) {
-        const m2 = sub.id.match(regex)
-        if (m2) { const n = parseInt(m2[1], 10); if (n > maxNum) maxNum = n }
-      }
     }
   }
   return `step_${maxNum + 1}`

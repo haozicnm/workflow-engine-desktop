@@ -34,6 +34,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
   const runStates = ref<Record<string, StepRunState>>({})
   const loading = ref(false)
   const saving = ref(false)
+  const lastWarnings = ref<string[]>([])
 
   // ─── List ───
 
@@ -54,7 +55,58 @@ export const useWorkflowStore = defineStore('workflow', () => {
   function normalizeSteps(steps: Step[]) {
     for (const step of steps) {
       if (!Array.isArray(step.actions)) step.actions = []
+      // 清理已废弃的嵌套步骤字段
+      delete (step as any).thenSteps
+      delete (step as any).elseSteps
     }
+  }
+
+  /** 校验变量引用：检查所有 {{...}} 引用的 stepId.actionId 是否存在 */
+  function validateRefs(wf: Workflow): string[] {
+    const warnings: string[] = []
+    const stepIds = new Set(wf.steps.map(s => s.id))
+    const actionIds = new Map<string, Set<string>>()
+    for (const step of wf.steps) {
+      actionIds.set(step.id, new Set((step.actions || []).map(a => a.id)))
+    }
+
+    const refRegex = /\{\{([^}]+)\}\}/g
+    function checkRefs(text: string, context: string) {
+      for (const m of text.matchAll(refRegex)) {
+        const ref = m[1]
+        const dotIdx = ref.indexOf('.')
+        if (dotIdx === -1) {
+          // 步骤级引用
+          if (!stepIds.has(ref)) {
+            warnings.push(`${context}: 引用了不存在的步骤 {{${ref}}}`)
+          }
+        } else {
+          // 动作级引用
+          const refStep = ref.slice(0, dotIdx)
+          const refAction = ref.slice(dotIdx + 1)
+          if (!stepIds.has(refStep)) {
+            warnings.push(`${context}: 引用了不存在的步骤 {{${ref}}}`)
+          } else if (!actionIds.get(refStep)?.has(refAction)) {
+            warnings.push(`${context}: 引用了不存在的动作 {{${ref}}}`)
+          }
+        }
+      }
+    }
+
+    for (const step of wf.steps) {
+      // 检查容器级参数
+      const configStr = JSON.stringify(step.config || {})
+      checkRefs(configStr, step.label)
+      // 检查条件表达式
+      if (step.condition) checkRefs(step.condition, step.label)
+      // 检查动作参数
+      for (const action of (step.actions || [])) {
+        const actionLabel = action.label || action.type
+        const paramsStr = JSON.stringify(action.params || {})
+        checkRefs(paramsStr, `${step.label} › ${actionLabel}`)
+      }
+    }
+    return warnings
   }
 
   async function loadWorkflow(id: string) {
@@ -90,6 +142,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   async function saveWorkflow(): Promise<boolean> {
     if (!current.value) return false
+    // 校验变量引用
+    lastWarnings.value = validateRefs(current.value)
     saving.value = true
     try {
       // Create new if no id
@@ -252,7 +306,25 @@ export const useWorkflowStore = defineStore('workflow', () => {
     if (!step) return
     const action = step.actions?.find(a => a.id === actionId)
     if (!action) return
-    action.params = { ...action.params, ...params }
+    action.params = deepMerge(action.params ?? {}, params) as typeof action.params
+    dirty.value = true
+  }
+
+  function updateStepConfig(stepId: string, key: string, value: unknown) {
+    const step = findStep(stepId)
+    if (!step) return
+    step.config[key] = value
+    dirty.value = true
+  }
+
+  function updateRunCondition(stepId: string, condition: import('../types/types').StepCondition | null) {
+    const step = findStep(stepId)
+    if (!step) return
+    if (condition) {
+      step.runCondition = condition
+    } else {
+      delete step.runCondition
+    }
     dirty.value = true
   }
 
@@ -263,6 +335,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
     if (step) {
       step.expanded = !step.expanded
     }
+  }
+
+  // ─── Deep merge for nested params ───
+  function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+    const result = { ...target }
+    for (const key of Object.keys(source)) {
+      if (
+        result[key] && typeof result[key] === 'object' && !Array.isArray(result[key]) &&
+        source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])
+      ) {
+        result[key] = deepMerge(result[key] as Record<string, unknown>, source[key] as Record<string, unknown>)
+      } else {
+        result[key] = source[key]
+      }
+    }
+    return result
   }
 
   // ─── Helpers ───
@@ -293,6 +381,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     runStates,
     loading,
     saving,
+    lastWarnings,
     // actions
     fetchList,
     loadWorkflow,
@@ -310,6 +399,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     renameAction,
     updateConditionGroup,
     updateActionParams,
+    updateStepConfig,
+    updateRunCondition,
     toggleStepExpanded,
     findStep,
     setWorkflowName,

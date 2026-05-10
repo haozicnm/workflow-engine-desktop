@@ -317,11 +317,27 @@ impl Database {
     pub fn update_run_status(&self, run_id: &str, status: &str, error: Option<&str>) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         let conn = self.conn()?;
-        conn.execute(
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
             "UPDATE runs SET status = ?1, finished_at = ?2, error = ?3 WHERE id = ?4",
             params![status, now, error, run_id],
         )?;
+        tx.commit()?;
         Ok(())
+    }
+
+    /// 启动时清理 running 状态 — 标记为 crashed
+    pub fn cleanup_running_on_startup(&self) -> Result<usize> {
+        let now = chrono::Utc::now().to_rfc3339();
+        let conn = self.conn()?;
+        let count = conn.execute(
+            "UPDATE runs SET status = 'crashed', finished_at = ?1, error = '应用异常退出，已自动标记' WHERE status = 'running'",
+            params![now],
+        )?;
+        if count > 0 {
+            tracing::warn!("[startup] 清理了 {} 个 running 状态的运行记录", count);
+        }
+        Ok(count)
     }
 
     pub fn get_run(&self, run_id: &str) -> Result<Option<RunInfo>> {
@@ -637,10 +653,12 @@ impl Database {
     ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         let conn = self.conn()?;
-        conn.execute(
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
            "UPDATE approvals SET status = 'decided', decision = ?1, comment = ?2, decided_at = ?3 WHERE id = ?4",
             params![decision, comment, now, id],
         )?;
+        tx.commit()?;
         Ok(())
     }
 

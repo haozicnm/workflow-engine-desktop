@@ -7,6 +7,7 @@ import { useEditorEnhancements, type LogEntry } from '../composables/useEditorEn
 import { useGlobalStatus } from '../composables/useGlobalStatus'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import StepCard from '../components/StepCard.vue'
+import ActionIcon from '../components/ActionIcon.vue'
 import ContainerConfigPanel from '../components/ContainerConfigPanel.vue'
 import CodeView from '../components/CodeView.vue'
 import Button from '../components/ui/button/Button.vue'
@@ -166,7 +167,7 @@ async function onSave() {
     if (store.lastWarnings.value.length > 0) {
       const msg = store.lastWarnings.value.slice(0, 5).join('\n')
       const extra = store.lastWarnings.value.length > 5 ? `\n...还有 ${store.lastWarnings.value.length - 5} 条` : ''
-      toast.show(`⚠️ 变量引用警告:\n${msg}${extra}`, 'info')
+      toast.show(`变量引用警告:\n${msg}${extra}`, 'info')
     }
     emit('workflow-updated')
   } else {
@@ -469,12 +470,12 @@ onUnmounted(() => {
     <Teleport to="body">
       <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" />
       <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">💾 保存</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">📋 另存为</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">📤 导出</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">⏰ 定时</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">保存</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">另存为</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">导出</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">定时</button>
         <div class="border-t border-border my-1" />
-        <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">🗑 删除</button>
+        <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">删除</button>
       </div>
     </Teleport>
 
@@ -492,7 +493,6 @@ onUnmounted(() => {
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-8 pt-6 pb-12 space-y-4 min-h-0">
             <div v-if="!workflow?.steps?.length" class="text-center py-16 text-muted-foreground">
-              <div class="text-4xl mb-3">⚙️</div>
               <div class="text-lg text-foreground mb-2">还没有步骤</div>
               <div class="text-sm">点击下方「增加步骤」开始构建工作流</div>
             </div>
@@ -551,7 +551,7 @@ onUnmounted(() => {
                 class="w-full py-2.5 text-sm text-muted-foreground border-dashed hover:border-primary hover:text-primary"
                 @click="showAddStep = !showAddStep"
               >
-                ＋ 增加步骤
+                <ActionIcon name="Plus" cls="w-4 h-4" /> 增加步骤
               </Button>
               <Teleport to="body">
                 <Transition name="fade">
@@ -563,7 +563,7 @@ onUnmounted(() => {
                         class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-secondary"
                         @click="onAddStep(def.type)"
                       >
-                        <span class="text-lg shrink-0">{{ def.icon }}</span>
+                        <ActionIcon :name="def.icon" cls="w-5 h-5 shrink-0" />
                         <div class="flex-1 min-w-0">
                           <div class="text-sm font-medium text-foreground">{{ def.label }}</div>
                           <div class="text-[11px] text-muted-foreground truncate">{{ def.description }}</div>
@@ -651,7 +651,7 @@ onUnmounted(() => {
               class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-secondary"
               @click="onSelectActionType(opt.type)"
             >
-              <span class="text-base">{{ opt.icon }}</span>
+              <ActionIcon :name="opt.icon" cls="w-4 h-4" />
               <span class="text-sm font-medium text-foreground">{{ opt.label }}</span>
             </div>
           </div>

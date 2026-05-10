@@ -5,6 +5,7 @@ import { useToast } from '../composables/useToast'
 import Button from '../components/ui/button/Button.vue'
 import Badge from '../components/ui/badge/Badge.vue'
 import Card from '../components/ui/card/Card.vue'
+import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
 import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
@@ -169,9 +170,9 @@ function calcDuration(started: string, finished: string | null): string {
 
 function statusBadge(status: string): { icon: string; variant: 'success' | 'destructive' | 'default' | 'secondary' } {
   switch (status) {
-    case 'completed': return { icon: '✅', variant: 'success' }
-    case 'failed': return { icon: '❌', variant: 'destructive' }
-    case 'running': return { icon: '⏳', variant: 'default' }
+    case 'completed': return { icon: 'CheckCircle', variant: 'success' }
+    case 'failed': return { icon: 'XCircle', variant: 'destructive' }
+    case 'running': return { icon: 'Loader', variant: 'default' }
     default: return { icon: '⏸', variant: 'secondary' }
   }
 }
@@ -206,7 +207,7 @@ const stats = computed(() => {
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3">
         <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">← 返回</Button>
-        <h2 class="text-3xl font-bold tracking-tight">📊 运行历史</h2>
+        <h2 class="text-3xl font-bold tracking-tight">运行历史</h2>
         <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ runs.length }} 条</Badge>
       </div>
       <div class="flex items-center gap-2">
@@ -223,9 +224,9 @@ const stats = computed(() => {
     <!-- Stats -->
     <div v-if="runs.length > 0" class="flex gap-4">
       <span class="text-sm text-muted-foreground">共 {{ stats.total }}</span>
-      <span class="text-sm text-success">✅ {{ stats.completed }}</span>
-      <span class="text-sm text-danger">❌ {{ stats.failed }}</span>
-      <span v-if="stats.running > 0" class="text-sm text-primary">⏳ {{ stats.running }}</span>
+      <span class="text-sm text-success">✓ {{ stats.completed }}</span>
+      <span class="text-sm text-danger">✗ {{ stats.failed }}</span>
+      <span v-if="stats.running > 0" class="text-sm text-primary">◷ {{ stats.running }}</span>
     </div>
 
     <!-- Loading -->
@@ -257,7 +258,7 @@ const stats = computed(() => {
         >
           <div class="shrink-0">
             <Badge :variant="statusBadge(run.status).variant" class="text-xs whitespace-nowrap">
-              {{ statusBadge(run.status).icon }} {{ run.status }}
+              <ActionIcon :name="statusBadge(run.status).icon" cls="w-4 h-4 inline" /> {{ run.status }}
             </Badge>
           </div>
           <div class="flex-1 min-w-0">
@@ -273,7 +274,7 @@ const stats = computed(() => {
         </div>
 
         <div v-if="run.error" class="px-4 py-2 bg-destructive/5 text-destructive text-xs font-mono border-t border-destructive/20">
-          ❌ {{ run.error }}
+          ✗ {{ run.error }}
         </div>
 
         <!-- Expanded detail -->
@@ -286,7 +287,7 @@ const stats = computed(() => {
             <!-- Tabs -->
             <Tabs :model-value="detailTab" @update:model-value="onTabChange" class="mt-3">
               <TabsList>
-                <TabsTrigger value="steps">📋 步骤 ({{ detailCache[run.id].steps.length }})</TabsTrigger>
+                <TabsTrigger value="steps">步骤 ({{ detailCache[run.id].steps.length }})</TabsTrigger>
                 <TabsTrigger value="logs">📟 日志{{ logCache[run.id] ? ' (' + logCache[run.id].length + ')' : '' }}</TabsTrigger>
               </TabsList>
 
@@ -303,7 +304,7 @@ const stats = computed(() => {
                   style="grid-template-columns: 28px 22px 1fr auto;"
                 >
                   <div class="text-[11px] text-muted-foreground/50 text-center">{{ idx + 1 }}</div>
-                  <div class="text-sm">{{ statusBadge(step.status).icon }}</div>
+                  <div class="text-sm"><ActionIcon :name="statusBadge(step.status).icon" cls="w-4 h-4" /></div>
                   <div class="text-sm text-foreground font-mono">{{ step.step_id }}</div>
                   <div class="text-[11px] text-muted-foreground">{{ calcDuration(step.started_at, step.finished_at) }}</div>
                   <div v-if="step.error" class="col-start-2 col-end-[-1] text-[11px] text-destructive font-mono">{{ step.error }}</div>

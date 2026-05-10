@@ -15,8 +15,8 @@ const variantClasses: Record<string, string> = {
   secondary: 'bg-secondary text-secondary-foreground border-border',
   destructive: 'bg-destructive/15 text-destructive border-destructive/30',
   outline: 'text-foreground border-border',
-  success: 'bg-[#238636]/15 text-[#3fb950] border-[#238636]/30',
-  warning: 'bg-[#d29922]/15 text-[#d29922] border-[#d29922]/30',
+  success: 'bg-success/15 text-success border-success/30',
+  warning: 'bg-warning/15 text-warning border-warning/30',
 }
 </script>
 

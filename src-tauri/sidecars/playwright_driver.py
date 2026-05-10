@@ -216,6 +216,23 @@ async def handle_action(action: str, params: dict) -> dict:
             # v1.6 文件下载
             case "download":
                 return await _download(params)
+            # v1.7 办公自动化新动作
+            case "upload":
+                return await _upload(params)
+            case "keyboard":
+                return await _keyboard(params)
+            case "double_click":
+                return await _double_click(params)
+            case "drag_to":
+                return await _drag_to(params)
+            case "context_menu":
+                return await _context_menu(params)
+            case "switch_frame":
+                return await _switch_frame(params)
+            case "handle_dialog":
+                return await _handle_dialog(params)
+            case "scroll_to_element":
+                return await _scroll_to_element(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -1737,6 +1754,245 @@ async def _stop_cdp_listener():
         except Exception:
             pass
         _cdp_session = None
+
+
+# ═══════════════════════════════════════════════
+# v1.7 办公自动化新动作
+# ═══════════════════════════════════════════════
+
+async def _upload(params: dict) -> dict:
+    """文件上传：设置 input[type=file] 的文件
+
+    params:
+      selector: 文件输入框选择器（通常是 input[type=file]）
+      file_paths: 文件路径列表（str 或 [str]）
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    selector = params.get("selector", "")
+    if not selector:
+        return {"success": False, "error": "upload 缺少 selector 参数"}
+
+    file_paths = params.get("file_paths", params.get("file_path", ""))
+    if isinstance(file_paths, str):
+        file_paths = [file_paths]
+
+    # 校验文件存在
+    for p in file_paths:
+        if not os.path.isfile(p):
+            return {"success": False, "error": f"文件不存在: {p}"}
+
+    try:
+        await page.set_input_files(selector, file_paths)
+        return {"success": True, "data": {"uploaded": file_paths}}
+    except Exception as e:
+        return {"success": False, "error": f"文件上传失败: {e}"}
+
+
+async def _keyboard(params: dict) -> dict:
+    """键盘操作：按键或快捷键
+
+    params:
+      key: 按键名（如 "Enter", "Tab", "Escape", "Control+a", "Control+s"）
+      text: 可选，直接输入文本（不经过元素）
+      delay: 按键间隔毫秒（默认 0）
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    key = params.get("key", "")
+    text = params.get("text", "")
+    delay = params.get("delay", 0)
+
+    try:
+        if key:
+            await page.keyboard.press(key, delay=delay)
+        if text:
+            await page.keyboard.type(text, delay=delay)
+        return {"success": True, "data": {"key": key, "text": text}}
+    except Exception as e:
+        return {"success": False, "error": f"键盘操作失败: {e}"}
+
+
+async def _double_click(params: dict) -> dict:
+    """双击元素
+
+    params:
+      selector: CSS 选择器
+      timeout_ms: 超时毫秒（默认 5000）
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    selector = params.get("selector", "")
+    if not selector:
+        return {"success": False, "error": "double_click 缺少 selector 参数"}
+
+    timeout_ms = params.get("timeout_ms", 5000)
+
+    try:
+        await page.dblclick(selector, timeout=timeout_ms)
+        return {"success": True, "data": {"selector": selector}}
+    except Exception as e:
+        return {"success": False, "error": f"双击失败: {e}"}
+
+
+async def _drag_to(params: dict) -> dict:
+    """拖拽：从源元素拖到目标元素
+
+    params:
+      source: 源元素选择器
+      target: 目标元素选择器
+      source_position: 可选，源元素内相对位置 {"x": 0, "y": 0}
+      target_position: 可选，目标元素内相对位置 {"x": 0, "y": 0}
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    source = params.get("source", "")
+    target = params.get("target", "")
+    if not source or not target:
+        return {"success": False, "error": "drag_to 缺少 source 或 target 参数"}
+
+    source_pos = params.get("source_position")
+    target_pos = params.get("target_position")
+
+    try:
+        # Playwright drag_to
+        src_el = await page.query_selector(source)
+        if not src_el:
+            return {"success": False, "error": f"源元素未找到: {source}"}
+        tgt_el = await page.query_selector(target)
+        if not tgt_el:
+            return {"success": False, "error": f"目标元素未找到: {target}"}
+
+        kwargs = {}
+        if source_pos:
+            kwargs["source_position"] = source_pos
+        if target_pos:
+            kwargs["target_position"] = target_pos
+
+        await src_el.drag_to(tgt_el, **kwargs)
+        return {"success": True, "data": {"source": source, "target": target}}
+    except Exception as e:
+        return {"success": False, "error": f"拖拽失败: {e}"}
+
+
+async def _context_menu(params: dict) -> dict:
+    """右键菜单：在指定元素上触发右键
+
+    params:
+      selector: CSS 选择器
+      timeout_ms: 超时毫秒（默认 5000）
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    selector = params.get("selector", "")
+    if not selector:
+        return {"success": False, "error": "context_menu 缺少 selector 参数"}
+
+    timeout_ms = params.get("timeout_ms", 5000)
+
+    try:
+        await page.click(selector, button="right", timeout=timeout_ms)
+        return {"success": True, "data": {"selector": selector}}
+    except Exception as e:
+        return {"success": False, "error": f"右键菜单失败: {e}"}
+
+
+async def _switch_frame(params: dict) -> dict:
+    """iframe 切换：切换到指定 iframe 或回到主文档
+
+    params:
+      selector: iframe 选择器（为空或 "main" 则回到主文档）
+    """
+    global _current_frame
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    selector = params.get("selector", "")
+
+    try:
+        if not selector or selector == "main":
+            # 回到主文档
+            _current_frame = None
+            return {"success": True, "data": {"frame": "main"}}
+
+        frame = page.frame_locator(selector)
+        if frame is None:
+            return {"success": False, "error": f"iframe 未找到: {selector}"}
+        _current_frame = frame
+        return {"success": True, "data": {"frame": selector}}
+    except Exception as e:
+        return {"success": False, "error": f"iframe 切换失败: {e}"}
+
+
+async def _handle_dialog(params: dict) -> dict:
+    """弹窗处理：接受或拒绝 alert/confirm/prompt
+
+    params:
+      action: "accept" 或 "reject"（默认 accept）
+      prompt_text: 可选，prompt 弹窗的输入文本
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    action = params.get("action", "accept")
+    prompt_text = params.get("prompt_text", "")
+
+    try:
+        # 注册一次性对话框处理器
+        async def handler(dialog):
+            if action == "accept":
+                if prompt_text:
+                    await dialog.accept(prompt_text)
+                else:
+                    await dialog.accept()
+            else:
+                await dialog.dismiss()
+
+        page.once("dialog", lambda d: asyncio.create_task(handler(d)))
+        return {"success": True, "data": {"action": action}}
+    except Exception as e:
+        return {"success": False, "error": f"弹窗处理设置失败: {e}"}
+
+
+async def _scroll_to_element(params: dict) -> dict:
+    """滚动到指定元素：确保元素可见
+
+    params:
+      selector: CSS 选择器
+      behavior: "smooth" 或 "instant"（默认 instant）
+      block: "start", "center", "end", "nearest"（默认 center）
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    selector = params.get("selector", "")
+    if not selector:
+        return {"success": False, "error": "scroll_to_element 缺少 selector 参数"}
+
+    behavior = params.get("behavior", "instant")
+    block = params.get("block", "center")
+
+    try:
+        await page.evaluate(f"""
+            document.querySelector({json.dumps(selector)})
+                ?.scrollIntoView({{behavior: "{behavior}", block: "{block}"}})
+        """)
+        return {"success": True, "data": {"selector": selector}}
+    except Exception as e:
+        return {"success": False, "error": f"滚动到元素失败: {e}"}
 
 
 async def main():

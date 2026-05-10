@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 <template>
   <DialogDescription
-    :class="cn('text-sm text-[#8b949e]', $attrs.class)"
+    :class="cn('text-sm text-muted-foreground', $attrs.class)"
   >
     <slot />
   </DialogDescription>

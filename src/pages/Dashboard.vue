@@ -65,7 +65,7 @@ onMounted(async () => {
   try {
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
-      if (status === 'completed') toast.success('工作流执行完成 ✅')
+      if (status === 'completed') toast.success('工作流执行完成')
       else if (status === 'failed') toast.error('工作流执行失败: ' + (error || '未知错误'))
     })
   } catch (e) { console.warn('无法监听执行事件:', e) }

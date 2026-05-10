@@ -94,12 +94,7 @@ pub struct Step {
     /// 可视化条件组（新格式，支持 AND/OR）
     #[serde(alias = "conditionGroup", default)]
     pub condition_group: Option<LogicConditionGroup>,
-    /// 条件为真时的子步骤
-    #[serde(default)]
-    pub then_steps: Option<Vec<Step>>,
-    /// 条件为假时的子步骤
-    #[serde(default)]
-    pub else_steps: Option<Vec<Step>>,
+
     /// 条件执行（引用逻辑步骤的 branch）
     #[serde(alias = "runCondition", default)]
     pub run_condition: Option<RunCondition>,

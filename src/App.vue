@@ -4,6 +4,7 @@ import { ref, provide, onMounted, onUnmounted } from 'vue'
 import Editor from './pages/Editor.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
+import ActionIcon from './components/ActionIcon.vue'
 import RunHistory from './pages/RunHistory.vue'
 import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -146,7 +147,9 @@ provide('globalStatus', globalStatus)
             <!-- Welcome / empty state -->
             <div v-else class="flex-1 flex items-center justify-center bg-background">
               <div class="text-center space-y-4">
-                <div class="text-6xl">⚙️</div>
+                <div class="flex justify-center">
+                  <ActionIcon name="Settings" cls="w-16 h-16 text-muted-foreground" />
+                </div>
                 <h2 class="text-2xl font-bold tracking-tight text-foreground">欢迎使用 WorkFlow</h2>
                 <p class="text-muted-foreground max-w-md">
                   从左侧选择一个工作流开始编辑，或点击「＋ 新建」创建新的工作流。
@@ -205,7 +208,7 @@ provide('globalStatus', globalStatus)
       <Transition name="fade">
         <div v-if="isDragging" class="fixed inset-0 bg-background/90 z-[100] flex items-center justify-center">
           <div class="text-center p-10 border-2 border-dashed border-primary rounded-2xl bg-primary/10">
-            <span class="text-5xl">📥</span>
+            <span class="text-5xl text-muted-foreground">↓</span>
             <div class="text-base text-foreground mt-2">松开导入工作流</div>
             <div class="text-xs text-muted-foreground">支持 .json / .yaml 文件</div>
           </div>

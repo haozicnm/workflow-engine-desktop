@@ -245,8 +245,7 @@ fn parse_inline_steps(value: &serde_json::Value) -> Result<Vec<Step>> {
                 expanded: None,
                 condition: None,
                 condition_group: None,
-                then_steps: None,
-                else_steps: None,
+
                 run_condition: None,
             });
             continue;
