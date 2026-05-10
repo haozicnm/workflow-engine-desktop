@@ -83,6 +83,7 @@ const { availableRefs } = useVariableRefs(
 
 const activeVarField = ref<string | null>(null)
 const varSearch = ref('')
+const varDropdownPos = ref({ top: 0, left: 0 })
 
 const filteredRefs = computed(() => {
   if (!varSearch.value.trim()) return availableRefs.value
@@ -101,9 +102,23 @@ function insertVarRef(refId: string) {
   varSearch.value = ''
 }
 
-function openVarPicker(condId: string, field: 'left' | 'right') {
+function openVarPicker(e: Event, condId: string, field: 'left' | 'right') {
   const key = `${condId}:${field}`
-  activeVarField.value = activeVarField.value === key ? null : key
+  if (activeVarField.value === key) {
+    activeVarField.value = null
+    return
+  }
+  const btn = (e.target as HTMLElement).closest('button')
+  if (btn) {
+    const rect = btn.getBoundingClientRect()
+    varDropdownPos.value = { top: rect.bottom + 4, left: rect.left }
+  }
+  activeVarField.value = key
+  varSearch.value = ''
+}
+
+function closeVarPicker() {
+  activeVarField.value = null
   varSearch.value = ''
 }
 </script>
@@ -156,24 +171,8 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
             :class="activeVarField === `${cond.id}:left` ? 'opacity-100 text-primary' : ''"
             title="引用变量"
             aria-label="引用变量"
-            @click="openVarPicker(cond.id, 'left')"
+            @click="openVarPicker($event, cond.id, 'left')"
           ><Link class="w-3 h-3" /></button>
-          <div v-if="activeVarField === `${cond.id}:left`" class="absolute left-0 top-full mt-1 z-50 w-72 bg-card border border-border rounded-md shadow-lg overflow-hidden">
-            <Input v-model="varSearch" placeholder="搜索变量..." class="h-7 text-xs rounded-none border-0 border-b border-border" />
-            <div class="max-h-[200px] overflow-y-auto">
-              <Button
-                v-for="ref in filteredRefs"
-                :key="ref.id"
-                variant="ghost"
-                class="w-full justify-start h-auto flex items-center gap-1.5 px-2 py-1.5 text-xs"
-                @click="insertVarRef(ref.id)"
-              >
-                <ActionIcon :name="ref.icon" cls="w-4 h-4 shrink-0" />
-                <span class="flex-1 truncate text-left" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
-                <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
-              </Button>
-            </div>
-          </div>
         </div>
 
         <!-- 操作符 -->
@@ -198,24 +197,8 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
             :class="activeVarField === `${cond.id}:right` ? 'opacity-100 text-primary' : ''"
             title="引用变量"
             aria-label="引用变量"
-            @click="openVarPicker(cond.id, 'right')"
+            @click="openVarPicker($event, cond.id, 'right')"
           ><Link class="w-3 h-3" /></button>
-          <div v-if="activeVarField === `${cond.id}:right`" class="absolute left-0 top-full mt-1 z-50 w-72 bg-card border border-border rounded-md shadow-lg overflow-hidden">
-            <Input v-model="varSearch" placeholder="搜索变量..." class="h-7 text-xs rounded-none border-0 border-b border-border" />
-            <div class="max-h-[200px] overflow-y-auto">
-              <Button
-                v-for="ref in filteredRefs"
-                :key="ref.id"
-                variant="ghost"
-                class="w-full justify-start h-auto flex items-center gap-1.5 px-2 py-1.5 text-xs"
-                @click="insertVarRef(ref.id)"
-              >
-                <ActionIcon :name="ref.icon" cls="w-4 h-4 shrink-0" />
-                <span class="flex-1 truncate text-left" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
-                <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
-              </Button>
-            </div>
-          </div>
         </div>
 
         <!-- 删除 -->
@@ -267,4 +250,31 @@ function openVarPicker(condId: string, field: 'left' | 'right') {
   <div v-if="runState?.duration" class="mt-2 text-[10px] text-muted-foreground text-right">
     耗时 {{ runState.duration }}ms
   </div>
+
+  <!-- 变量选择器（Teleport 到 body 避免 overflow 裁剪） -->
+  <Teleport to="body">
+    <!-- 遮罩层 -->
+    <div v-if="activeVarField" class="fixed inset-0 z-40" @click="closeVarPicker" />
+    <!-- 下拉面板 -->
+    <div
+      v-if="activeVarField"
+      class="fixed z-50 w-72 bg-background border border-border rounded-md shadow-lg overflow-hidden"
+      :style="{ top: varDropdownPos.top + 'px', left: varDropdownPos.left + 'px' }"
+    >
+      <Input v-model="varSearch" placeholder="搜索变量..." class="h-7 text-xs rounded-none border-0 border-b border-border" />
+      <div class="max-h-[200px] overflow-y-auto">
+        <Button
+          v-for="ref in filteredRefs"
+          :key="ref.id"
+          variant="ghost"
+          class="w-full justify-start h-auto flex items-center gap-1.5 px-2 py-1.5 text-xs"
+          @click="insertVarRef(ref.id)"
+        >
+          <ActionIcon :name="ref.icon" cls="w-4 h-4 shrink-0" />
+          <span class="flex-1 truncate text-left" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
+          <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
+        </Button>
+      </div>
+    </div>
+  </Teleport>
 </template>

@@ -2,11 +2,10 @@
 import { ref, watch, computed } from 'vue'
 import type { Step, ContainerType } from '../types/types'
 import { getContainerDef } from '../types/node-registry'
+import { useVariableRefs } from '../composables/useVariableRefs'
 import ActionIcon from './ActionIcon.vue'
+import ParamField from './ParamField.vue'
 import Button from './ui/button/Button.vue'
-import Input from './ui/input/Input.vue'
-import Label from './ui/label/Label.vue'
-import Checkbox from './ui/checkbox/Checkbox.vue'
 import Card from './ui/card/Card.vue'
 import CardHeader from './ui/card/CardHeader.vue'
 import CardTitle from './ui/card/CardTitle.vue'
@@ -15,6 +14,7 @@ import Select from './ui/select/Select.vue'
 
 const props = defineProps<{
   step: Step
+  steps?: Step[]
 }>()
 
 const emit = defineEmits<{
@@ -32,26 +32,15 @@ watch(
   },
 )
 
+// ─── Variable refs ───
+const { groupedRefs } = useVariableRefs(
+  () => props.steps || [],
+  () => props.step.id,
+)
+
 function onParamChange(key: string, value: unknown) {
   localConfig.value[key] = value
   emit('update-config', { ...localConfig.value })
-}
-
-function onTextInput(key: string, e: Event) {
-  onParamChange(key, (e.target as HTMLInputElement).value)
-}
-
-function onNumberInput(key: string, e: Event) {
-  const v = (e.target as HTMLInputElement).value
-  onParamChange(key, v === '' ? '' : Number(v))
-}
-
-function onSelectChange(key: string, e: Event) {
-  onParamChange(key, (e.target as HTMLSelectElement).value)
-}
-
-function onCheckboxChange(key: string, val: boolean) {
-  onParamChange(key, val)
 }
 </script>
 
@@ -68,53 +57,16 @@ function onCheckboxChange(key: string, val: boolean) {
     </CardHeader>
 
     <CardContent class="px-4 pb-4 pt-0">
-      <!-- Param fields -->
+      <!-- Param fields (with variable refs!) -->
       <div v-if="containerDef.params.length > 0" class="space-y-3">
-        <div
+        <ParamField
           v-for="param in containerDef.params"
           :key="param.key"
-        >
-          <Label class="text-xs text-muted-foreground block mb-1.5">{{ param.label }}</Label>
-
-          <!-- Text input -->
-          <Input
-            v-if="param.type === 'text'"
-            type="text"
-            :model-value="(localConfig[param.key] as string) ?? (param.default as string) ?? ''"
-            :placeholder="param.placeholder"
-            class="h-8 text-xs"
-            @input="onTextInput(param.key, $event)"
-          />
-
-          <!-- Number input -->
-          <Input
-            v-else-if="param.type === 'number'"
-            type="number"
-            :model-value="(localConfig[param.key] as string) ?? (param.default as string) ?? ''"
-            :placeholder="param.placeholder"
-            class="h-8 text-xs"
-            @input="onNumberInput(param.key, $event)"
-          />
-
-          <!-- Select -->
-          <Select
-            v-else-if="param.type === 'select'"
-            :model-value="(localConfig[param.key] as string) ?? (param.default as string) ?? ''"
-            :options="param.options"
-            @update:model-value="v => onParamChange(param.key, v)"
-          />
-
-          <!-- Checkbox -->
-          <div v-else-if="param.type === 'checkbox'" class="flex items-center gap-2">
-            <Checkbox
-              :model-value="!!(localConfig[param.key] ?? param.default)"
-              @update:model-value="(v) => onCheckboxChange(param.key, v)"
-            />
-            <span class="text-xs text-foreground">
-              {{ localConfig[param.key] ? '已启用' : '未启用' }}
-            </span>
-          </div>
-        </div>
+          :param="param"
+          :model-value="localConfig[param.key] ?? param.default"
+          :grouped-refs="groupedRefs"
+          @update:model-value="v => onParamChange(param.key, v)"
+        />
       </div>
 
       <!-- No params -->

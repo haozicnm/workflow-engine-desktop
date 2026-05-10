@@ -581,6 +581,7 @@ onUnmounted(() => {
             <ContainerConfigPanel
               v-if="configStep"
               :step="configStep"
+              :steps="workflow?.steps"
               @update-config="onUpdateContainerConfig"
               @close="onCloseConfig"
             />
