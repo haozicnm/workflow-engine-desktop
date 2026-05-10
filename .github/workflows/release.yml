@@ -1,229 +1,183 @@
-name: Release
+# GitHub Actions — 手动触发构建三平台安装包
+# 触发方式：GitHub 页面手动运行 workflow_dispatch
+# 产出：x86_64 Linux / ARM64 Linux / Windows 安装包
+
+name: Build Release (手动触发)
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 v6.5.0)'
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NODE_VERSION: '18'
 
 jobs:
-  # ═══ Windows 构建 (Full) ═══
-  build-windows:
-    runs-on: windows-latest
-    timeout-minutes: 50
-    permissions:
-      contents: read
-
+  # ═══════════════════════════════════════════
+  # Job 1: 构建 x86_64 Linux
+  # ═══════════════════════════════════════════
+  build-linux-x86_64:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: src/package-lock.json
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Install frontend dependencies
-        working-directory: src
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: src
-        run: npm run build
-
-      - name: Create python-runtime directories
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/wheels
-          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
-
-      # ─── Setup Python & download playwright + Chromium ───
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Download playwright wheels
-        run: |
-          pip download playwright --dest src-tauri/python-runtime/wheels
-          Write-Host "Wheels downloaded:"
-          Get-ChildItem src-tauri/python-runtime/wheels
-
-      - name: Download Playwright Chromium
-        run: |
-          pip install playwright
-          $env:PLAYWRIGHT_BROWSERS_PATH = "${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
-          python -m playwright install chromium
-          Get-ChildItem "$env:PLAYWRIGHT_BROWSERS_PATH"
-
-      # ─── Build ───
-      - name: Build Tauri (Windows)
-        run: npx --prefix src tauri build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Upload NSIS installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-nsis
-          path: src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
-
-  # ═══ Linux 构建 (AppImage) ═══
-  build-linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          targets: x86_64-unknown-linux-gnu
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libgtk-3-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev \
-            libxdo-dev
+            libsoup2.4-dev \
+            libjavascriptcoregtk-4.0-dev
+
+      - name: Build frontend
+        run: |
+          cd src
+          npm ci
+          npm run build
+
+      - name: Build Tauri (x86_64)
+        run: cargo tauri build
+        working-directory: src-tauri
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: src-tauri/target/release/bundle/deb/*.deb
+
+  # ═══════════════════════════════════════════
+  # Job 2: 构建 ARM64 Linux (交叉编译)
+  # ═══════════════════════════════════════════
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: src/package-lock.json
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            patchelf
+
+      - name: Configure cross-compilation
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          rustflags = ["-L", "/usr/aarch64-linux-gnu/lib"]
+          EOF
+
+      - name: Build frontend
+        run: |
+          cd src
+          npm ci
+          npm run build
+
+      - name: Build Tauri (ARM64)
+        run: cargo tauri build --target aarch64-unknown-linux-gnu
+        working-directory: src-tauri
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: src-tauri/target/aarch64-unknown-linux-gnu/release/bundle/deb/*.deb
+
+  # ═══════════════════════════════════════════
+  # Job 3: 构建 Windows
+  # ═══════════════════════════════════════════
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Install frontend dependencies
-        working-directory: src
-        run: npm ci
-
       - name: Build frontend
-        working-directory: src
-        run: npm run build
-
-      - name: Create python-runtime directories
-        run: mkdir -p src-tauri/python-runtime/wheels src-tauri/python-runtime/playwright-browsers
-
-      # ─── Setup Python & download playwright + Chromium ───
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Download playwright wheels
         run: |
-          pip download playwright --dest src-tauri/python-runtime/wheels
-          ls -la src-tauri/python-runtime/wheels/
+          cd src
+          npm ci
+          npm run build
 
-      - name: Download Playwright Chromium
-        run: |
-          pip install playwright
-          export PLAYWRIGHT_BROWSERS_PATH="${{ github.workspace }}/src-tauri/python-runtime/playwright-browsers"
-          python -m playwright install chromium
-          ls -la "$PLAYWRIGHT_BROWSERS_PATH/"
+      - name: Build Tauri (Windows)
+        run: cargo tauri build
+        working-directory: src-tauri
 
-      # ─── Build ───
-      - name: Build Tauri (Linux AppImage)
-        run: npx --prefix src tauri build --bundles appimage
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Upload AppImage
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
-          if-no-files-found: warn
+          name: windows-x86_64
+          path: src-tauri/target/release/bundle/nsis/*.exe
 
-  # ═══ 创建 Release ═══
-  create-release:
-    needs: [build-windows, build-linux]
+  # ═══════════════════════════════════════════
+  # Job 4: 汇总发布
+  # ═══════════════════════════════════════════
+  release:
+    needs: [build-linux-x86_64, build-linux-arm64, build-windows]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-
+    if: startsWith(github.event.inputs.version, 'v')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Show artifacts
-        run: find artifacts -type f -ls
-
-      - name: Delete existing release (clean start)
-        run: gh release delete "${{ github.ref_name }}" --yes 2>/dev/null || true
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
-          name: "Workflow Engine Desktop ${{ github.ref_name }}"
+          tag_name: ${{ github.event.inputs.version }}
+          name: Workflow Engine ${{ github.event.inputs.version }}
           body: |
-            ## Workflow Engine Desktop ${{ github.ref_name }}
+            ## Workflow Engine ${{ github.event.inputs.version }}
 
-            ### 🪟 Windows
-            - **Full 安装包** (.exe) — 离线版，内置 Playwright Chromium + pip wheels
+            ### 安装包
+            - **Windows x86_64**: `Workflow Engine_*_x64-setup.exe`
+            - **Linux x86_64**: `workflow-engine_*_amd64.deb`
+            - **Linux ARM64**: `workflow-engine_*_arm64.deb` (鲲鹏/飞腾)
 
-            ### 🐧 Linux
-            - **Full AppImage** — 内置 Playwright Chromium + pip wheels
-
-            ### 系统要求
-            - Windows 10+
-            - Ubuntu 22.04+ (或其他支持 AppImage 的发行版)
-
-            ### 内置内容
-            - Playwright Chromium（最新稳定版）
-            - playwright pip 离线安装包（自动安装到系统 Python）
-
-            ### 变更
-            详见 [commits](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }})
+            ### 说明
+            手动触发构建，版本稳定后发布。
           files: |
-            artifacts/windows-nsis/*.exe
-            artifacts/linux-appimage/*.AppImage
-          draft: false
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+          draft: true
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
