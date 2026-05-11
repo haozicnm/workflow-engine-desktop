@@ -16,11 +16,25 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// 列出所有工作流
-    List,
+    List {
+        /// 输出 JSON 格式
+        #[arg(long)]
+        json: bool,
+    },
     /// 运行工作流
-    Run { id: String },
+    Run {
+        id: String,
+        /// 注入变量 (可多次使用: --var key=value --var key2=value2)
+        #[arg(short = 'v', long = "var", value_parser = parse_var)]
+        vars: Vec<(String, String)>,
+    },
     /// 查看运行状态
-    Status { run_id: String },
+    Status {
+        run_id: String,
+        /// 输出 JSON 格式
+        #[arg(long)]
+        json: bool,
+    },
     /// 导出工作流 (JSON)
     Export {
         id: String,
@@ -30,22 +44,72 @@ pub enum Commands {
     /// 导入工作流
     Import { file: String },
     /// 校验工作流文件
-    Validate { file: String },
+    Validate {
+        file: String,
+        /// 输出 JSON 格式
+        #[arg(long)]
+        json: bool,
+    },
+    /// 管理定时调度
+    #[command(subcommand)]
+    Schedule(ScheduleCommand),
+}
+
+#[derive(Subcommand)]
+pub enum ScheduleCommand {
+    /// 列出所有调度
+    List {
+        /// 输出 JSON 格式
+        #[arg(long)]
+        json: bool,
+    },
+    /// 创建调度
+    Create {
+        workflow_id: String,
+        /// cron 表达式 (如 "0 9 * * *")
+        cron_expr: String,
+    },
+    /// 删除调度
+    Delete {
+        id: String,
+    },
+}
+
+/// 解析 --var key=value 参数
+fn parse_var(s: &str) -> Result<(String, String), String> {
+    let (k, v) = s.split_once('=')
+        .ok_or_else(|| format!("无效格式 '{}'，应为 key=value", s))?;
+    Ok((k.to_string(), v.to_string()))
 }
 
 pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
     match cli.command {
-        Commands::List => cmd_list(&app),
-        Commands::Run { id } => cmd_run(&app, &id).await,
-        Commands::Status { run_id } => cmd_status(&app, &run_id),
+        Commands::List { json } => cmd_list(&app, json),
+        Commands::Run { id, vars } => cmd_run(&app, &id, &vars).await,
+        Commands::Status { run_id, json } => cmd_status(&app, &run_id, json),
         Commands::Export { id, output } => cmd_export(&app, &id, output.as_deref()),
         Commands::Import { file } => cmd_import(&app, &file),
-        Commands::Validate { file } => cmd_validate(&file),
+        Commands::Validate { file, json } => cmd_validate(&file, json),
+        Commands::Schedule(sub) => cmd_schedule(&app, sub),
     }
 }
 
-fn cmd_list(app: &App) -> Result<(), String> {
+fn cmd_list(app: &App, json: bool) -> Result<(), String> {
     let workflows = app.db.list_workflows().map_err(|e| format!("查询失败: {e}"))?;
+    if json {
+        let items: Vec<serde_json::Value> = workflows.iter().map(|w| {
+            serde_json::json!({
+                "id": w.id,
+                "name": w.name,
+                "updated_at": w.updated_at,
+            })
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+            "workflows": items,
+            "count": items.len(),
+        })).unwrap());
+        return Ok(());
+    }
     if workflows.is_empty() {
         println!("(无工作流)");
         return Ok(());
@@ -59,7 +123,7 @@ fn cmd_list(app: &App) -> Result<(), String> {
     Ok(())
 }
 
-async fn cmd_run(app: &App, workflow_id: &str) -> Result<(), String> {
+async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Result<(), String> {
     let yaml = app.db.get_workflow_yaml(workflow_id)
         .map_err(|e| format!("获取工作流失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
@@ -74,6 +138,13 @@ async fn cmd_run(app: &App, workflow_id: &str) -> Result<(), String> {
         .map_err(|e| format!("创建运行记录失败: {e}"))?;
 
     let mut ctx = ExecutionContext::new(&run_id, &workflow);
+    // 注入 --var 变量
+    for (k, v) in vars {
+        ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
+    }
+    if !vars.is_empty() {
+        println!("注入变量: {}", vars.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(", "));
+    }
     let executor = StepExecutor::new(app.approval_store.clone(), app.db.clone());
 
     if workflow.steps.is_empty() {
@@ -128,10 +199,30 @@ async fn cmd_run(app: &App, workflow_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_status(app: &App, run_id: &str) -> Result<(), String> {
+fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
     let detail = app.db.get_run_detail(run_id)
         .map_err(|e| format!("查询失败: {e}"))?
         .ok_or_else(|| "运行记录不存在".to_string())?;
+
+    if json {
+        let steps: Vec<serde_json::Value> = detail.steps.iter().map(|s| {
+            serde_json::json!({
+                "step_id": s.step_id,
+                "status": s.status,
+                "output": s.output,
+            })
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+            "run_id": detail.run.id,
+            "workflow_name": detail.workflow_name,
+            "status": detail.run.status,
+            "started_at": detail.run.started_at,
+            "finished_at": detail.run.finished_at,
+            "error": detail.run.error,
+            "steps": steps,
+        })).unwrap());
+        return Ok(());
+    }
 
     println!("运行 ID:   {}", detail.run.id);
     println!("工作流:    {}", detail.workflow_name);
@@ -189,7 +280,7 @@ fn cmd_import(app: &App, file: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_validate(file: &str) -> Result<(), String> {
+fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
     let content = std::fs::read_to_string(file)
         .map_err(|e| format!("读取失败: {e}"))?;
     let _: serde_json::Value = serde_json::from_str(&content)
@@ -197,11 +288,97 @@ fn cmd_validate(file: &str) -> Result<(), String> {
     let workflow = parser::parse_workflow(&content)
         .map_err(|e| format!("工作流结构错误: {e}"))?;
 
+    if json {
+        let steps: Vec<serde_json::Value> = workflow.steps.iter().map(|s| {
+            serde_json::json!({
+                "name": s.name,
+                "type": s.step_type,
+                "next": s.next,
+            })
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+            "valid": true,
+            "name": workflow.name,
+            "step_count": workflow.steps.len(),
+            "steps": steps,
+        })).unwrap());
+        return Ok(());
+    }
+
     println!("✓ 校验通过");
     println!("  名称: {}", workflow.name);
     println!("  步骤数: {}", workflow.steps.len());
     for (i, s) in workflow.steps.iter().enumerate() {
         println!("  {}. {} ({})", i + 1, s.name, s.step_type);
     }
+    Ok(())
+}
+
+// ─── Schedule 管理 ───
+
+fn cmd_schedule(app: &App, sub: ScheduleCommand) -> Result<(), String> {
+    match sub {
+        ScheduleCommand::List { json } => cmd_schedule_list(app, json),
+        ScheduleCommand::Create { workflow_id, cron_expr } => cmd_schedule_create(app, &workflow_id, &cron_expr),
+        ScheduleCommand::Delete { id } => cmd_schedule_delete(app, &id),
+    }
+}
+
+fn cmd_schedule_list(app: &App, json: bool) -> Result<(), String> {
+    let schedules = app.db.list_schedules().map_err(|e| format!("查询失败: {e}"))?;
+    if json {
+        let items: Vec<serde_json::Value> = schedules.iter().map(|s| {
+            serde_json::json!({
+                "id": s.id,
+                "workflow_id": s.workflow_id,
+                "workflow_name": s.workflow_name,
+                "cron_expr": s.cron_expr,
+                "enabled": s.enabled,
+                "last_run_at": s.last_run_at,
+            })
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+            "schedules": items,
+            "count": items.len(),
+        })).unwrap());
+        return Ok(());
+    }
+    if schedules.is_empty() {
+        println!("(无调度)");
+        return Ok(());
+    }
+    println!("{:<38} {:<38} {:<20} {:<8} {:<20}", "ID", "工作流ID", "Cron", "启用", "上次运行");
+    println!("{}", "-".repeat(130));
+    for s in &schedules {
+        let enabled = if s.enabled { "✓" } else { "✗" };
+        let last = s.last_run_at.as_deref().unwrap_or("-");
+        println!("{:<38} {:<38} {:<20} {:<8} {:<20}", s.id, s.workflow_id, s.cron_expr, enabled, last);
+    }
+    println!("\n共 {} 个调度", schedules.len());
+    Ok(())
+}
+
+fn cmd_schedule_create(app: &App, workflow_id: &str, cron_expr: &str) -> Result<(), String> {
+    use std::str::FromStr;
+    // 验证 cron 表达式
+    cron::Schedule::from_str(cron_expr)
+        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+    // 验证工作流存在
+    app.db.get_workflow_yaml(workflow_id)
+        .map_err(|e| format!("查询失败: {e}"))?
+        .ok_or_else(|| "工作流不存在".to_string())?;
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    app.db.create_schedule(&id, workflow_id, cron_expr, &now)
+        .map_err(|e| format!("创建调度失败: {e}"))?;
+    println!("✓ 调度已创建 (ID: {})", id);
+    Ok(())
+}
+
+fn cmd_schedule_delete(app: &App, id: &str) -> Result<(), String> {
+    app.db.delete_schedule(id)
+        .map_err(|e| format!("删除调度失败: {e}"))?;
+    println!("✓ 调度已删除");
     Ok(())
 }
