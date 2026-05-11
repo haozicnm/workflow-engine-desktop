@@ -103,6 +103,85 @@ function truncatePath(path: string, maxLen: number): string {
   if (path.length <= maxLen) return path
   return '...' + path.slice(-(maxLen - 3))
 }
+
+const SKILL_CONTENT = [
+  '---',
+  'name: workflow-engine-cli',
+  'description: "Control Workflow Engine via wf-cli"',
+  'version: 1.0.0',
+  '---',
+  '',
+  '# Workflow Engine CLI — Agent Guide',
+  '',
+  'Control Workflow Engine via `wf-cli` command line tool.',
+  'All commands support `--json` for machine-readable output.',
+  '',
+  '## Install',
+  '',
+  'Download `wf-cli.exe` from GitHub Releases and add to PATH.',
+  '',
+  '## Commands',
+  '',
+  '### list',
+  '```',
+  'wf-cli list              # table',
+  'wf-cli list --json       # JSON (agents use this)',
+  '```',
+  '',
+  '### run',
+  '```',
+  'wf-cli run <id>',
+  'wf-cli run <id> --var key=value',
+  '```',
+  '',
+  '### status',
+  '```',
+  'wf-cli status <run_id> --json',
+  '```',
+  '',
+  '### validate',
+  '```',
+  'wf-cli validate file.json --json',
+  '```',
+  '',
+  '### export / import',
+  '```',
+  'wf-cli export <id> -o file.json',
+  'wf-cli import file.json',
+  '```',
+  '',
+  '### schedule',
+  '```',
+  'wf-cli schedule list --json',
+  'wf-cli schedule create <id> "0 9 * * *"',
+  'wf-cli schedule delete <schedule_id>',
+  '```',
+  '',
+  '## Agent Patterns',
+  '',
+  'Discover: `wf-cli list --json`',
+  'Execute + poll: `wf-cli run <id> --var x=y` then `wf-cli status <rid> --json`',
+  '',
+  '## Pitfalls',
+  '',
+  '1. Reads same SQLite DB as GUI app — same machine required',
+  '2. No headless mode — browser steps need GUI running',
+  '3. run blocks until workflow completes',
+  '4. --var values are always JSON strings',
+].join('\n')
+
+function downloadSkill() {
+  const blob = new Blob([SKILL_CONTENT], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'workflow-engine-cli.SKILL.md'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  toast.success('SKILL.md 已下载')
+}
 </script>
 
 <template>
@@ -258,6 +337,36 @@ function truncatePath(path: string, maxLen: number): string {
               <Label class="text-sm text-foreground cursor-pointer">开机自启</Label>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <!-- Agent integration -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🤖 Agent 集成</h2>
+          <p class="text-xs text-muted-foreground mb-4">
+            AI Agent（如 Claude Code、Codex、Hermes）可以通过 CLI 控制 Workflow Engine。
+            下载下方 SKILL.md 文件放入 Agent 的技能目录即可使用。
+          </p>
+
+          <!-- CLI command preview -->
+          <div class="bg-muted rounded-md p-3 mb-4 font-mono text-xs space-y-1">
+            <div class="text-muted-foreground"># 列出工作流（JSON 输出）</div>
+            <div class="text-foreground">wf-cli list --json</div>
+            <div class="text-muted-foreground mt-2"># 运行工作流并注入变量</div>
+            <div class="text-foreground">wf-cli run &lt;id&gt; --var url=https://example.com</div>
+            <div class="text-muted-foreground mt-2"># 查询运行状态</div>
+            <div class="text-foreground">wf-cli status &lt;run_id&gt; --json</div>
+            <div class="text-muted-foreground mt-2"># 管理定时调度</div>
+            <div class="text-foreground">wf-cli schedule list --json</div>
+          </div>
+
+          <p class="text-xs text-muted-foreground mb-4">
+            完整文档包含 list / run / status / export / import / validate / schedule 七个命令，
+            JSON 输出格式、Agent 调用模式和常见陷阱。
+          </p>
+
+          <Button variant="outline" size="sm" @click="downloadSkill">📥 下载 SKILL.md</Button>
         </div>
       </Card>
 
