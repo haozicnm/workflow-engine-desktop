@@ -25,7 +25,3 @@ __pycache__/
 dist/
 
 # Internal docs
-docs/
-.agents/
-skills
-skills-lock.json
