@@ -6833,7 +6833,7 @@ dependencies = [
 
 [[package]]
 name = "workflow-engine"
-version = "6.5.0"
+version = "6.6.0"
 dependencies = [
  "anyhow",
  "arboard",
@@ -6847,9 +6847,7 @@ dependencies = [
  "dirs",
  "enigo",
  "futures",
- "lazy_static",
  "log",
- "once_cell",
  "opener",
  "r2d2",
  "r2d2_sqlite",

@@ -393,6 +393,8 @@ function downloadSkill() {
           <h3 class="text-sm text-foreground mb-2">更新明细</h3>
           <div class="space-y-0">
             <div v-for="(item, i) in [
+              { version: 'v6.7.0', desc: 'CLI 执行器升级：支持条件分支、错误恢复(Ignore/Branch)、重试机制、步骤延迟、游标迭代 · Import 读取工作流名称' },
+              { version: 'v6.6.0', desc: 'GitHub 迁移 · 项目结构整理 · CLI 双模入口(独立二进制) · 调度管理' },
               { version: 'v6.5.0', desc: '浏览器容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
               { version: 'v6.4.0', desc: '生产风险修复：启动清理/事务保护/HTTP超时/空选择器校验/整体超时 · 帮助文档' },
               { version: 'v6.3.0', desc: '变量选择器改版（树形分组+点击插入）· 容器内数据流可视化' },
@@ -405,7 +407,7 @@ function downloadSkill() {
               { version: 'v1.x', desc: 'YAML 工作流引擎原型 · Web 前端 · Playwright 自动化' },
             ]" :key="item.version"
               class="text-xs text-muted-foreground py-1.5"
-              :class="i < 9 ? 'border-b border-border' : ''"
+              :class="i < 11 ? 'border-b border-border' : ''"
             >
               <strong class="text-foreground">{{ item.version }}</strong> — {{ item.desc }}
             </div>
