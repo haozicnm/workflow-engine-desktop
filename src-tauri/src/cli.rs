@@ -144,8 +144,6 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
     if !vars.is_empty() {
         println!("注入变量: {}", vars.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(", "));
     }
-    // TODO: pass vars to scheduler when it supports initial variable injection
-    let _vars = vars;
 
     // 并发控制
     let _permit = app.run_semaphore.clone().try_acquire_owned()
@@ -180,6 +178,7 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         &app.db,
         app.approval_store.clone(),
         "auto", // browser_channel: CLI 默认 auto
+        vars,
         &ctrl,
     ).await;
 

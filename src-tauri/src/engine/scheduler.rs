@@ -36,10 +36,15 @@ pub async fn run_workflow(
     db: &Arc<Database>,
     approval_store: Arc<ApprovalStore>,
     browser_channel: &str,
+    initial_vars: &[(String, String)],
     ctrl: &RunControl,
 ) -> Result<RunState> {
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.browser_channel = browser_channel.to_string();
+    // 注入初始变量（CLI --var 等场景）
+    for (k, v) in initial_vars {
+        ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
+    }
     let mut state = RunState::new(run_id, ctx.variables.clone());
     let executor = StepExecutor::new(approval_store, db.clone());
 

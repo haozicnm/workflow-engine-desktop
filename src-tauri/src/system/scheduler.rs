@@ -128,15 +128,11 @@ async fn start_scheduled_run(
             step_mode_flag,
             debug_snapshots,
         };
-        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, Some(&handle_clone), &db_clone, approval_store, &browser_channel, &ctrl).await {
+        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, Some(&handle_clone), &db_clone, approval_store, &browser_channel, &[], &ctrl).await {
             Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 error!("定时工作流执行失败: {} - {}", run_id_clone, e);
-                if let Err(e) = handle_clone.emit("run-update", serde_json::json!({
-                    "run_id": run_id_clone,
-                    "status": "failed",
-                    "error": e.to_string(),
-                })) { warn!("emit run-update failed: {}", e); }
+                // run_workflow 内部已发射 run-update 事件，此处不再重复
             }
         }
     });

@@ -78,7 +78,7 @@ pub async fn run_start(
     let db = app.db.clone();
     let approval_store = app.approval_store.clone();
     let run_id_clone = run_id.clone();
-    let wf_name = workflow_name.clone();
+    let _wf_name = workflow_name.clone();
     let cancel_flags = app.cancel_flags.clone();
     let cancel_tokens = app.cancel_tokens.clone();
     let pause_flags = app.pause_flags.clone();
@@ -98,7 +98,7 @@ pub async fn run_start(
             debug_snapshots,
         };
         let result = crate::engine::scheduler::run_workflow(
-            &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &ctrl,
+            &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl,
         ).await;
 
         // 清理标志和令牌
@@ -115,17 +115,9 @@ pub async fn run_start(
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                // 取消不算真正失败
                 let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
-                if let Err(e) = app_handle.emit("run-update", serde_json::json!({
-                    "run_id": run_id_clone,
-                    "workflow_name": wf_name,
-                    "status": status,
-                    "error": err_msg,
-                })) {
-                    warn!("发送 run-update 事件失败: {}", e);
-                }
+                // run_workflow 内部已发射 run-update 事件，此处不再重复
             }
         }
     });
