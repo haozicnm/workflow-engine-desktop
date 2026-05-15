@@ -1,6 +1,6 @@
 import struct, zlib, os
 
-BASE = r"C:\Users\haozi\.openclaw\workspace\workflow-engine-desktop\src-tauri\icons"
+BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 
 def create_png(width, height):
     """Create a PNG with blue gradient circle"""
