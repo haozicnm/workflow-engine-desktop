@@ -3,7 +3,8 @@
 
 use clap::{Parser, Subcommand};
 use crate::App;
-use crate::engine::{parser, executor::StepExecutor, context::ExecutionContext};
+use crate::engine::{parser, scheduler, executor::StepExecutor, context::ExecutionContext};
+use crate::engine::workflow::ErrorStrategy;
 use std::sync::Arc;
 
 #[derive(Parser)]
@@ -138,7 +139,6 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         .map_err(|e| format!("创建运行记录失败: {e}"))?;
 
     let mut ctx = ExecutionContext::new(&run_id, &workflow);
-    // 注入 --var 变量
     for (k, v) in vars {
         ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
     }
@@ -156,14 +156,21 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
 
     println!("▶ {} (共 {} 步)", workflow_name, workflow.steps.len());
 
+    // 预构建步骤索引
+    let step_index: std::collections::HashMap<&str, usize> = workflow.steps.iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.as_str(), i))
+        .collect();
+
     let mut current_id = workflow.steps[0].id.clone();
     let total = workflow.steps.len();
     let start = std::time::Instant::now();
+    let mut executed_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     loop {
-        let pos = workflow.steps.iter().position(|s| s.id == current_id);
-        let step = match pos {
-            Some(i) => &workflow.steps[i],
+        let pos = step_index.get(current_id.as_str()).copied();
+        let step = match pos.and_then(|i| workflow.steps.get(i)) {
+            Some(s) => s,
             None => {
                 eprintln!("  ✗ 步骤 {} 不存在", current_id);
                 break;
@@ -172,23 +179,100 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         let idx = pos.unwrap();
         let name = step.name.clone();
 
-        print!("  [{}/{}] {} ... ", idx + 1, total, name);
+        // 防止无限循环：同一步骤最多执行一次（cursor 除外）
+        if !executed_ids.insert(current_id.clone()) && step.step_type != "cursor" {
+            eprintln!("  ✗ 检测到循环引用，步骤 {} 已执行过", current_id);
+            break;
+        }
 
-        match executor.execute(step, &mut ctx).await {
-            Ok(output) => {
-                ctx.set_output(&step.id, output);
-                println!("✓ ({:.1}s)", start.elapsed().as_secs_f64());
-            }
-            Err(e) => {
-                println!("✗");
-                eprintln!("      错误: {}", e);
-                let _ = app.db.update_run_status(&run_id, "failed", Some(&e.to_string()));
-                return Err(format!("步骤 '{}' 失败: {}", name, e));
+        // ─── 条件执行检查（runCondition） ───
+        if let Some(ref rc) = step.run_condition {
+            let branch = ctx.get_output(&rc.ref_step)
+                .and_then(|o| o.get("branch"))
+                .and_then(|b| b.as_str())
+                .unwrap_or("false");
+            if !rc.should_run(branch) {
+                println!("  [{}/{}] {} ... ⏭ 跳过 (条件: ref={} branch={})",
+                    idx + 1, total, name, rc.ref_step, branch);
+                ctx.set_output(&current_id, serde_json::json!({"skipped": true, "reason": "condition"}));
+                current_id = match scheduler::determine_next_step(step, &workflow, &ctx) {
+                    Some(next) => next,
+                    None => break,
+                };
+                continue;
             }
         }
 
-        match &step.next {
-            Some(next) => current_id = next.clone(),
+        // ─── 步骤延迟 ───
+        if let Some(delay_ms) = step.delay {
+            if delay_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            }
+        }
+
+        print!("  [{}/{}] {} ... ", idx + 1, total, name);
+
+        // ─── 执行（带重试） ───
+        let max_retries = step.retry.as_ref().map(|r| r.max).unwrap_or(0);
+        let mut last_err = None;
+        let mut result = Err(anyhow::anyhow!("unreachable"));
+
+        for attempt in 0..=max_retries {
+            result = executor.execute(step, &mut ctx).await;
+            match &result {
+                Ok(_) => break,
+                Err(e) => {
+                    last_err = Some(e.to_string());
+                    if attempt < max_retries {
+                        let delay_ms = step.retry.as_ref().map(|r| r.delay_ms).unwrap_or(1000);
+                        let delay = delay_ms * (attempt + 1) as u64;
+                        eprint!("[重试 {}/{}] ", attempt + 1, max_retries);
+                        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                    }
+                }
+            }
+        }
+
+        match result {
+            Ok(output) => {
+                ctx.set_output(&current_id, output);
+                println!("✓ ({:.1}s)", start.elapsed().as_secs_f64());
+            }
+            Err(e) => {
+                let err_msg = last_err.unwrap_or_else(|| e.to_string());
+                let strategy = step.on_error.clone().unwrap_or_default();
+                match strategy {
+                    ErrorStrategy::Fail => {
+                        println!("✗");
+                        eprintln!("      错误: {}", err_msg);
+                        let _ = app.db.update_run_status(&run_id, "failed", Some(&err_msg));
+                        return Err(format!("步骤 '{}' 失败: {}", name, err_msg));
+                    }
+                    ErrorStrategy::Ignore => {
+                        println!("⚠ 已忽略 ({:.1}s)", start.elapsed().as_secs_f64());
+                        eprintln!("      错误(已忽略): {}", err_msg);
+                        ctx.set_output(&current_id, serde_json::Value::Null);
+                    }
+                    ErrorStrategy::Branch { step_id: ref branch_id } => {
+                        println!("↪ 分支跳转 → {} ({:.1}s)", branch_id, start.elapsed().as_secs_f64());
+                        eprintln!("      错误(分支): {}", err_msg);
+                        ctx.set_output(&current_id, serde_json::Value::Null);
+                        if workflow.steps.iter().any(|s| s.id == *branch_id) {
+                            current_id = branch_id.clone();
+                            continue;
+                        } else {
+                            eprintln!("      分支目标 '{}' 不存在，终止", branch_id);
+                            let _ = app.db.update_run_status(&run_id, "failed", Some(&format!("分支目标不存在: {}", branch_id)));
+                            return Err(format!("步骤 '{}' 失败，分支目标 '{}' 不存在", name, branch_id));
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── 确定下一个步骤 ───
+        current_id = match scheduler::determine_next_step(step, &workflow, &ctx) {
+            Some(next) => next,
             None => break,
         }
     }
@@ -267,16 +351,22 @@ fn cmd_export(app: &App, workflow_id: &str, output: Option<&str>) -> Result<(), 
 fn cmd_import(app: &App, file: &str) -> Result<(), String> {
     let content = std::fs::read_to_string(file)
         .map_err(|e| format!("读取失败: {e}"))?;
-    let _: serde_json::Value = serde_json::from_str(&content)
+    let value: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| format!("JSON 格式错误: {e}"))?;
+
+    // 从 JSON 中读取工作流名称
+    let name = value.get("name")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("未命名工作流");
 
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_workflow(&id, "导入工作流", "", &now, &now)
+    app.db.create_workflow(&id, name, "", &now, &now)
         .map_err(|e| format!("创建失败: {e}"))?;
     app.db.save_workflow_yaml(&id, &content)
         .map_err(|e| format!("保存失败: {e}"))?;
-    println!("✓ 已导入 (ID: {})", id);
+    println!("✓ 已导入: {} (ID: {})", name, id);
     Ok(())
 }
 
