@@ -24,4 +24,7 @@ __pycache__/
 # Build outputs
 dist/
 
+# Embedded Python runtime (local dev only)
+src-tauri/python-runtime/
+
 # Internal docs
