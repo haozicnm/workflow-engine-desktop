@@ -3,12 +3,12 @@ use crate::engine::workflow::{Workflow, Step};
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::state::RunState;
+use crate::engine::approval_store::ApprovalStore;
 use crate::data::db::Database;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Result;
 use tauri::Emitter;
-use tauri::Manager;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -32,16 +32,15 @@ pub struct RunControl {
 pub async fn run_workflow(
     workflow: &Workflow,
     run_id: &str,
-    app_handle: &tauri::AppHandle,
+    app_handle: Option<&tauri::AppHandle>,
     db: &Arc<Database>,
+    approval_store: Arc<ApprovalStore>,
     browser_channel: &str,
     ctrl: &RunControl,
 ) -> Result<RunState> {
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.browser_channel = browser_channel.to_string();
     let mut state = RunState::new(run_id, ctx.variables.clone());
-    let approval_store = app_handle.state::<std::sync::Arc<crate::App>>().approval_store.clone();
-    let db = app_handle.state::<std::sync::Arc<crate::App>>().db.clone();
     let executor = StepExecutor::new(approval_store, db.clone());
 
     let workflow_name = workflow.name.clone();
@@ -120,13 +119,15 @@ pub async fn run_workflow(
             update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
             // 通知前端：断点命中
-            if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
+            if let Some(h) = app_handle {
+                if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
                 "run_id": run_id,
                 "step_id": current_id,
                 "step_name": step.name,
                 "variables": ctx.variables,
                 "step_outputs": ctx.step_outputs,
-            })) { warn!("emit breakpoint-hit failed: {}", e); }
+                })) { warn!("emit breakpoint-hit failed: {}", e); }
+            }
 
             // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
             ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
@@ -209,7 +210,8 @@ pub async fn run_workflow(
                 // 单步模式：执行完暂停
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-                    if let Err(e) = app_handle.emit("breakpoint-hit", serde_json::json!({
+                    if let Some(h) = app_handle {
+                        if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
                         "run_id": run_id,
                         "step_id": current_id,
                         "step_name": step.name,
@@ -217,6 +219,7 @@ pub async fn run_workflow(
                         "variables": ctx.variables,
                         "step_outputs": ctx.step_outputs,
                     })) { warn!("emit breakpoint-hit failed: {}", e); }
+                    }
                 }
             }
             Err(e) => {
@@ -366,7 +369,8 @@ pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionCont
 
 // ─── 事件推送 ───
 
-fn emit_step_update(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, status: &str, output: Option<&serde_json::Value>) {
+fn emit_step_update(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, status: &str, output: Option<&serde_json::Value>) {
+    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -380,7 +384,8 @@ fn emit_step_update(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_na
 }
 
 /// 执行后推送变量快照，供前端实时监视
-fn emit_variable_snapshot(app: &tauri::AppHandle, run_id: &str, ctx: &ExecutionContext) {
+fn emit_variable_snapshot(app: Option<&tauri::AppHandle>, run_id: &str, ctx: &ExecutionContext) {
+    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "variables": ctx.variables,
@@ -389,7 +394,8 @@ fn emit_variable_snapshot(app: &tauri::AppHandle, run_id: &str, ctx: &ExecutionC
     if let Err(e) = app.emit("variable-update", event) { warn!("emit failed: {}", e); }
 }
 
-fn emit_step_update_with_error(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_name: &str, error: &str) {
+fn emit_step_update_with_error(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, error: &str) {
+    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -402,7 +408,8 @@ fn emit_step_update_with_error(app: &tauri::AppHandle, run_id: &str, step_id: &s
 }
 
 /// 错误被忽略时的事件（status = ignored, 区别于 failed）
-fn emit_step_update_ignored(app: &tauri::AppHandle, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, error: &str) {
+fn emit_step_update_ignored(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, error: &str) {
+    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -415,7 +422,8 @@ fn emit_step_update_ignored(app: &tauri::AppHandle, run_id: &str, step_id: &str,
     if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
 
-fn emit_run_update(app: &tauri::AppHandle, run_id: &str, workflow_name: &str, status: &str) {
+fn emit_run_update(app: Option<&tauri::AppHandle>, run_id: &str, workflow_name: &str, status: &str) {
+    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "workflow_name": workflow_name,

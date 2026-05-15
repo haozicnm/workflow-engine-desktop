@@ -3,9 +3,10 @@
 
 use clap::{Parser, Subcommand};
 use crate::App;
-use crate::engine::{parser, scheduler, executor::StepExecutor, context::ExecutionContext};
-use crate::engine::workflow::ErrorStrategy;
+use crate::engine::{parser, scheduler};
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::collections::HashMap;
 
 #[derive(Parser)]
 #[command(name = "workflow-engine", about = "Workflow Engine CLI")]
@@ -138,14 +139,27 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
     app.db.create_run(&run_id, workflow_id, &workflow_name, &now)
         .map_err(|e| format!("创建运行记录失败: {e}"))?;
 
-    let mut ctx = ExecutionContext::new(&run_id, &workflow);
-    for (k, v) in vars {
-        ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
-    }
+    // 注入 --var 变量到 context（scheduler 内部会创建 ExecutionContext）
+    // 由于 scheduler 内部管理 ctx，变量注入需在调用前通过 workflow.variables 传递
     if !vars.is_empty() {
         println!("注入变量: {}", vars.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(", "));
     }
-    let executor = StepExecutor::new(app.approval_store.clone(), app.db.clone());
+    // TODO: pass vars to scheduler when it supports initial variable injection
+    let _vars = vars;
+
+    // 并发控制
+    let _permit = app.run_semaphore.clone().try_acquire_owned()
+        .map_err(|_| "已达到最大并发工作流数限制，请等待其他工作流完成后再试".to_string())?;
+
+    // 构建 RunControl（CLI 模式：无取消/暂停/断点/单步）
+    let ctrl = scheduler::RunControl {
+        cancel_flag: Arc::new(AtomicBool::new(false)),
+        cancel_token: tokio_util::sync::CancellationToken::new(),
+        pause_flag: Arc::new(AtomicBool::new(false)),
+        breakpoint_flag: Arc::new(AtomicBool::new(false)),
+        step_mode_flag: Arc::new(AtomicBool::new(false)),
+        debug_snapshots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+    };
 
     if workflow.steps.is_empty() {
         app.db.update_run_status(&run_id, "completed", None)
@@ -154,133 +168,36 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         return Ok(());
     }
 
-    println!("▶ {} (共 {} 步)", workflow_name, workflow.steps.len());
-
-    // 预构建步骤索引
-    let step_index: std::collections::HashMap<&str, usize> = workflow.steps.iter()
-        .enumerate()
-        .map(|(i, s)| (s.id.as_str(), i))
-        .collect();
-
-    let mut current_id = workflow.steps[0].id.clone();
     let total = workflow.steps.len();
+    println!("▶ {} (共 {} 步)", workflow_name, total);
     let start = std::time::Instant::now();
-    let mut executed_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    loop {
-        let pos = step_index.get(current_id.as_str()).copied();
-        let step = match pos.and_then(|i| workflow.steps.get(i)) {
-            Some(s) => s,
-            None => {
-                eprintln!("  ✗ 步骤 {} 不存在", current_id);
-                break;
-            }
-        };
-        let idx = pos.unwrap();
-        let name = step.name.clone();
-
-        // 防止无限循环：同一步骤最多执行一次（cursor 除外）
-        if !executed_ids.insert(current_id.clone()) && step.step_type != "cursor" {
-            eprintln!("  ✗ 检测到循环引用，步骤 {} 已执行过", current_id);
-            break;
-        }
-
-        // ─── 条件执行检查（runCondition） ───
-        if let Some(ref rc) = step.run_condition {
-            let branch = ctx.get_output(&rc.ref_step)
-                .and_then(|o| o.get("branch"))
-                .and_then(|b| b.as_str())
-                .unwrap_or("false");
-            if !rc.should_run(branch) {
-                println!("  [{}/{}] {} ... ⏭ 跳过 (条件: ref={} branch={})",
-                    idx + 1, total, name, rc.ref_step, branch);
-                ctx.set_output(&current_id, serde_json::json!({"skipped": true, "reason": "condition"}));
-                current_id = match scheduler::determine_next_step(step, &workflow, &ctx) {
-                    Some(next) => next,
-                    None => break,
-                };
-                continue;
-            }
-        }
-
-        // ─── 步骤延迟 ───
-        if let Some(delay_ms) = step.delay {
-            if delay_ms > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-            }
-        }
-
-        print!("  [{}/{}] {} ... ", idx + 1, total, name);
-
-        // ─── 执行（带重试） ───
-        let max_retries = step.retry.as_ref().map(|r| r.max).unwrap_or(0);
-        let mut last_err = None;
-        let mut result = Err(anyhow::anyhow!("unreachable"));
-
-        for attempt in 0..=max_retries {
-            result = executor.execute(step, &mut ctx).await;
-            match &result {
-                Ok(_) => break,
-                Err(e) => {
-                    last_err = Some(e.to_string());
-                    if attempt < max_retries {
-                        let delay_ms = step.retry.as_ref().map(|r| r.delay_ms).unwrap_or(1000);
-                        let delay = delay_ms * (attempt + 1) as u64;
-                        eprint!("[重试 {}/{}] ", attempt + 1, max_retries);
-                        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
-                    }
-                }
-            }
-        }
-
-        match result {
-            Ok(output) => {
-                ctx.set_output(&current_id, output);
-                println!("✓ ({:.1}s)", start.elapsed().as_secs_f64());
-            }
-            Err(e) => {
-                let err_msg = last_err.unwrap_or_else(|| e.to_string());
-                let strategy = step.on_error.clone().unwrap_or_default();
-                match strategy {
-                    ErrorStrategy::Fail => {
-                        println!("✗");
-                        eprintln!("      错误: {}", err_msg);
-                        let _ = app.db.update_run_status(&run_id, "failed", Some(&err_msg));
-                        return Err(format!("步骤 '{}' 失败: {}", name, err_msg));
-                    }
-                    ErrorStrategy::Ignore => {
-                        println!("⚠ 已忽略 ({:.1}s)", start.elapsed().as_secs_f64());
-                        eprintln!("      错误(已忽略): {}", err_msg);
-                        ctx.set_output(&current_id, serde_json::Value::Null);
-                    }
-                    ErrorStrategy::Branch { step_id: ref branch_id } => {
-                        println!("↪ 分支跳转 → {} ({:.1}s)", branch_id, start.elapsed().as_secs_f64());
-                        eprintln!("      错误(分支): {}", err_msg);
-                        ctx.set_output(&current_id, serde_json::Value::Null);
-                        if workflow.steps.iter().any(|s| s.id == *branch_id) {
-                            current_id = branch_id.clone();
-                            continue;
-                        } else {
-                            eprintln!("      分支目标 '{}' 不存在，终止", branch_id);
-                            let _ = app.db.update_run_status(&run_id, "failed", Some(&format!("分支目标不存在: {}", branch_id)));
-                            return Err(format!("步骤 '{}' 失败，分支目标 '{}' 不存在", name, branch_id));
-                        }
-                    }
-                }
-            }
-        }
-
-        // ─── 确定下一个步骤 ───
-        current_id = match scheduler::determine_next_step(step, &workflow, &ctx) {
-            Some(next) => next,
-            None => break,
-        }
-    }
+    // 委托 scheduler::run_workflow 执行（CLI 模式不传 app_handle → 无 Tauri 事件推送）
+    let result = scheduler::run_workflow(
+        &workflow,
+        &run_id,
+        None, // CLI 模式无 Tauri AppHandle
+        &app.db,
+        app.approval_store.clone(),
+        "auto", // browser_channel: CLI 默认 auto
+        &ctrl,
+    ).await;
 
     let elapsed = start.elapsed().as_secs_f64();
-    let _ = app.db.update_run_status(&run_id, "completed", None);
-    println!("\n✓ 完成 ({:.1}s)", elapsed);
-    Ok(())
+
+    match result {
+        Ok(_state) => {
+            let _ = app.db.update_run_status(&run_id, "completed", None);
+            println!("\n✓ 完成 ({:.1}s)", elapsed);
+            Ok(())
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            let _ = app.db.update_run_status(&run_id, "failed", Some(&err_msg));
+            eprintln!("\n✗ 失败 ({:.1}s): {}", elapsed, err_msg);
+            Err(format!("工作流执行失败: {}", err_msg))
+        }
+    }
 }
 
 fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {

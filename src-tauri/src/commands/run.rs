@@ -76,6 +76,7 @@ pub async fn run_start(
 
     // 8. 后台异步执行
     let db = app.db.clone();
+    let approval_store = app.approval_store.clone();
     let run_id_clone = run_id.clone();
     let wf_name = workflow_name.clone();
     let cancel_flags = app.cancel_flags.clone();
@@ -97,7 +98,7 @@ pub async fn run_start(
             debug_snapshots,
         };
         let result = crate::engine::scheduler::run_workflow(
-            &workflow, &run_id_clone, &app_handle, &db, &browser_channel, &ctrl,
+            &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &ctrl,
         ).await;
 
         // 清理标志和令牌

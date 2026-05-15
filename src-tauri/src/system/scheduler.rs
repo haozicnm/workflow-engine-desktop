@@ -112,6 +112,7 @@ async fn start_scheduled_run(
     let run_id_clone = run_id.clone();
     let db_clone = db.clone();
     let handle_clone = app_handle.clone();
+    let approval_store = app_handle.state::<crate::App>().approval_store.clone();
     tauri::async_runtime::spawn(async move {
         let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let cancel_token = tokio_util::sync::CancellationToken::new();
@@ -127,7 +128,7 @@ async fn start_scheduled_run(
             step_mode_flag,
             debug_snapshots,
         };
-        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, &handle_clone, &db_clone, &browser_channel, &ctrl).await {
+        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, Some(&handle_clone), &db_clone, approval_store, &browser_channel, &ctrl).await {
             Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 error!("定时工作流执行失败: {} - {}", run_id_clone, e);
