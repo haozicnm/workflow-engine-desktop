@@ -79,7 +79,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '标记失败', value: 'fail' },
     ], default: 'recommended' },
   ]},
-  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持 {{变量}}', outputHint: '{ stdout, stderr, exit_code }', isContainer: true, params: [
+  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持 {{变量}}', outputHint: '{ stdout, stderr, exit_code }', params: [
     { key: 'command', label: '命令', type: 'textarea', placeholder: 'echo "Hello {{name}}"' },
     { key: 'shell', label: 'Shell 类型', type: 'select', options: [
       { label: '自动检测', value: 'auto' },
