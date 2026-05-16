@@ -45,6 +45,7 @@ rdev = "0.5"
 scraper = "0.26.0"
 
 # 新增节点依赖
+walkdir = "2"
 arboard = "3"
 regex = "1"
 base64 = "0.22"

@@ -90,6 +90,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'cwd', label: '工作目录', type: 'text', placeholder: '/home/user/project' },
     { key: 'timeout_secs', label: '超时(秒)', type: 'number', default: 300 },
   ]},
+  { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: '{ actionId: result, ... }', isContainer: true, params: []},
 ]
 
 export function getContainerDef(type: string): ContainerDef {

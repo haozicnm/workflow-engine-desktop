@@ -131,6 +131,7 @@ impl StepExecutor {
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
+        register!(executors, "file", crate::nodes::file_container::FileContainerNode);
 
         for type_name in executors.keys() {
             debug!("节点注册: {}", type_name);
