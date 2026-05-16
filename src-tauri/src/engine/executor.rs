@@ -43,13 +43,7 @@ impl StepExecutor {
         register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
 
         // ── 文件节点（v3: 独立 executor） ──
-        register!(executors, "file_read", crate::nodes::file::FileReadNode);
-        register!(executors, "file_write", crate::nodes::file::FileWriteNode);
-        register!(executors, "file_list", crate::nodes::file::FileListNode);
-        register!(executors, "file_delete", crate::nodes::file::FileDeleteNode);
-        register!(executors, "file_exists", crate::nodes::file::FileExistsNode);
-        register!(executors, "file_save", crate::nodes::file_save::FileSaveNode);
-
+        
         // ── 剪贴板节点（v3: 独立 executor） ──
         register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
         register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
@@ -83,37 +77,12 @@ impl StepExecutor {
 
         // ── P2 文件节点 ──
         register!(executors, "excel", crate::nodes::excel_container::ExcelContainerNode);
-        register!(executors, "excel_legacy", crate::nodes::excel::ExcelNode);
-        register!(executors, "excel_read", crate::nodes::excel::ExcelReadNode);
-        register!(executors, "excel_write", crate::nodes::excel::ExcelWriteNode);
-        register!(executors, "excel_create", crate::nodes::excel::ExcelCreateNode);
-        register!(executors, "excel_filter", crate::nodes::excel::ExcelFilterNode);
-        register!(executors, "excel_sort", crate::nodes::excel::ExcelSortNode);
-        register!(executors, "excel_append", crate::nodes::excel::ExcelAppendNode);
-        register!(executors, "excel_csv", crate::nodes::excel::ExcelCsvNode);
-        register!(executors, "word", crate::nodes::word_container::WordContainerNode);
-        register!(executors, "word_legacy", crate::nodes::word::WordNode);
-        register!(executors, "word_read", crate::nodes::word::WordReadNode);
-        register!(executors, "word_write", crate::nodes::word::WordWriteNode);
-        register!(executors, "word_create", crate::nodes::word::WordCreateNode);
-        register!(executors, "word_replace", crate::nodes::word::WordReplaceNode);
-        register!(executors, "word_merge", crate::nodes::word::WordMergeNode);
-
+                                                                register!(executors, "word", crate::nodes::word_container::WordContainerNode);
+                                        
         // ── 浏览器节点 ──
         register!(executors, "browser", crate::nodes::browser_container::BrowserContainerNode);
-        // 向后兼容：旧格式 browser_xxx 独立节点
-        register!(executors, "browser_legacy", crate::nodes::browser::BrowserNode);
-        register!(executors, "browser_navigate", crate::nodes::browser::BrowserNavigateNode);
-        register!(executors, "browser_click", crate::nodes::browser::BrowserClickNode);
-        register!(executors, "browser_fill", crate::nodes::browser::BrowserFillNode);
-        register!(executors, "browser_extract", crate::nodes::browser::BrowserExtractNode);
-        register!(executors, "browser_screenshot", crate::nodes::browser::BrowserScreenshotNode);
-        register!(executors, "browser_evaluate", crate::nodes::browser::BrowserEvaluateNode);
-        register!(executors, "browser_scroll", crate::nodes::browser::BrowserScrollNode);
-        register!(executors, "browser_wait", crate::nodes::browser::BrowserWaitNode);
-        register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
-                                register!(executors, "logic_container", crate::nodes::condition::ConditionNode);
-        register!(executors, "condition", crate::nodes::condition::ConditionNode);  // 向后兼容旧格式
+                                                                                                        register!(executors, "logic_container", crate::nodes::condition::ConditionNode);
+        register!(executors, "condition", crate::nodes::condition::ConditionNode);
 
         // ── 其他节点 ──
         register!(executors, "notify", crate::nodes::notify::NotifyNode);
