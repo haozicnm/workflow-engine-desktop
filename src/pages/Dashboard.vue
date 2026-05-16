@@ -23,7 +23,7 @@ interface WorkflowItem {
   updated_at: string
 }
 
-const props = defineProps<{
+defineProps<{
   selectedId: string | null
 }>()
 

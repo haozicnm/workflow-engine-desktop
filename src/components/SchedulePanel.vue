@@ -7,10 +7,7 @@ import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'
 import Badge from './ui/badge/Badge.vue'
 import Card from './ui/card/Card.vue'
-import CardHeader from './ui/card/CardHeader.vue'
-import CardTitle from './ui/card/CardTitle.vue'
 import CardContent from './ui/card/CardContent.vue'
-import Separator from './ui/separator/Separator.vue'
 import { cn } from '@/lib/utils'
 
 interface ScheduleItem {
@@ -54,7 +51,7 @@ onMounted(loadSchedules)
 async function loadSchedules() {
   loading.value = true
   try {
-    const all = await safeInvoke<ScheduleItem[]>('schedule_list')
+    const all = await safeInvoke<ScheduleItem[]>('schedule_list') ?? []
     schedules.value = props.workflowId
       ? all.filter(s => s.workflow_id === props.workflowId)
       : all

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import type { Step, ContainerType } from '../types/types'
+import type { Step } from '../types/types'
 import { getContainerDef } from '../types/node-registry'
 import { useVariableRefs } from '../composables/useVariableRefs'
 import ActionIcon from './ActionIcon.vue'
@@ -10,7 +10,6 @@ import Card from './ui/card/Card.vue'
 import CardHeader from './ui/card/CardHeader.vue'
 import CardTitle from './ui/card/CardTitle.vue'
 import CardContent from './ui/card/CardContent.vue'
-import Select from './ui/select/Select.vue'
 
 const props = defineProps<{
   step: Step

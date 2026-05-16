@@ -9,7 +9,7 @@ const errorInfo = ref('')
 onErrorCaptured((err, instance, info) => {
   error.value = err.message || String(err)
   errorInfo.value = info
-  console.error('[ErrorBoundary]', err, info)
+  console.error('[ErrorBoundary]', err, instance, info)
   return false // prevent propagation
 })
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Settings, Circle, Square, Merge, CircleStop, CircleAlert, ArrowRightLeft, Plus } from 'lucide-vue-next'
-import type { Step, StepRunState, ContainerType, ErrorStrategy } from '../types/types'
+import { Settings, Circle, Square, Plus } from 'lucide-vue-next'
+import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
 import { useVariableRefs } from '../composables/useVariableRefs'
@@ -397,13 +397,13 @@ function closeAllMenus() {
         :steps="steps"
         @update-condition="(id, c) => emit('update-condition', id, c)"
         @update-condition-group="(id, g) => emit('update-condition-group', id, g)"
-        @open-config="(sId) => emit('open-config', sId)"
-        @add-action="(id) => emit('add-action', id)"
-        @remove-action="(id, aId) => emit('remove-action', id, aId)"
-        @action-click="(id, aId) => emit('action-click', id, aId)"
-        @rename-action="(id, aId, label) => emit('rename-action', id, aId, label)"
-        @remove-step="(id) => emit('remove-step', id)"
-        @rename-step="(id, label) => emit('rename-step', id, label)"
+        @open-config="(sId: string) => emit('open-config', sId)"
+        @add-action="(id: string) => emit('add-action', id)"
+        @remove-action="(id: string, aId: string) => emit('remove-action', id, aId)"
+        @action-click="(id: string, aId: string) => emit('action-click', id, aId)"
+        @rename-action="(id: string, aId: string, label: string) => emit('rename-action', id, aId, label)"
+        @remove-step="(id: string) => emit('remove-step', id)"
+        @rename-step="(id: string, label: string) => emit('rename-step', id, label)"
       />
 
       <!-- Container type -->
