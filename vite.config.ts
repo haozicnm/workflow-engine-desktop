@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 const host = process.env.TAURI_DEV_HOST;
 
 // Path to project-root templates/
-const templatesDir = path.resolve(__dirname, "..", "templates");
+const templatesDir = path.resolve(__dirname, "templates");
 
 export default defineConfig({
   plugins: [
@@ -65,7 +65,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      '@': path.resolve(__dirname),
+      '@': path.resolve(__dirname, "src"),
     },
   },
   clearScreen: false,

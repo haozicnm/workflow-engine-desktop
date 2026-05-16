@@ -3,9 +3,9 @@
   "version": "6.7.0",
   "identifier": "com.workflow-engine.desktop",
   "build": {
-    "frontendDist": "../src/dist",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm --prefix ./src run dev",
+    "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": ""
   },
   "app": {
