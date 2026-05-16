@@ -40,9 +40,6 @@ const emit = defineEmits<{
 const toast = useToast()
 const workflows = ref<WorkflowItem[]>([])
 const loading = ref(false)
-const deletingId = ref<string | null>(null)
-const exportingId = ref<string | null>(null)
-const cloningId = ref<string | null>(null)
 const scheduleWorkflowId = ref<string | null>(null)
 const scheduleWorkflowName = ref('')
 
@@ -157,61 +154,6 @@ async function onExportYaml(item: WorkflowItem) {
     toast.error('导出失败: ' + ((e as Error).message || e))
   }
 }
-
-async function onRun(item: WorkflowItem) {
-  try {
-    await safeInvoke<string>('run_start', { workflowId: item.id })
-    toast.info(`「${item.name}」已启动`)
-  } catch (e: unknown) {
-    toast.error('执行失败: ' + ((e as Error).message || e))
-  }
-}
-
-async function onDelete(item: WorkflowItem) {
-  if (!confirm(`确定删除「${item.name}」？此操作不可撤销。`)) return
-  deletingId.value = item.id
-  try {
-    await safeInvoke('workflow_delete', { id: item.id })
-    workflows.value = workflows.value.filter(w => w.id !== item.id)
-    toast.success(`已删除「${item.name}」`)
-  } catch (e: unknown) {
-    toast.error('删除失败: ' + ((e as Error).message || e))
-  } finally { deletingId.value = null }
-}
-
-async function onExport(item: WorkflowItem) {
-  exportingId.value = item.id
-  try {
-    const wf = await safeInvoke<{ yaml: string | null }>('workflow_get', { id: item.id })
-    if (wf?.yaml) {
-      const blob = new Blob([wf.yaml], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = item.name + '.json'; a.click()
-      URL.revokeObjectURL(url)
-      toast.success(`已导出「${item.name}」`)
-    }
-  } catch (e: unknown) {
-    toast.error('导出失败: ' + ((e as Error).message || e))
-  } finally { exportingId.value = null }
-}
-
-async function onClone(item: WorkflowItem) {
-  cloningId.value = item.id
-  try {
-    const wf = await safeInvoke<{ yaml: string | null; name: string }>('workflow_get', { id: item.id })
-    if (!wf?.yaml) { toast.error('获取工作流内容失败'); return }
-    const newId = await safeInvoke<string>('workflow_create', { name: wf.name + ' (副本)', description: '' })
-    if (!newId) { toast.error('创建工作流失败'); return }
-    await safeInvoke('workflow_save_yaml', { id: newId, yaml: wf.yaml })
-    toast.success(`已复制「${item.name}」`)
-    await loadList()
-    emit('workflow-created', newId)
-  } catch (e: unknown) {
-    toast.error('复制失败: ' + ((e as Error).message || e))
-  } finally { cloningId.value = null }
-}
-
 function onSettings() {
   emit('open-settings')
 }
