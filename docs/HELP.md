@@ -1,6 +1,6 @@
 # WorkFlow Engine 使用帮助
 
-> 版本 6.6.0 · 最后更新 2026-05-15
+> 版本 6.7.0 &middot; 最后更新 2026-05-16
 
 ## 目录
 
@@ -17,6 +17,8 @@
 - [浏览器自动化](#浏览器自动化)
 - [定时执行](#定时执行)
 - [调试技巧](#调试技巧)
+- [错误处理](#错误处理)
+- [CLI 使用](#cli-使用)
 - [常见问题](#常见问题)
 
 ---
@@ -276,6 +278,74 @@ text=登录        → 文本选择器（精确匹配）
 - 已执行步骤数
 - 总耗时
 - 错误信息
+
+---
+
+## 错误处理
+
+### 错误策略（onError）
+
+每个步骤可以设置失败时的处理策略：
+
+| 策略 | 行为 | 适用场景 |
+|------|------|----------|
+| 终止（fail） | 步骤失败后立即终止整个工作流 | 关键步骤 |
+| 忽略（ignore） | 跳过错误，继续执行下一步 | 非关键步骤（如截图） |
+| 跳转（branch） | 失败时跳转到指定步骤 | 降级 / 重试逻辑 |
+
+### 重试（retry）
+
+设置步骤的 `retry` 字段（整数），失败后自动重试指定次数。重试间隔为 1 秒。
+
+### 延时执行（delay）
+
+设置步骤的 `delay` 字段（毫秒），步骤执行前等待指定时间。适合限速场景。
+
+### 条件执行（runCondition）
+
+下游步骤可监听逻辑节点的分支结果，仅在条件满足时执行。详见 [条件执行](#条件执行) 章节。
+
+---
+
+## CLI 使用
+
+Workflow Engine 支持命令行模式，无需启动 GUI：
+
+```powershell
+# 基本用法
+workflow-engine.exe --cli <command> [args]
+
+# 列出工作流
+workflow-engine.exe --cli list --json
+
+# 执行工作流（注入变量）
+workflow-engine.exe --cli run <workflow-id> -v url=https://example.com
+
+# 导入/导出
+workflow-engine.exe --cli import workflow.json
+workflow-engine.exe --cli export <id> -o workflow.json
+
+# 校验
+workflow-engine.exe --cli validate workflow.json --json
+
+# 定时任务
+workflow-engine.exe --cli schedule list --json
+workflow-engine.exe --cli schedule create <wid> "0 9 * * *"
+workflow-engine.exe --cli schedule delete <id>
+```
+
+### CLI 变量注入
+
+通过 `-v key=value` 在运行时注入变量，覆盖工作流中的默认值。可多次使用：
+
+```powershell
+workflow-engine.exe --cli run <id> \
+  -v url=https://new-site.com \
+  -v keyword=product \
+  -v max_pages=10
+```
+
+---
 
 ## 常见问题
 

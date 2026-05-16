@@ -4,7 +4,7 @@
 
 混合架构：Rust 做核心引擎，Python 仅负责浏览器自动化（Playwright）。
 
-版本：**6.6.0**
+版本：**6.7.0**
 
 ## 架构总览
 
@@ -293,7 +293,7 @@ run-update         — 工作流运行状态变化 (started/completed/failed/can
 workflow-engine.exe --cli list --json
 
 # 执行工作流（支持变量注入）
-workflow-engine.exe --cli run <id> -v url=https://example.com
+workflow-engine.exe --cli run <id> -v url=https://example.com -v name=test
 
 # 查看运行状态
 workflow-engine.exe --cli status <run-id> --json
@@ -302,12 +302,25 @@ workflow-engine.exe --cli status <run-id> --json
 workflow-engine.exe --cli export <id> -o workflow.json
 workflow-engine.exe --cli import workflow.json
 
+# 校验工作流文件
+workflow-engine.exe --cli validate workflow.json --json
+
 # 定时调度
 workflow-engine.exe --cli schedule list --json
 workflow-engine.exe --cli schedule create <wid> "0 9 * * *"
+workflow-engine.exe --cli schedule delete <id>
 ```
 
-详细用法：[docs/CLI.md](./docs/CLI.md)
+### 运行时特性
+
+| 特性 | 说明 | 配置位置 |
+|------|------|----------|
+| `runCondition` | 条件执行：根据逻辑节点分支决定是否运行 | Step 级别 |
+| `onError` | 错误策略：`fail`(终止) / `ignore`(跳过) / `branch`(跳转) | Step 级别 |
+| `delay` | 步骤执行前延迟（毫秒） | Step 级别 |
+| `retry` | 失败重试次数 | Step 级别 |
+| `breakpoint` | 断点调试标记 | Step 级别 |
+| `--var` | CLI 变量注入（运行时覆盖） | CLI 参数 |
 
 ## 开发路线
 
@@ -323,6 +336,7 @@ workflow-engine.exe --cli schedule create <wid> "0 9 * * *"
 | v6.0 | 游标迭代 + 审批重构（channel）+ 容器统一 | ✅ |
 | v6.5 | CLI 双模 + 布局常量 + Lucide 图标迁移 | ✅ |
 | v6.6 | 仓库整理 + 文档更新 + GitHub 迁移 | ✅ |
+| v6.7 | CLI 增强（条件执行/错误策略/重试/变量注入）+ TS 类型修复（67+ 错） | ✅ |
 
 ## 快速开始
 
