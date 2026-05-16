@@ -55,6 +55,12 @@ pub enum Commands {
     /// 管理定时调度
     #[command(subcommand)]
     Schedule(ScheduleCommand),
+    /// 列出所有可用步骤类型和动作（JSON）
+    Steps {
+        /// 输出 JSON 格式（默认）
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -93,6 +99,7 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Import { file } => cmd_import(&app, &file),
         Commands::Validate { file, json } => cmd_validate(&file, json),
         Commands::Schedule(sub) => cmd_schedule(&app, sub),
+        Commands::Steps { json: _ } => cmd_steps(),
     }
 }
 
@@ -318,6 +325,273 @@ fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
         println!("  {}. {} ({})", i + 1, s.name, s.step_type);
     }
     Ok(())
+}
+
+// ─── Steps manifest ───
+
+/// 输出所有可用步骤类型和动作（JSON），与前端 CONTAINER_DEFS 保持同步
+fn cmd_steps() -> Result<(), String> {
+    let manifest = build_step_manifest();
+    println!("{}", serde_json::to_string_pretty(&manifest).unwrap());
+    Ok(())
+}
+
+fn build_step_manifest() -> serde_json::Value {
+    serde_json::json!({
+        "version": "6.7.0",
+        "total_types": 14,
+        "types": [
+            // ═══ 容器节点 (isContainer: true) ═══
+            {
+                "type": "browser",
+                "label": "浏览器",
+                "isContainer": true,
+                "description": "网页操作：导航、点击、输入、提取",
+                "config": [
+                    {"key": "browser", "type": "select", "options": ["chromium", "firefox", "webkit"], "default": "chromium"},
+                    {"key": "headless", "type": "checkbox", "default": false},
+                    {"key": "timeout", "type": "number", "default": 30000}
+                ],
+                "actions": [
+                    {"type": "navigate", "label": "打开页面", "params": [{"key": "url", "type": "text"}]},
+                    {"type": "click", "label": "点击元素", "params": [{"key": "selector", "type": "text"}]},
+                    {"type": "input", "label": "输入文本", "params": [{"key": "selector", "type": "text"}, {"key": "value", "type": "text"}]},
+                    {"type": "wait", "label": "等待", "params": [{"key": "ms", "type": "number", "default": 1000}]},
+                    {"type": "screenshot", "label": "截图", "params": [{"key": "path", "type": "text"}]},
+                    {"type": "evaluate", "label": "执行 JS", "params": [{"key": "script", "type": "textarea"}]},
+                    {"type": "scroll", "label": "滚动页面", "params": [{"key": "x", "type": "number", "default": 0}, {"key": "y", "type": "number", "default": 500}]},
+                    {"type": "extract", "label": "提取数据", "params": [{"key": "selector", "type": "text", "default": "body"}, {"key": "mode", "type": "select", "options": ["text", "html", "attr"], "default": "text"}]},
+                    {"type": "get_title", "label": "获取标题", "params": []},
+                    {"type": "extract_table", "label": "提取表格", "params": [{"key": "selector", "type": "text", "default": "table"}]},
+                    {"type": "extract_links", "label": "提取链接", "params": [{"key": "selector", "type": "text", "default": "body"}]},
+                    {"type": "select", "label": "下拉选择", "params": [{"key": "selector", "type": "text"}, {"key": "value", "type": "text"}]},
+                    {"type": "check", "label": "勾选/取消", "params": [{"key": "selector", "type": "text"}, {"key": "checked", "type": "checkbox", "default": true}]},
+                    {"type": "hover", "label": "鼠标悬停", "params": [{"key": "selector", "type": "text"}]},
+                    {"type": "cookies", "label": "Cookie 管理", "params": [{"key": "action", "type": "select", "options": ["get", "set", "clear"], "default": "get"}, {"key": "cookies", "type": "textarea"}]},
+                    {"type": "set_headers", "label": "设置请求头", "params": [{"key": "headers", "type": "textarea"}]},
+                    {"type": "new_page", "label": "新建标签页", "params": [{"key": "url", "type": "text"}]},
+                    {"type": "close_page", "label": "关闭标签页", "params": [{"key": "index", "type": "number"}]},
+                    {"type": "switch_page", "label": "切换标签页", "params": [{"key": "index", "type": "number", "default": 0}]},
+                    {"type": "pages", "label": "标签页列表", "params": []},
+                    {"type": "back", "label": "后退", "params": []},
+                    {"type": "forward", "label": "前进", "params": []},
+                    {"type": "reload", "label": "刷新页面", "params": []},
+                    {"type": "current_url", "label": "当前网址", "params": []},
+                    {"type": "pdf", "label": "生成 PDF", "params": [{"key": "path", "type": "text", "default": "output.pdf"}]},
+                    {"type": "wait_network_idle", "label": "等待网络空闲", "params": [{"key": "timeout", "type": "number", "default": 30000}]},
+                    {"type": "wait_load_state", "label": "等待加载状态", "params": [{"key": "state", "type": "select", "options": ["load", "domcontentloaded", "networkidle"], "default": "load"}, {"key": "timeout", "type": "number", "default": 30000}]},
+                    {"type": "wait_url_contains", "label": "等待 URL 变更", "params": [{"key": "substring", "type": "text"}, {"key": "timeout", "type": "number", "default": 30000}]},
+                    {"type": "verify", "label": "验证健康", "params": []},
+                    {"type": "download", "label": "下载文件", "params": [{"key": "save_dir", "type": "text", "default": "."}, {"key": "click_selector", "type": "text"}, {"key": "timeout", "type": "number", "default": 30000}]},
+                    {"type": "upload", "label": "上传文件", "params": [{"key": "selector", "type": "text"}, {"key": "file_paths", "type": "text"}]},
+                    {"type": "keyboard", "label": "键盘操作", "params": [{"key": "key", "type": "text"}, {"key": "text", "type": "text"}, {"key": "delay", "type": "number", "default": 0}]},
+                    {"type": "double_click", "label": "双击元素", "params": [{"key": "selector", "type": "text"}, {"key": "timeout_ms", "type": "number", "default": 10000}]},
+                    {"type": "drag_to", "label": "拖拽元素", "params": [{"key": "source", "type": "text"}, {"key": "target", "type": "text"}, {"key": "source_position", "type": "text"}, {"key": "target_position", "type": "text"}]},
+                    {"type": "context_menu", "label": "右键菜单", "params": [{"key": "selector", "type": "text"}, {"key": "timeout_ms", "type": "number", "default": 10000}]},
+                    {"type": "switch_frame", "label": "切换 iframe", "params": [{"key": "selector", "type": "text"}]},
+                    {"type": "handle_dialog", "label": "处理弹窗", "params": [{"key": "action", "type": "select", "options": ["accept", "reject"], "default": "accept"}, {"key": "prompt_text", "type": "text"}]},
+                    {"type": "scroll_to_element", "label": "滚动到元素", "params": [{"key": "selector", "type": "text"}, {"key": "behavior", "type": "select", "options": ["smooth", "instant"], "default": "smooth"}, {"key": "block", "type": "select", "options": ["center", "start", "end", "nearest"], "default": "center"}]}
+                ]
+            },
+            {
+                "type": "excel",
+                "label": "Excel",
+                "isContainer": true,
+                "description": "Excel 操作：读写单元格、筛选、排序",
+                "config": [
+                    {"key": "file_path", "type": "text"},
+                    {"key": "sheet", "type": "text", "default": "Sheet1"}
+                ],
+                "actions": [
+                    {"type": "read", "label": "读取整表", "params": []},
+                    {"type": "write", "label": "写入数据", "params": [{"key": "value", "type": "textarea"}]},
+                    {"type": "create", "label": "创建文件", "params": [{"key": "headers", "type": "text"}]},
+                    {"type": "append", "label": "追加行", "params": [{"key": "value", "type": "textarea"}]},
+                    {"type": "filter", "label": "筛选", "params": [{"key": "column", "type": "text"}, {"key": "op", "type": "select", "options": ["contains", "equals", "not_equals", "gt", "gte", "lt", "lte", "is_empty", "not_empty"], "default": "contains"}, {"key": "value", "type": "text"}]},
+                    {"type": "sort", "label": "排序", "params": [{"key": "column", "type": "text"}, {"key": "order", "type": "select", "options": ["asc", "desc"], "default": "asc"}]},
+                    {"type": "formula", "label": "公式", "params": [{"key": "cell", "type": "text"}, {"key": "formula", "type": "text"}]}
+                ]
+            },
+            {
+                "type": "word",
+                "label": "Word",
+                "isContainer": true,
+                "description": "Word 操作：读写、替换、合并",
+                "config": [
+                    {"key": "file_path", "type": "text"}
+                ],
+                "actions": [
+                    {"type": "read", "label": "读取内容", "params": []},
+                    {"type": "write", "label": "写入段落", "params": [{"key": "value", "type": "textarea"}]},
+                    {"type": "replace", "label": "替换文本", "params": [{"key": "old_text", "type": "text"}, {"key": "new_text", "type": "text"}]},
+                    {"type": "create", "label": "创建文档", "params": [{"key": "title", "type": "text"}]},
+                    {"type": "insert_table", "label": "插入表格", "params": [{"key": "data", "type": "textarea"}]},
+                    {"type": "merge", "label": "合并文档", "params": [{"key": "files", "type": "textarea"}]}
+                ]
+            },
+            {
+                "type": "file",
+                "label": "文件操作",
+                "isContainer": true,
+                "description": "统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep",
+                "config": [],
+                "actions": [
+                    {"type": "read", "label": "读取文件", "params": [{"key": "path", "type": "text"}, {"key": "encoding", "type": "select", "options": ["text", "base64"], "default": "text"}]},
+                    {"type": "write", "label": "写入文件", "params": [{"key": "path", "type": "text"}, {"key": "content", "type": "textarea"}]},
+                    {"type": "append", "label": "追加内容", "params": [{"key": "path", "type": "text"}, {"key": "content", "type": "textarea"}]},
+                    {"type": "copy", "label": "复制文件", "params": [{"key": "source", "type": "text"}, {"key": "dest", "type": "text"}]},
+                    {"type": "move", "label": "移动/重命名", "params": [{"key": "source", "type": "text"}, {"key": "dest", "type": "text"}]},
+                    {"type": "delete", "label": "删除文件", "params": [{"key": "path", "type": "text"}]},
+                    {"type": "list", "label": "列出目录", "params": [{"key": "path", "type": "text"}, {"key": "recursive", "type": "checkbox", "default": false}]},
+                    {"type": "exists", "label": "存在检查", "params": [{"key": "path", "type": "text"}]},
+                    {"type": "glob", "label": "通配符匹配", "params": [{"key": "pattern", "type": "text"}, {"key": "path", "type": "text", "default": "."}]},
+                    {"type": "grep", "label": "内容搜索", "params": [{"key": "pattern", "type": "text"}, {"key": "path", "type": "text", "default": "."}, {"key": "file_glob", "type": "text"}]}
+                ]
+            },
+            {
+                "type": "logic",
+                "label": "条件判断",
+                "isContainer": true,
+                "description": "条件分支：满足/不满足走不同路径",
+                "config": [
+                    {"key": "condition", "type": "text"}
+                ],
+                "operators": [
+                    {"type": "contains", "label": "包含", "hasRight": true},
+                    {"type": "not_contains", "label": "不包含", "hasRight": true},
+                    {"type": "equals", "label": "等于", "hasRight": true},
+                    {"type": "not_equals", "label": "不等于", "hasRight": true},
+                    {"type": "greater_than", "label": "大于", "hasRight": true},
+                    {"type": "less_than", "label": "小于", "hasRight": true},
+                    {"type": "greater_equal", "label": "大于等于", "hasRight": true},
+                    {"type": "less_equal", "label": "小于等于", "hasRight": true},
+                    {"type": "starts_with", "label": "开头是", "hasRight": true},
+                    {"type": "ends_with", "label": "结尾是", "hasRight": true},
+                    {"type": "is_empty", "label": "为空", "hasRight": false},
+                    {"type": "not_empty", "label": "不为空", "hasRight": false},
+                    {"type": "regex", "label": "正则匹配", "hasRight": true}
+                ]
+            },
+            {
+                "type": "cursor",
+                "label": "游标迭代",
+                "isContainer": true,
+                "description": "逐条迭代：每次运行处理一行/一项，游标跨次保存",
+                "config": [
+                    {"key": "items", "type": "text"}
+                ],
+                "body_actions": [
+                    {"type": "http", "label": "HTTP 请求", "params": [{"key": "method", "type": "select", "options": ["GET", "POST"], "default": "GET"}, {"key": "url", "type": "text"}, {"key": "body", "type": "textarea"}]},
+                    {"type": "script", "label": "脚本", "params": [{"key": "script", "type": "textarea"}]},
+                    {"type": "delay", "label": "延迟等待", "params": [{"key": "duration_ms", "type": "number", "default": 1000}]},
+                    {"type": "notify", "label": "通知", "params": [{"key": "title", "type": "text"}, {"key": "body", "type": "textarea"}]}
+                ]
+            },
+            {
+                "type": "loop",
+                "label": "批量循环",
+                "isContainer": true,
+                "description": "一次性遍历全部数据，适合小数据内存变换",
+                "config": [
+                    {"key": "items", "type": "text"}
+                ],
+                "body_actions": [
+                    {"type": "http", "label": "HTTP 请求", "params": [{"key": "method", "type": "select", "options": ["GET", "POST"], "default": "GET"}, {"key": "url", "type": "text"}, {"key": "body", "type": "textarea"}]},
+                    {"type": "script", "label": "脚本", "params": [{"key": "script", "type": "textarea"}]},
+                    {"type": "delay", "label": "延迟等待", "params": [{"key": "duration_ms", "type": "number", "default": 1000}]},
+                    {"type": "notify", "label": "通知", "params": [{"key": "title", "type": "text"}, {"key": "body", "type": "textarea"}]}
+                ]
+            },
+            // ═══ 简单节点 (isContainer: false) ═══
+            {
+                "type": "http",
+                "label": "HTTP 请求",
+                "isContainer": false,
+                "description": "发送 HTTP 请求：GET/POST/PUT/DELETE",
+                "config": [
+                    {"key": "method", "type": "select", "options": ["GET", "POST", "PUT", "DELETE"], "default": "GET"},
+                    {"key": "url", "type": "text"},
+                    {"key": "headers", "type": "textarea"},
+                    {"key": "body", "type": "textarea"}
+                ],
+                "output": "{ status, body, headers }"
+            },
+            {
+                "type": "delay",
+                "label": "延迟等待",
+                "isContainer": false,
+                "description": "等待指定时间后继续",
+                "config": [
+                    {"key": "duration_ms", "type": "number", "default": 1000},
+                    {"key": "max_duration_ms", "type": "number", "default": 5000}
+                ],
+                "output": "{ waited: ms }"
+            },
+            {
+                "type": "notify",
+                "label": "通知",
+                "isContainer": false,
+                "description": "发送通知：系统通知/Webhook",
+                "config": [
+                    {"key": "notify_type", "type": "select", "options": ["system", "webhook"], "default": "system"},
+                    {"key": "title", "type": "text"},
+                    {"key": "body", "type": "textarea"},
+                    {"key": "url", "type": "text"}
+                ],
+                "output": "{ sent: true }"
+            },
+            {
+                "type": "script",
+                "label": "脚本",
+                "isContainer": false,
+                "description": "执行自定义脚本（Rhai）",
+                "config": [
+                    {"key": "script", "type": "textarea"}
+                ],
+                "output": "脚本返回值"
+            },
+            {
+                "type": "clipboard",
+                "label": "剪贴板",
+                "isContainer": false,
+                "description": "读写系统剪贴板",
+                "config": [
+                    {"key": "action", "type": "select", "options": ["read", "write"], "default": "read"},
+                    {"key": "text", "type": "textarea"}
+                ],
+                "output": "剪贴板内容"
+            },
+            {
+                "type": "approval",
+                "label": "人工审批",
+                "isContainer": false,
+                "description": "暂停流程等待人工审核",
+                "config": [
+                    {"key": "title", "type": "text"},
+                    {"key": "message", "type": "textarea"},
+                    {"key": "options", "type": "text", "default": "同意,拒绝"},
+                    {"key": "recommended", "type": "text", "default": "同意"},
+                    {"key": "require_review", "type": "select", "options": ["true", "false"], "default": "true"},
+                    {"key": "timeout", "type": "number", "default": 300},
+                    {"key": "timeout_action", "type": "select", "options": ["recommended", "reject", "approve", "fail"], "default": "recommended"}
+                ],
+                "output": "{ decision, comment, item }"
+            },
+            {
+                "type": "shell",
+                "label": "Shell 命令",
+                "isContainer": false,
+                "description": "执行任意 Shell 命令（bash/powershell/cmd），支持 {{变量}} — 万能 OS 自动化原语",
+                "config": [
+                    {"key": "command", "type": "textarea"},
+                    {"key": "shell", "type": "select", "options": ["auto", "bash", "powershell", "cmd"], "default": "auto"},
+                    {"key": "cwd", "type": "text"},
+                    {"key": "timeout_secs", "type": "number", "default": 300}
+                ],
+                "output": "{ stdout, stderr, exit_code }"
+            }
+        ]
+    })
 }
 
 // ─── Schedule 管理 ───
