@@ -1,7 +1,5 @@
 import { ref, watch, onUnmounted, computed } from 'vue'
 import { useWorkflowStore } from '../stores/workflowStore'
-import { useToast } from './useToast'
-import type { Workflow } from '../types/types'
 
 export interface LogEntry {
   time: string
@@ -17,7 +15,6 @@ export interface LogEntry {
  */
 export function useEditorEnhancements() {
   const store = useWorkflowStore()
-  const toast = useToast()
 
   // ─── AutoSave ───
   let autoSaveTimer: ReturnType<typeof setTimeout> | null = null

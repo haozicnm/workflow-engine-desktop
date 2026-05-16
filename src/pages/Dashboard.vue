@@ -2,12 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
-import SchedulePanel from '../components/SchedulePanel.vue'
 import Button from '../components/ui/button/Button.vue'
 import Input from '../components/ui/input/Input.vue'
-import Badge from '../components/ui/badge/Badge.vue'
-import { inject, type Ref } from 'vue'
-import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
 import SidebarHeader from '../components/ui/sidebar/SidebarHeader.vue'
 import SidebarContent from '../components/ui/sidebar/SidebarContent.vue'
 import SidebarFooter from '../components/ui/sidebar/SidebarFooter.vue'
@@ -16,6 +12,7 @@ import SidebarGroupLabel from '../components/ui/sidebar/SidebarGroupLabel.vue'
 import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
 import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
+import { inject, type Ref } from 'vue'
 
 interface WorkflowItem {
   id: string
@@ -25,10 +22,6 @@ interface WorkflowItem {
   created_at: string
   updated_at: string
 }
-
-const props = defineProps<{
-  selectedId: string | null
-}>()
 
 const emit = defineEmits<{
   'open-workflow': [id?: string]
@@ -40,8 +33,6 @@ const emit = defineEmits<{
 const toast = useToast()
 const workflows = ref<WorkflowItem[]>([])
 const loading = ref(false)
-const scheduleWorkflowId = ref<string | null>(null)
-const scheduleWorkflowName = ref('')
 
 const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
 
@@ -73,7 +64,7 @@ onUnmounted(() => { unlistenRunUpdate?.() })
 async function loadList() {
   loading.value = true
   try {
-    workflows.value = await safeInvoke<WorkflowItem[]>('workflow_list')
+    workflows.value = await safeInvoke<WorkflowItem[]>('workflow_list') || []
   } catch (e: unknown) {
     toast.error('获取工作流列表失败: ' + ((e as Error).message || e))
   } finally { loading.value = false }
@@ -139,21 +130,6 @@ async function importFromContent(content: string) {
   }
 }
 
-async function onExportYaml(item: WorkflowItem) {
-  try {
-    const wf = await safeInvoke<{ yaml: string | null }>('workflow_get', { id: item.id })
-    if (wf?.yaml) {
-      const blob = new Blob([wf.yaml], { type: 'text/yaml' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = item.name + '.yaml'; a.click()
-      URL.revokeObjectURL(url)
-      toast.success(`已导出「${item.name}」为 YAML`)
-    }
-  } catch (e: unknown) {
-    toast.error('导出失败: ' + ((e as Error).message || e))
-  }
-}
 function onSettings() {
   emit('open-settings')
 }
