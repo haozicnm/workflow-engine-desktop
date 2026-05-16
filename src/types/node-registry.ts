@@ -79,6 +79,17 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '标记失败', value: 'fail' },
     ], default: 'recommended' },
   ]},
+  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持 {{变量}}', outputHint: '{ stdout, stderr, exit_code }', isContainer: true, params: [
+    { key: 'command', label: '命令', type: 'textarea', placeholder: 'echo "Hello {{name}}"' },
+    { key: 'shell', label: 'Shell 类型', type: 'select', options: [
+      { label: '自动检测', value: 'auto' },
+      { label: 'Bash', value: 'bash' },
+      { label: 'PowerShell', value: 'powershell' },
+      { label: 'CMD', value: 'cmd' },
+    ], default: 'auto' },
+    { key: 'cwd', label: '工作目录', type: 'text', placeholder: '/home/user/project' },
+    { key: 'timeout_secs', label: '超时(秒)', type: 'number', default: 300 },
+  ]},
 ]
 
 export function getContainerDef(type: string): ContainerDef {

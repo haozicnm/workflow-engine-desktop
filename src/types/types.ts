@@ -3,7 +3,7 @@
 
 // ─── 容器类型 ───
 
-export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor' | 'loop' | 'approval'
+export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'clipboard' | 'cursor' | 'loop' | 'approval' | 'shell'
 
 export interface ContainerDef {
   type: ContainerType

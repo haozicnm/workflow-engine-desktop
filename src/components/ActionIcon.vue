@@ -18,6 +18,7 @@ import {
   HelpCircle, ExternalLink, Copy, Clipboard, FolderPlus,
   Sun, Moon, Monitor, XCircle, Loader,
   Circle, Merge, CircleStop, CircleAlert, ArrowRightLeft,
+  Terminal,
 } from 'lucide-vue-next'
 
 withDefaults(defineProps<{
@@ -63,6 +64,7 @@ withDefaults(defineProps<{
   <Frame v-else-if="name === 'Frame'" :class="cls" />
   <MessageSquare v-else-if="name === 'MessageSquare'" :class="cls" />
   <Target v-else-if="name === 'Target'" :class="cls" />
+  <Terminal v-else-if="name === 'Terminal'" :class="cls" />
   <Pencil v-else-if="name === 'Pencil'" :class="cls" />
   <Search v-else-if="name === 'Search'" :class="cls" />
   <ArrowUpDown v-else-if="name === 'ArrowUpDown'" :class="cls" />
