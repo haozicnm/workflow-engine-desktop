@@ -12,7 +12,6 @@ import Badge from '../components/ui/badge/Badge.vue'
 import Card from '../components/ui/card/Card.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
-import Separator from '../components/ui/separator/Separator.vue'
 import { cn } from '@/lib/utils'
 
 const emit = defineEmits<{ 'back': [] }>()

@@ -164,9 +164,9 @@ async function onSave() {
   if (ok) {
     toast.show('保存成功', 'success')
     // 显示变量引用警告
-    if (store.lastWarnings.value.length > 0) {
-      const msg = store.lastWarnings.value.slice(0, 5).join('\n')
-      const extra = store.lastWarnings.value.length > 5 ? `\n...还有 ${store.lastWarnings.value.length - 5} 条` : ''
+    if (store.lastWarnings.length > 0) {
+      const msg = store.lastWarnings.slice(0, 5).join('\n')
+      const extra = store.lastWarnings.length > 5 ? `\n...还有 ${store.lastWarnings.length - 5} 条` : ''
       toast.show(`变量引用警告:\n${msg}${extra}`, 'info')
     }
     emit('workflow-updated')

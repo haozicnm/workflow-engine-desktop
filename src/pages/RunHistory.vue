@@ -7,7 +7,6 @@ import Badge from '../components/ui/badge/Badge.vue'
 import Card from '../components/ui/card/Card.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
-import ScrollArea from '../components/ui/scroll-area/ScrollArea.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
@@ -71,7 +70,7 @@ onMounted(async () => {
 
 async function loadWorkflowList() {
   try {
-    const list: any[] = await safeInvoke('workflow_list')
+    const list: any[] = await safeInvoke('workflow_list') || []
     workflowList.value = list.map(w => ({ id: w.id, name: w.name }))
   } catch (e) {
     console.warn('加载工作流列表失败:', e)
@@ -105,7 +104,7 @@ async function toggleExpand(runId: string) {
     loadingDetail.value = runId
     try {
       const detail = await safeInvoke<RunDetail>('run_detail', { runId })
-      detailCache.value[runId] = detail
+      if (detail) detailCache.value[runId] = detail
     } catch (e: any) {
       toast.error('加载详情失败: ' + (e.message || e))
     } finally {
@@ -117,7 +116,7 @@ async function toggleExpand(runId: string) {
 async function loadLogs(runId: string) {
   if (logCache.value[runId]) return
   try {
-    logCache.value[runId] = await safeInvoke<StepLogEntry[]>('run_step_logs', { runId })
+    logCache.value[runId] = await safeInvoke<StepLogEntry[]>('run_step_logs', { runId }) || []
   } catch (e: any) {
     toast.error('加载日志失败: ' + (e.message || e))
     logCache.value[runId] = []

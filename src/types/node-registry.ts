@@ -2,7 +2,7 @@
 // 容器定义、动作列表、工厂函数
 
 import type {
-  ContainerType, ContainerDef, ActionDef, ActionParam,
+  ContainerType, ContainerDef, ActionDef,
   Action, Step,
 } from './types'
 import { uid, nextStepId, nextActionId } from './types'
