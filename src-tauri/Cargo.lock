@@ -5372,7 +5372,6 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -6833,7 +6832,7 @@ dependencies = [
 
 [[package]]
 name = "workflow-engine"
-version = "6.7.0"
+version = "6.8.0"
 dependencies = [
  "anyhow",
  "arboard",
