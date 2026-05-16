@@ -23,6 +23,10 @@ interface WorkflowItem {
   updated_at: string
 }
 
+const props = defineProps<{
+  selectedId: string | null
+}>()
+
 const emit = defineEmits<{
   'open-workflow': [id?: string]
   'open-settings': []

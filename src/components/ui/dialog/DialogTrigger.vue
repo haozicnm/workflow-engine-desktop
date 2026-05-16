@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { DialogTrigger } from 'radix-vue'
-import { cn } from '@/lib/utils'
 
-const props = defineProps<{
+defineProps<{
   asChild?: boolean
 }>()
 </script>

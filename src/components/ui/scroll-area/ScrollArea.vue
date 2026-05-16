@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
 
-interface Props {
+defineProps<{
   class?: string
-}
+}>()
 </script>
 
 <template>

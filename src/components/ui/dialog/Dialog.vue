@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  DialogRoot,
-  DialogTrigger,
-  DialogPortal,
-  DialogOverlay,
-  DialogContent,
-  DialogClose,
-  DialogTitle,
-  DialogDescription,
-} from 'radix-vue'
-import { cn } from '@/lib/utils'
+import { DialogRoot } from 'radix-vue'
 
 const props = withDefaults(defineProps<{
   open?: boolean
