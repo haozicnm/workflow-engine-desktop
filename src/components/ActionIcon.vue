@@ -20,7 +20,7 @@ import {
   Circle, Merge, CircleStop, CircleAlert, ArrowRightLeft,
 } from 'lucide-vue-next'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   name: string
   cls?: string
 }>(), {

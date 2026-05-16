@@ -59,7 +59,7 @@ function timeoutPercent(entry: PendingItem): number {
 // 加载待审批列表
 async function loadPending() {
   try {
-    const list = await safeInvoke<ApprovalEntry[]>('approval_list_pending')
+    const list = await safeInvoke<ApprovalEntry[]>('approval_list_pending') ?? []
     // 清理旧的 timer
     pending.value.forEach(p => { if (p.timer) clearInterval(p.timer) })
     pending.value = list.map(entry => {

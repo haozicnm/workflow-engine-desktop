@@ -77,8 +77,11 @@ let pickSessionActive = false
 
 function getStepUrl(): string | undefined {
   if (!props.steps?.length) return undefined
-  const browserStep = props.steps.find(s => s.type === 'browser' || s.container_type === 'browser')
-  return browserStep?.config?.url || browserStep?.config?.params?.url
+  const browserStep = props.steps.find(s => s.type === 'browser')
+  const cfg = browserStep?.config as Record<string, unknown> | undefined
+  const url = cfg?.url as string | undefined
+  const paramsUrl = (cfg?.params as Record<string, unknown> | undefined)?.url as string | undefined
+  return url || paramsUrl
 }
 
 async function onPickElement(fieldKey: string) {
