@@ -41,9 +41,9 @@
           "conditions": [
             {
               "id": "c1",
-              "left": "{{step_1.action_1_2.result}}",
-              "op": "not_empty",
-              "right": ""
+              "left": "{{step_1.action_1_2.count}}",
+              "op": "gt",
+              "right": "0"
             }
           ]
         }
@@ -54,7 +54,7 @@
       "type": "cursor",
       "label": "逐个处理CSV",
       "config": {
-        "items": "{{step_1.action_1_2.result}}"
+        "items": "{{step_1.action_1_2.matches}}"
       },
       "actions": [
         {

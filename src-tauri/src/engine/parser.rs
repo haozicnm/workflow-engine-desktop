@@ -226,7 +226,7 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
         expanded: None,
         condition: step.condition.clone(),
         condition_group: step.condition_group.clone(),
-        run_condition: None,
+        run_condition: step.run_condition.clone(),
     })
 }
 
