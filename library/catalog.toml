@@ -27,3 +27,12 @@ params = ["test_dir", "items_list", "delay_ms"]
 schedule = ""                 # 手动触发
 category = "stress"
 file = "stress/integration-smoke.wf.json"
+
+[[templates]]
+name = "my-test"
+version = "1.0.0"
+description = "嵌套容错链压力测试"
+params = ["test_dir", "items"]
+schedule = ""
+category = "general"
+file = "general/my-test.wf.json"

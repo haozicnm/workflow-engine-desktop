@@ -77,16 +77,39 @@ pub enum LibraryCommand {
     Show {
         name: String,
     },
+    /// 从已导入的工作流创建模板
+    Create {
+        /// 模板名称
+        name: String,
+        /// 源工作流 ID
+        #[arg(long)]
+        from: String,
+        /// 分类 (monitoring/batch/stress/general)
+        #[arg(long, default_value = "general")]
+        category: String,
+        /// 参数声明 (逗号分隔)
+        #[arg(long, default_value = "")]
+        params: String,
+    },
     /// 运行模板（参数化执行）
     Run {
         name: String,
-        /// JSON 参数覆盖, 如 '{"source":"https://..."}'
+        /// JSON 参数覆盖
         #[arg(long, default_value = "{}")]
         params: String,
     },
     /// 校验模板
     Validate {
         name: String,
+    },
+    /// 为模板创建定时调度
+    Schedule {
+        name: String,
+        /// cron 表达式 (6段: 秒 分 时 日 月 周)
+        cron_expr: String,
+        /// JSON 参数覆盖
+        #[arg(long, default_value = "{}")]
+        params: String,
     },
 }
 
@@ -699,8 +722,10 @@ async fn cmd_library(app: &App, sub: LibraryCommand) -> Result<(), String> {
     match sub {
         LibraryCommand::List { json } => cmd_library_list(json),
         LibraryCommand::Show { name } => cmd_library_show(&name),
+        LibraryCommand::Create { name, from, category, params } => cmd_library_create(app, &name, &from, &category, &params),
         LibraryCommand::Run { name, params } => cmd_library_run(app, &name, &params).await,
         LibraryCommand::Validate { name } => cmd_library_validate(&name),
+        LibraryCommand::Schedule { name, cron_expr, params } => cmd_library_schedule(app, &name, &cron_expr, &params).await,
     }
 }
 
@@ -898,5 +923,137 @@ fn cmd_library_validate(name: &str) -> Result<(), String> {
     println!("  版本:     {}", entry.version);
     println!("  参数:     {}", entry.params.join(", "));
     println!("  步骤数:   {}", steps.len());
+    Ok(())
+}
+
+fn cmd_library_create(app: &App, name: &str, workflow_id: &str, category: &str, params_decl: &str) -> Result<(), String> {
+    // 从 DB 导出工作流 JSON
+    let yaml = app.db.get_workflow_yaml(workflow_id)
+        .map_err(|e| format!("获取工作流失败: {e}"))?
+        .ok_or_else(|| "工作流不存在".to_string())?;
+
+    let mut wf: serde_json::Value = serde_json::from_str(&yaml)
+        .map_err(|e| format!("工作流 JSON 解析失败: {e}"))?;
+
+    let original_name = wf.get("name").and_then(|v| v.as_str()).unwrap_or("未命名").to_string();
+
+    let declared: Vec<String> = if params_decl.is_empty() {
+        Vec::new()
+    } else {
+        params_decl.split(',').map(|s| s.trim().to_string()).collect()
+    };
+
+    // 构建默认 params 值
+    let default_params: serde_json::Map<String, serde_json::Value> = declared.iter()
+        .map(|p| (p.clone(), serde_json::Value::String(format!("TODO: replace with {{{{params.{}}}}}", p))))
+        .collect();
+
+    if let Some(obj) = wf.as_object_mut() {
+        obj.insert("params".to_string(), serde_json::Value::Object(default_params));
+    }
+
+    let template_json = serde_json::to_string_pretty(&wf)
+        .map_err(|e| format!("序列化失败: {e}"))?;
+
+    let category_dir = library_dir().join(category);
+    std::fs::create_dir_all(&category_dir)
+        .map_err(|e| format!("创建目录失败: {e}"))?;
+
+    let file_name = format!("{}.wf.json", name);
+    let file_path = category_dir.join(&file_name);
+    std::fs::write(&file_path, &template_json)
+        .map_err(|e| format!("写入模板文件失败: {e}"))?;
+
+    // 更新 catalog.toml
+    let catalog_path = library_dir().join("catalog.toml");
+    let relative_file = format!("{}/{}", category, file_name);
+
+    let entry = format!(
+        "\n[[templates]]\nname = \"{}\"\nversion = \"1.0.0\"\ndescription = \"{}\"\nparams = [{}]\nschedule = \"\"\ncategory = \"{}\"\nfile = \"{}\"\n",
+        name,
+        original_name,
+        declared.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(", "),
+        category,
+        relative_file
+    );
+
+    let mut catalog_content = std::fs::read_to_string(&catalog_path).unwrap_or_default();
+    catalog_content.push_str(&entry);
+    std::fs::write(&catalog_path, &catalog_content)
+        .map_err(|e| format!("更新 catalog.toml 失败: {e}"))?;
+
+    println!("✓ 模板已创建: {}", name);
+    println!("  源工作流: {}", original_name);
+    println!("  文件:     ~/.hermes/workflows/{}", relative_file);
+    println!("  分类:     {}", category);
+    if !declared.is_empty() {
+        println!("  参数:     {}", declared.join(", "));
+        println!("\n  请编辑模板文件，将硬编码值替换为 {{{{params.xxx}}}} 占位符。");
+    } else {
+        println!("  (未声明参数，可手动编辑模板添加 {{{{params.xxx}}}} 占位符)");
+    }
+    Ok(())
+}
+
+async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_json: &str) -> Result<(), String> {
+    use std::str::FromStr;
+
+    cron::Schedule::from_str(cron_expr)
+        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+
+    let templates = load_catalog()?;
+    let entry = templates.iter().find(|t| t.name == name)
+        .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
+
+    let file_path = library_dir().join(&entry.file);
+    let mut content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取模板文件失败: {e}"))?;
+
+    let wf: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("模板 JSON 格式错误: {e}"))?;
+
+    let mut resolved: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
+        for (k, v) in params {
+            resolved.insert(k.clone(), match v {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+        }
+    }
+    if params_json != "{}" {
+        let overrides: serde_json::Value = serde_json::from_str(params_json)
+            .map_err(|e| format!("--params JSON 解析失败: {e}"))?;
+        if let Some(obj) = overrides.as_object() {
+            for (k, v) in obj {
+                resolved.insert(k.clone(), match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                });
+            }
+        }
+    }
+    for (key, val) in &resolved {
+        let placeholder = format!("{{{{params.{}}}}}", key);
+        content = content.replace(&placeholder, val);
+    }
+
+    let workflow_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let label = format!("[库调度] {}", entry.name);
+    app.db.create_workflow(&workflow_id, &label, "", &now, &now)
+        .map_err(|e| format!("创建失败: {e}"))?;
+    app.db.save_workflow_yaml(&workflow_id, &content)
+        .map_err(|e| format!("保存失败: {e}"))?;
+
+    let schedule_id = uuid::Uuid::new_v4().to_string();
+    app.db.create_schedule(&schedule_id, &workflow_id, cron_expr, &now)
+        .map_err(|e| format!("创建调度失败: {e}"))?;
+
+    println!("✓ 调度已创建");
+    println!("  模板:     {}", name);
+    println!("  Cron:     {}", cron_expr);
+    println!("  工作流ID: {}", workflow_id);
+    println!("  调度ID:   {}", schedule_id);
     Ok(())
 }
