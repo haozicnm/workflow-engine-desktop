@@ -57,6 +57,12 @@ fn resolve_items(items_value: &Value, ctx: &ExecutionContext) -> Result<Vec<Valu
         return Ok(arr.clone());
     }
     if let Some(s) = items_value.as_str() {
+        // 尝试将 JSON 字符串解析为数组
+        if let Ok(parsed) = serde_json::from_str::<Value>(s) {
+            if let Some(arr) = parsed.as_array() {
+                return Ok(arr.clone());
+            }
+        }
         if let Some(key) = s.strip_prefix("output.") {
             return ctx.get_output(key)
                 .and_then(|v| v.as_array())
@@ -156,6 +162,13 @@ impl NodeExecutor for CursorNode {
         ctx.set_var("__item".to_string(), current.clone());
         ctx.set_var("__index".to_string(), json!(cursor.index));
         ctx.set_var("__index1".to_string(), json!(cursor.index + 1));
+        // 友好别名：{{cursor.current}} / {{cursor.index}}
+        ctx.set_var("cursor".to_string(), json!({
+            "current": current,
+            "index": cursor.index,
+            "index1": cursor.index + 1,
+            "total": total,
+        }));
 
         // 执行 body
         for body_step in &body_steps {
