@@ -13,6 +13,7 @@ import Card from '../components/ui/card/Card.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
 import { cn } from '@/lib/utils'
+import SKILL_CONTENT from '../assets/workflow-engine-cli.SKILL.md?raw'
 
 const emit = defineEmits<{ 'back': [] }>()
 
@@ -102,72 +103,6 @@ function truncatePath(path: string, maxLen: number): string {
   if (path.length <= maxLen) return path
   return '...' + path.slice(-(maxLen - 3))
 }
-
-const SKILL_CONTENT = [
-  '---',
-  'name: workflow-engine-cli',
-  'description: "Control Workflow Engine via wf-cli"',
-  'version: 1.0.0',
-  '---',
-  '',
-  '# Workflow Engine CLI — Agent Guide',
-  '',
-  'Control Workflow Engine via `wf-cli` command line tool.',
-  'All commands support `--json` for machine-readable output.',
-  '',
-  '## Install',
-  '',
-  'Download `wf-cli.exe` from GitHub Releases and add to PATH.',
-  '',
-  '## Commands',
-  '',
-  '### list',
-  '```',
-  'wf-cli list              # table',
-  'wf-cli list --json       # JSON (agents use this)',
-  '```',
-  '',
-  '### run',
-  '```',
-  'wf-cli run <id>',
-  'wf-cli run <id> --var key=value',
-  '```',
-  '',
-  '### status',
-  '```',
-  'wf-cli status <run_id> --json',
-  '```',
-  '',
-  '### validate',
-  '```',
-  'wf-cli validate file.json --json',
-  '```',
-  '',
-  '### export / import',
-  '```',
-  'wf-cli export <id> -o file.json',
-  'wf-cli import file.json',
-  '```',
-  '',
-  '### schedule',
-  '```',
-  'wf-cli schedule list --json',
-  'wf-cli schedule create <id> "0 9 * * *"',
-  'wf-cli schedule delete <schedule_id>',
-  '```',
-  '',
-  '## Agent Patterns',
-  '',
-  'Discover: `wf-cli list --json`',
-  'Execute + poll: `wf-cli run <id> --var x=y` then `wf-cli status <rid> --json`',
-  '',
-  '## Pitfalls',
-  '',
-  '1. Reads same SQLite DB as GUI app — same machine required',
-  '2. No headless mode — browser steps need GUI running',
-  '3. run blocks until workflow completes',
-  '4. --var values are always JSON strings',
-].join('\n')
 
 function downloadSkill() {
   const blob = new Blob([SKILL_CONTENT], { type: 'text/markdown;charset=utf-8' })
