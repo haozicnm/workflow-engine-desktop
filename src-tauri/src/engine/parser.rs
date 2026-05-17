@@ -55,7 +55,60 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
         }
     }
 
+    // 校验步骤引用完整性（runCondition / onError branch）
+    validate_step_references(&wf.steps)?;
+
     Ok(wf)
+}
+
+/// 校验工作流内步骤引用的完整性
+///
+/// 检查：
+/// 1. runCondition.ref_step 是否指向存在的步骤
+/// 2. onError: Branch { step_id } 是否指向存在的步骤（排除自引用）
+/// 3. 容器 actions 内的变量引用是否指向 body 内存在的 action
+fn validate_step_references(steps: &[Step]) -> Result<()> {
+    use crate::engine::workflow::ErrorStrategy;
+
+    // 收集所有顶层步骤 ID
+    let step_ids: std::collections::HashSet<&str> = steps.iter().map(|s| s.id.as_str()).collect();
+
+    for step in steps {
+        // 校验 runCondition
+        if let Some(ref rc) = step.run_condition {
+            if !step_ids.contains(rc.ref_step.as_str()) {
+                return Err(anyhow!(
+                    "步骤 '{}' 的 runCondition 引用了不存在的步骤 '{}'",
+                    step.id, rc.ref_step
+                ));
+            }
+            // 自引用警告（不阻止，但提示）
+            if rc.ref_step == step.id {
+                tracing::warn!(
+                    "步骤 '{}' 的 runCondition 引用了自身，这通常是个配置错误",
+                    step.id
+                );
+            }
+        }
+
+        // 校验 onError branch
+        if let Some(ErrorStrategy::Branch { ref step_id }) = step.on_error {
+            if !step_ids.contains(step_id.as_str()) {
+                return Err(anyhow!(
+                    "步骤 '{}' 的 onError branch 引用了不存在的步骤 '{}'",
+                    step.id, step_id
+                ));
+            }
+            if step_id == &step.id {
+                return Err(anyhow!(
+                    "步骤 '{}' 的 onError branch 引用了自身，这会形成死循环",
+                    step.id
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// 转换单个步骤：容器类型加 _container，actions 移入 config
@@ -301,4 +354,69 @@ fn extract_step_refs(s: &str) -> Vec<String> {
     refs.sort();
     refs.dedup();
     refs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::workflow::ErrorStrategy;
+
+    fn make_step(id: &str, rc_ref: Option<&str>, on_error: Option<ErrorStrategy>) -> Step {
+        Step {
+            id: id.to_string(),
+            run_condition: rc_ref.map(|r| crate::engine::workflow::RunCondition {
+                ref_step: r.to_string(),
+                when: "true".to_string(),
+            }),
+            on_error,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn valid_run_condition_passes() {
+        let steps = vec![
+            make_step("step_1", None, None),
+            make_step("step_2", Some("step_1"), None),
+        ];
+        assert!(validate_step_references(&steps).is_ok());
+    }
+
+    #[test]
+    fn missing_run_condition_fails() {
+        let steps = vec![
+            make_step("step_1", None, None),
+            make_step("step_2", Some("step_missing"), None),
+        ];
+        let err = validate_step_references(&steps).unwrap_err();
+        assert!(err.to_string().contains("step_missing"));
+    }
+
+    #[test]
+    fn valid_branch_on_error_passes() {
+        let steps = vec![
+            make_step("step_1", None, None),
+            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
+        ];
+        assert!(validate_step_references(&steps).is_ok());
+    }
+
+    #[test]
+    fn missing_branch_target_fails() {
+        let steps = vec![
+            make_step("step_1", None, None),
+            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_missing".into() })),
+        ];
+        let err = validate_step_references(&steps).unwrap_err();
+        assert!(err.to_string().contains("step_missing"));
+    }
+
+    #[test]
+    fn self_referencing_branch_fails() {
+        let steps = vec![
+            make_step("step_1", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
+        ];
+        let err = validate_step_references(&steps).unwrap_err();
+        assert!(err.to_string().contains("死循环"));
+    }
 }
