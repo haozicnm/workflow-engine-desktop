@@ -7,6 +7,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing::{info, debug};
 use std::env;
+use std::sync::Arc;
 use clap::Parser;
 
 fn main() {
