@@ -334,6 +334,8 @@ function downloadSkill() {
           <h3 class="text-sm text-foreground mb-2">更新明细</h3>
           <div class="space-y-0">
             <div v-for="(item, i) in [
+              { version: 'v6.9.0', desc: '修复 runCondition 被 parser 抹除 · cursor/loop items 变量解析 · 模板库前端浏览+实例化 · IPC 守护进程状态指示' },
+              { version: 'v6.8.0', desc: 'Shell Command 节点(万能原语) · File Operations 统一容器(10操作+grep) · 节点标准化 · ABCD 四轮交付(35测试)' },
               { version: 'v6.7.0', desc: 'CLI 执行器升级：支持条件分支、错误恢复(Ignore/Branch)、重试机制、步骤延迟、游标迭代 · Import 读取工作流名称' },
               { version: 'v6.6.0', desc: 'GitHub 迁移 · 项目结构整理 · CLI 双模入口(独立二进制) · 调度管理' },
               { version: 'v6.5.0', desc: '浏览器容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
