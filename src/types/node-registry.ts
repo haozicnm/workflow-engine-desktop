@@ -367,10 +367,54 @@ export const BODY_STEP_ACTIONS: ActionDef[] = [
   ]},
 ]
 
+// ─── 文件容器 — 10 个动作 ✨ v6.9.0 ───
+export const FILE_ACTIONS: ActionDef[] = [
+  { type: 'read', label: '读取文件', icon: 'FileText', params: [
+    { key: 'path', label: '文件路径', type: 'text', placeholder: 'C:\\data\\file.txt' },
+    { key: 'encoding', label: '编码', type: 'select', options: [
+      { label: 'UTF-8', value: 'utf-8' }, { label: 'GBK', value: 'gbk' },
+    ], default: 'utf-8' },
+  ]},
+  { type: 'write', label: '写入文件', icon: 'FilePlus', params: [
+    { key: 'path', label: '文件路径', type: 'text' },
+    { key: 'content', label: '内容', type: 'textarea' },
+  ]},
+  { type: 'append', label: '追加内容', icon: 'FileUp', params: [
+    { key: 'path', label: '文件路径', type: 'text' },
+    { key: 'content', label: '追加内容', type: 'textarea' },
+  ]},
+  { type: 'copy', label: '复制文件', icon: 'Copy', params: [
+    { key: 'source', label: '源路径', type: 'text' },
+    { key: 'dest', label: '目标路径', type: 'text' },
+  ]},
+  { type: 'move', label: '移动/重命名', icon: 'MoveRight', params: [
+    { key: 'source', label: '源路径', type: 'text' },
+    { key: 'dest', label: '目标路径', type: 'text' },
+  ]},
+  { type: 'delete', label: '删除', icon: 'Trash2', params: [
+    { key: 'path', label: '路径', type: 'text' },
+  ]},
+  { type: 'list', label: '列出目录', icon: 'FolderTree', params: [
+    { key: 'path', label: '目录路径', type: 'text', placeholder: 'C:\\Users\\haozi\\Desktop' },
+    { key: 'pattern', label: '过滤', type: 'text', placeholder: '*.txt' },
+  ]},
+  { type: 'mkdir', label: '创建目录', icon: 'FolderPlus', params: [
+    { key: 'path', label: '目录路径', type: 'text' },
+  ]},
+  { type: 'exists', label: '检查存在', icon: 'Search', params: [
+    { key: 'path', label: '路径', type: 'text' },
+  ]},
+  { type: 'grep', label: '搜索内容', icon: 'ScanSearch', params: [
+    { key: 'path', label: '文件/目录', type: 'text' },
+    { key: 'pattern', label: '搜索模式', type: 'text', placeholder: 'regex 或文本' },
+  ]},
+]
+
 // ─── 注册表查询函数 ───
 
 export function getActionDefs(containerType: ContainerType): ActionDef[] {
   switch (containerType) {
+    case 'file': return FILE_ACTIONS
     case 'browser': return BROWSER_ACTIONS
     case 'excel': return EXCEL_ACTIONS
     case 'word': return WORD_ACTIONS
