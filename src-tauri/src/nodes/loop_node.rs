@@ -74,6 +74,12 @@ impl NodeExecutor for LoopNode {
             ctx.set_var("__item".to_string(), item.clone());
             ctx.set_var("__index".to_string(), json!(i));
             ctx.set_var("__index1".to_string(), json!(i + 1));
+            // 友好别名：{{loop.current}} / {{loop.index}}
+            ctx.set_var("loop".to_string(), json!({
+                "current": item,
+                "index": i,
+                "index1": i + 1,
+            }));
 
             let mut item_outputs = serde_json::Map::new();
             for body_step in &body_steps {

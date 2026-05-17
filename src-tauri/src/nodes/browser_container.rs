@@ -136,19 +136,24 @@ async fn execute_actions(
             }
 
             "wait" => {
-                let selector = require_selector(action)?;
-                let timeout = action
-                    .config
-                    .get("timeout")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(5000);
+                // 支持两种模式：时间等待（ms）和选择器等待（selector）
+                if let Some(ms) = action.config.get("ms").and_then(|v| v.as_u64()) {
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                } else {
+                    let selector = require_selector(action)?;
+                    let timeout = action
+                        .config
+                        .get("timeout")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(5000);
 
-                let params = serde_json::json!({
-                    "selector": selector,
-                    "timeout": timeout,
-                });
-                crate::nodes::browser::send_sidecar_action("wait", &params).await
-                    .map_err(|e| anyhow!("等待失败: {}", e))?;
+                    let params = serde_json::json!({
+                        "selector": selector,
+                        "timeout": timeout,
+                    });
+                    crate::nodes::browser::send_sidecar_action("wait", &params).await
+                        .map_err(|e| anyhow!("等待失败: {}", e))?;
+                }
             }
 
             "click" => {
