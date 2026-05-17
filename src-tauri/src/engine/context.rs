@@ -160,6 +160,18 @@ impl ExecutionContext {
         let parts: Vec<&str> = key.split('.').collect();
         let root_key = parts[0];
 
+        // 特殊处理：{{params.X.Y}} — workflow params 以 flat map 存储，
+        // 所以 params.data_dir 应直接查 variables["data_dir"] 而非 variables["params"]["data_dir"]
+        if root_key == "params" && parts.len() >= 2 {
+            if let Some(root) = self.variables.get(parts[1]) {
+                let mut current = root;
+                for part in &parts[2..] {
+                    current = current.get(*part)?;
+                }
+                return Some(current);
+            }
+        }
+
         // 查找根值：按优先级依次尝试
         //   1. 完整 key 查 step_outputs（模板引用：{{step_abc123.actionLabel}}）
         //   2. 完整 key 查 variables（工作流变量：{{myVar.field}}）

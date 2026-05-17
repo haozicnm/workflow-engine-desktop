@@ -42,7 +42,12 @@ impl NodeExecutor for ConditionNode {
                 let results: Vec<bool> = group.conditions.iter().map(|cond| {
                     let left = ctx.resolve_config(&serde_json::json!(cond.left));
                     let right = ctx.resolve_config(&serde_json::json!(cond.right));
-                    eval_condition(&left, &cond.op, &right)
+                    let result = eval_condition(&left, &cond.op, &right);
+                    info!(
+                        "[逻辑判断] left_template={} left={} op={} right_template={} right={} → {}",
+                        cond.left, left, cond.op, cond.right, right, if result { "✓" } else { "✗" }
+                    );
+                    result
                 }).collect();
 
                 let pass = if group.combinator == "or" {

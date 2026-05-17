@@ -22,6 +22,7 @@ pub struct Workflow {
     pub name: String,
     pub description: Option<String>,
     pub steps: Vec<Step>,
+    #[serde(alias = "params")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 

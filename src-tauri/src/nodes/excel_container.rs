@@ -313,7 +313,20 @@ impl NodeExecutor for ExcelContainerNode {
         ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let mut config: ExcelContainerConfig = serde_json::from_value(step.config.clone())
+        // 预处理：file_path 可能是对象（如 cursor.current glob match），提取 .path
+        let mut raw_config = step.config.clone();
+        if let Some(obj) = raw_config.get("file_path").and_then(|v| v.as_object()) {
+            let extracted = obj.get("path")
+                .or_else(|| obj.get("name"))
+                .and_then(|v| v.as_str())
+                .map(|s| Value::String(s.to_string()))
+                .unwrap_or_else(|| Value::String(serde_json::to_string(&obj).unwrap_or_default()));
+            if let Value::Object(ref mut map) = raw_config {
+                map.insert("file_path".to_string(), extracted);
+            }
+        }
+
+        let mut config: ExcelContainerConfig = serde_json::from_value(raw_config)
             .map_err(|e| anyhow!("Excel 容器配置解析失败: {}", e))?;
 
         // 容器不再走全局 resolve_config，这里解析每个 action 的模板变量
