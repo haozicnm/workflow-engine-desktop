@@ -137,7 +137,17 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
 
         if is_recursive {
             // 递归调用：config 中已有 actions，只改类型名
-            (container_type, step.config.clone())
+            // 但仍然需要处理 conditionGroup → condition_group 转换
+            let mut config = step.config.clone();
+            if step.step_type == "logic" {
+                if let Some(cg_json) = step.config.get("conditionGroup") {
+                    if let Value::Object(ref mut map) = config {
+                        map.entry("condition_group".to_string())
+                            .or_insert_with(|| cg_json.clone());
+                    }
+                }
+            }
+            (container_type, config)
         } else {
             // 顶层调用：actions 从顶层移入 config
             // ⚠️ 如果 config 已有 actions（直接编辑 JSON），优先使用
