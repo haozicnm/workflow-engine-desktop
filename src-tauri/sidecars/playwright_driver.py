@@ -233,6 +233,8 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _handle_dialog(params)
             case "scroll_to_element":
                 return await _scroll_to_element(params)
+            case "reset_state":
+                return await _reset_state(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -680,6 +682,54 @@ async def _close() -> dict:
     _extra_headers = {}
 
     return {"success": True, "data": {"message": "浏览器已关闭"}}
+
+
+async def _reset_state(_params: dict) -> dict:
+    """重置浏览器状态：关闭多余页面，保留一个空白页
+
+    用于多个 browser 容器共享 sidecar 时，清理上一容器遗留的状态：
+    - 关闭所有已打开的 dialog（关闭页面时自动处理）
+    - 关闭除 index 0 外的所有页面
+    - 将 index 0 页面导航到 about:blank
+    """
+    global _pages, _current_page_idx
+
+    if not _pages:
+        return {"success": True, "data": {"message": "无活跃页面，无需重置"}}
+
+    try:
+        # 先 list 所有页面
+        all_pages = list(_pages)
+        closed_count = 0
+
+        # 从后往前关闭（避免索引变化），保留 index 0
+        for i in range(len(all_pages) - 1, 0, -1):
+            try:
+                await all_pages[i].close()
+                closed_count += 1
+            except Exception:
+                pass
+
+        # 更新全局页面列表
+        _pages = [all_pages[0]] if all_pages else []
+        _current_page_idx = 0
+
+        # 导航到 about:blank 重置页面状态
+        if _pages:
+            try:
+                await _pages[0].goto("about:blank", wait_until="commit")
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "data": {
+                "message": f"已清理 {closed_count} 个多余页面，当前保留 1 个空白页",
+                "closed_pages": closed_count,
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": f"重置状态失败: {e}"}
 
 
 # ═══════════════════════════════════════════════

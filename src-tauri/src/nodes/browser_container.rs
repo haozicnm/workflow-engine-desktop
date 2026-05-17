@@ -105,6 +105,15 @@ async fn execute_actions(
 ) -> Result<ContainerResult> {
     let mut output_ports: HashMap<String, Value> = HashMap::new();
 
+    // ── 清理上一容器遗留的状态（dialog、多余 tab）──
+    // 多个 browser 容器共享同一个 sidecar 进程，此处在每次执行前重置
+    match crate::nodes::browser::send_sidecar_action(
+        "reset_state", &serde_json::json!({})
+    ).await {
+        Ok(_) => tracing::debug!("浏览器状态已重置"),
+        Err(e) => tracing::warn!("浏览器重置失败（非致命，sidecar 可能未启动）: {}", e),
+    }
+
     // NOTE: 当前使用 match 分发 31 个 action，模式清晰但文件较长。
     // 如果 action 数量继续增长，考虑参考 executor.rs 的注册表模式重构。
     for action in &config.actions {
