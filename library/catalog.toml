@@ -5,7 +5,7 @@
 name = "daily-monitor"
 version = "1.0.0"
 description = "每日全栈舆情监控 — HTTP API 数据采集 + Excel 报表 + 通知"
-params = ["source", "hn_api", "github_api", "output_dir"]
+params = ["hn_api", "github_api", "output_dir"]
 schedule = "0 0 9 * * * *"   # 每天 9:00
 category = "monitoring"
 file = "monitoring/daily-monitor.wf.json"
