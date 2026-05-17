@@ -389,6 +389,8 @@ fn extract_step_refs(s: &str) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::engine::workflow::ErrorStrategy;
+    use crate::engine::context::ExecutionContext;
+    use crate::engine::workflow::{Workflow, Step};
 
     fn make_step(id: &str, rc_ref: Option<&str>, on_error: Option<ErrorStrategy>) -> Step {
         Step {
@@ -478,7 +480,6 @@ mod tests {
 
     #[test]
     fn invalid_step_ref_in_config_fails() {
-        // 引用 {{step_nonexistent}} 应被拦截
         let json = r#"{
             "name": "test",
             "steps": [
@@ -491,5 +492,209 @@ mod tests {
         let err = parse_workflow(json).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("step_99"), "expected error about step_99, got: {}", msg);
+    }
+
+    // ─── D2: parser 边界测试 ───
+
+    #[test]
+    fn empty_name_rejected() {
+        let json = r#"{"name": "", "steps": [{"id": "s1", "type": "shell", "label": "s", "config": {"command": "echo"}}]}"#;
+        let err = parse_workflow(json).unwrap_err();
+        assert!(err.to_string().contains("名称不能为空"));
+    }
+
+    #[test]
+    fn no_steps_rejected() {
+        let json = r#"{"name": "test", "steps": []}"#;
+        let err = parse_workflow(json).unwrap_err();
+        assert!(err.to_string().contains("至少需要一个步骤"));
+    }
+
+    #[test]
+    fn duplicate_step_ids_rejected() {
+        let json = r#"{
+            "name": "test",
+            "steps": [
+                {"id": "s1", "type": "shell", "label": "a", "config": {"command": "echo"}},
+                {"id": "s1", "type": "shell", "label": "b", "config": {"command": "echo"}}
+            ]
+        }"#;
+        let err = parse_workflow(json).unwrap_err();
+        assert!(err.to_string().contains("ID 重复"));
+    }
+
+    #[test]
+    fn malformed_json_rejected() {
+        let json = "not valid json {{{";
+        let err = parse_workflow(json).unwrap_err();
+        assert!(err.to_string().contains("解析失败"));
+    }
+
+    #[test]
+    fn yaml_format_parsed() {
+        let yaml = r#"
+name: yaml-test
+steps:
+  - id: s1
+    type: shell
+    label: step1
+    config:
+      command: echo hello
+"#;
+        let wf = parse_workflow(yaml).unwrap();
+        assert_eq!(wf.name, "yaml-test");
+        assert_eq!(wf.steps.len(), 1);
+        assert_eq!(wf.steps[0].step_type, "shell");
+    }
+
+    #[test]
+    fn container_type_suffix_added() {
+        let json = r#"{
+            "name": "test",
+            "steps": [{
+                "id": "step_1",
+                "type": "browser",
+                "label": "browse",
+                "config": {"browser": "chromium"},
+                "actions": [{"id": "a1", "type": "navigate", "label": "nav", "params": {"url": "http://x.com"}}]
+            }]
+        }"#;
+        let wf = parse_workflow(json).unwrap();
+        assert_eq!(wf.steps[0].step_type, "browser_container");
+        let config = &wf.steps[0].config;
+        assert!(config.get("actions").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0) > 0,
+            "config.actions should contain converted actions");
+    }
+
+    #[test]
+    fn logic_container_handles_condition_group() {
+        let json = r#"{
+            "name": "test",
+            "steps": [{
+                "id": "step_1",
+                "type": "logic",
+                "label": "check",
+                "config": {
+                    "conditionGroup": {
+                        "combinator": "or",
+                        "conditions": [{"id": "c1", "left": "x", "op": "equals", "right": "y"}]
+                    }
+                }
+            }]
+        }"#;
+        let wf = parse_workflow(json).unwrap();
+        assert_eq!(wf.steps[0].step_type, "logic_container");
+        let config = &wf.steps[0].config;
+        assert!(config.get("condition_group").is_some(), "condition_group should be in config");
+    }
+
+    #[test]
+    fn step_with_retry_config_parsed() {
+        let json = r#"{
+            "name": "test",
+            "steps": [{
+                "id": "s1",
+                "type": "http",
+                "label": "req",
+                "config": {"method": "GET", "url": "http://x.com"},
+                "retry": {"max": 3, "delay_ms": 500}
+            }]
+        }"#;
+        let wf = parse_workflow(json).unwrap();
+        let retry = wf.steps[0].retry.as_ref().unwrap();
+        assert_eq!(retry.max, 3);
+        assert_eq!(retry.delay_ms, 500);
+    }
+
+    // ─── D3: 变量解析测试 ───
+
+    #[test]
+    fn variable_nested_key_resolution() {
+        let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
+        ctx.set_output("step_1", serde_json::json!({"data": {"name": "alice"}}));
+        let val = ctx.resolve_var("step_1.data.name");
+        assert_eq!(val.and_then(|v| v.as_str()), Some("alice"));
+    }
+
+    #[test]
+    fn variable_step_outputs_priority_over_variables() {
+        let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
+        ctx.set_var("x".into(), serde_json::json!("var_val"));
+        ctx.set_output("x", serde_json::json!("output_val"));
+        let val = ctx.resolve_var("x");
+        assert_eq!(val.and_then(|v| v.as_str()), Some("output_val"),
+            "step_outputs should take priority over variables for same key");
+    }
+
+    #[test]
+    fn missing_variable_returns_none() {
+        let ctx = ExecutionContext::new("run-1", &Workflow::default());
+        assert!(ctx.resolve_var("nonexistent").is_none());
+    }
+
+    #[test]
+    fn resolve_config_recursively_replaces_variables() {
+        let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
+        ctx.set_var("name".into(), serde_json::json!("world"));
+        let config = serde_json::json!({
+            "command": "echo {{name}}",
+            "nested": {"msg": "hello {{name}}"}
+        });
+        let resolved = ctx.resolve_config(&config);
+        assert_eq!(resolved["command"].as_str(), Some("echo world"));
+        assert_eq!(resolved["nested"]["msg"].as_str(), Some("hello world"));
+    }
+
+    // ─── D4: 条件 + 错误策略测试 ───
+
+    #[test]
+    fn run_condition_with_self_reference_warns() {
+        let steps = vec![
+            make_step("step_1", Some("step_1"), None),
+        ];
+        // self-referencing runCondition is a warning, not an error
+        assert!(validate_step_references(&steps).is_ok());
+    }
+
+    #[test]
+    fn error_strategy_fail_is_default() {
+        use crate::engine::workflow::ErrorStrategy;
+        let default = ErrorStrategy::default();
+        match default {
+            ErrorStrategy::Fail => {}  // expected
+            _ => panic!("default ErrorStrategy should be Fail"),
+        }
+    }
+
+    #[test]
+    fn error_strategy_branch_with_valid_target() {
+        let steps = vec![
+            make_step("step_1", None, None),
+            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
+        ];
+        assert!(validate_step_references(&steps).is_ok());
+    }
+
+    #[test]
+    fn step_auto_order_by_reference() {
+        // step_2 references {{step_1}} → step_1 must be ordered before step_2
+        let steps = vec![
+            Step {
+                id: "step_1".into(),
+                step_type: "data_set".into(),
+                config: serde_json::json!({"key": "x", "value": "42"}),
+                ..Default::default()
+            },
+            Step {
+                id: "step_2".into(),
+                step_type: "data_get".into(),
+                config: serde_json::json!({"key": "{{step_1.result}}"}),
+                ..Default::default()
+            },
+        ];
+        let order = auto_order_steps(&steps);
+        let pos1 = order.iter().position(|&i| i == 0);
+        let pos2 = order.iter().position(|&i| i == 1);
+        assert!(pos1 < pos2, "step_1 must come before step_2 in dependency order");
     }
 }

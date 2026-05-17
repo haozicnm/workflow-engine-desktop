@@ -168,6 +168,21 @@ impl StepExecutor {
 mod tests {
     use super::*;
     use crate::engine::parser;
+    use crate::engine::context::ExecutionContext;
+    use crate::engine::workflow::{Workflow, Step};
+    use std::sync::Arc;
+
+    fn test_db() -> Arc<crate::data::db::Database> {
+        Arc::new(crate::data::db::Database::open_default().expect("open db"))
+    }
+
+    fn test_approval_store() -> Arc<crate::engine::approval_store::ApprovalStore> {
+        Arc::new(crate::engine::approval_store::ApprovalStore::new())
+    }
+
+    fn block_on<F: std::future::Future>(f: F) -> F::Output {
+        tokio::runtime::Runtime::new().unwrap().block_on(f)
+    }
 
     #[test]
     fn container_types_match_registrations() {
@@ -184,20 +199,114 @@ mod tests {
             let expected_name = format!("{}_container", container_type);
             assert!(
                 executors.contains_key(&expected_name),
-                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}' —— 请在 register_containers! 中添加",
+                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}'",
                 container_type, expected_name
             );
         }
 
-        // 反向检查：所有注册的容器都必须在 parser 中声明
         let registered_types: Vec<String> = executors.keys().cloned().collect();
         for name in &registered_types {
             let base = name.trim_end_matches("_container");
             assert!(
                 parser::CONTAINER_TYPES.contains(&base),
-                "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明 —— 请在 parser 中添加 '{}'",
-                name, base
+                "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明",
+                name
             );
         }
+    }
+
+    #[test]
+    fn all_registered_types_can_be_instantiated() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        // 验证至少注册了核心类型
+        let required = &[
+            "http", "script", "condition", "shell", "notify", "delay",
+            "loop", "while", "cursor", "parallel", "map",
+            "browser_container", "excel_container", "word_container", "file_container", "logic_container",
+            "data_set", "data_get", "data_length", "data_default", "data_merge",
+            "clipboard", "approval",
+        ];
+        for &t in required {
+            assert!(exec.executors.contains_key(t), "缺少注册: {}", t);
+        }
+    }
+
+    #[test]
+    fn unknown_node_type_rejected() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let step = Step {
+            id: "s1".into(),
+            step_type: "nonexistent_type_xyz".into(),
+            config: serde_json::json!({}),
+            ..Default::default()
+        };
+        let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
+        let result = block_on(exec.execute(&step, &mut ctx));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("未知节点类型"));
+    }
+
+    #[test]
+    fn simple_node_config_is_resolved_before_execution() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let mut workflow = Workflow::default();
+        workflow.steps = vec![Step {
+            id: "step_x".into(),
+            step_type: "data_set".into(),
+            config: serde_json::json!({"key": "greeting", "value": "hello"}),
+            ..Default::default()
+        }];
+        let step = workflow.steps[0].clone();
+        let mut ctx = ExecutionContext::new("run-1", &workflow);
+        // data_set should set a variable
+        let result = block_on(exec.execute(&step, &mut ctx));
+        assert!(result.is_ok());
+        assert_eq!(ctx.variables.get("greeting").and_then(|v| v.as_str()), Some("hello"));
+    }
+
+    #[test]
+    fn variable_resolution_in_config_works() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let mut workflow = Workflow::default();
+        workflow.variables = Some({
+            let mut m = std::collections::HashMap::new();
+            m.insert("name".into(), serde_json::json!("world"));
+            m
+        });
+        workflow.steps = vec![Step {
+            id: "s1".into(),
+            step_type: "data_set".into(),
+            config: serde_json::json!({"key": "msg", "value": "{{name}}"}),
+            ..Default::default()
+        }];
+        let step = workflow.steps[0].clone();
+        let mut ctx = ExecutionContext::new("run-1", &workflow);
+        let result = block_on(exec.execute(&step, &mut ctx));
+        assert!(result.is_ok());
+        assert_eq!(ctx.variables.get("msg").and_then(|v| v.as_str()), Some("world"));
+    }
+
+    #[test]
+    fn condition_node_returns_branch_result() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let step = Step {
+            id: "c1".into(),
+            step_type: "condition".into(),
+            config: serde_json::json!({
+                "condition_group": {
+                    "combinator": "and",
+                    "conditions": [
+                        {"id": "c1", "left": "2", "op": "greater_than", "right": "1"}
+                    ]
+                }
+            }),
+            ..Default::default()
+        };
+        let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
+        let result = block_on(exec.execute(&step, &mut ctx));
+        assert!(result.is_ok(), "condition execution failed: {:?}", result.err());
+        let output = result.unwrap();
+        assert_eq!(output.get("branch").and_then(|v| v.as_str()), Some("true"));
+        assert_eq!(output.get("result").and_then(|v| v.as_bool()), Some(true));
     }
 }
