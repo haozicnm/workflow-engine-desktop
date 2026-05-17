@@ -2,6 +2,8 @@
 use tauri::State;
 use crate::App;
 use std::process::Command as StdCommand;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 
 #[tauri::command]
@@ -62,7 +64,10 @@ pub async fn run_pipeline(
     }
 
     // 执行 Python 管道
-    let output = StdCommand::new("python")
+    let mut cmd = StdCommand::new("python");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+    let output = cmd
         .args(&args)
         .output()
         .map_err(|e| format!("执行 Python 失败: {}", e))?;

@@ -19,6 +19,8 @@ use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
 use std::sync::Arc;
 use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use anyhow::{Result, anyhow};
 use serde_json::json;
 use tracing::{info, warn};
@@ -68,6 +70,8 @@ impl NodeExecutor for ShellNode {
 
         // 3. 执行命令
         let mut cmd = Command::new(&shell_cmd);
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW — 不弹命令行窗口
         cmd.arg(&shell_arg);
         cmd.arg(&command);
 
