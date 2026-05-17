@@ -199,10 +199,11 @@ impl BrowserSidecar {
 impl Drop for BrowserSidecar {
     fn drop(&mut self) {
         // 应用退出时强制 kill Python 子进程，防止孤儿进程残留
-        // 用 blocking_lock 而非 try_lock，确保 shutdown() 释放锁后仍能 kill
-        let mut guard = self.child.blocking_lock();
-        if let Some(ref mut child) = *guard {
-            let _ = child.start_kill();
+        // 用 try_lock 而非 blocking_lock，避免在 async 上下文中 panic
+        if let Ok(mut guard) = self.child.try_lock() {
+            if let Some(ref mut child) = *guard {
+                let _ = child.start_kill();
+            }
         }
     }
 }

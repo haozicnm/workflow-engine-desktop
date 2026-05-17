@@ -76,11 +76,11 @@ impl StepExecutor {
         register!(executors, "text_template", crate::nodes::text_template::TextTemplateNode);
 
         // ── P2 文件节点 ──
-        register!(executors, "excel", crate::nodes::excel_container::ExcelContainerNode);
-                                                                register!(executors, "word", crate::nodes::word_container::WordContainerNode);
+        register!(executors, "excel_container", crate::nodes::excel_container::ExcelContainerNode);
+                                                                register!(executors, "word_container", crate::nodes::word_container::WordContainerNode);
                                         
         // ── 浏览器节点 ──
-        register!(executors, "browser", crate::nodes::browser_container::BrowserContainerNode);
+        register!(executors, "browser_container", crate::nodes::browser_container::BrowserContainerNode);
                                                                                                         register!(executors, "logic_container", crate::nodes::condition::ConditionNode);
         register!(executors, "condition", crate::nodes::condition::ConditionNode);
 
@@ -101,7 +101,7 @@ impl StepExecutor {
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
-        register!(executors, "file", crate::nodes::file_container::FileContainerNode);
+        register!(executors, "file_container", crate::nodes::file_container::FileContainerNode);
 
         for type_name in executors.keys() {
             debug!("节点注册: {}", type_name);
@@ -147,7 +147,7 @@ impl StepExecutor {
             actions: step.actions.clone(),
             expanded: step.expanded,
             condition: step.condition.clone(),
-            condition_group: None,
+            condition_group: step.condition_group.clone(),
 
             run_condition: None,
         };

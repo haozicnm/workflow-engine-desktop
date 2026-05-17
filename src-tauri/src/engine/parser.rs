@@ -17,7 +17,7 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 // 容器类型列表
-const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic"];
+const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic", "file"];
 // 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
 const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 
@@ -83,6 +83,13 @@ fn convert_step(step: &Step) -> Result<Step> {
 
         // logic 容器：把 condition 和 conditionGroup 放入 config
         if step.step_type == "logic" {
+            // 如果 conditionGroup 在 config 里（前端格式），用 snake_case 复制一份
+            if let Some(cg_json) = step.config.get("conditionGroup") {
+                if let Value::Object(ref mut map) = config {
+                    map.entry("condition_group".to_string())
+                        .or_insert_with(|| cg_json.clone());
+                }
+            }
             if let Some(ref cond) = step.condition {
                 if let Value::Object(ref mut map) = config {
                     map.insert("condition".to_string(), Value::String(cond.clone()));

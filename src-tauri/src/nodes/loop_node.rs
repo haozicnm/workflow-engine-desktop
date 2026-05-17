@@ -12,12 +12,18 @@ use serde_json::{Value, json};
 #[derive(Default)]
 pub struct LoopNode;
 
-/// 解析循环 items：支持直接数组、字符串引用（`output.xxx` 或变量名）
+/// 解析循环 items：支持直接数组、JSON 编码字符串、字符串引用（`output.xxx` 或变量名）
 fn resolve_items(items_value: &Value, ctx: &ExecutionContext) -> Result<Vec<Value>> {
     if let Some(arr) = items_value.as_array() {
         return Ok(arr.clone());
     }
     if let Some(s) = items_value.as_str() {
+        // 尝试将 JSON 字符串解析为数组（如 "[\"alpha\",\"beta\"]"）
+        if let Ok(parsed) = serde_json::from_str::<Value>(s) {
+            if let Some(arr) = parsed.as_array() {
+                return Ok(arr.clone());
+            }
+        }
         if let Some(key) = s.strip_prefix("output.") {
             return ctx.get_output(key)
                 .and_then(|v| v.as_array())
