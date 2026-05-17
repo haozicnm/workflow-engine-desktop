@@ -48,6 +48,28 @@ fn main() {
             let db = tauri_app.state::<App>().db.clone();
             workflow_engine::system::scheduler::start(handle, db);
 
+            // 启动 IPC WebSocket Server
+            let app_state = tauri_app.state::<App>();
+            let app = Arc::new(App {
+                db: app_state.db.clone(),
+                config: app_state.config.clone(),
+                cancel_flags: app_state.cancel_flags.clone(),
+                cancel_tokens: app_state.cancel_tokens.clone(),
+                pause_flags: app_state.pause_flags.clone(),
+                breakpoint_flags: app_state.breakpoint_flags.clone(),
+                step_mode_flags: app_state.step_mode_flags.clone(),
+                debug_snapshots: app_state.debug_snapshots.clone(),
+                run_semaphore: app_state.run_semaphore.clone(),
+                approval_store: app_state.approval_store.clone(),
+            });
+            let ipc_server = Arc::new(workflow_engine::ipc::IpcServer::new(
+                app,
+                tauri_app.handle().clone(),
+            ));
+            tauri::async_runtime::spawn(async move {
+                ipc_server.start().await;
+            });
+
             Ok(())
         })
         .on_window_event(|window, event| {

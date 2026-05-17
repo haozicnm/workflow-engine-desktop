@@ -184,6 +184,17 @@ fn cmd_list(app: &App, json: bool) -> Result<(), String> {
 }
 
 async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Result<(), String> {
+    // 优先尝试通过 IPC 发送给桌面 daemon
+    if crate::ipc_client::IpcClient::is_daemon_available().await {
+        let vars_map: Option<std::collections::HashMap<String, String>> = if vars.is_empty() {
+            None
+        } else {
+            Some(vars.iter().map(|(k,v)| (k.clone(), v.clone())).collect())
+        };
+        return crate::ipc_client::IpcClient::run_remote(workflow_id, vars_map).await;
+    }
+
+    // 回退：本地直接执行
     let yaml = app.db.get_workflow_yaml(workflow_id)
         .map_err(|e| format!("获取工作流失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
@@ -826,6 +837,24 @@ fn cmd_library_show(name: &str) -> Result<(), String> {
 }
 
 async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(), String> {
+    // 优先尝试通过 IPC 发送给桌面 daemon
+    if crate::ipc_client::IpcClient::is_daemon_available().await {
+        let params_map: Option<std::collections::HashMap<String, String>> = if params_json != "{}" {
+            let overrides: serde_json::Value = serde_json::from_str(params_json)
+                .map_err(|e| format!("--params JSON 解析失败: {}", e))?;
+            Some(overrides.as_object().map(|obj| {
+                obj.iter().map(|(k,v)| (k.clone(), match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                })).collect()
+            }).unwrap_or_default())
+        } else {
+            None
+        };
+        return crate::ipc_client::IpcClient::library_run_remote(name, params_map).await;
+    }
+
+    // 回退：本地执行
     let templates = load_catalog()?;
     let entry = templates.iter().find(|t| t.name == name)
         .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
