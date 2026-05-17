@@ -140,17 +140,23 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
             (container_type, step.config.clone())
         } else {
             // 顶层调用：actions 从顶层移入 config
-            let actions = step.actions.clone().unwrap_or_default();
-            let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
-
+            // ⚠️ 如果 config 已有 actions（直接编辑 JSON），优先使用
             let mut config = if step.config.is_object() {
                 step.config.clone()
             } else {
                 serde_json::json!({})
             };
 
+            let has_config_actions = config.get("actions").is_some();
+
             if let Value::Object(ref mut map) = config {
-                map.insert("actions".to_string(), Value::Array(converted_actions));
+                if !has_config_actions {
+                    // config 里没有 actions → 从顶层 step.actions 迁移
+                    let actions = step.actions.clone().unwrap_or_default();
+                    let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
+                    map.insert("actions".to_string(), Value::Array(converted_actions));
+                }
+                // else: config 已有 actions，不覆盖（直接编辑 JSON 的方式）
             }
 
             // logic 容器：把 condition 和 conditionGroup 放入 config
