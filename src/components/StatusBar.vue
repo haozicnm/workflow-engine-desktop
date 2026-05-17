@@ -10,8 +10,16 @@ let tickTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => { tickTimer = setInterval(() => { now.value = Date.now() }, 1000) })
 onUnmounted(() => { if (tickTimer) clearInterval(tickTimer) })
 
+// IPC health polling
+let ipcTimer: ReturnType<typeof setInterval> | null = null
+const { refreshIpcStatus } = useGlobalStatus()
+onMounted(() => {
+  refreshIpcStatus()
+  ipcTimer = setInterval(refreshIpcStatus, 30_000)
+})
+onUnmounted(() => { if (ipcTimer) clearInterval(ipcTimer) })
+
 const runningList = computed(() => {
-  // Touch now.value to ensure reactivity
   void now.value
   return Array.from(state.runningWorkflows.values())
 })
@@ -34,7 +42,6 @@ function formatNextRun(iso: string | null): string {
   if (diff < 0) return '即将'
   if (diff < 60_000) return `${Math.ceil(diff / 1000)}s`
   if (diff < 3_600_000) return `${Math.ceil(diff / 60_000)}min`
-  // Show time if today, otherwise date+time
   const today = new Date()
   if (d.toDateString() === today.toDateString()) {
     return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -45,6 +52,15 @@ function formatNextRun(iso: string | null): string {
 
 <template>
   <div class="status-bar h-7 border-t border-border bg-card/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-muted-foreground select-none shrink-0">
+    <!-- IPC daemon status -->
+    <span class="flex items-center gap-1.5" :title="state.ipcOnline ? '守护进程已连接' : '守护进程未连接'">
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
+      <span v-if="state.ipcOnline" class="text-muted-foreground/70">守护进程</span>
+      <span v-else class="text-destructive/70">离线</span>
+    </span>
+
+    <span class="text-border">│</span>
+
     <!-- Idle state -->
     <template v-if="isIdle">
       <span class="flex items-center gap-1.5">

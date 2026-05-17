@@ -22,12 +22,14 @@ interface GlobalStatusState {
   runningWorkflows: Map<string, RunningWorkflow>
   scheduledWorkflows: ScheduledWorkflow[]
   schedulesLoaded: boolean
+  ipcOnline: boolean
 }
 
 const state = reactive<GlobalStatusState>({
   runningWorkflows: new Map(),
   scheduledWorkflows: [],
   schedulesLoaded: false,
+  ipcOnline: false,
 })
 
 let scheduleRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -76,6 +78,15 @@ export function useGlobalStatus() {
     }
   }
 
+  async function refreshIpcStatus() {
+    try {
+      const ok = await safeInvoke<boolean>('check_ipc')
+      state.ipcOnline = ok === true
+    } catch (e) {
+      state.ipcOnline = false
+    }
+  }
+
   function startSchedulePolling() {
     if (scheduleRefreshTimer) return
     refreshSchedules()
@@ -95,6 +106,7 @@ export function useGlobalStatus() {
     updateRunProgress,
     unregisterRun,
     refreshSchedules,
+    refreshIpcStatus,
     startSchedulePolling,
     stopSchedulePolling,
   }

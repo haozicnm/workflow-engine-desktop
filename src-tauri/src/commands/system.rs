@@ -218,3 +218,15 @@ pub fn clear_logs() -> Result<(), String> {
     info!("日志已清空");
     Ok(())
 }
+
+/// 检查 IPC WebSocket 守护进程是否在监听
+#[tauri::command]
+pub async fn check_ipc() -> Result<bool, String> {
+    use std::net::{TcpStream, SocketAddr};
+    use std::time::Duration;
+    let addr: SocketAddr = "127.0.0.1:19527".parse().map_err(|e: std::net::AddrParseError| e.to_string())?;
+    match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}

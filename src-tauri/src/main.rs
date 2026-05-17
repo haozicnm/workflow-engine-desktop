@@ -140,6 +140,11 @@ fn main() {
             // Preview
             workflow_engine::commands::preview::preview_excel,
             workflow_engine::commands::preview::preview_word,
+            // Templates
+            workflow_engine::commands::template::list_templates,
+            workflow_engine::commands::template::load_template,
+            // IPC health
+            workflow_engine::commands::system::check_ipc,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
