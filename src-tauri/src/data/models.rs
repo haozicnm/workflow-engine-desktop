@@ -8,6 +8,7 @@ pub struct WorkflowMeta {
     pub description: String,
     pub yaml: String,
     pub enabled: bool,
+    pub locked: bool,
     pub created_at: String,
     pub updated_at: String,
 }

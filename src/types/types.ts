@@ -88,6 +88,7 @@ export interface Workflow {
   id?: string
   name: string
   description?: string
+  locked?: boolean
   steps: Step[]
 }
 

@@ -229,6 +229,20 @@ async function doDelete() {
   showDeleteConfirm.value = false
 }
 
+async function onToggleLock() {
+  if (!workflow.value?.id) return
+  const newLocked = !workflow.value.locked
+  try {
+    await safeInvoke('workflow_lock', { id: workflow.value.id, locked: newLocked })
+    workflow.value.locked = newLocked
+    toast.show(newLocked ? '已锁定 🔒' : '已解锁 🔓', 'success')
+  } catch (e: unknown) {
+    toast.error('操作失败: ' + ((e as Error).message || e))
+  }
+}
+
+const isLocked = computed(() => workflow.value?.locked === true)
+
 async function onRun() {
   if (!workflow.value) return
   enh.clearLogs()
@@ -443,8 +457,9 @@ onUnmounted(() => {
           <div v-if="!editingName" class="flex-1 min-w-0">
             <span
               class="text-base font-semibold text-foreground cursor-text hover:text-primary transition-colors"
-              title="点击编辑名称"
-              @click="onStartEditName"
+              :class="{ 'cursor-not-allowed opacity-60': isLocked }"
+              :title="isLocked ? '已锁定，无法编辑' : '点击编辑名称'"
+              @click="isLocked ? undefined : onStartEditName()"
             >
               {{ workflow?.name || '未命名工作流' }}
             </span>
@@ -461,6 +476,16 @@ onUnmounted(() => {
               @keydown.escape="editingName = false"
             />
           </div>
+
+          <!-- Lock toggle -->
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7 shrink-0"
+            :class="isLocked ? 'text-warning' : 'text-muted-foreground/30 hover:text-muted-foreground'"
+            :title="isLocked ? '解锁以编辑' : '锁定以防止修改'"
+            @click="onToggleLock"
+          >{{ isLocked ? '🔒' : '🔓' }}</Button>
 
           <!-- Primary action -->
           <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground shrink-0" @click="onRun">▶ 运行</Button>

@@ -63,6 +63,9 @@ impl Database {
             |r| r.get(0),
         )?;
 
+        // 迁移：为旧数据库添加 locked 列
+        let _ = conn.execute("ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0", []);
+
         if version < 1 {
             info!("[db] 执行 v1 初始化…");
             let start = Instant::now();
@@ -72,6 +75,7 @@ impl Database {
                     name TEXT NOT NULL,
                     description TEXT DEFAULT '',
                     enabled INTEGER DEFAULT 1,
+                    locked INTEGER DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -192,16 +196,17 @@ impl Database {
     pub fn list_workflows(&self) -> Result<Vec<WorkflowListItem>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, name, description, enabled, created_at, updated_at FROM workflows ORDER BY updated_at DESC"
+            "SELECT id, name, description, enabled, locked, created_at, updated_at FROM workflows ORDER BY updated_at DESC"
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(WorkflowListItem {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
+                id: row.get::<_, String>(0)?,
+                name: row.get::<_, String>(1)?,
+                description: row.get::<_, String>(2)?,
                 enabled: row.get::<_, i64>(3)? != 0,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                locked: row.get::<_, i64>(4)? != 0,
+                created_at: row.get::<_, String>(5)?,
+                updated_at: row.get::<_, String>(6)?,
             })
         })?;
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
@@ -218,18 +223,29 @@ impl Database {
 
     pub fn get_workflow(&self, id: &str) -> Result<Option<WorkflowMeta>> {
         let conn = self.conn()?;
-        let mut stmt = conn.prepare(
-            "SELECT id, name, description, enabled, created_at, updated_at, COALESCE(yaml_content, '') FROM workflows WHERE id = ?1"
-        )?;
+        let conn_ref = &conn;
+        // 检查 locked 列是否存在（兼容旧数据库）
+        let has_locked: bool = conn_ref.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('workflows') WHERE name='locked'",
+            [],
+            |r| r.get::<_, i64>(0),
+        ).unwrap_or(0) > 0;
+        let query = if has_locked {
+            "SELECT id, name, description, enabled, locked, created_at, updated_at, COALESCE(yaml_content, '') FROM workflows WHERE id = ?1"
+        } else {
+            "SELECT id, name, description, enabled, 0 as locked, created_at, updated_at, COALESCE(yaml_content, '') FROM workflows WHERE id = ?1"
+        };
+        let mut stmt = conn.prepare(query)?;
         let mut rows = stmt.query_map(params![id], |row| {
             Ok(WorkflowMeta {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 description: row.get(2)?,
-                yaml: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                yaml: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
                 enabled: row.get::<_, i64>(3)? != 0,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                locked: row.get::<_, i64>(4)? != 0,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?;
         match rows.next() {
@@ -265,6 +281,17 @@ impl Database {
         let param_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
         let conn = self.conn()?;
         conn.execute(&query, &param_refs[..])?;
+        Ok(())
+    }
+
+    pub fn set_workflow_locked(&self, id: &str, locked: bool) -> Result<()> {
+        let conn = self.conn()?;
+        // 确保列存在
+        let _ = conn.execute("ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0", []);
+        conn.execute(
+            "UPDATE workflows SET locked = ?1 WHERE id = ?2",
+            params![if locked { 1i64 } else { 0i64 }, id],
+        )?;
         Ok(())
     }
 

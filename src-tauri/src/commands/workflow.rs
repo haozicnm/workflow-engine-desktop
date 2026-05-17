@@ -11,6 +11,7 @@ pub struct WorkflowListItem {
     pub name: String,
     pub description: String,
     pub enabled: bool,
+    pub locked: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -76,9 +77,31 @@ pub async fn workflow_delete(
     app_handle: AppHandle,
     id: String,
 ) -> Result<(), String> {
+    // 检查是否锁定
+    let wf = app.db.get_workflow(&id).map_err(|e| e.to_string())?
+        .ok_or_else(|| "工作流不存在".to_string())?;
+    if wf.locked {
+        return Err("工作流已锁定，无法删除".to_string());
+    }
     app.db.delete_workflow(&id).map_err(|e| format!("删除工作流失败 (id={id}): {e}"))?;
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "delete",
+        "workflow_id": &id,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn workflow_lock(
+    app: State<'_, App>,
+    app_handle: AppHandle,
+    id: String,
+    locked: bool,
+) -> Result<(), String> {
+    app.db.set_workflow_locked(&id, locked)
+        .map_err(|e| format!("{}工作流失败: {e}", if locked { "锁定" } else { "解锁" }))?;
+    let _ = app_handle.emit("workflow-changed", serde_json::json!({
+        "action": if locked { "lock" } else { "unlock" },
         "workflow_id": &id,
     }));
     Ok(())

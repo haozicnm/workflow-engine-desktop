@@ -6,7 +6,6 @@ import Editor from './pages/Editor.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
 import RunHistory from './pages/RunHistory.vue'
-import TemplatePreview from './pages/TemplatePreview.vue'
 import ActionIcon from './components/ActionIcon.vue'
 import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -37,7 +36,6 @@ type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template'
 
 const currentView = ref<MainView>('welcome')
 const selectedWorkflowId = ref<string | null>(null)
-const selectedTemplate = ref<any>(null)
 const showSchedule = ref(false)
 const scheduleWorkflowId = ref<string | null>(null)
 const dashboardRef = ref<InstanceType<typeof Dashboard> | null>(null)
@@ -72,17 +70,6 @@ function onOpenWorkflow(id?: string) {
   currentView.value = 'editor'
 }
 
-function onOpenTemplate(template: any) {
-  selectedTemplate.value = template
-  currentView.value = 'template'
-}
-
-function onTemplateInstantiated(workflowId: string) {
-  selectedWorkflowId.value = workflowId
-  currentView.value = 'editor'
-  dashboardRef.value?.loadList()
-}
-
 function onWorkflowCreated(id: string) {
   selectedWorkflowId.value = id
   currentView.value = 'editor'
@@ -97,12 +84,7 @@ function onOpenHistory() {
 }
 
 function onBackToMain() {
-  if (currentView.value === 'template') {
-    selectedTemplate.value = null
-    currentView.value = 'welcome'
-  } else {
-    currentView.value = selectedWorkflowId.value ? 'editor' : 'welcome'
-  }
+  currentView.value = selectedWorkflowId.value ? 'editor' : 'welcome'
 }
 
 function onSchedule(workflowId: string) {
@@ -173,7 +155,6 @@ function statusColor(status: string): string {
               ref="dashboardRef"
               :selected-id="selectedWorkflowId"
               @open-workflow="onOpenWorkflow"
-              @open-template="onOpenTemplate"
               @open-settings="onOpenSettings"
               @open-history="onOpenHistory"
               @workflow-created="onWorkflowCreated"
@@ -190,14 +171,6 @@ function statusColor(status: string): string {
               @schedule="onSchedule"
               @workflow-updated="onWorkflowUpdated"
               @workflow-deleted="onWorkflowDeleted"
-            />
-
-            <!-- Template preview view -->
-            <TemplatePreview
-              v-else-if="currentView === 'template' && selectedTemplate"
-              :template="selectedTemplate"
-              @back="onBackToMain"
-              @instantiated="onTemplateInstantiated"
             />
 
             <!-- Welcome / empty state -->

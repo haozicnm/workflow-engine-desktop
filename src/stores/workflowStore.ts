@@ -12,6 +12,7 @@ export interface WorkflowListItem {
   name: string
   description: string
   enabled: boolean
+  locked: boolean
   created_at: string
   updated_at: string
 }
@@ -21,6 +22,7 @@ export interface WorkflowFull {
   name: string
   description: string
   enabled: boolean
+  locked: boolean
   yaml: string   // backend field — now holds JSON string
   created_at: string
   updated_at: string
@@ -124,6 +126,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         parsed.id = wf.id
         parsed.name = wf.name
         parsed.description = wf.description || ''
+        parsed.locked = wf.locked
         // 确保所有 step 都有 actions 数组（兼容旧格式）
         normalizeSteps(parsed.steps)
         current.value = parsed
@@ -142,6 +145,10 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   async function saveWorkflow(): Promise<boolean> {
     if (!current.value) return false
+    if (current.value.locked) {
+      console.warn('[WorkflowStore] 工作流已锁定，无法保存')
+      return false
+    }
     // 校验变量引用
     lastWarnings.value = validateRefs(current.value)
     saving.value = true

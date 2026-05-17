@@ -24,23 +24,12 @@ interface WorkflowItem {
   updated_at: string
 }
 
-interface TemplateMeta {
-  id: string
-  name: string
-  description: string
-  step_count: number
-  source: string
-  category: string
-  file_path?: string
-}
-
 defineProps<{
   selectedId: string | null
 }>()
 
 const emit = defineEmits<{
   'open-workflow': [id?: string]
-  'open-template': [template: TemplateMeta]
   'open-settings': []
   'open-history': []
   'workflow-created': [id: string]
@@ -49,9 +38,7 @@ const emit = defineEmits<{
 const toast = useToast()
 const globalStatus = useGlobalStatus()
 const workflows = ref<WorkflowItem[]>([])
-const templates = ref<TemplateMeta[]>([])
 const loading = ref(false)
-const templatesLoading = ref(false)
 
 const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
 
@@ -71,7 +58,6 @@ let unlistenScheduleChanged: (() => void) | null = null
 
 onMounted(async () => {
   await loadList()
-  loadTemplates()
   try {
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
@@ -104,19 +90,6 @@ async function loadList() {
 
 function selectWorkflow(item: WorkflowItem) {
   emit('open-workflow', item.id)
-}
-
-async function loadTemplates() {
-  templatesLoading.value = true
-  try {
-    templates.value = await safeInvoke<TemplateMeta[]>('list_templates') || []
-  } catch (e: unknown) {
-    console.error('[Dashboard] 加载模板库失败:', e)
-  } finally { templatesLoading.value = false }
-}
-
-function selectTemplate(tpl: TemplateMeta) {
-  emit('open-template', tpl)
 }
 
 function onNewWorkflow() {
@@ -205,33 +178,6 @@ defineExpose({ loadList })
   </SidebarHeader>
 
   <SidebarContent>
-    <!-- Template library -->
-    <SidebarGroup v-if="sidebar?.open.value">
-      <SidebarGroupLabel label="模板库" />
-      <div v-if="templatesLoading" class="px-2 py-2">
-        <div class="h-6 bg-secondary/50 rounded animate-pulse w-3/4" />
-      </div>
-      <div v-else-if="!templates.length" class="px-2 py-2 text-xs text-muted-foreground">
-        暂无模板
-      </div>
-      <SidebarMenuItem v-for="tpl in templates" :key="tpl.id" v-else>
-        <SidebarMenuButton
-          :tooltip="tpl.name"
-          @click.stop="selectTemplate(tpl)"
-        >
-          <template #icon>
-            <span class="flex items-center justify-center w-5 h-5 rounded bg-emerald-500/10 text-emerald-600 text-[10px] font-bold shrink-0">
-              📋
-            </span>
-          </template>
-          <span class="truncate text-sm">{{ tpl.name }}</span>
-          <span class="ml-auto text-[10px] text-muted-foreground/50 tabular-nums shrink-0">
-            {{ tpl.step_count }}步
-          </span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarGroup>
-
     <SidebarGroup>
       <SidebarGroupLabel label="工作流" />
 
