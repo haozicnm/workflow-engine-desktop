@@ -82,7 +82,6 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
                     step.id, rc.ref_step
                 ));
             }
-            // 自引用警告（不阻止，但提示）
             if rc.ref_step == step.id {
                 tracing::warn!(
                     "步骤 '{}' 的 runCondition 引用了自身，这通常是个配置错误",
@@ -103,6 +102,18 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
                 return Err(anyhow!(
                     "步骤 '{}' 的 onError branch 引用了自身，这会形成死循环",
                     step.id
+                ));
+            }
+        }
+
+        // 校验变量引用：{{step_xxx}} 中的 step ID 必须存在
+        let config_str = serde_json::to_string(&step.config).unwrap_or_default();
+        for ref_id in extract_step_refs(&config_str) {
+            let full_id = format!("step_{}", ref_id);
+            if !step_ids.contains(full_id.as_str()) {
+                return Err(anyhow!(
+                    "步骤 '{}' 中引用了不存在的步骤 '{}'（{{{{step_{}}}}} 指向的步骤不存在）",
+                    step.id, full_id, ref_id
                 ));
             }
         }
@@ -461,9 +472,24 @@ mod tests {
         assert_eq!(loop_step.step_type, "loop");
         let body = loop_step.body_steps.as_ref().unwrap();
         assert_eq!(body.len(), 1);
-        // 关键断言：body 内的 browser 类型应被递归转换为 browser_container
         assert_eq!(body[0].step_type, "browser_container");
-        // config 中的 actions 应保留
         assert!(body[0].config.get("actions").is_some());
+    }
+
+    #[test]
+    fn invalid_step_ref_in_config_fails() {
+        // 引用 {{step_nonexistent}} 应被拦截
+        let json = r#"{
+            "name": "test",
+            "steps": [
+                {"id": "step_1", "type": "shell", "label": "s1",
+                 "config": {"command": "echo ok"}},
+                {"id": "step_2", "type": "http", "label": "s2",
+                 "config": {"method": "GET", "url": "{{step_99.result}}"}}
+            ]
+        }"#;
+        let err = parse_workflow(json).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("step_99"), "expected error about step_99, got: {}", msg);
     }
 }
