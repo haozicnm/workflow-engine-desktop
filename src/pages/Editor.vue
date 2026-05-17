@@ -5,6 +5,7 @@ import { useStepRunner } from '../composables/useStepRunner'
 import { useToast } from '../composables/useToast'
 import { useEditorEnhancements, type LogEntry } from '../composables/useEditorEnhancements'
 import { useGlobalStatus } from '../composables/useGlobalStatus'
+import { useOpsConsole } from '../composables/useOpsConsole'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import StepCard from '../components/StepCard.vue'
 import ActionIcon from '../components/ActionIcon.vue'
@@ -40,6 +41,7 @@ const { runWorkflow, stopWorkflow, isRunning } = useStepRunner()
 const toast = useToast()
 const enh = useEditorEnhancements()
 const globalStatus = useGlobalStatus()
+const ops = useOpsConsole()
 
 let currentRunId: string | null = null
 
@@ -230,6 +232,8 @@ async function doDelete() {
 async function onRun() {
   if (!workflow.value) return
   enh.clearLogs()
+  // Auto-expand console
+  if (!ops.visible.value) ops.toggle()
   // Register in global status
   if (workflow.value.id) {
     globalStatus.registerRun(workflow.value.id, workflow.value.name)
@@ -379,6 +383,9 @@ onMounted(async () => {
     const level: LogEntry['level'] = status === 'error' ? 'error' : status === 'running' ? 'info' : 'info'
     const msg = status === 'error' ? (error || '执行失败') : status === 'running' ? '开始执行...' : status === 'success' ? '执行成功' : status
     enh.addLog({ time: new Date().toLocaleTimeString(), stepId: step_id, stepName: step_name || step_id, status, message: msg, level })
+    // Log to unified console
+    const detail = status === 'error' ? (error || '') : `step: ${step_name || step_id}`
+    ops.addOp({ source: 'agent', category: 'event', name: `step: ${status}`, status: status === 'error' ? 'fail' : 'ok', detail })
     // Update global status progress
     if (currentRunId && workflow.value) {
       const steps = workflow.value.steps || []
@@ -394,6 +401,14 @@ onMounted(async () => {
   unlistenLogRun = await safeListen<{ run_id: string; status: string; error?: string }>('run-update', (event) => {
     const { status, error } = event.payload
     enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: '工作流', status, message: status === 'completed' ? '运行完成' : status === 'error' ? `运行失败: ${error}` : status, level: status === 'error' ? 'error' : 'info' })
+    // Log to unified console
+    ops.addOp({
+      source: 'agent',
+      category: 'event',
+      name: `run: ${status}`,
+      status: status === 'failed' ? 'fail' : 'ok',
+      detail: status === 'completed' ? '工作流运行完成' : status === 'failed' ? (error || '未知错误') : status,
+    })
     // Unregister from global status when run finishes
     if (currentRunId && (status === 'completed' || status === 'failed' || status === 'cancelled')) {
       globalStatus.unregisterRun(currentRunId)
@@ -601,48 +616,6 @@ onUnmounted(() => {
         />
       </TabsContent>
     </Tabs>
-
-    <!-- Log Panel (bottom bar, collapsed by default) -->
-    <div class="border-t border-border bg-background shrink-0 select-none">
-      <button
-        class="w-full flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-secondary/50 transition-colors"
-        @click="enh.logPanelVisible.value = !enh.logPanelVisible.value"
-        :aria-expanded="enh.logPanelVisible.value"
-        aria-label="切换运行日志面板"
-      >
-        <div>
-        <div class="flex items-center gap-2">
-          <span class="text-[11px] text-muted-foreground">{{ enh.logPanelVisible.value ? '▼' : '▶' }}</span>
-          <span class="text-xs text-foreground">📟 运行日志</span>
-          <span v-if="enh.logs.value.length" class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5">{{ enh.logs.value.length }}</span>
-        </div>
-        <Button
-          v-if="enh.logPanelVisible.value"
-          variant="ghost"
-          size="sm"
-          class="h-5 text-[10px] text-muted-foreground"
-          @click.stop="enh.clearLogs()"
-        >清空</Button>
-      </div>
-      </button>
-      <Transition name="collapse">
-        <div v-if="enh.logPanelVisible.value" class="max-h-[180px] overflow-y-auto border-t border-border">
-          <div v-if="!enh.logs.value.length" class="text-muted-foreground text-xs p-3">
-            暂无日志，运行工作流后显示
-          </div>
-          <div
-            v-for="(log, i) in enh.logs.value"
-            :key="i"
-            class="flex items-baseline gap-2 px-3 py-0.5 text-[11px] font-mono text-muted-foreground hover:bg-card transition-colors"
-            :class="{ 'text-danger': log.level === 'error', 'text-warning': log.level === 'warn' }"
-          >
-            <span class="text-muted-foreground/50 shrink-0 w-[70px]">{{ log.time }}</span>
-            <span class="text-primary shrink-0 w-[100px] truncate">{{ log.stepName }}</span>
-            <span class="flex-1">{{ log.message }}</span>
-          </div>
-        </div>
-      </Transition>
-    </div>
 
     <!-- Action type picker popup -->
     <Teleport to="body">

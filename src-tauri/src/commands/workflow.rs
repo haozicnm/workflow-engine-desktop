@@ -1,5 +1,5 @@
 // commands/workflow.rs — 工作流 CRUD 命令
-use tauri::State;
+use tauri::{State, AppHandle, Emitter};
 use serde::Serialize;
 use crate::App;
 use crate::data::models::WorkflowMeta;
@@ -25,6 +25,7 @@ pub async fn workflow_list(
 #[tauri::command]
 pub async fn workflow_create(
     app: State<'_, App>,
+    app_handle: AppHandle,
     name: String,
     description: Option<String>,
 ) -> Result<String, String> {
@@ -34,6 +35,11 @@ pub async fn workflow_create(
     app.db.create_workflow(&id, &name, description.as_deref().unwrap_or(""), &now, &now)
         .map_err(|e| format!("创建工作流失败 (name={name}): {e}"))?;
 
+    let _ = app_handle.emit("workflow-changed", serde_json::json!({
+        "action": "create",
+        "workflow_id": &id,
+        "workflow_name": &name,
+    }));
     Ok(id)
 }
 
@@ -48,6 +54,7 @@ pub async fn workflow_get(
 #[tauri::command]
 pub async fn workflow_update(
     app: State<'_, App>,
+    app_handle: AppHandle,
     id: String,
     name: Option<String>,
     description: Option<String>,
@@ -55,15 +62,26 @@ pub async fn workflow_update(
 ) -> Result<(), String> {
     let now = chrono::Utc::now().to_rfc3339();
     app.db.update_workflow(&id, name.as_deref(), description.as_deref(), enabled, &now)
-        .map_err(|e| format!("更新工作流失败 (id={id}): {e}"))
+        .map_err(|e| format!("更新工作流失败 (id={id}): {e}"))?;
+    let _ = app_handle.emit("workflow-changed", serde_json::json!({
+        "action": "update",
+        "workflow_id": &id,
+    }));
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn workflow_delete(
     app: State<'_, App>,
+    app_handle: AppHandle,
     id: String,
 ) -> Result<(), String> {
-    app.db.delete_workflow(&id).map_err(|e| format!("删除工作流失败 (id={id}): {e}"))
+    app.db.delete_workflow(&id).map_err(|e| format!("删除工作流失败 (id={id}): {e}"))?;
+    let _ = app_handle.emit("workflow-changed", serde_json::json!({
+        "action": "delete",
+        "workflow_id": &id,
+    }));
+    Ok(())
 }
 
 #[tauri::command]
@@ -88,11 +106,17 @@ pub async fn workflow_validate(
 #[tauri::command]
 pub async fn workflow_save_yaml(
     app: State<'_, App>,
+    app_handle: AppHandle,
     id: String,
     yaml: String,
 ) -> Result<(), String> {
     app.db.save_workflow_yaml(&id, &yaml)
-        .map_err(|e| format!("保存工作流 YAML 失败 (id={id}): {e}"))
+        .map_err(|e| format!("保存工作流 YAML 失败 (id={id}): {e}"))?;
+    let _ = app_handle.emit("workflow-changed", serde_json::json!({
+        "action": "save",
+        "workflow_id": &id,
+    }));
+    Ok(())
 }
 
 /// 自动排序步骤（根据 {{step_xxx}} 引用推断依赖）

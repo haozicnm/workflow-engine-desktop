@@ -1,11 +1,13 @@
 // utils/tauri.ts — 共享 safeInvoke / safeListen，供所有 Vue 组件使用
 // 在浏览器 dev 模式下优雅降级（不抛异常，不白屏）
+import { addOp } from '../composables/useOpsConsole'
 
 const isTauri =
   typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
 
 /**
  * 安全调用 Tauri 命令。dev 模式下返回 undefined + console.warn。
+ * 所有调用自动记录到全局操作控制台。
  */
 export async function safeInvoke<T = unknown>(
   command: string,
@@ -15,8 +17,32 @@ export async function safeInvoke<T = unknown>(
     console.warn(`[dev] safeInvoke("${command}") 跳过 — 不在 Tauri 环境`)
     return undefined
   }
+  const start = Date.now()
   const { invoke } = await import('@tauri-apps/api/core')
-  return invoke<T>(command, args)
+  try {
+    const result = await invoke<T>(command, args)
+    const elapsed = Date.now() - start
+    addOp({
+      source: 'gui',
+      category: 'invoke',
+      name: command,
+      status: 'ok',
+      elapsed,
+      detail: args ? JSON.stringify(args).slice(0, 120) : undefined,
+    })
+    return result
+  } catch (e: unknown) {
+    const elapsed = Date.now() - start
+    addOp({
+      source: 'gui',
+      category: 'invoke',
+      name: command,
+      status: 'fail',
+      elapsed,
+      detail: (e as Error).message || String(e),
+    })
+    throw e
+  }
 }
 
 /**

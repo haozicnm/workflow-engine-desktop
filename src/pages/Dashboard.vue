@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
+import { useGlobalStatus } from '../composables/useGlobalStatus'
 import Button from '../components/ui/button/Button.vue'
 import Input from '../components/ui/input/Input.vue'
 import SidebarHeader from '../components/ui/sidebar/SidebarHeader.vue'
@@ -46,6 +47,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const globalStatus = useGlobalStatus()
 const workflows = ref<WorkflowItem[]>([])
 const templates = ref<TemplateMeta[]>([])
 const loading = ref(false)
@@ -64,6 +66,8 @@ const filteredWorkflows = computed(() => {
 })
 
 let unlistenRunUpdate: (() => void) | null = null
+let unlistenWorkflowChanged: (() => void) | null = null
+let unlistenScheduleChanged: (() => void) | null = null
 
 onMounted(async () => {
   await loadList()
@@ -74,10 +78,20 @@ onMounted(async () => {
       if (status === 'completed') toast.success('工作流执行完成')
       else if (status === 'failed') toast.error('工作流执行失败: ' + (error || '未知错误'))
     })
-  } catch (e) { console.warn('无法监听执行事件:', e) }
+    unlistenWorkflowChanged = await safeListen('workflow-changed', () => {
+      loadList()
+    })
+    unlistenScheduleChanged = await safeListen('schedule-changed', () => {
+      globalStatus.refreshSchedules()
+    })
+  } catch (e) { console.warn('无法监听事件:', e) }
 })
 
-onUnmounted(() => { unlistenRunUpdate?.() })
+onUnmounted(() => {
+  unlistenRunUpdate?.()
+  unlistenWorkflowChanged?.()
+  unlistenScheduleChanged?.()
+})
 
 async function loadList() {
   loading.value = true

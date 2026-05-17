@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // App.vue — Single-page layout: Sidebar (workflow list) + Main content (editor/settings/history)
-import { ref, provide, onMounted, onUnmounted } from 'vue'
+// + Unified operation console at bottom
+import { ref, provide, onMounted, onUnmounted, computed } from 'vue'
 import Editor from './pages/Editor.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
@@ -14,12 +15,14 @@ import Toast from './components/Toast.vue'
 import ApprovalCenter from './components/ApprovalCenter.vue'
 import { useToast } from './composables/useToast'
 import { useGlobalStatus } from './composables/useGlobalStatus'
+import { useOpsConsole } from './composables/useOpsConsole'
 import SidebarProvider from './components/ui/sidebar/SidebarProvider.vue'
 import Sidebar from './components/ui/sidebar/Sidebar.vue'
 import SidebarInset from './components/ui/sidebar/SidebarInset.vue'
 
 const { toasts, remove } = useToast()
 const globalStatus = useGlobalStatus()
+const ops = useOpsConsole()
 
 onMounted(() => {
   globalStatus.startSchedulePolling()
@@ -27,6 +30,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   globalStatus.stopSchedulePolling()
+  ops.unsubscribe()
 })
 
 type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template'
@@ -125,6 +129,31 @@ provide('app:backToDashboard', () => {
   currentView.value = selectedWorkflowId.value ? 'editor' : 'welcome'
 })
 provide('globalStatus', globalStatus)
+
+// ─── Console panel helpers ───
+const consoleStatusCounts = computed(() => {
+  let ok = 0, fail = 0, start = 0
+  for (const l of ops.logs.value) {
+    if (l.status === 'ok') ok++
+    else if (l.status === 'fail') fail++
+    else start++
+  }
+  return { ok, fail, start }
+})
+
+function statusIcon(status: string): string {
+  if (status === 'start') return '▶'
+  if (status === 'ok') return '✓'
+  if (status === 'fail') return '✗'
+  return '·'
+}
+
+function statusColor(status: string): string {
+  if (status === 'start') return 'text-primary'
+  if (status === 'ok') return 'text-success'
+  if (status === 'fail') return 'text-destructive'
+  return 'text-muted-foreground'
+}
 </script>
 
 <template>
@@ -226,6 +255,52 @@ provide('globalStatus', globalStatus)
               </div>
             </Transition>
             </SidebarInset>
+
+            <!-- ─── Unified Operation Console ─── -->
+            <div class="border-t border-border bg-background shrink-0 select-none">
+              <button
+                class="w-full flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-secondary/50 transition-colors"
+                @click="ops.toggle()"
+                :aria-expanded="ops.visible.value"
+                aria-label="切换操作控制台"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] text-muted-foreground">{{ ops.visible.value ? '▼' : '▶' }}</span>
+                  <span class="text-xs text-foreground">📟 操作控制台</span>
+                  <span v-if="ops.logs.value.length" class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5">
+                    {{ ops.logs.value.length }}
+                  </span>
+                  <span class="text-[10px] text-success ml-0.5">✓{{ consoleStatusCounts.ok }}</span>
+                  <span v-if="consoleStatusCounts.fail" class="text-[10px] text-destructive ml-0.5">✗{{ consoleStatusCounts.fail }}</span>
+                </div>
+                <button
+                  v-if="ops.visible.value"
+                  class="h-5 text-[10px] text-muted-foreground hover:text-foreground"
+                  @click.stop="ops.clearLogs()"
+                >清空</button>
+              </button>
+              <Transition name="collapse">
+                <div v-if="ops.visible.value" class="max-h-[200px] overflow-y-auto border-t border-border">
+                  <div v-if="!ops.logs.value.length" class="text-muted-foreground text-xs p-3">
+                    暂无操作记录 — 所有操作会自动显示在这里
+                  </div>
+                  <div
+                    v-for="(log, i) in ops.logs.value"
+                    :key="i"
+                    class="flex items-baseline gap-2 px-3 py-0.5 text-[11px] font-mono hover:bg-card transition-colors"
+                    :class="statusColor(log.status)"
+                  >
+                    <span class="text-muted-foreground/50 shrink-0 w-[70px]">{{ log.time }}</span>
+                    <span class="shrink-0 w-[12px]">{{ statusIcon(log.status) }}</span>
+                    <span class="text-muted-foreground/60 shrink-0 w-[32px] text-[10px]">{{ log.source === 'gui' ? 'GUI' : 'Agent' }}</span>
+                    <span class="text-foreground flex-1 truncate">{{ log.name }}</span>
+                    <span v-if="log.detail" class="text-muted-foreground/50 text-[10px] max-w-[180px] truncate">{{ log.detail }}</span>
+                    <span v-if="log.elapsed" class="text-muted-foreground/40 text-[10px] shrink-0">{{ log.elapsed }}ms</span>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+
             <StatusBar />
           </div>
         </div>
@@ -270,4 +345,15 @@ provide('globalStatus', globalStatus)
 
 .slide-right-enter-active, .slide-right-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
 .slide-right-enter-from, .slide-right-leave-to { transform: translateX(100%); opacity: 0; }
+
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all 0.15s ease;
+  overflow: hidden;
+}
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
 </style>

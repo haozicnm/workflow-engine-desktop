@@ -1,5 +1,5 @@
 // commands/schedule.rs — 定时计划命令
-use tauri::State;
+use tauri::{State, AppHandle, Emitter};
 use crate::App;
 use crate::data::models::ScheduleInfo;
 
@@ -13,6 +13,7 @@ pub async fn schedule_list(
 #[tauri::command]
 pub async fn schedule_create(
     app: State<'_, App>,
+    app_handle: AppHandle,
     workflow_id: String,
     cron_expr: String,
 ) -> Result<String, String> {
@@ -30,12 +31,18 @@ pub async fn schedule_create(
     let now = chrono::Utc::now().to_rfc3339();
     app.db.create_schedule(&id, &workflow_id, &cron_expr, &now)
         .map_err(|e| e.to_string())?;
+    let _ = app_handle.emit("schedule-changed", serde_json::json!({
+        "action": "create",
+        "schedule_id": &id,
+        "workflow_id": &workflow_id,
+    }));
     Ok(id)
 }
 
 #[tauri::command]
 pub async fn schedule_update(
     app: State<'_, App>,
+    app_handle: AppHandle,
     id: String,
     cron_expr: Option<String>,
     enabled: Option<bool>,
@@ -53,13 +60,24 @@ pub async fn schedule_update(
     }
 
     app.db.update_schedule(&id, cron_expr.as_deref(), enabled)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let _ = app_handle.emit("schedule-changed", serde_json::json!({
+        "action": "update",
+        "schedule_id": &id,
+    }));
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn schedule_delete(
     app: State<'_, App>,
+    app_handle: AppHandle,
     id: String,
 ) -> Result<(), String> {
-    app.db.delete_schedule(&id).map_err(|e| e.to_string())
+    app.db.delete_schedule(&id).map_err(|e| e.to_string())?;
+    let _ = app_handle.emit("schedule-changed", serde_json::json!({
+        "action": "delete",
+        "schedule_id": &id,
+    }));
+    Ok(())
 }
