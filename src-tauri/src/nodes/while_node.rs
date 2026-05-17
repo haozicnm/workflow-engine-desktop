@@ -159,10 +159,9 @@ impl NodeExecutor for WhileNode {
             ctx.set_var("__index1".to_string(), json!(i + 1));
 
             let mut item_outputs = serde_json::Map::new();
+            // 迭代变量已设入 ctx，容器/节点各自解析模板
             for body_step in &body_steps {
-                let mut resolved = body_step.clone();
-                resolved.config = ctx.resolve_config(&body_step.config);
-                let output = executor.execute(&resolved, ctx).await?;
+                let output = executor.execute(body_step, ctx).await?;
                 item_outputs.insert(body_step.id.clone(), output.clone());
                 ctx.set_output(&body_step.id, output);
             }

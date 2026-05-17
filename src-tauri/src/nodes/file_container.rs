@@ -49,13 +49,20 @@ impl NodeExecutor for FileContainerNode {
     async fn execute(
         &self,
         step: &Step,
-        _ctx: &mut ExecutionContext,
+        ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let actions: Vec<FileAction> = step.config
+        let mut actions: Vec<FileAction> = step.config
             .get("actions")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .ok_or_else(|| anyhow!("file 容器缺少 actions 参数"))?;
+
+        // 容器不再走全局 resolve_config，这里解析每个 action 的模板变量
+        for action in &mut actions {
+            for (_, v) in action.config.iter_mut() {
+                *v = ctx.resolve_config(v);
+            }
+        }
 
         let mut results = serde_json::Map::new();
 

@@ -643,8 +643,15 @@ impl NodeExecutor for BrowserContainerNode {
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
         // 解析配置
-        let config: BrowserContainerConfig = serde_json::from_value(step.config.clone())
+        let mut config: BrowserContainerConfig = serde_json::from_value(step.config.clone())
             .map_err(|e| anyhow!("浏览器容器配置解析失败: {}", e))?;
+
+        // 容器不再走全局 resolve_config，这里解析每个 action 的模板变量
+        for action in &mut config.actions {
+            for (_, v) in action.config.iter_mut() {
+                *v = ctx.resolve_config(v);
+            }
+        }
 
         // 从 ctx.input_ports 获取连线传入的数据
         let input_ports = ctx.input_ports.clone();

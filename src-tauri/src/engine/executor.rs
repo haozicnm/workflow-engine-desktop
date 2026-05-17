@@ -137,7 +137,15 @@ impl StepExecutor {
             }
         };
 
-        let resolved_config = ctx.resolve_config(&step.config);
+        let is_container = step.step_type.ends_with("_container");
+        let resolved_config = if is_container {
+            // 容器节点跳过全局 resolve_config：容器 config 有类型化 struct 字段，
+            // 全量递归解析会把模板变量变成数字/对象，导致反序列化失败。
+            // 各容器自己负责解析内部 action config。
+            step.config.clone()
+        } else {
+            ctx.resolve_config(&step.config)
+        };
         let resolved_step = Step {
             id: step.id.clone(),
             name: step.name.clone(),

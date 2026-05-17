@@ -143,11 +143,9 @@ impl NodeExecutor for CursorNode {
             "total": total,
         }));
 
-        // 执行 body
+        // 执行 body — 迭代变量已设入 ctx，容器/节点各自解析模板
         for body_step in &body_steps {
-            let mut resolved = body_step.clone();
-            resolved.config = ctx.resolve_config(&body_step.config);
-            let output = executor.execute(&resolved, ctx).await?;
+            let output = executor.execute(body_step, ctx).await?;
             ctx.set_output(&body_step.id, output);
         }
 

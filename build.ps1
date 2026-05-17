@@ -1,10 +1,19 @@
 # build.ps1 — Build with git commit hash in version
 $hash = (git rev-parse --short HEAD)
 Write-Host "Build: 6.9.0-$hash"
-# Patch versions (use Out-File -Encoding utf8NoBOM to avoid corrupting UTF-8)
-(Get-Content package.json) -replace '"version": "6\.9\.0"', ('"version": "6.9.0-' + $hash + '"') | Out-File -Encoding utf8NoBOM package.json
-(Get-Content src-tauri/Cargo.toml) -replace '^version = "6\.9\.0"', ('version = "6.9.0-' + $hash + '"') | Out-File -Encoding utf8NoBOM src-tauri/Cargo.toml
-(Get-Content src-tauri/tauri.conf.json) -replace '"version": "6\.9\.0"', ('"version": "6.9.0-' + $hash + '"') | Out-File -Encoding utf8NoBOM src-tauri/tauri.conf.json
+# Patch versions (use JSON manipulation to avoid regex escaping issues)
+$pkg = Get-Content package.json -Raw | ConvertFrom-Json
+$pkg.version = "6.9.0-$hash"
+$pkg | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8NoBOM package.json
+
+$cargo = Get-Content src-tauri/Cargo.toml -Raw
+$cargo = $cargo -replace '^version = "[^"]*"', ('version = "6.9.0-' + $hash + '"')
+$cargo | Out-File -Encoding utf8NoBOM src-tauri/Cargo.toml
+
+$tauri = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+$tauri.version = "6.9.0-$hash"
+$tauri | ConvertTo-Json -Depth 10 | Out-File -Encoding utf8NoBOM src-tauri/tauri.conf.json
+
 # Build
 npx tauri build
 # Revert
