@@ -55,11 +55,38 @@ pub enum Commands {
     /// 管理定时调度
     #[command(subcommand)]
     Schedule(ScheduleCommand),
+    /// 管理标准化工作流模板库
+    #[command(subcommand)]
+    Library(LibraryCommand),
     /// 列出所有可用步骤类型和动作（JSON）
     Steps {
         /// 输出 JSON 格式（默认）
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum LibraryCommand {
+    /// 列出所有模板
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// 查看模板详情
+    Show {
+        name: String,
+    },
+    /// 运行模板（参数化执行）
+    Run {
+        name: String,
+        /// JSON 参数覆盖, 如 '{"source":"https://..."}'
+        #[arg(long, default_value = "{}")]
+        params: String,
+    },
+    /// 校验模板
+    Validate {
+        name: String,
     },
 }
 
@@ -99,6 +126,7 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Import { file } => cmd_import(&app, &file),
         Commands::Validate { file, json } => cmd_validate(&file, json),
         Commands::Schedule(sub) => cmd_schedule(&app, sub),
+        Commands::Library(sub) => cmd_library(&app, sub).await,
         Commands::Steps { json: _ } => cmd_steps(),
     }
 }
@@ -660,5 +688,215 @@ fn cmd_schedule_delete(app: &App, id: &str) -> Result<(), String> {
     app.db.delete_schedule(id)
         .map_err(|e| format!("删除调度失败: {e}"))?;
     println!("✓ 调度已删除");
+    Ok(())
+}
+
+// ─── Library 管理 ───
+
+const LIBRARY_DIR: &str = ".hermes/workflows";
+
+async fn cmd_library(app: &App, sub: LibraryCommand) -> Result<(), String> {
+    match sub {
+        LibraryCommand::List { json } => cmd_library_list(json),
+        LibraryCommand::Show { name } => cmd_library_show(&name),
+        LibraryCommand::Run { name, params } => cmd_library_run(app, &name, &params).await,
+        LibraryCommand::Validate { name } => cmd_library_validate(&name),
+    }
+}
+
+fn library_dir() -> std::path::PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    home.join(LIBRARY_DIR)
+}
+
+fn load_catalog() -> Result<Vec<TemplateEntry>, String> {
+    let path = library_dir().join("catalog.toml");
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取 catalog.toml 失败: {}\n路径: {}", e, path.display()))?;
+    let catalog: Catalog = toml::from_str(&content)
+        .map_err(|e| format!("解析 catalog.toml 失败: {}", e))?;
+    Ok(catalog.templates)
+}
+
+#[derive(serde::Deserialize)]
+struct Catalog {
+    templates: Vec<TemplateEntry>,
+}
+
+#[derive(serde::Deserialize, Clone)]
+struct TemplateEntry {
+    name: String,
+    version: String,
+    description: String,
+    params: Vec<String>,
+    schedule: Option<String>,
+    category: String,
+    file: String,
+}
+
+fn cmd_library_list(json: bool) -> Result<(), String> {
+    let templates = load_catalog()?;
+    if json {
+        let items: Vec<serde_json::Value> = templates.iter().map(|t| {
+            serde_json::json!({
+                "name": t.name,
+                "version": t.version,
+                "description": t.description,
+                "params": t.params,
+                "schedule": t.schedule,
+                "category": t.category,
+            })
+        }).collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+            "templates": items,
+            "count": items.len(),
+        })).unwrap());
+        return Ok(());
+    }
+    if templates.is_empty() {
+        println!("(无模板)");
+        return Ok(());
+    }
+    println!("{:<25} {:<8} {:<12} {:<30}", "名称", "版本", "分类", "描述");
+    println!("{}", "-".repeat(80));
+    for t in &templates {
+        let schedule = t.schedule.as_deref().unwrap_or("手动");
+        println!("{:<25} {:<8} {:<12} {:<30}", t.name, t.version, t.category, t.description);
+        println!("  参数: {}  默认调度: {}", t.params.join(", "), schedule);
+    }
+    println!("\n共 {} 个模板", templates.len());
+    Ok(())
+}
+
+fn cmd_library_show(name: &str) -> Result<(), String> {
+    let templates = load_catalog()?;
+    let entry = templates.iter().find(|t| t.name == name)
+        .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
+
+    let file_path = library_dir().join(&entry.file);
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取模板文件失败: {}", e))?;
+    let wf: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
+
+    let params = wf.get("params").and_then(|v| v.as_object());
+    let default_params: Vec<String> = params.map(|p| {
+        p.iter().map(|(k, v)| format!("  {} = {}", k, v)).collect()
+    }).unwrap_or_default();
+
+    println!("名称:     {}", entry.name);
+    println!("版本:     {}", entry.version);
+    println!("分类:     {}", entry.category);
+    println!("描述:     {}", entry.description);
+    println!("声明参数: {}", entry.params.join(", "));
+    println!("默认调度: {}", entry.schedule.as_deref().unwrap_or("手动触发"));
+    if !default_params.is_empty() {
+        println!("\n默认参数值:");
+        for p in &default_params {
+            println!("{}", p);
+        }
+    }
+    println!("\n步骤数:   {}", wf.get("steps").and_then(|s| s.as_array()).map(|a| a.len()).unwrap_or(0));
+    Ok(())
+}
+
+async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(), String> {
+    let templates = load_catalog()?;
+    let entry = templates.iter().find(|t| t.name == name)
+        .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
+
+    let file_path = library_dir().join(&entry.file);
+    let mut content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取模板文件失败: {}", e))?;
+
+    // 解析模板 JSON
+    let wf: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
+
+    // 收集默认参数
+    let mut resolved: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
+        for (k, v) in params {
+            resolved.insert(k.clone(), match v {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+        }
+    }
+
+    // 覆盖用户参数
+    if params_json != "{}" {
+        let overrides: serde_json::Value = serde_json::from_str(params_json)
+            .map_err(|e| format!("--params JSON 解析失败: {}", e))?;
+        if let Some(obj) = overrides.as_object() {
+            for (k, v) in obj {
+                resolved.insert(k.clone(), match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                });
+            }
+        }
+    }
+
+    // 替换 {{params.xxx}} 占位符
+    for (key, val) in &resolved {
+        let placeholder = format!("{{{{params.{}}}}}", key);
+        content = content.replace(&placeholder, val);
+    }
+
+    // 校验解析后的 JSON
+    let _: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("参数替换后 JSON 格式错误: {}", e))?;
+
+    // 导入到临时工作流并运行
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let label = format!("[库] {}", entry.name);
+    app.db.create_workflow(&id, &label, "", &now, &now)
+        .map_err(|e| format!("创建失败: {e}"))?;
+    app.db.save_workflow_yaml(&id, &content)
+        .map_err(|e| format!("保存失败: {e}"))?;
+
+    // 调用 cmd_run 逻辑（复用已有实现，通过 db 中的工作流执行）
+    // 直接委托给 cmd_run
+    cmd_run(app, &id, &[]).await
+}
+
+fn cmd_library_validate(name: &str) -> Result<(), String> {
+    let templates = load_catalog()?;
+    let entry = templates.iter().find(|t| t.name == name)
+        .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
+
+    let file_path = library_dir().join(&entry.file);
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("读取模板文件失败: {}", e))?;
+
+    // 验证 JSON 结构
+    let wf: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("JSON 格式错误: {}", e))?;
+
+    // 检查 params 声明
+    let declared_params = entry.params.iter().cloned().collect::<std::collections::HashSet<_>>();
+    if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
+        let actual_params: std::collections::HashSet<String> = params.keys().cloned().collect();
+        let missing: Vec<_> = declared_params.difference(&actual_params).collect();
+        let extra: Vec<_> = actual_params.difference(&declared_params).collect();
+        if !missing.is_empty() {
+            return Err(format!("模板 JSON 缺少声明的参数: {:?}", missing));
+        }
+        if !extra.is_empty() {
+            return Err(format!("模板 JSON 包含未声明的参数: {:?}", extra));
+        }
+    }
+
+    // 验证含占位符的工作流结构（占位符不影响结构校验，但类型可能变化）
+    // 这里仅验证 JSON 合法性和参数完整性，完整校验用 wf-cli validate
+    let steps = wf.get("steps").and_then(|v| v.as_array())
+        .ok_or_else(|| "模板缺少 steps 数组".to_string())?;
+    println!("✓ 模板校验通过");
+    println!("  名称:     {}", entry.name);
+    println!("  版本:     {}", entry.version);
+    println!("  参数:     {}", entry.params.join(", "));
+    println!("  步骤数:   {}", steps.len());
     Ok(())
 }
