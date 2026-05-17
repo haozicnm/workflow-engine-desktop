@@ -154,7 +154,18 @@ function formatTime(iso: string): string {
 }
 
 function calcDuration(started: string, finished: string | null): string {
-  if (!finished) return '—'
+  if (!finished) {
+    try {
+      const ms = new Date().getTime() - new Date(started).getTime()
+      if (ms < 1000) return `运行中 (${ms}ms)`
+      if (ms < 60000) return `运行中 (${(ms / 1000).toFixed(1)}s)`
+      const m = Math.floor(ms / 60000)
+      const s = Math.round((ms % 60000) / 1000)
+      return `运行中 (${m}m ${s}s)`
+    } catch {
+      return '—'
+    }
+  }
   try {
     const ms = new Date(finished).getTime() - new Date(started).getTime()
     if (ms < 1000) return `${ms}ms`
@@ -251,8 +262,10 @@ const stats = computed(() => {
           expandedId === run.id ? 'border-primary/25' : 'hover:border-foreground/20',
         )"
       >
-        <div
-          class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-secondary"
+        <button
+          class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-secondary w-full text-left"
+          :aria-expanded="expandedId === run.id"
+          :aria-label="expandedId === run.id ? '收起运行详情' : '展开运行详情'"
           @click="toggleExpand(run.id)"
         >
           <div class="shrink-0">
@@ -270,8 +283,7 @@ const stats = computed(() => {
           <div class="shrink-0">
             <span :class="cn('text-sm text-muted-foreground/50 transition-transform inline-block', expandedId === run.id ? 'rotate-90' : '')">▸</span>
           </div>
-        </div>
-
+        </button>
         <div v-if="run.error" class="px-4 py-2 bg-destructive/5 text-destructive text-xs font-mono border-t border-destructive/20">
           ✗ {{ run.error }}
         </div>

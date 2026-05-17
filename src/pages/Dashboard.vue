@@ -166,7 +166,21 @@ defineExpose({ loadList })
   <SidebarContent>
     <SidebarGroup>
       <SidebarGroupLabel label="工作流" />
-      <SidebarMenuItem v-for="wf in filteredWorkflows" :key="wf.id">
+
+      <!-- Loading skeleton -->
+      <div v-if="loading" class="space-y-2 px-2">
+        <div class="h-8 bg-secondary/50 rounded animate-pulse" />
+        <div class="h-8 bg-secondary/50 rounded animate-pulse w-3/4" />
+        <div class="h-8 bg-secondary/50 rounded animate-pulse w-1/2" />
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-muted-foreground">
+        暂无工作流
+      </div>
+
+      <template v-else>
+        <SidebarMenuItem v-for="wf in filteredWorkflows" :key="wf.id">
         <SidebarMenuButton
           :active="selectedId === wf.id"
           :tooltip="wf.name"
@@ -182,6 +196,7 @@ defineExpose({ loadList })
           </span>
         </SidebarMenuButton>
       </SidebarMenuItem>
+      </template>
     </SidebarGroup>
   </SidebarContent>
 

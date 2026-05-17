@@ -216,11 +216,12 @@ provide('globalStatus', globalStatus)
       </Transition>
 
       <Toast
-        v-for="t in toasts"
+        v-for="(t, i) in toasts"
         :key="t.id"
         :message="t.message"
         :type="t.type"
         :duration="t.duration"
+        :index="i"
         @close="remove(t.id)"
       />
 

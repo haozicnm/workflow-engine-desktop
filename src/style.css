@@ -47,8 +47,9 @@
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  /* Objects in Space design principles: larger corner radii for a softer, more modern feel */
+  --radius-lg: 24px;
+  --radius-xl: 24px;
 
   /* 布局常量 */
   --spacing-step-gap: 1rem;          /* 步骤卡片间距 */
@@ -132,6 +133,11 @@
   ::selection {
     background: var(--color-primary);
     color: var(--color-primary-foreground);
+  }
+
+  /* Objects in Space design principles: flat cards without shadows */
+  .bg-card {
+    box-shadow: none;
   }
 }
 

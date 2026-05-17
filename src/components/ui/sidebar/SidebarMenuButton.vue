@@ -15,6 +15,7 @@ const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
 <template>
   <button
     :title="!sidebar?.open.value && tooltip ? tooltip : undefined"
+    :aria-current="props.active ? 'page' : undefined"
     :class="cn(
       'flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm transition-colors cursor-pointer',
       props.active

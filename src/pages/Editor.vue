@@ -17,6 +17,11 @@ import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
 import TabsContent from '../components/ui/tabs/TabsContent.vue'
+import Dialog from '../components/ui/dialog/Dialog.vue'
+import DialogContent from '../components/ui/dialog/DialogContent.vue'
+import DialogTitle from '../components/ui/dialog/DialogTitle.vue'
+import DialogDescription from '../components/ui/dialog/DialogDescription.vue'
+import DialogFooter from '../components/ui/dialog/DialogFooter.vue'
 import type { ContainerType, Step } from '../types/types'
 import { CONTAINER_DEFS, getActionDefs } from '../types/node-registry'
 
@@ -61,6 +66,8 @@ const showAddStep = ref(false)
 const activeView = ref<'visual' | 'code'>('visual')
 const isRecording = ref(false)
 const recordingError = ref('')
+const showDeleteConfirm = ref(false)
+const pendingDelete = ref<{ name: string; id: string }>({ name: '', id: '' })
 
 function getContainerUrl(): string | undefined {
   if (!workflow.value || !selectedStepId.value) return undefined
@@ -204,15 +211,20 @@ async function onExport() {
 async function onDelete() {
   if (!workflow.value) return
   const name = workflow.value.name
-  if (!confirm(`确定删除「${name}」？此操作不可撤销。`)) return
   const id = workflow.value.id
-  if (id) {
-    await store.deleteWorkflow(id)
-  }
+  if (!id) return
+  pendingDelete.value = { name, id }
+  showDeleteConfirm.value = true
+}
+
+async function doDelete() {
+  const { id, name } = pendingDelete.value
+  await store.deleteWorkflow(id)
   store.current = null
   store.dirty = false
   toast.show(`已删除「${name}」`, 'success')
   emit('workflow-deleted')
+  showDeleteConfirm.value = false
 }
 
 async function onRun() {
@@ -591,11 +603,14 @@ onUnmounted(() => {
     </Tabs>
 
     <!-- Log Panel (bottom bar, collapsed by default) -->
-    <div
-      class="border-t border-border bg-background shrink-0 cursor-pointer select-none"
-      @click="enh.logPanelVisible.value = !enh.logPanelVisible.value"
-    >
-      <div class="flex items-center justify-between px-3 py-1.5">
+    <div class="border-t border-border bg-background shrink-0 select-none">
+      <button
+        class="w-full flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-secondary/50 transition-colors"
+        @click="enh.logPanelVisible.value = !enh.logPanelVisible.value"
+        :aria-expanded="enh.logPanelVisible.value"
+        aria-label="切换运行日志面板"
+      >
+        <div>
         <div class="flex items-center gap-2">
           <span class="text-[11px] text-muted-foreground">{{ enh.logPanelVisible.value ? '▼' : '▶' }}</span>
           <span class="text-xs text-foreground">📟 运行日志</span>
@@ -609,6 +624,7 @@ onUnmounted(() => {
           @click.stop="enh.clearLogs()"
         >清空</Button>
       </div>
+      </button>
       <Transition name="collapse">
         <div v-if="enh.logPanelVisible.value" class="max-h-[180px] overflow-y-auto border-t border-border">
           <div v-if="!enh.logs.value.length" class="text-muted-foreground text-xs p-3">
@@ -651,6 +667,20 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Delete confirmation dialog -->
+    <Dialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
+      <DialogContent class="sm:max-w-md">
+        <DialogTitle>删除工作流</DialogTitle>
+        <DialogDescription>
+          确定删除「{{ pendingDelete.name }}」？此操作不可撤销。
+        </DialogDescription>
+        <DialogFooter>
+          <Button variant="ghost" @click="showDeleteConfirm = false">取消</Button>
+          <Button variant="destructive" @click="doDelete">删除</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

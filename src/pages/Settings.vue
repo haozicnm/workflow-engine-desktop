@@ -205,6 +205,7 @@ function downloadSkill() {
               v-for="opt in themeOptions"
               :key="opt.value"
               variant="outline"
+              :aria-pressed="currentTheme === opt.value"
               :class="cn(
                 'flex flex-col items-center gap-2 p-4 h-auto border-2',
                 currentTheme === opt.value
@@ -229,16 +230,22 @@ function downloadSkill() {
 
           <div class="space-y-2 mb-4">
             <Label class="text-xs text-muted-foreground font-semibold">浏览器通道</Label>
-            <div class="flex flex-col gap-2">
-              <label
-                v-for="opt in browserOptions"
+            <div class="flex flex-col gap-2" role="radiogroup" aria-label="浏览器通道">
+              <button
+                v-for="(opt, idx) in browserOptions"
                 :key="opt.value"
+                role="radio"
+                :aria-checked="settings.browser_channel === opt.value"
+                :tabindex="settings.browser_channel === opt.value ? 0 : -1"
                 :class="cn(
-                  'flex items-start gap-2.5 px-3 py-2.5 border rounded-md cursor-pointer transition-colors',
+                  'flex items-start gap-2.5 px-3 py-2.5 border rounded-md cursor-pointer transition-colors text-left',
                   settings.browser_channel === opt.value
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary',
                 )"
+                @click="settings.browser_channel = opt.value"
+                @keydown.up.prevent="browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value !== opt.value && (settings.browser_channel = browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value)"
+                @keydown.down.prevent="browserOptions[(idx + 1) % browserOptions.length].value !== opt.value && (settings.browser_channel = browserOptions[(idx + 1) % browserOptions.length].value)"
               >
                 <div :class="cn('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0', settings.browser_channel === opt.value ? 'border-primary bg-primary' : 'border-muted-foreground/40')">
                   <div v-if="settings.browser_channel === opt.value" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
@@ -247,7 +254,7 @@ function downloadSkill() {
                   <span class="text-sm text-foreground font-semibold">{{ opt.label }}</span>
                   <span class="text-[11px] text-muted-foreground">{{ opt.desc }}</span>
                 </div>
-              </label>
+              </button>
             </div>
           </div>
 
