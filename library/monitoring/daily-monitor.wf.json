@@ -1,0 +1,178 @@
+{
+  "name": "每日全栈舆情监控",
+  "description": "HTTP API 数据采集 → 浏览器截图 → Excel 报表 → Word 日报 → 飞书通知。参数化版本。",
+  "params": {
+    "hn_api": "https://hacker-news.firebaseio.com/v0/topstories.json",
+    "github_api": "https://api.github.com/repos/torvalds/linux/commits?per_page=5",
+    "output_dir": "/tmp/wf-monitor-output"
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "shell",
+      "label": "环境检查",
+      "config": {
+        "command": "mkdir -p {{params.output_dir}}/{data,reports} && echo \"ready\"",
+        "shell": "bash",
+        "timeout_secs": 10
+      }
+    },
+    {
+      "id": "step_2",
+      "type": "http",
+      "label": "抓取HackerNews API",
+      "config": {
+        "method": "GET",
+        "url": "{{params.hn_api}}",
+        "headers": "{}",
+        "body": null
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "http",
+      "label": "抓取GitHub Trending",
+      "config": {
+        "method": "GET",
+        "url": "{{params.github_api}}",
+        "headers": "{\"Accept\":\"application/vnd.github.v3+json\"}",
+        "body": null
+      }
+    },
+    {
+      "id": "step_4",
+      "type": "logic",
+      "label": "检查API响应",
+      "config": {
+        "conditionGroup": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "left": "{{step_2.result.status}}",
+              "op": "equals",
+              "right": "200"
+            },
+            {
+              "id": "c2",
+              "left": "{{step_3.result.status}}",
+              "op": "equals",
+              "right": "200"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "step_5",
+      "type": "browser",
+      "label": "截图HackerNews首页",
+      "config": {
+        "browser": "chromium",
+        "headless": true,
+        "timeout": 30
+      },
+      "actions": [
+        {
+          "id": "action_5_1",
+          "type": "navigate",
+          "label": "打开HN",
+          "params": {
+            "url": "https://news.ycombinator.com",
+            "wait_until": "networkidle"
+          }
+        },
+        {
+          "id": "action_5_2",
+          "type": "screenshot",
+          "label": "截图保存",
+          "params": {
+            "path": "{{params.output_dir}}/reports/hn-screenshot.png",
+            "full_page": true
+          }
+        }
+      ],
+      "runCondition": {
+        "ref": "step_4",
+        "when": "true"
+      }
+    },
+    {
+      "id": "step_6",
+      "type": "delay",
+      "label": "API限速等待",
+      "config": {
+        "duration_ms": 2000
+      }
+    },
+    {
+      "id": "step_7",
+      "type": "loop",
+      "label": "处理新闻源列表",
+      "config": {
+        "items": "[{\"name\":\"HackerNews\",\"data\":\"{{step_2.result}}\"},{\"name\":\"GitHub\",\"data\":\"{{step_3.result}}\"}]"
+      },
+      "actions": [
+        {
+          "id": "action_7_1",
+          "type": "data_set",
+          "label": "提取源名称",
+          "params": {
+            "key": "current_source",
+            "value": "{{loop.current.name}}"
+          }
+        },
+        {
+          "id": "action_7_2",
+          "type": "print",
+          "label": "记录处理进度",
+          "params": {
+            "message": "处理中: {{loop.current.name}} ({{loop.index}}/{{loop.total}})"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_8",
+      "type": "file",
+      "label": "保存原始数据",
+      "config": {},
+      "actions": [
+        {
+          "id": "action_8_1",
+          "type": "write",
+          "label": "保存HN数据",
+          "params": {
+            "path": "{{params.output_dir}}/data/hn-raw.json",
+            "content": "{{step_2.result.body}}"
+          }
+        },
+        {
+          "id": "action_8_2",
+          "type": "write",
+          "label": "保存GitHub数据",
+          "params": {
+            "path": "{{params.output_dir}}/data/gh-raw.json",
+            "content": "{{step_3.result.body}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_11",
+      "type": "delay",
+      "label": "等待",
+      "config": { "duration_ms": 500 }
+    },
+    {
+      "id": "step_12",
+      "type": "notify",
+      "label": "完成通知",
+      "config": {
+        "notify_type": "system",
+        "title": "舆情监控完成",
+        "body": "数据已保存至 {{params.output_dir}}"
+      }
+    }
+  ]
+}

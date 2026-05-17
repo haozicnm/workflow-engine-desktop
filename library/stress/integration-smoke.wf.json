@@ -1,0 +1,159 @@
+{
+  "name": "嵌套容错链压力测试",
+  "description": "runCondition 分叉 + retry 重试 + loop 内嵌多类型节点 + 跨步骤变量引用。冒烟参数化版本。",
+  "params": {
+    "test_dir": "/tmp/wf-stress-test",
+    "items_list": ["alpha", "beta", "gamma"],
+    "delay_ms": 300
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "shell",
+      "label": "创建测试目录",
+      "config": {
+        "command": "mkdir -p {{params.test_dir}}/{input,output,logs} && echo \"dirs_created\"",
+        "shell": "bash",
+        "timeout_secs": 10
+      }
+    },
+    {
+      "id": "step_2",
+      "type": "file",
+      "label": "准备测试数据",
+      "config": {},
+      "actions": [
+        {
+          "id": "action_2_1",
+          "type": "write",
+          "label": "写入input1",
+          "params": {
+            "path": "{{params.test_dir}}/input/data1.txt",
+            "content": "hello world from step_2"
+          }
+        },
+        {
+          "id": "action_2_2",
+          "type": "write",
+          "label": "写入input2",
+          "params": {
+            "path": "{{params.test_dir}}/input/data2.txt",
+            "content": "second file content"
+          }
+        },
+        {
+          "id": "action_2_3",
+          "type": "exists",
+          "label": "验证文件存在",
+          "params": {
+            "path": "{{params.test_dir}}/input/data1.txt"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_3",
+      "type": "logic",
+      "label": "文件是否就绪",
+      "config": {
+        "conditionGroup": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "left": "{{step_2.action_2_3.result}}",
+              "op": "equals",
+              "right": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "step_6",
+      "type": "http",
+      "label": "HTTP测试",
+      "config": {
+        "method": "GET",
+        "url": "https://httpbin.org/get?source=wf-stress",
+        "headers": "{}",
+        "body": null
+      },
+      "runCondition": {
+        "ref": "step_3",
+        "when": "true"
+      },
+      "retry": {
+        "max": 1,
+        "delay_ms": 1000
+      }
+    },
+    {
+      "id": "step_7",
+      "type": "loop",
+      "label": "批量POST测试",
+      "config": {
+        "items": "[\"alpha\", \"beta\", \"gamma\"]"
+      },
+      "actions": [
+        {
+          "id": "action_7_1",
+          "type": "http",
+          "label": "POST item",
+          "params": {
+            "method": "POST",
+            "url": "https://httpbin.org/post",
+            "headers": "{\"Content-Type\": \"application/json\"}",
+            "body": "{\"item\": \"{{loop.current}}\", \"batch\": \"stress-test\"}"
+          }
+        },
+        {
+          "id": "action_7_2",
+          "type": "delay",
+          "label": "等待",
+          "params": {
+            "duration_ms": "{{params.delay_ms}}"
+          }
+        },
+        {
+          "id": "action_7_3",
+          "type": "script",
+          "label": "记录进度",
+          "params": {
+            "script": "#{item: __item, index: __index}"
+          }
+        },
+        {
+          "id": "action_7_4",
+          "type": "notify",
+          "label": "进度通知",
+          "params": {
+            "notify_type": "system",
+            "title": "Loop进度",
+            "body": "{{action_7_3.result.processed}} ({{loop.index}}/{{loop.total}})"
+          }
+        }
+      ],
+      "onError": "ignore"
+    },
+    {
+      "id": "step_11",
+      "type": "delay",
+      "label": "最终等待",
+      "config": {
+        "duration_ms": 500
+      }
+    },
+    {
+      "id": "step_12",
+      "type": "notify",
+      "label": "完成通知",
+      "config": {
+        "notify_type": "system",
+        "title": "压力测试完成",
+        "body": "状态: {{step_7.result.status}}"
+      },
+      "onError": "ignore"
+    }
+  ]
+}

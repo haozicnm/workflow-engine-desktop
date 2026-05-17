@@ -1,0 +1,138 @@
+{
+  "name": "文件批量处理+审批流水线",
+  "description": "扫描目录 → 逐文件处理 → 数据校验 → 人工审批 → 归档。参数化版本。",
+  "params": {
+    "data_dir": "/tmp/wf-test-data",
+    "file_pattern": "*.csv",
+    "approval_timeout_ms": 60000
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "file",
+      "label": "扫描CSV文件",
+      "config": {},
+      "actions": [
+        {
+          "id": "action_1_1",
+          "type": "list",
+          "label": "列出CSV",
+          "params": {
+            "path": "{{params.data_dir}}"
+          }
+        },
+        {
+          "id": "action_1_2",
+          "type": "glob",
+          "label": "匹配模板",
+          "params": {
+            "pattern": "{{params.file_pattern}}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_2",
+      "type": "logic",
+      "label": "检查是否有CSV",
+      "config": {
+        "conditionGroup": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "left": "{{step_1.action_1_2.result}}",
+              "op": "not_empty",
+              "right": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "cursor",
+      "label": "逐个处理CSV",
+      "config": {
+        "items": "{{step_1.action_1_2.result}}"
+      },
+      "actions": [
+        {
+          "id": "action_3_1",
+          "type": "excel",
+          "label": "读取CSV",
+          "params": {
+            "file_path": "{{cursor.current}}",
+            "actions": [
+              {
+                "id": "read_1",
+                "type": "read",
+                "label": "读取数据",
+                "params": { "path": "{{cursor.current}}" }
+              }
+            ]
+          }
+        },
+        {
+          "id": "action_3_2",
+          "type": "logic",
+          "label": "数据质量校验",
+          "params": {
+            "conditionGroup": {
+              "combinator": "and",
+              "conditions": [
+                {
+                  "id": "qc1",
+                  "left": "{{action_3_1.result}}",
+                  "op": "not_empty",
+                  "right": ""
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "runCondition": {
+        "ref": "step_2",
+        "when": "true"
+      }
+    },
+    {
+      "id": "step_8",
+      "type": "approval",
+      "label": "人工审批",
+      "config": {
+        "message": "文件批量处理完成，请审批通过",
+        "options": ["approve", "reject"],
+        "timeout_ms": "{{params.approval_timeout_ms}}"
+      }
+    },
+    {
+      "id": "step_9",
+      "type": "file",
+      "label": "归档文件",
+      "config": {},
+      "actions": [
+        {
+          "id": "action_9_1",
+          "type": "move",
+          "label": "移入归档",
+          "params": {
+            "from": "{{params.data_dir}}/*.csv",
+            "to": "{{params.data_dir}}/archive/"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_12",
+      "type": "shell",
+      "label": "生成处理报告",
+      "config": {
+        "command": "echo \"处理完成\" && ls -la {{params.data_dir}}/archive/ 2>/dev/null | wc -l",
+        "shell": "bash",
+        "timeout_secs": 10
+      }
+    }
+  ]
+}

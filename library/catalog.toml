@@ -1,0 +1,29 @@
+# 工作流模板库 — 索引
+# 每个模板是一个独立的 .wf.json 文件
+
+[[templates]]
+name = "daily-monitor"
+version = "1.0.0"
+description = "每日全栈舆情监控 — HTTP API 数据采集 + Excel 报表 + 通知"
+params = ["source", "hn_api", "github_api", "output_dir"]
+schedule = "0 0 9 * * * *"   # 每天 9:00
+category = "monitoring"
+file = "monitoring/daily-monitor.wf.json"
+
+[[templates]]
+name = "file-batch-approval"
+version = "1.0.0"
+description = "批量文件处理 + 人工审批流水线"
+params = ["data_dir", "file_pattern", "approval_timeout_ms"]
+schedule = ""                 # 手动触发
+category = "batch"
+file = "batch/file-batch-approval.wf.json"
+
+[[templates]]
+name = "integration-smoke"
+version = "1.0.0"
+description = "嵌套容错链冒烟测试 — runCondition + retry + loop + 变量引用全链路"
+params = ["test_dir", "items_list", "delay_ms"]
+schedule = ""                 # 手动触发
+category = "stress"
+file = "stress/integration-smoke.wf.json"
