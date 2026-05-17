@@ -43,7 +43,7 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
     // 转换每个步骤
     let mut converted_steps = Vec::new();
     for step in &wf.steps {
-        converted_steps.push(convert_step(step)?);
+        converted_steps.push(convert_step(step, false)?);
     }
     wf.steps = converted_steps;
 
@@ -113,71 +113,89 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
 
 /// 转换单个步骤：容器类型加 _container，actions 移入 config
 /// 迭代类型（cursor/loop）：actions 转为 body_steps
-fn convert_step(step: &Step) -> Result<Step> {
+///
+/// `is_recursive`: true 表示这是 body step 的递归调用。
+///   此时容器类型仅改 type 名（加 _container 后缀），
+///   不再重复移动 actions（config 中已有）。
+fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
     let is_container = CONTAINER_TYPES.contains(&step.step_type.as_str());
     let is_iteration = ITERATION_TYPES.contains(&step.step_type.as_str());
 
     let (new_type, new_config) = if is_container {
-        // 容器类型：加 _container 后缀，把 actions 移入 config
         let container_type = format!("{}_container", step.step_type);
 
-        let actions = step.actions.clone().unwrap_or_default();
-        let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
-
-        let mut config = if step.config.is_object() {
-            step.config.clone()
+        if is_recursive {
+            // 递归调用：config 中已有 actions，只改类型名
+            (container_type, step.config.clone())
         } else {
-            serde_json::json!({})
-        };
+            // 顶层调用：actions 从顶层移入 config
+            let actions = step.actions.clone().unwrap_or_default();
+            let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
 
-        // 把 actions 放入 config
-        if let Value::Object(ref mut map) = config {
-            map.insert("actions".to_string(), Value::Array(converted_actions));
+            let mut config = if step.config.is_object() {
+                step.config.clone()
+            } else {
+                serde_json::json!({})
+            };
+
+            if let Value::Object(ref mut map) = config {
+                map.insert("actions".to_string(), Value::Array(converted_actions));
+            }
+
+            // logic 容器：把 condition 和 conditionGroup 放入 config
+            if step.step_type == "logic" {
+                if let Some(cg_json) = step.config.get("conditionGroup") {
+                    if let Value::Object(ref mut map) = config {
+                        map.entry("condition_group".to_string())
+                            .or_insert_with(|| cg_json.clone());
+                    }
+                }
+                if let Some(ref cond) = step.condition {
+                    if let Value::Object(ref mut map) = config {
+                        map.insert("condition".to_string(), Value::String(cond.clone()));
+                    }
+                }
+                if let Some(ref cg) = step.condition_group {
+                    if let Value::Object(ref mut map) = config {
+                        map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
+                    }
+                }
+            }
+
+            (container_type, config)
         }
-
-        // logic 容器：把 condition 和 conditionGroup 放入 config
-        if step.step_type == "logic" {
-            // 如果 conditionGroup 在 config 里（前端格式），用 snake_case 复制一份
-            if let Some(cg_json) = step.config.get("conditionGroup") {
-                if let Value::Object(ref mut map) = config {
-                    map.entry("condition_group".to_string())
-                        .or_insert_with(|| cg_json.clone());
-                }
-            }
-            if let Some(ref cond) = step.condition {
-                if let Value::Object(ref mut map) = config {
-                    map.insert("condition".to_string(), Value::String(cond.clone()));
-                }
-            }
-            if let Some(ref cg) = step.condition_group {
-                if let Value::Object(ref mut map) = config {
-                    map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
-                }
-            }
-        }
-
-        (container_type, config)
     } else {
         // 非容器步骤：保持原样
         (step.step_type.clone(), step.config.clone())
     };
 
-    // 迭代类型：把 actions 转为 body_steps
+    // 迭代类型：把 actions 转为 body_steps，并递归转换容器类型
     let body_steps = if is_iteration {
         let actions = step.actions.clone().unwrap_or_default();
-        if actions.is_empty() {
+        let raw_steps: Vec<Step> = if actions.is_empty() {
             // 没有 actions，保留原有 body_steps（可能来自手动 JSON 编辑的 config.body）
-            step.body_steps.clone()
+            step.body_steps.clone().unwrap_or_default()
         } else {
             // 把前端的 Action 对象转为 Step 对象
-            let converted: Vec<Step> = actions
+            actions
                 .iter()
                 .map(|a| convert_action_to_step(a))
-                .collect::<Result<Vec<_>>>()?;
-            Some(converted)
-        }
+                .collect::<Result<Vec<_>>>()?
+        };
+        // 递归转换每个子步骤：body 内如果有容器类型（browser/excel/word/file/logic），
+        // 需要加 _container 后缀，否则 executor 找不到 handler
+        let converted: Vec<Step> = raw_steps
+            .into_iter()
+            .map(|s| convert_step(&s, true))
+            .collect::<Result<Vec<_>>>()?;
+        Some(converted)
     } else {
-        step.body_steps.clone()
+        // 非迭代类型也可能有 body_steps（如 sub_workflow），同样递归转换
+        step.body_steps.as_ref().map(|steps| {
+            steps.iter()
+                    .map(|s| convert_step(s, true))
+                .collect::<Result<Vec<_>>>()
+        }).transpose()?
     };
 
 
@@ -418,5 +436,34 @@ mod tests {
         ];
         let err = validate_step_references(&steps).unwrap_err();
         assert!(err.to_string().contains("死循环"));
+    }
+
+    #[test]
+    fn recursive_container_conversion_in_loop_body() {
+        // loop 体内有 browser 容器 → body step type 应变为 browser_container
+        let json = r#"{
+            "name": "test",
+            "steps": [{
+                "id": "step_1",
+                "type": "loop",
+                "label": "loop",
+                "config": {"items": "[\"a\"]"},
+                "actions": [{
+                    "id": "a1",
+                    "type": "browser",
+                    "label": "browse",
+                    "params": {"browser": "chromium", "actions": []}
+                }]
+            }]
+        }"#;
+        let wf = parse_workflow(json).unwrap();
+        let loop_step = &wf.steps[0];
+        assert_eq!(loop_step.step_type, "loop");
+        let body = loop_step.body_steps.as_ref().unwrap();
+        assert_eq!(body.len(), 1);
+        // 关键断言：body 内的 browser 类型应被递归转换为 browser_container
+        assert_eq!(body[0].step_type, "browser_container");
+        // config 中的 actions 应保留
+        assert!(body[0].config.get("actions").is_some());
     }
 }
