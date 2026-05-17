@@ -241,7 +241,13 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
         actions: None, // 已移入 config 或 body_steps
         expanded: None,
         condition: step.condition.clone(),
-        condition_group: step.condition_group.clone(),
+        condition_group: step.condition_group.clone().or_else(|| {
+            // 如果 JSON 的 condition_group 在 config 内而非 step 顶层，
+            // 自动提升到 step 级别，避免 executor 的 resolve_config 改变类型后反序列化失败
+            step.config.get("condition_group")
+                .or_else(|| step.config.get("conditionGroup"))
+                .and_then(|cg| serde_json::from_value(cg.clone()).ok())
+        }),
         run_condition: step.run_condition.clone(),
     })
 }
