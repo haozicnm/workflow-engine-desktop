@@ -16,6 +16,7 @@ import {
   FolderOpen, File, List, Grid3x3, Table, Type, Hash, ToggleLeft,
   Workflow, Boxes, Eye, EyeOff, Lock, Unlock, Info, AlertTriangle,
   HelpCircle, ExternalLink, Copy, Clipboard, FolderPlus,
+  FilePlus, FileUp, MoveRight, FolderTree, ScanSearch,
   Sun, Moon, Monitor, XCircle, Loader,
   Circle, Merge, CircleStop, CircleAlert, ArrowRightLeft,
   Terminal,
@@ -110,6 +111,11 @@ withDefaults(defineProps<{
   <Copy v-else-if="name === 'Copy'" :class="cls" />
   <Clipboard v-else-if="name === 'Clipboard'" :class="cls" />
   <FolderPlus v-else-if="name === 'FolderPlus'" :class="cls" />
+  <FilePlus v-else-if="name === 'FilePlus'" :class="cls" />
+  <FileUp v-else-if="name === 'FileUp'" :class="cls" />
+  <MoveRight v-else-if="name === 'MoveRight'" :class="cls" />
+  <FolderTree v-else-if="name === 'FolderTree'" :class="cls" />
+  <ScanSearch v-else-if="name === 'ScanSearch'" :class="cls" />
   <Sun v-else-if="name === 'Sun'" :class="cls" />
   <Moon v-else-if="name === 'Moon'" :class="cls" />
   <Monitor v-else-if="name === 'Monitor'" :class="cls" />
