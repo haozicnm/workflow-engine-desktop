@@ -21,8 +21,17 @@ pub struct StepExecutor {
 }
 
 macro_rules! register {
-    ($map:expr, $key:literal, $ctor:expr) => {
+    ($map:expr, $key:expr, $ctor:expr) => {
         $map.insert($key.to_string(), Box::new($ctor));
+    };
+}
+
+/// 容器节点注册宏 — 自动加 _container 后缀，与 parser::CONTAINER_TYPES 保持同步
+macro_rules! register_containers {
+    ($map:expr, $( $type:literal => $ctor:expr ),* $(,)?) => {
+        $(
+            $map.insert(concat!($type, "_container").to_string(), Box::new($ctor));
+        )*
     };
 }
 
@@ -75,13 +84,14 @@ impl StepExecutor {
         register!(executors, "json_parse", crate::nodes::json_parse::JsonParseNode);
         register!(executors, "text_template", crate::nodes::text_template::TextTemplateNode);
 
-        // ── P2 文件节点 ──
-        register!(executors, "excel_container", crate::nodes::excel_container::ExcelContainerNode);
-                                                                register!(executors, "word_container", crate::nodes::word_container::WordContainerNode);
-                                        
-        // ── 浏览器节点 ──
-        register!(executors, "browser_container", crate::nodes::browser_container::BrowserContainerNode);
-                                                                                                        register!(executors, "logic_container", crate::nodes::condition::ConditionNode);
+        // ── 容器节点（由 register_containers! 统一注册，与 parser::CONTAINER_TYPES 对应）──
+        register_containers!(executors,
+            "browser" => crate::nodes::browser_container::BrowserContainerNode,
+            "excel"   => crate::nodes::excel_container::ExcelContainerNode,
+            "word"    => crate::nodes::word_container::WordContainerNode,
+            "logic"   => crate::nodes::condition::ConditionNode,
+            "file"    => crate::nodes::file_container::FileContainerNode,
+        );
         register!(executors, "condition", crate::nodes::condition::ConditionNode);
 
         // ── 其他节点 ──
@@ -101,7 +111,6 @@ impl StepExecutor {
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
-        register!(executors, "file_container", crate::nodes::file_container::FileContainerNode);
 
         for type_name in executors.keys() {
             debug!("节点注册: {}", type_name);
@@ -129,9 +138,6 @@ impl StepExecutor {
         };
 
         let resolved_config = ctx.resolve_config(&step.config);
-        // NOTE: Step clone necessary because execute() needs owned Step with resolved config.
-        // After parser conversion, most Option fields (actions, condition_group, etc.) are None,
-        // so actual clone cost is minimal (id/name/step_type strings + config value).
         let resolved_step = Step {
             id: step.id.clone(),
             name: step.name.clone(),
@@ -155,5 +161,43 @@ impl StepExecutor {
         Box::pin(async move {
             executor.execute(&resolved_step, ctx, self).await
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::parser;
+
+    #[test]
+    fn container_types_match_registrations() {
+        let mut executors: HashMap<String, Box<dyn NodeExecutor>> = HashMap::new();
+        register_containers!(executors,
+            "browser" => crate::nodes::browser_container::BrowserContainerNode,
+            "excel"   => crate::nodes::excel_container::ExcelContainerNode,
+            "word"    => crate::nodes::word_container::WordContainerNode,
+            "logic"   => crate::nodes::condition::ConditionNode,
+            "file"    => crate::nodes::file_container::FileContainerNode,
+        );
+
+        for &container_type in parser::CONTAINER_TYPES {
+            let expected_name = format!("{}_container", container_type);
+            assert!(
+                executors.contains_key(&expected_name),
+                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}' —— 请在 register_containers! 中添加",
+                container_type, expected_name
+            );
+        }
+
+        // 反向检查：所有注册的容器都必须在 parser 中声明
+        let registered_types: Vec<String> = executors.keys().cloned().collect();
+        for name in &registered_types {
+            let base = name.trim_end_matches("_container");
+            assert!(
+                parser::CONTAINER_TYPES.contains(&base),
+                "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明 —— 请在 parser 中添加 '{}'",
+                name, base
+            );
+        }
     }
 }

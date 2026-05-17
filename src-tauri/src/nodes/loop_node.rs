@@ -12,33 +12,6 @@ use serde_json::{Value, json};
 #[derive(Default)]
 pub struct LoopNode;
 
-/// 解析循环 items：支持直接数组、JSON 编码字符串、字符串引用（`output.xxx` 或变量名）
-fn resolve_items(items_value: &Value, ctx: &ExecutionContext) -> Result<Vec<Value>> {
-    if let Some(arr) = items_value.as_array() {
-        return Ok(arr.clone());
-    }
-    if let Some(s) = items_value.as_str() {
-        // 尝试将 JSON 字符串解析为数组（如 "[\"alpha\",\"beta\"]"）
-        if let Ok(parsed) = serde_json::from_str::<Value>(s) {
-            if let Some(arr) = parsed.as_array() {
-                return Ok(arr.clone());
-            }
-        }
-        if let Some(key) = s.strip_prefix("output.") {
-            return ctx.get_output(key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .ok_or_else(|| anyhow!("循环 items 引用 '{}' 无法解析为数组", s));
-        }
-        return ctx.get_output(s)
-            .and_then(|v| v.as_array())
-            .cloned()
-            .or_else(|| ctx.variables.get(s).and_then(|v| v.as_array()).cloned())
-            .ok_or_else(|| anyhow!("循环 items '{}' 不是数组", s));
-    }
-    Err(anyhow!("循环 items 必须是数组或引用"))
-}
-
 /// 解析 YAML body 为 Vec<Step>：优先 step.body_steps（编辑器 UI），回退 config.body（手写 JSON）
 fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
     if let Some(ref body) = step.body_steps {
@@ -65,7 +38,7 @@ impl NodeExecutor for LoopNode {
     ) -> Result<Value> {
         let items_value = step.config.get("items")
             .ok_or_else(|| anyhow!("循环节点缺少 items 参数"))?;
-        let items = resolve_items(items_value, ctx)?;
+        let items = crate::engine::common::resolve_iteration_items(items_value, ctx, "循环")?;
         let body_steps = parse_body_steps(step)?;
 
         // 逐轮执行

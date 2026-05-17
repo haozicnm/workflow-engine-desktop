@@ -16,8 +16,9 @@ use crate::engine::workflow::{Step, Workflow};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
-// 容器类型列表
-const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic", "file"];
+// 容器类型列表 — 新增容器类型时只需改这一处
+// executor.rs 的注册宏依赖此列表，通过编译期测试保证一致性
+pub const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic", "file"];
 // 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
 const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 

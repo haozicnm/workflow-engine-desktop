@@ -51,34 +51,7 @@ fn cursor_path(step_id: &str) -> PathBuf {
     home.join(".workflow-engine").join("cursors").join(format!("{}.json", step_id))
 }
 
-/// 解析 items
-fn resolve_items(items_value: &Value, ctx: &ExecutionContext) -> Result<Vec<Value>> {
-    if let Some(arr) = items_value.as_array() {
-        return Ok(arr.clone());
-    }
-    if let Some(s) = items_value.as_str() {
-        // 尝试将 JSON 字符串解析为数组
-        if let Ok(parsed) = serde_json::from_str::<Value>(s) {
-            if let Some(arr) = parsed.as_array() {
-                return Ok(arr.clone());
-            }
-        }
-        if let Some(key) = s.strip_prefix("output.") {
-            return ctx.get_output(key)
-                .and_then(|v| v.as_array())
-                .cloned()
-                .ok_or_else(|| anyhow!("cursor: items 引用 '{}' 无法解析为数组", s));
-        }
-        return ctx.get_output(s)
-            .and_then(|v| v.as_array())
-            .cloned()
-            .or_else(|| ctx.variables.get(s).and_then(|v| v.as_array()).cloned())
-            .ok_or_else(|| anyhow!("cursor: items '{}' 不是数组", s));
-    }
-    Err(anyhow!("cursor: items 必须是数组或引用"))
-}
-
-/// 解析 body 步骤：优先从 step.body_steps（编辑器 UI 设置），回退到 config.body（手动编辑）
+/// 读取游标状态
 fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
     // 优先 body_steps
     if let Some(ref body) = step.body_steps {
@@ -130,7 +103,7 @@ impl NodeExecutor for CursorNode {
     ) -> Result<Value> {
         let items_value = step.config.get("items")
             .ok_or_else(|| anyhow!("cursor 节点缺少 items 参数"))?;
-        let items = resolve_items(items_value, ctx)?;
+        let items = crate::engine::common::resolve_iteration_items(items_value, ctx, "cursor")?;
         let body_steps = parse_body_steps(step)?;
         let total = items.len();
         let items_hash = hash_items(&items);
