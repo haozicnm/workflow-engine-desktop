@@ -105,13 +105,29 @@ async fn execute_actions(
 ) -> Result<ContainerResult> {
     let mut output_ports: HashMap<String, Value> = HashMap::new();
 
+    // ── 确保浏览器已启动（首次或侧车重启后需要 launch）──
+    // BrowserSidecar::start() 只启动侧车进程，不发送 launch 命令
+    // launch 幂等，再次调用返回"浏览器已在运行"
+    match crate::nodes::browser::send_sidecar_action(
+        "launch",
+        &serde_json::json!({
+            "headless": config.headless,
+            "browser": config.browser,
+        }),
+    )
+    .await
+    {
+        Ok(_) => tracing::debug!("浏览器已就绪"),
+        Err(e) => return Err(anyhow!("浏览器启动失败: {}", e)),
+    }
+
     // ── 清理上一容器遗留的状态（dialog、多余 tab）──
     // 多个 browser 容器共享同一个 sidecar 进程，此处在每次执行前重置
     match crate::nodes::browser::send_sidecar_action(
         "reset_state", &serde_json::json!({})
     ).await {
         Ok(_) => tracing::debug!("浏览器状态已重置"),
-        Err(e) => tracing::warn!("浏览器重置失败（非致命，sidecar 可能未启动）: {}", e),
+        Err(e) => tracing::warn!("浏览器重置失败（非致命）: {}", e),
     }
 
     // NOTE: 当前使用 match 分发 31 个 action，模式清晰但文件较长。
