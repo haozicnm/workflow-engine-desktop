@@ -109,6 +109,9 @@ async def handle_action(action: str, params: dict) -> dict:
 
     try:
         match action:
+            # 健康检查
+            case "ping":
+                return {"success": True, "data": {"message": "pong"}}
             # 基础动作
             case "launch":
                 return await _launch(params)
