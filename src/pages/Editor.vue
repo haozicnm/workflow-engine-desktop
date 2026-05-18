@@ -139,8 +139,8 @@ const configStep = computed<Step | null>(() => {
 const translatedContainerDefs = computed(() =>
   CONTAINER_DEFS.map(d => ({
     ...d,
-    label: t(`nodeLabel.${d.type}`, d.label) as string,
-    description: t(`nodeDesc.${d.type}`, d.description) as string,
+    label: t(`nodeLabel.${d.type}`, d.label),
+    description: t(`nodeDesc.${d.type}`, d.description),
   }))
 )
 

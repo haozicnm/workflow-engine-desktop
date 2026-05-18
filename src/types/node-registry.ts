@@ -8,7 +8,7 @@ import type {
 import { uid, nextStepId, nextActionId } from './types'
 
 /** i18n 翻译函数类型 */
-type TFn = (key: string, params?: Record<string, unknown>) => string
+type TFn = (key: string, defaultMsg?: string) => string
 
 // ─── 容器定义 ───
 
@@ -118,8 +118,8 @@ export function getContainerDef(type: string, t?: TFn): ContainerDef {
   if (!t) return def
   return {
     ...def,
-    label: t(`nodeLabel.${type}`, { defaultValue: def.label }) || def.label,
-    description: t(`nodeDesc.${type}`, { defaultValue: def.description }) || def.description,
+    label: t(`nodeLabel.${type}`, def.label),
+    description: t(`nodeDesc.${type}`, def.description),
   }
 }
 
@@ -456,7 +456,7 @@ export function getActionDefs(containerType: ContainerType, t?: TFn): ActionDef[
     default: return []
   }})()
   if (!t) return defs
-  return defs.map(d => ({ ...d, label: t(`actionLabel.${d.type}`, { defaultValue: d.label }) || d.label }))
+  return defs.map(d => ({ ...d, label: t(`actionLabel.${d.type}`, d.label) }))
 }
 
 export function getActionDef(containerType: ContainerType, actionType: string, t?: TFn): ActionDef | undefined {

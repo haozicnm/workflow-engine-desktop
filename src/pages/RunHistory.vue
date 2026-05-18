@@ -89,7 +89,7 @@ async function loadRuns() {
     })
     runs.value = Array.isArray(result) ? result : []
   } catch (e: any) {
-    toast.error(t('history.loadFailed', { defaultValue: 'Failed to load history' }) + ': ' + (e.message || e))
+    toast.error(t('history.loadFailed') + ': ' + (e.message || e))
   } finally {
     loading.value = false
   }
@@ -109,7 +109,7 @@ async function toggleExpand(runId: string) {
       const detail = await safeInvoke<RunDetail>('run_detail', { runId })
       if (detail) detailCache.value[runId] = detail
     } catch (e: any) {
-      toast.error(t('history.loadDetailFailed', { defaultValue: 'Failed to load detail' }) + ': ' + (e.message || e))
+      toast.error(t('history.loadDetailFailed') + ': ' + (e.message || e))
     } finally {
       loadingDetail.value = null
     }
@@ -121,7 +121,7 @@ async function loadLogs(runId: string) {
   try {
     logCache.value[runId] = await safeInvoke<StepLogEntry[]>('run_step_logs', { runId }) || []
   } catch (e: any) {
-    toast.error(t('history.loadLogsFailed', { defaultValue: 'Failed to load logs' }) + ': ' + (e.message || e))
+    toast.error(t('history.loadLogsFailed') + ': ' + (e.message || e))
     logCache.value[runId] = []
   }
 }
