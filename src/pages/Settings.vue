@@ -299,7 +299,7 @@ function downloadSkill() {
           <div class="space-y-4">
             <div class="space-y-1.5">
               <Label class="text-xs text-muted-foreground font-semibold">Python Path (Optional)</Label>
-              <Input v-model="settings.python_path" placeholder="Leave empty for auto-detect" class="h-8 text-xs" />
+              <Input v-model="settings.python_path" :placeholder="t('settingsPage.pythonPathPlaceholder')" class="h-8 text-xs" />
               <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.pythonPathHint') }}</p>
             </div>
 

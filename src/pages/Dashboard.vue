@@ -64,8 +64,8 @@ onMounted(async () => {
   try {
     unlistenRunUpdate = await safeListen('run-update', (event: { payload: { status: string; error?: string } }) => {
       const { status, error } = event.payload
-      if (status === 'completed') toast.success('工作流执行完成')
-      else if (status === 'failed') toast.error('工作流执行失败: ' + (error || '未知错误'))
+      if (status === 'completed') toast.success(t('dashboard.workflowCompleted'))
+      else if (status === 'failed') toast.error(t('dashboard.workflowFailed') + ': ' + (error || t('dashboard.unknownError')))
     })
     unlistenWorkflowChanged = await safeListen('workflow-changed', () => {
       loadList()
@@ -87,7 +87,7 @@ async function loadList() {
   try {
     workflows.value = await safeInvoke<WorkflowItem[]>('workflow_list') || []
   } catch (e: unknown) {
-    toast.error('获取工作流列表失败: ' + ((e as Error).message || e))
+    toast.error(t('dashboard.listFailed') + ': ' + ((e as Error).message || e))
   } finally { loading.value = false }
 }
 
@@ -112,13 +112,13 @@ async function onImportFile() {
     }
     input.click()
   } catch (e: unknown) {
-    toast.error('导入失败: ' + ((e as Error).message || e))
+    toast.error(t('dashboard.importFailed') + ': ' + ((e as Error).message || e))
   }
 }
 
 async function importFromContent(content: string) {
   try {
-    let name = '导入的工作流'
+    let name = t('dashboard.importedWorkflow')
     try {
       const parsed = JSON.parse(content)
       if (parsed.name) name = parsed.name
@@ -129,25 +129,25 @@ async function importFromContent(content: string) {
           const id = await safeInvoke<string>('workflow_create', { name: result.name || name, description: '' })
           if (id) {
             await safeInvoke('workflow_save_yaml', { id, yaml: content })
-            toast.success(`已导入「${result.name}」（${result.step_count} 步）`)
+            toast.success(t('dashboard.importedWithCount', { name: result.name, count: result.step_count }))
             await loadList()
             emit('workflow-created', id)
             return
           }
         }
       } catch { /* fall through */ }
-      toast.error('无法识别文件格式，请使用 JSON 或 YAML')
+      toast.error(t('dashboard.unrecognizedFormat'))
       return
     }
     const id = await safeInvoke<string>('workflow_create', { name, description: '' })
     if (id) {
       await safeInvoke('workflow_save_yaml', { id, yaml: content })
-      toast.success(`已导入「${name}」`)
+      toast.success(t('dashboard.imported', { name }))
       await loadList()
       emit('workflow-created', id)
     }
   } catch (e: unknown) {
-    toast.error('导入失败: ' + ((e as Error).message || e))
+    toast.error(t('dashboard.importFailed') + ': ' + ((e as Error).message || e))
   }
 }
 
@@ -191,9 +191,14 @@ defineExpose({ loadList })
         <div class="h-8 bg-secondary/50 rounded animate-pulse w-1/2" />
       </div>
 
-      <!-- Empty state -->
-      <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-muted-foreground">
+      <!-- Empty state (no workflows at all) -->
+      <div v-else-if="workflows.length === 0" class="px-2 py-4 text-center text-xs text-muted-foreground">
         {{ t('nav.noWorkflows') }}
+      </div>
+
+      <!-- Empty search results -->
+      <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-muted-foreground">
+        {{ t('nav.noSearchResults') }}
       </div>
 
       <template v-else>
@@ -219,7 +224,7 @@ defineExpose({ loadList })
 
   <SidebarFooter>
     <SidebarMenuItem>
-      <SidebarMenuButton tooltip="设置" @click="onSettings">
+      <SidebarMenuButton :tooltip="t('nav.settings')" @click="onSettings">
         <template #icon>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -230,7 +235,7 @@ defineExpose({ loadList })
       </SidebarMenuButton>
     </SidebarMenuItem>
     <SidebarMenuItem>
-      <SidebarMenuButton tooltip="历史" @click="onHistory">
+      <SidebarMenuButton :tooltip="t('nav.history')" @click="onHistory">
         <template #icon>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -242,7 +247,7 @@ defineExpose({ loadList })
       </SidebarMenuButton>
     </SidebarMenuItem>
     <SidebarMenuItem>
-      <SidebarMenuButton tooltip="导入" @click="onImportFile">
+      <SidebarMenuButton :tooltip="t('common.import')" @click="onImportFile">
         <template #icon>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

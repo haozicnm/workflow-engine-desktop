@@ -20,7 +20,6 @@ describe('workflowStore', () => {
       id: 'wf-1',
       name: 'test',
       description: '',
-      enabled: true,
       locked: false,
       steps: [],
     }
@@ -36,7 +35,6 @@ describe('workflowStore', () => {
       id: 'wf-1',
       name: 'test',
       description: '',
-      enabled: true,
       locked: false,
       steps: [
         { id: 's1', type: 'http', actions: [], label: 'Step 1', config: {}, expanded: false },
@@ -54,7 +52,6 @@ describe('workflowStore', () => {
       id: 'wf-1',
       name: 'test',
       description: '',
-      enabled: true,
       locked: false,
       steps: [
         { id: 's1', type: 'http', actions: [], label: 'S1', config: {}, expanded: false },
@@ -74,7 +71,6 @@ describe('workflowStore', () => {
       id: 'wf-1',
       name: 'test',
       description: '',
-      enabled: true,
       locked: false,
       steps: [
         { id: 's1', type: 'http', actions: [], label: 'Old', config: {}, expanded: false },

@@ -198,7 +198,7 @@ function isSelectorField(key: string): boolean {
       <span
         v-else
         class="flex-1 text-xs text-foreground whitespace-nowrap overflow-hidden text-ellipsis"
-        title="双击重命名"
+        :title="t('actionRow.dblclickRename')"
         @dblclick.stop="startRename"
       >
         {{ displayLabel() }}
@@ -217,7 +217,7 @@ function isSelectorField(key: string): boolean {
         variant="ghost"
         size="icon"
         class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 shrink-0"
-        aria-label="删除动作"
+        :aria-label="t('actionRow.deleteActionAria')"
         @click.stop="emit('remove')"
       >
         <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -231,16 +231,16 @@ function isSelectorField(key: string): boolean {
       <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
         <!-- No params message -->
         <div v-if="!hasParams" class="text-[11px] text-muted-foreground/60 py-1 text-center">
-          此动作无需参数
+          {{ t('actionRow.noParams') }}
         </div>
 
         <!-- Data flow hint -->
         <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
           <template v-if="prevAction">
-            数据来自: <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
+            {{ t('actionRow.dataFrom') }} <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
           </template>
           <template v-else>
-            无上游输入
+            {{ t('actionRow.noUpstream') }}
           </template>
         </div>
 

@@ -218,7 +218,7 @@ function closeAllMenus() {
       <span
         v-else
         class="flex-1 text-sm font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis"
-        title="双击重命名"
+        :title="t('stepCard.dblclickRename')"
         @dblclick.stop="startRenameStep"
       >
         {{ step.label }}
@@ -229,14 +229,14 @@ function closeAllMenus() {
         v-if="step.onError && step.onError !== 'fail'"
         variant="warning"
         class="text-[10px] px-1.5 py-0 shrink-0"
-        :title="`错误策略: ${errStrategyLabel}`"
+        :title="errStrategyLabel"
       >{{ errStrategyLabel }}</Badge>
 
       <Badge
         v-if="step.runCondition"
         variant="outline"
         class="text-[10px] px-1.5 py-0 border-warning/40 text-warning bg-warning/10 shrink-0"
-        :title="`条件执行: ${conditionLabel}`"
+        :title="conditionLabel"
       >{{ conditionLabel }}</Badge>
 
       <!-- Duration + Status -->
@@ -252,8 +252,8 @@ function closeAllMenus() {
           variant="ghost"
           size="icon"
           class="text-muted-foreground hover:text-foreground opacity-40 group-hover:opacity-100 transition-opacity"
-          title="更多操作"
-          aria-label="更多操作"
+          :title="t('stepCard.moreActions')"
+          :aria-label="t('stepCard.moreActions')"
           @click="toggleMenu"
         >⋯</Button>
       </div>
@@ -268,7 +268,7 @@ function closeAllMenus() {
         variant="ghost"
         size="icon"
         class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-40 group-hover:opacity-100 transition-opacity"
-        aria-label="删除步骤"
+        :aria-label="t('stepCard.deleteStepAria')"
         @click.stop="emit('remove-step', step.id)"
       >×</Button>
     </div>
@@ -290,7 +290,7 @@ function closeAllMenus() {
             class="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
             @click="emit('open-config', step.id); closeAllMenus()"
           >
-            <Settings class="w-4 h-4 inline" /> 容器设置
+            <Settings class="w-4 h-4 inline" /> {{ t('stepCard.containerSettings') }}
           </button>
 
           <!-- 录制 (Browser only) -->
@@ -299,14 +299,14 @@ function closeAllMenus() {
             class="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
             @click="emit('start-recording', step.id); closeAllMenus()"
           >
-            <Circle class="w-4 h-4 text-red-500 fill-red-500" /> 录制操作
+            <Circle class="w-4 h-4 text-red-500 fill-red-500" /> {{ t('stepCard.recordActions') }}
           </button>
           <button
             v-if="step.type === 'browser' && isRecording"
             class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors"
             @click="emit('stop-recording', step.id); closeAllMenus()"
           >
-            <Square class="w-4 h-4" /> 停止录制
+            <Square class="w-4 h-4" /> {{ t('stepCard.stopRecording') }}
           </button>
 
           <!-- 条件执行 -->
@@ -342,7 +342,7 @@ function closeAllMenus() {
               class="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               @click="removeCondition"
             >
-              移除条件
+              {{ t('stepCard.removeCondition') }}
             </button>
           </div>
 
@@ -351,9 +351,9 @@ function closeAllMenus() {
             <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.errorStrategy') }}</div>
             <button
               v-for="(opt, key) in {
-                fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: '步骤失败时终止整个工作流' },
-                ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: '跳过错误，继续下一步' },
-                branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: '失败时跳转到指定步骤' },
+                fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: t('stepCard.errDescFail') },
+                ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: t('stepCard.errDescIgnore') },
+                branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: t('stepCard.errDescBranch') },
               }"
               :key="key"
               :class="cn(
@@ -435,7 +435,7 @@ function closeAllMenus() {
           class="mt-1 text-xs text-muted-foreground gap-1 w-full justify-start"
           @click="emit('add-action', step.id)"
         >
-          <Plus class="w-3.5 h-3.5" /> 增加动作
+          <Plus class="w-3.5 h-3.5" /> {{ t('stepCard.addAction') }}
         </Button>
       </template>
     </div>
@@ -451,7 +451,7 @@ function closeAllMenus() {
       >
         <span class="text-[10px] text-muted-foreground w-3.5">{{ showOutput ? '▼' : '▶' }}</span>
         <span class="text-xs text-muted-foreground">
-          {{ runState?.status === 'error' ? '✗ 错误' : '✓ 输出' }}
+          {{ runState?.status === 'error' ? t('stepCard.outputError') : t('stepCard.outputSuccess') }}
         </span>
       </div>
       <pre v-if="showOutput" class="m-0 px-3 py-2 text-[11px] text-muted-foreground bg-background border-t border-border font-mono max-h-[200px] overflow-auto whitespace-pre-wrap break-all">{{ formattedOutput }}</pre>

@@ -166,7 +166,7 @@ function onFinishEditName() {
 async function onSave() {
   const ok = await store.saveWorkflow()
   if (ok) {
-    toast.show('保存成功', 'success')
+    toast.show(t('editor.saveSuccess'), 'success')
     // 显示变量引用警告
     if (store.lastWarnings.length > 0) {
       const msg = store.lastWarnings.slice(0, 5).join('\n')
@@ -175,7 +175,7 @@ async function onSave() {
     }
     emit('workflow-updated')
   } else {
-    toast.show('保存失败', 'error')
+    toast.show(t('editor.saveFailed'), 'error')
   }
 }
 
@@ -184,7 +184,7 @@ async function onScheduleClick() {
   // 未保存时先自动保存
   if (!workflow.value.id) {
     const ok = await store.saveWorkflow()
-    if (!ok) { toast.show('请先保存工作流', 'error'); return }
+    if (!ok) { toast.show(t('editor.saveFirst'), 'error'); return }
     emit('workflow-updated')
   }
   if (workflow.value.id) {
@@ -200,7 +200,7 @@ async function onSaveAs() {
   store.dirty = true
   const ok = await store.saveWorkflow()
   if (ok) {
-    toast.show(`已另存为「${workflow.value.name}」`, 'success')
+    toast.show(t('editor.savedAs', { name: workflow.value.name }), 'success')
     emit('workflow-updated')
   } else {
     toast.show(t('error.saveFailed'), 'error')
@@ -210,7 +210,7 @@ async function onSaveAs() {
 async function onExport() {
   if (!workflow.value) return
   store.exportJson(workflow.value)
-  toast.show('已导出工作流', 'success')
+  toast.show(t('editor.exported'), 'success')
 }
 
 async function onDelete() {
@@ -227,7 +227,7 @@ async function doDelete() {
   await store.deleteWorkflow(id)
   store.current = null
   store.dirty = false
-  toast.show(`已删除「${name}」`, 'success')
+  toast.show(t('toast.deleted'), 'success')
   emit('workflow-deleted')
   showDeleteConfirm.value = false
 }
@@ -238,7 +238,7 @@ async function onToggleLock() {
   try {
     await safeInvoke('workflow_lock', { id: workflow.value.id, locked: newLocked })
     workflow.value.locked = newLocked
-    toast.show(newLocked ? '已锁定 🔒' : '已解锁 🔓', 'success')
+    toast.show(newLocked ? t('editor.locked') : t('editor.unlocked'), 'success')
   } catch (e: unknown) {
     toast.error('操作失败: ' + ((e as Error).message || e))
   }
@@ -398,7 +398,7 @@ onMounted(async () => {
   }>('step-update', (event) => {
     const { step_id, step_name, status, error } = event.payload
     const level: LogEntry['level'] = status === 'error' ? 'error' : status === 'running' ? 'info' : 'info'
-    const msg = status === 'error' ? (error || t('error.runFailed')) : status === 'running' ? t('toast.running') : status === 'success' ? '执行成功' : status
+    const msg = status === 'error' ? (error || t('error.runFailed')) : status === 'running' ? t('toast.running') : status === 'success' ? t('editor.stepSuccess') : status
     enh.addLog({ time: new Date().toLocaleTimeString(), stepId: step_id, stepName: step_name || step_id, status, message: msg, level })
     // Log to unified console
     const detail = status === 'error' ? (error || '') : `step: ${step_name || step_id}`
@@ -417,7 +417,7 @@ onMounted(async () => {
 
   unlistenLogRun = await safeListen<{ run_id: string; status: string; error?: string }>('run-update', (event) => {
     const { status, error } = event.payload
-    enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: t('nav.workflows'), status, message: status === 'completed' ? '运行完成' : status === 'error' ? `运行失败: ${error}` : status, level: status === 'error' ? 'error' : 'info' })
+    enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: t('nav.workflows'), status, message: status === 'completed' ? t('editor.runComplete') : status === 'error' ? t('editor.runFailedMsg', { error }) : status, level: status === 'error' ? 'error' : 'info' })
     // Log to unified console
     ops.addOp({
       source: 'agent',
@@ -453,7 +453,12 @@ onUnmounted(() => {
   >
     <!-- Workflow Detail Card -->
     <Card color="#6e7681" class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
-      <div class="px-4 py-3">
+      <!-- Loading skeleton -->
+      <div v-if="store.loading" class="px-4 py-3 space-y-3 animate-pulse">
+        <div class="h-5 bg-secondary/50 rounded w-1/3" />
+        <div class="h-3 bg-secondary/30 rounded w-2/3" />
+      </div>
+      <div v-else class="px-4 py-3">
         <!-- Row 1: Title + Actions -->
         <div class="flex items-center gap-3">
           <!-- Name -->
@@ -461,7 +466,7 @@ onUnmounted(() => {
             <span
               class="text-base font-semibold text-foreground cursor-text hover:text-primary transition-colors"
               :class="{ 'cursor-not-allowed opacity-60': isLocked }"
-              :title="isLocked ? '已锁定，无法编辑' : '点击编辑名称'"
+              :title="isLocked ? t('editor.lockedHint2') : t('editor.clickToEditName')"
               @click="isLocked ? undefined : onStartEditName()"
             >
               {{ workflow?.name || t('editor.untitled') }}
@@ -486,13 +491,13 @@ onUnmounted(() => {
             size="icon"
             class="h-7 w-7 shrink-0"
             :class="isLocked ? 'text-warning' : 'text-muted-foreground/30 hover:text-muted-foreground'"
-            :title="isLocked ? '解锁以编辑' : '锁定以防止修改'"
+            :title="isLocked ? t('editor.unlockToEdit') : t('editor.lockToPrevent')"
             @click="onToggleLock"
           >{{ isLocked ? '🔒' : '🔓' }}</Button>
 
           <!-- Primary action -->
-          <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground shrink-0" @click="onRun">▶ 运行</Button>
-          <Button v-else variant="destructive" size="sm" class="h-8 shrink-0" @click="onStop">■ 停止</Button>
+          <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground shrink-0" @click="onRun">{{ t('editor.run') }}</Button>
+          <Button v-else variant="destructive" size="sm" class="h-8 shrink-0" @click="onStop">{{ t('editor.stop') }}</Button>
 
           <!-- ⋯ Menu -->
           <div class="relative shrink-0" @click.stop>
@@ -505,7 +510,7 @@ onUnmounted(() => {
           <input
             v-if="workflow"
             :value="workflow.description"
-            placeholder="输入工作流描述..."
+            :placeholder="t('editor.descPlaceholder')"
             class="w-full text-xs text-muted-foreground bg-transparent border-0 outline-none placeholder:text-muted-foreground/40 hover:text-foreground transition-colors"
             @input="workflow.description = ($event.target as HTMLInputElement).value; store.dirty = true"
           />
@@ -530,8 +535,8 @@ onUnmounted(() => {
     <Tabs v-model="activeView" default-value="visual" class="flex-1 flex flex-col overflow-hidden min-h-0">
       <div class="px-[var(--spacing-section-padding-x)] pt-4 pb-0 shrink-0">
         <TabsList>
-          <TabsTrigger value="visual">可视化</TabsTrigger>
-          <TabsTrigger value="code">代码</TabsTrigger>
+          <TabsTrigger value="visual">{{ t('editor.visual') }}</TabsTrigger>
+          <TabsTrigger value="code">{{ t('editor.code') }}</TabsTrigger>
         </TabsList>
       </div>
 
@@ -540,8 +545,8 @@ onUnmounted(() => {
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-[var(--spacing-section-padding-x)] pt-6 pb-12 space-y-[var(--spacing-step-gap)] min-h-0">
             <div v-if="!workflow?.steps?.length" class="text-center py-16 text-muted-foreground">
-              <div class="text-lg text-foreground mb-2">还没有步骤</div>
-              <div class="text-sm">点击下方「增加步骤」开始构建工作流</div>
+              <div class="text-lg text-foreground mb-2">{{ t('editor.noStepsTitle') }}</div>
+              <div class="text-sm">{{ t('editor.noStepsHint') }}</div>
             </div>
 
             <!-- Step cards (with drag) -->
@@ -598,7 +603,7 @@ onUnmounted(() => {
                 class="w-full py-2.5 text-sm text-muted-foreground border-dashed hover:border-primary hover:text-primary"
                 @click="showAddStep = !showAddStep"
               >
-                <ActionIcon name="Plus" cls="w-4 h-4" /> 增加步骤
+                <ActionIcon name="Plus" cls="w-4 h-4" /> {{ t('editor.addStep') }}
               </Button>
               <Teleport to="body">
                 <Transition name="fade">
@@ -654,7 +659,7 @@ onUnmounted(() => {
           @click="addActionStepId = null"
         >
           <div class="bg-card border border-border rounded-xl p-4 min-w-[280px] max-h-[400px] overflow-y-auto shadow-2xl" @click.stop>
-            <div class="text-sm font-semibold text-foreground mb-3 px-1">选择动作类型</div>
+            <div class="text-sm font-semibold text-foreground mb-3 px-1">{{ t('editor.selectActionType') }}</div>
             <div
               v-for="opt in addActionOptions"
               :key="opt.type"
@@ -672,9 +677,9 @@ onUnmounted(() => {
     <!-- Delete confirmation dialog -->
     <Dialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
       <DialogContent class="sm:max-w-md">
-        <DialogTitle>删除工作流</DialogTitle>
+        <DialogTitle>{{ t('editor.deleteWorkflow') }}</DialogTitle>
         <DialogDescription>
-          确定删除「{{ pendingDelete.name }}」？此操作不可撤销。
+          {{ t('editor.deleteConfirm', { name: pendingDelete.name }) }}
         </DialogDescription>
         <DialogFooter>
           <Button variant="ghost" @click="showDeleteConfirm = false">{{ t('common.cancel') }}</Button>

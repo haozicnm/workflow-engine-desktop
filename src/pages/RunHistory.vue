@@ -142,7 +142,7 @@ function clearFilter() {
   onFilterChange()
 }
 const filterOptions = computed(() => [
-  { value: '__all__', label: '全部工作流' },
+  { value: '__all__', label: t('history.allWorkflows') },
   ...workflowList.value.map(wf => ({ value: wf.id, label: wf.name })),
 ])
 
@@ -160,11 +160,11 @@ function calcDuration(started: string, finished: string | null): string {
   if (!finished) {
     try {
       const ms = new Date().getTime() - new Date(started).getTime()
-      if (ms < 1000) return `运行中 (${ms}ms)`
-      if (ms < 60000) return `运行中 (${(ms / 1000).toFixed(1)}s)`
+      if (ms < 1000) return t('history.runningDuration', { text: `${ms}ms` })
+      if (ms < 60000) return t('history.runningDuration', { text: `${(ms / 1000).toFixed(1)}s` })
       const m = Math.floor(ms / 60000)
       const s = Math.round((ms % 60000) / 1000)
-      return `运行中 (${m}m ${s}s)`
+      return t('history.runningDuration', { text: `${m}m ${s}s` })
     } catch {
       return '—'
     }
@@ -219,24 +219,24 @@ const stats = computed(() => {
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3">
-        <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">← 返回</Button>
+        <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">{{ t('history.back') }}</Button>
         <h2 class="text-3xl font-bold tracking-tight">{{ t('history.title') }}</h2>
-        <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ runs.length }} 条</Badge>
+        <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ t('history.items', { n: runs.length }) }}</Badge>
       </div>
       <div class="flex items-center gap-2">
         <Select
           :model-value="filterWorkflowId ?? '__all__'"
           @update:model-value="v => { filterWorkflowId = (v === '__all__' ? null : v); onFilterChange() }"
           :options="filterOptions"
-          placeholder="全部工作流"
+          :placeholder="t('history.allWorkflows')"
         />
-        <Button v-if="filterWorkflowId" variant="outline" size="sm" class="text-[11px]" @click="clearFilter">✕ 清除筛选</Button>
+        <Button v-if="filterWorkflowId" variant="outline" size="sm" class="text-[11px]" @click="clearFilter">{{ t('history.clearFilter') }}</Button>
       </div>
     </div>
 
     <!-- Stats -->
     <div v-if="runs.length > 0" class="flex gap-4">
-      <span class="text-sm text-muted-foreground">共 {{ stats.total }}</span>
+      <span class="text-sm text-muted-foreground">{{ t('history.total', { n: stats.total }) }}</span>
       <span class="text-sm text-success">✓ {{ stats.completed }}</span>
       <span class="text-sm text-danger">✗ {{ stats.failed }}</span>
       <span v-if="stats.running > 0" class="text-sm text-primary">◷ {{ stats.running }}</span>
@@ -295,14 +295,14 @@ const stats = computed(() => {
         <div v-if="expandedId === run.id" class="border-t border-border">
           <div v-if="loadingDetail === run.id" class="flex items-center gap-2 px-4 py-4 text-muted-foreground text-sm">
             <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
-            加载步骤详情...
+            {{ t('history.loadingDetail') }}
           </div>
           <div v-else-if="detailCache[run.id]" class="px-4 pb-4">
             <!-- Tabs -->
             <Tabs :model-value="detailTab" @update:model-value="onTabChange" class="mt-3">
               <TabsList>
-                <TabsTrigger value="steps">步骤 ({{ detailCache[run.id].steps.length }})</TabsTrigger>
-                <TabsTrigger value="logs">📟 日志{{ logCache[run.id] ? ' (' + logCache[run.id].length + ')' : '' }}</TabsTrigger>
+                <TabsTrigger value="steps">{{ t('history.stepsTab', { n: detailCache[run.id].steps.length }) }}</TabsTrigger>
+                <TabsTrigger value="logs">{{ t('history.logsTab', { n: logCache[run.id]?.length ?? 0 }) }}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="steps">
@@ -326,16 +326,16 @@ const stats = computed(() => {
                     <pre class="text-[11px] text-muted-foreground bg-background p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
                   </div>
                 </div>
-                <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">暂无步骤记录</div>
+                <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">{{ t('history.noStepsRecord') }}</div>
               </TabsContent>
 
               <!-- Logs list -->
               <TabsContent value="logs" class="max-h-[400px] overflow-y-auto">
                 <div v-if="!logCache[run.id]" class="flex items-center gap-2 px-2 py-4 text-muted-foreground text-sm">
                   <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
-                  加载日志...
+                  {{ t('history.loadingLogs') }}
                 </div>
-                <div v-else-if="logCache[run.id].length === 0" class="text-center text-muted-foreground/50 text-sm py-3">暂无执行日志</div>
+                <div v-else-if="logCache[run.id].length === 0" class="text-center text-muted-foreground/50 text-sm py-3">{{ t('history.noLogsRecord') }}</div>
                 <div
                   v-else
                   v-for="log in logCache[run.id]"
