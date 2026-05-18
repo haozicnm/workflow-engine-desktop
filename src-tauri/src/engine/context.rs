@@ -94,7 +94,9 @@ impl ExecutionContext {
             }
             for (k, v) in &self.step_outputs {
                 let dynamic = json_to_rhai(v);
-                scope.push(format!("step_{}", k), dynamic);
+                // 去重 step_ 前缀（step_outputs key 可能已是 "step_1"，也可能只是 "1"）
+                let stem = k.strip_prefix("step_").unwrap_or(k);
+                scope.push(format!("step_{}", stem), dynamic);
             }
 
             let result = engine.eval_with_scope::<rhai::Dynamic>(&mut scope, expr)
