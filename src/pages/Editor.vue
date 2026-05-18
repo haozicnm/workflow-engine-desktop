@@ -136,6 +136,14 @@ const configStep = computed<Step | null>(() => {
   return store.findStep(configStepId.value)
 })
 
+const translatedContainerDefs = computed(() =>
+  CONTAINER_DEFS.map(d => ({
+    ...d,
+    label: t(`nodeLabel.${d.type}`, d.label) as string,
+    description: t(`nodeDesc.${d.type}`, d.description) as string,
+  }))
+)
+
 watch(() => props.workflowId, async (newId) => {
   if (newId) {
     await store.loadWorkflow(newId)
@@ -279,7 +287,7 @@ function onRemoveStep(stepId: string) {
 function onAddAction(stepId: string) {
   const step = store.findStep(stepId)
   if (!step) return
-  addActionOptions.value = getActionDefs(step.type).map(a => ({
+  addActionOptions.value = getActionDefs(step.type, t).map(a => ({
     type: a.type, label: a.label, icon: a.icon,
   }))
   addActionStepId.value = stepId
@@ -610,7 +618,7 @@ onUnmounted(() => {
                   <div v-if="showAddStep" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="showAddStep = false" @keydown.escape="showAddStep = false">
                     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[260px] shadow-xl" @click.stop>
                       <div
-                        v-for="def in CONTAINER_DEFS"
+                        v-for="def in translatedContainerDefs"
                         :key="def.type"
                         class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-secondary"
                         @click="onAddStep(def.type)"

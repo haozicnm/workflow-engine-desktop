@@ -42,8 +42,8 @@ const emit = defineEmits<{
   'toggle-expand': []
 }>()
 
-const actionDef = computed(() => getActionDef(props.containerType, props.action.type))
-const displayLabel = () => getActionLabel(props.action, props.containerType)
+const actionDef = computed(() => getActionDef(props.containerType, props.action.type, t))
+const displayLabel = () => getActionLabel(props.action, props.containerType, t)
 
 // 变量引用名称
 const varName = computed(() => {
@@ -186,7 +186,7 @@ function isSelectorField(key: string): boolean {
       <span :class="cn('w-2 h-2 rounded-full shrink-0', statusDotClass)" />
 
       <!-- Icon + Label -->
-      <ActionIcon :name="getContainerDef(containerType).icon" cls="w-4 h-4 shrink-0" />
+      <ActionIcon :name="getContainerDef(containerType, t).icon" cls="w-4 h-4 shrink-0" />
 
       <input
         v-if="editing"

@@ -50,7 +50,7 @@ function toggleActionExpand(actionId: string) {
   expandedActionId.value = expandedActionId.value === actionId ? null : actionId
 }
 
-const containerDef = computed(() => getContainerDef(props.step.type))
+const containerDef = computed(() => getContainerDef(props.step.type, t))
 const isContainer = computed(() => isContainerType(props.step.type))
 
 // ─── Variable refs (for simple steps) ───
@@ -318,7 +318,7 @@ function closeAllMenus() {
               class="border-b border-border/50 last:border-b-0"
             >
               <div class="px-3 py-1 text-[11px] text-muted-foreground bg-muted/30">
-                <ActionIcon :name="getContainerDef(ls.type).icon" cls="w-3.5 h-3.5 inline" /> {{ ls.label }}
+                <ActionIcon :name="getContainerDef(ls.type, t).icon" cls="w-3.5 h-3.5 inline" /> {{ ls.label }}
               </div>
               <button
                 v-for="opt in [

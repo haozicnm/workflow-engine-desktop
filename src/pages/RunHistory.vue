@@ -89,7 +89,7 @@ async function loadRuns() {
     })
     runs.value = Array.isArray(result) ? result : []
   } catch (e: any) {
-    toast.error('加载运行历史失败: ' + (e.message || e))
+    toast.error(t('history.loadFailed', { defaultValue: 'Failed to load history' }) + ': ' + (e.message || e))
   } finally {
     loading.value = false
   }
@@ -109,7 +109,7 @@ async function toggleExpand(runId: string) {
       const detail = await safeInvoke<RunDetail>('run_detail', { runId })
       if (detail) detailCache.value[runId] = detail
     } catch (e: any) {
-      toast.error('加载详情失败: ' + (e.message || e))
+      toast.error(t('history.loadDetailFailed', { defaultValue: 'Failed to load detail' }) + ': ' + (e.message || e))
     } finally {
       loadingDetail.value = null
     }
@@ -121,7 +121,7 @@ async function loadLogs(runId: string) {
   try {
     logCache.value[runId] = await safeInvoke<StepLogEntry[]>('run_step_logs', { runId }) || []
   } catch (e: any) {
-    toast.error('加载日志失败: ' + (e.message || e))
+    toast.error(t('history.loadLogsFailed', { defaultValue: 'Failed to load logs' }) + ': ' + (e.message || e))
     logCache.value[runId] = []
   }
 }
@@ -148,9 +148,7 @@ const filterOptions = computed(() => [
 
 function formatTime(iso: string): string {
   try {
-    const d = new Date(iso)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    return new Date(iso).toLocaleString()
   } catch {
     return iso
   }
@@ -181,14 +179,29 @@ function calcDuration(started: string, finished: string | null): string {
   }
 }
 
-function statusBadge(status: string): { icon: string; variant: 'success' | 'destructive' | 'default' | 'secondary' } {
+function statusBadge(status: string): { icon: string; variant: 'success' | 'destructive' | 'default' | 'secondary'; label: string } {
+  const statusKey = status as keyof typeof statusLabelMap
+  const label = statusLabelMap[statusKey] || status
   switch (status) {
-    case 'completed': return { icon: 'CheckCircle', variant: 'success' }
-    case 'failed': return { icon: 'XCircle', variant: 'destructive' }
-    case 'running': return { icon: 'Loader', variant: 'default' }
-    default: return { icon: '⏸', variant: 'secondary' }
+    case 'completed': return { icon: 'CheckCircle', variant: 'success', label }
+    case 'failed': return { icon: 'XCircle', variant: 'destructive', label }
+    case 'running': return { icon: 'Loader', variant: 'default', label }
+    default: return { icon: '⏸', variant: 'secondary', label }
   }
 }
+
+const statusLabelMap: Record<string, string> = {
+  completed: '', failed: '', running: '', cancelled: '', pending: '',
+}
+// populate from i18n
+function initStatusLabels() {
+  statusLabelMap.completed = t('statusLabel.completed')
+  statusLabelMap.failed = t('statusLabel.failed')
+  statusLabelMap.running = t('statusLabel.running')
+  statusLabelMap.cancelled = t('statusLabel.cancelled')
+  statusLabelMap.pending = t('statusLabel.pending')
+}
+initStatusLabels()
 
 function logLevelColor(level: string): string {
   switch (level) {
@@ -235,11 +248,11 @@ const stats = computed(() => {
     </div>
 
     <!-- Stats -->
-    <div v-if="runs.length > 0" class="flex gap-4">
+    <div v-if="runs.length > 0" class="flex gap-4" role="status" aria-label="运行统计">
       <span class="text-sm text-muted-foreground">{{ t('history.total', { n: stats.total }) }}</span>
-      <span class="text-sm text-success">✓ {{ stats.completed }}</span>
-      <span class="text-sm text-danger">✗ {{ stats.failed }}</span>
-      <span v-if="stats.running > 0" class="text-sm text-primary">◷ {{ stats.running }}</span>
+      <span class="text-sm text-success" aria-label="成功 {{ stats.completed }}">✓ {{ stats.completed }}</span>
+      <span class="text-sm text-danger" aria-label="失败 {{ stats.failed }}">✗ {{ stats.failed }}</span>
+      <span v-if="stats.running > 0" class="text-sm text-primary" aria-label="运行中 {{ stats.running }}">◷ {{ stats.running }}</span>
     </div>
 
     <!-- Loading -->
@@ -273,7 +286,7 @@ const stats = computed(() => {
         >
           <div class="shrink-0">
             <Badge :variant="statusBadge(run.status).variant" class="text-xs whitespace-nowrap">
-              <ActionIcon :name="statusBadge(run.status).icon" cls="w-4 h-4 inline" /> {{ run.status }}
+              <ActionIcon :name="statusBadge(run.status).icon" cls="w-4 h-4 inline" /> {{ statusBadge(run.status).label }}
             </Badge>
           </div>
           <div class="flex-1 min-w-0">

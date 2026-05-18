@@ -7,6 +7,9 @@ import type {
 } from './types'
 import { uid, nextStepId, nextActionId } from './types'
 
+/** i18n 翻译函数类型 */
+type TFn = (key: string, params?: Record<string, unknown>) => string
+
 // ─── 容器定义 ───
 
 export const CONTAINER_DEFS: ContainerDef[] = [
@@ -108,10 +111,16 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: '{ actionId: result, ... }', isContainer: true, params: []},
 ]
 
-export function getContainerDef(type: string): ContainerDef {
+export function getContainerDef(type: string, t?: TFn): ContainerDef {
   const found = CONTAINER_DEFS.find(d => d.type === type)
+  const def = found || CONTAINER_DEFS[0]
   if (!found) console.warn(`getContainerDef: 未知类型 "${type}"，使用 fallback`)
-  return found || CONTAINER_DEFS[0]
+  if (!t) return def
+  return {
+    ...def,
+    label: t(`nodeLabel.${type}`, { defaultValue: def.label }) || def.label,
+    description: t(`nodeDesc.${type}`, { defaultValue: def.description }) || def.description,
+  }
 }
 
 /** 获取容器类型的主色 */
@@ -435,8 +444,8 @@ export const FILE_ACTIONS: ActionDef[] = [
 
 // ─── 注册表查询函数 ───
 
-export function getActionDefs(containerType: ContainerType): ActionDef[] {
-  switch (containerType) {
+export function getActionDefs(containerType: ContainerType, t?: TFn): ActionDef[] {
+  const defs = (() => { switch (containerType) {
     case 'file': return FILE_ACTIONS
     case 'browser': return BROWSER_ACTIONS
     case 'excel': return EXCEL_ACTIONS
@@ -445,15 +454,21 @@ export function getActionDefs(containerType: ContainerType): ActionDef[] {
     case 'cursor': return BODY_STEP_ACTIONS
     case 'loop': return BODY_STEP_ACTIONS
     default: return []
+  }})()
+  if (!t) return defs
+  return defs.map(d => ({ ...d, label: t(`actionLabel.${d.type}`, { defaultValue: d.label }) || d.label }))
+}
+
+export function getActionDef(containerType: ContainerType, actionType: string, t?: TFn): ActionDef | undefined {
+  return getActionDefs(containerType, t).find(a => a.type === actionType)
+}
+
+/** 获取动作显示名称 — t 存在时优先翻译，否则回退到已存储的 label */
+export function getActionLabel(action: Action, containerType?: ContainerType, t?: TFn): string {
+  if (t && containerType) {
+    const def = getActionDef(containerType, action.type, t)
+    if (def) return def.label
   }
-}
-
-export function getActionDef(containerType: ContainerType, actionType: string): ActionDef | undefined {
-  return getActionDefs(containerType).find(a => a.type === actionType)
-}
-
-/** 获取动作显示名称（兼容旧数据） */
-export function getActionLabel(action: Action, containerType?: ContainerType): string {
   if (action.label) return action.label
   if (containerType) {
     const def = getActionDef(containerType, action.type)
@@ -470,8 +485,8 @@ export function isContainerType(type: ContainerType): boolean {
 
 // ─── 工厂函数 ───
 
-export function newAction(type: string, containerType?: ContainerType, existingActions?: Action[], stepId?: string): Action {
-  const def = containerType ? getActionDef(containerType, type) : undefined
+export function newAction(type: string, containerType?: ContainerType, existingActions?: Action[], stepId?: string, t?: TFn): Action {
+  const def = containerType ? getActionDef(containerType, type, t) : undefined
   let label = def?.label || type
   // 重名处理：自动加 _2, _3 后缀
   if (existingActions && existingActions.length > 0) {
@@ -486,8 +501,8 @@ export function newAction(type: string, containerType?: ContainerType, existingA
   return { id, type, label, params: {} }
 }
 
-export function newStep(containerType: ContainerType, existingSteps?: Step[]): Step {
-  const def = getContainerDef(containerType)
+export function newStep(containerType: ContainerType, existingSteps?: Step[], t?: TFn): Step {
+  const def = getContainerDef(containerType, t)
   // 从容器定义中提取默认参数
   const config: Record<string, unknown> = {}
   for (const p of def.params) {

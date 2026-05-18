@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
@@ -24,10 +24,10 @@ const toast = useToast()
 const APP_VERSION = pkg.version
 const { theme: currentTheme, setTheme } = useTheme()
 
-const localeOptions: { value: Locale; label: string }[] = [
-  { value: 'zh-CN', label: '简体中文' },
-  { value: 'en-US', label: 'English' },
-]
+const localeOptions = computed<{ value: Locale; label: string }[]>(() => [
+  { value: 'zh-CN', label: t('settingsPage.langZh') },
+  { value: 'en-US', label: t('settingsPage.langEn') },
+])
 
 const settings = ref({
   theme: 'system',
@@ -42,25 +42,25 @@ const sysInfo = ref<any>(null)
 const saving = ref(false)
 const loading = ref(true)
 
-const browserOptions = [
-  { value: 'auto', label: 'Auto-detect', desc: 'Priority: Edge → Chrome → Playwright Chromium' },
-  { value: 'msedge', label: 'Microsoft Edge', desc: 'Built into Windows' },
-  { value: 'chrome', label: 'Google Chrome', desc: 'Requires Chrome browser' },
-  { value: 'chromium', label: 'Playwright Chromium', desc: 'Use Playwright bundled Chromium' },
-]
+const browserOptions = computed(() => [
+  { value: 'auto', label: t('settingsPage.browserAuto'), desc: t('settingsPage.browserAutoDesc') },
+  { value: 'msedge', label: t('settingsPage.browserEdge'), desc: t('settingsPage.browserEdgeDesc') },
+  { value: 'chrome', label: t('settingsPage.browserChrome'), desc: t('settingsPage.browserChromeDesc') },
+  { value: 'chromium', label: t('settingsPage.browserChromium'), desc: t('settingsPage.browserChromiumDesc') },
+])
 
-const logLevelOptions = [
-  { value: 'debug', label: 'Debug' },
-  { value: 'info', label: 'Info' },
-  { value: 'warn', label: 'Warn' },
-  { value: 'error', label: 'Error' },
-]
+const logLevelOptions = computed(() => [
+  { value: 'debug', label: t('settingsPage.logDebug') },
+  { value: 'info', label: t('settingsPage.logInfo') },
+  { value: 'warn', label: t('settingsPage.logWarn') },
+  { value: 'error', label: t('settingsPage.logError') },
+])
 
-const themeOptions: { value: Theme; label: string; icon: string; desc: string }[] = [
-  { value: 'light', label: 'Light', icon: 'Sun', desc: 'Light theme, bright environments' },
-  { value: 'dark', label: 'Dark', icon: 'Moon', desc: 'Dark theme, eye comfort' },
-  { value: 'system', label: 'System', icon: 'Monitor', desc: 'Follow system preference' },
-]
+const themeOptions = computed<{ value: Theme; label: string; icon: string; desc: string }[]>(() => [
+  { value: 'light', label: t('settingsPage.themeLight'), icon: 'Sun', desc: t('settingsPage.themeLightDesc') },
+  { value: 'dark', label: t('settingsPage.themeDark'), icon: 'Moon', desc: t('settingsPage.themeDarkDesc') },
+  { value: 'system', label: t('settingsPage.themeSystem'), icon: 'Monitor', desc: t('settingsPage.themeSystemDesc') },
+])
 
 onMounted(async () => {
   loading.value = true
@@ -100,16 +100,16 @@ async function openLogDir() {
   try {
     await safeInvoke('open_log_dir')
   } catch (e: any) {
-    toast.error('Open log dir failed: ' + e)
+    toast.error(t('settingsPage.logOpenFailed') + ': ' + e)
   }
 }
 
 async function clearLogs() {
   try {
     await safeInvoke('clear_logs')
-    toast.success('Logs cleared')
+    toast.success(t('settingsPage.logCleared'))
   } catch (e: any) {
-    toast.error('Clear logs failed: ' + e)
+    toast.error(t('settingsPage.logClearFailed') + ': ' + e)
   }
 }
 
@@ -128,7 +128,7 @@ function downloadSkill() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success('SKILL.md downloaded')
+  toast.success(t('settingsPage.skillDownloaded'))
 }
 </script>
 
@@ -200,10 +200,10 @@ function downloadSkill() {
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.browserNode') }}</h2>
-          <p class="text-xs text-muted-foreground mb-4">Select browser for automation. Edge recommended for intranet.</p>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.browserAutoDesc') }}</p>
 
           <div class="space-y-2 mb-4">
-            <Label class="text-xs text-muted-foreground font-semibold">Browser channel</Label>
+            <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserNode') }}</Label>
             <div class="flex flex-col gap-2" role="radiogroup" aria-label="Browser channel">
               <button
                 v-for="(opt, idx) in browserOptions"
@@ -235,21 +235,21 @@ function downloadSkill() {
           <!-- System check -->
           <div v-if="sysInfo" class="mt-4 p-3 bg-background rounded-md">
             <h3 class="text-xs text-muted-foreground mb-2.5 flex items-center gap-2">
-              Environment
+              {{ t('settingsPage.envBrowser') }}
               <Badge :variant="sysInfo.ready ? 'success' : 'warning'" class="text-[10px]">
-                {{ sysInfo.ready ? '✓ Ready' : '⊘ Not set up' }}
+                {{ sysInfo.ready ? t('settingsPage.envReady') : t('settingsPage.envNotReady') }}
               </Badge>
             </h3>
             <div class="flex flex-col gap-1.5">
               <!-- Python -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">Python</span>
+                <span class="text-foreground">{{ t('settingsPage.envPython') }}</span>
                 <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
-                  {{ sysInfo.python_available ? '✓ detected' : '✗ not found' }}
+                  {{ sysInfo.python_available ? t('settingsPage.envDetected') : t('settingsPage.envNotFound') }}
                 </span>
               </div>
               <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ Path</span>
+                <span class="text-foreground pl-3">{{ t('settingsPage.envPath') }}</span>
                 <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
               </div>
               <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
@@ -259,17 +259,17 @@ function downloadSkill() {
 
               <!-- Playwright -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">Playwright</span>
+                <span class="text-foreground">{{ t('settingsPage.envPlaywright') }}</span>
                 <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_playwright_pkg ? '✓ installed' : '◷ auto-install on first use' }}
+                  {{ sysInfo.has_playwright_pkg ? t('settingsPage.envInstalled') : t('settingsPage.envAutoInstall') }}
                 </span>
               </div>
 
               <!-- Browser -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">Browser</span>
+                <span class="text-foreground">{{ t('settingsPage.envBrowser') }}</span>
                 <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_browser ? '✓ available' : t('settingsPage.autoDownloadNote') }}
+                  {{ sysInfo.has_browser ? t('settingsPage.envAvailable') : t('settingsPage.autoDownloadNote') }}
                 </span>
               </div>
               <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
@@ -279,12 +279,12 @@ function downloadSkill() {
                 </span>
               </div>
               <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ Bundled Chromium</span>
-                <span class="text-success text-[11px]">✓ bundled</span>
+                <span class="text-foreground pl-3">{{ t('settingsPage.envBundledChromium') }}</span>
+                <span class="text-success text-[11px]">{{ t('settingsPage.envBundled') }}</span>
               </div>
               <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
                 <span class="text-foreground pl-3">{{ t('settingsPage.playwrightCache') }}</span>
-                <span class="text-success text-[11px]">✓ downloaded</span>
+                <span class="text-success text-[11px]">{{ t('settingsPage.envDownloaded') }}</span>
               </div>
             </div>
           </div>
