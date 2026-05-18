@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { AlertTriangle } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
 
-const { t } = useI18n()
+
 
 const error = ref<string | null>(null)
 const errorInfo = ref('')

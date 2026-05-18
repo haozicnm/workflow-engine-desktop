@@ -1,7 +1,7 @@
 {
     "name":  "workflow-engine-frontend",
     "private":  true,
-    "version":  "6.9.0-c85b80a",
+    "version":  "6.9.0-66c9c66",
     "type":  "module",
     "scripts":  {
                     "dev":  "vite",

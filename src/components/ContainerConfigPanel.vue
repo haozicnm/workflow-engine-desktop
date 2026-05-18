@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import type { Step } from '../types/types'
 import { getContainerDef } from '../types/node-registry'
 import { useVariableRefs } from '../composables/useVariableRefs'
@@ -12,7 +11,7 @@ import CardHeader from './ui/card/CardHeader.vue'
 import CardTitle from './ui/card/CardTitle.vue'
 import CardContent from './ui/card/CardContent.vue'
 
-const { t } = useI18n()
+
 
 const props = defineProps<{
   step: Step
