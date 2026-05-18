@@ -30,7 +30,7 @@
       "type": "script",
       "name": "3.数据质量评估",
       "config": {
-        "script": "#{body_len: 100, fields_ok: 4, id: 1, level: \"优秀\", quality: 80.0, title: \"测试标题\", title_len: 4, userId: 1}"
+        "script": "let data = step_2;\nlet id = data.id;\nlet userId = data.userId;\nlet title = data.title;\nlet body = data.body;\nlet body_len = body.len();\nlet title_len = title.len();\nlet fields_ok = 4;\nlet quality = if body_len > 50 { 80.0 } else if body_len > 20 { 50.0 } else { 30.0 };\nlet level = if quality > 70 { \"优秀\" } else if quality > 40 { \"合格\" } else { \"差\" };\n#{id: id, userId: userId, title: title, body_len: body_len, title_len: title_len, fields_ok: fields_ok, quality: quality, level: level}"
       }
     },
     {
@@ -130,7 +130,7 @@
           "type": "write",
           "config": {
             "path": "/tmp/wf-approval-decision.json",
-            "content": "{\"id\":{{step_3.id}},\"title\":\"{{step_3.title}}\",\"decision\":\"{{step_5.decision}}\",\"quality\":{{step_3.quality}},\"comment\":\"{{step_5.comment}}\",\"timestamp\":\"now\"}"
+            "content": "{\"id\":{{step_3.id}},\"title\":\"{{step_3.title}}\",\"decision\":\"{{step_5.decision}}\",\"quality\":{{step_3.quality}},\"comment\":\"{{step_5.comment}}\"}"
           }
         }
       ]
@@ -144,8 +144,8 @@
         "when": "false"
       },
       "config": {
-        "command": "echo \"[REJECTED] $(date): {{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}} - 原因:{{step_5.comment}}\" >> /tmp/wf-rejected.log; echo 'logged'",
-        "shell": "bash",
+        "command": "echo \"[REJECTED] ID:{{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}}\" >> /tmp/wf-rejected.log 2>/dev/null; echo 'logged'",
+        "shell": "auto",
         "timeout_secs": 5
       }
     },
@@ -174,7 +174,7 @@
       "config": {
         "notify_type": "system",
         "title": "❌ 数据审批未通过",
-        "body": "ID={{step_3.id}} 标题={{step_3.title}}\n决策={{step_5.decision}} 原因={{step_5.comment}}"
+        "body": "ID={{step_3.id}} 标题={{step_3.title}}\n决策={{step_5.decision}} 意见={{step_5.comment}}"
       }
     }
   ]

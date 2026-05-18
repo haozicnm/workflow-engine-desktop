@@ -12,8 +12,8 @@
       "type": "shell",
       "name": "1.创建输出目录",
       "config": {
-        "command": "mkdir -p /tmp/wf-daily-report; echo '/tmp/wf-daily-report'",
-        "shell": "bash",
+        "command": "mkdir -p /tmp/wf-daily-report 2>/dev/null; echo '/tmp/wf-daily-report'",
+        "shell": "auto",
         "timeout_secs": 5
       }
     },
@@ -40,7 +40,7 @@
       "type": "script",
       "name": "4.摘要统计",
       "config": {
-        "script": "#{top_ids: \"1,2,3\", total: 10, top_count: 10, source: \"HackerNews\"}"
+        "script": "let ids = step_3;\nlet total = ids.len();\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
       }
     },
     {
@@ -67,7 +67,7 @@
       "type": "script",
       "name": "7.综合计算评分",
       "config": {
-        "script": "#{stars: 0, forks: 0, open_issues: 0, score: 50.0, level: \"⭐中等\", repo: \"unknown\"}"
+        "script": "let repo = step_6;\nlet stars = repo.stargazers_count;\nlet forks = repo.forks_count;\nlet issues = repo.open_issues_count;\nlet name = repo.full_name;\nlet score = stars + forks * 2;\nlet level = if score > 100 { \"🔥热门\" } else if score > 50 { \"⭐活跃\" } else { \"💤休眠\" };\n#{stars: stars, forks: forks, open_issues: issues, score: score, level: level, repo: name}"
       }
     },
     {
@@ -98,10 +98,6 @@
       "id": "step_9",
       "type": "excel",
       "name": "9.生成Excel日报表",
-      "config": {
-        "file_path": "/tmp/wf-daily-report/daily-report.xlsx",
-        "sheet": "舆情日报"
-      },
       "actions": [
         {
           "id": "a9_1",
@@ -115,42 +111,12 @@
           "type": "write",
           "config": {
             "value": [
-              [
-                "HackerNews",
-                "热榜总数",
-                "{{step_4.total}}",
-                "正常"
-              ],
-              [
-                "HackerNews",
-                "Top10 ID",
-                "{{step_4.top_ids}}",
-                "-"
-              ],
-              [
-                "GitHub",
-                "Stars",
-                "{{step_7.stars}}",
-                "{{step_7.level}}"
-              ],
-              [
-                "GitHub",
-                "Forks",
-                "{{step_7.forks}}",
-                "-"
-              ],
-              [
-                "GitHub",
-                "Open Issues",
-                "{{step_7.open_issues}}",
-                "-"
-              ],
-              [
-                "综合",
-                "活跃度评分",
-                "{{step_7.score}}",
-                "{{step_8.branch}}"
-              ]
+              ["HackerNews", "热榜总数", "{{step_4.total}}", "正常"],
+              ["HackerNews", "Top10 ID", "{{step_4.top_ids}}", "-"],
+              ["GitHub", "Stars", "{{step_7.stars}}", "{{step_7.level}}"],
+              ["GitHub", "Forks", "{{step_7.forks}}", "-"],
+              ["GitHub", "Open Issues", "{{step_7.open_issues}}", "-"],
+              ["综合", "活跃度评分", "{{step_7.score}}", "{{step_8.branch}}"]
             ]
           }
         },
@@ -183,9 +149,6 @@
       "id": "step_11",
       "type": "word",
       "name": "11.生成Word日报摘要",
-      "config": {
-        "file_path": "/tmp/wf-daily-report/daily-summary.docx"
-      },
       "actions": [
         {
           "id": "a11_1",

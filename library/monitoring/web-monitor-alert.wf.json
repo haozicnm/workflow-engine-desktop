@@ -12,8 +12,8 @@
       "type": "shell",
       "name": "1.初始化监控目录",
       "config": {
-        "command": "mkdir -p /tmp/wf-monitor; echo 'ready'",
-        "shell": "bash",
+        "command": "mkdir -p /tmp/wf-monitor 2>/dev/null; echo 'ready'",
+        "shell": "auto",
         "timeout_secs": 5
       }
     },
@@ -54,7 +54,7 @@
           "id": "body_3_2",
           "type": "script",
           "config": {
-            "script": "#{site: __item.name, url: __item.url, status: 200, is_ok: true, body_length: 0}"
+            "script": "let resp_len = body_3_1.body.len();\nlet status = body_3_1.status;\nlet is_ok = status >= 200 && status < 400;\n#{site: __item.name, url: __item.url, status: status, is_ok: is_ok, body_length: resp_len}"
           }
         }
       ]
@@ -64,7 +64,7 @@
       "type": "script",
       "name": "4.汇总分析+趋势对比",
       "config": {
-        "script": "#{alert_sites: [], fail_count: 0, health_pct: 100, ok_count: 3, status: \"🟢全通\", summary: [], total: 3}"
+        "script": "let results = step_3.results;\nlet total = results.len();\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n#{alert_sites: alert_sites, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total}"
       }
     },
     {
@@ -101,7 +101,7 @@
           "type": "write",
           "config": {
             "path": "/tmp/wf-monitor/last-state.json",
-            "content": "{\"ok\":{{step_4.ok_count}},\"fail\":{{step_4.fail_count}},\"health\":{{step_4.health_pct}},\"status\":\"{{step_4.status}}\",\"timestamp\":\"now\"}"
+            "content": "{\"ok\":{{step_4.ok_count}},\"fail\":{{step_4.fail_count}},\"health\":{{step_4.health_pct}},\"status\":\"{{step_4.status}}\"}"
           }
         }
       ]
@@ -110,22 +110,13 @@
       "id": "step_7",
       "type": "excel",
       "name": "7.追加监控日志到Excel",
-      "config": {
-        "file_path": "/tmp/wf-monitor/monitor-log.xlsx",
-        "sheet": "监控日志"
-      },
+      "onError": "ignore",
       "actions": [
         {
           "id": "a7_1",
           "type": "append",
           "config": {
-            "value": [
-              "{{step_4.status}}",
-              "{{step_4.ok_count}}",
-              "{{step_4.fail_count}}",
-              "{{step_4.health_pct}}%",
-              "{{step_4.summary}}"
-            ]
+            "value": ["{{step_4.status}}", "{{step_4.ok_count}}", "{{step_4.fail_count}}", "{{step_4.health_pct}}%", "{{step_4.summary}}"]
           }
         }
       ]

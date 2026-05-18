@@ -3,7 +3,7 @@
   "description": "【教学模板 ③】智能文件审批管道 — 文件扫描→条件筛选→逐项审批（条件推荐）→归档通知。演示 Cursor 游标迭代、approval_conditions 条件推荐、runCondition 分支。",
   "params": {
     "data_dir": "/tmp/wf-approval-batch",
-    "file_pattern": "*.docx",
+    "file_pattern": "*.txt",
     "approval_timeout_ms": 5000
   },
   "steps": [
@@ -12,8 +12,8 @@
       "type": "shell",
       "name": "1.准备测试文件集",
       "config": {
-        "command": "mkdir -p /tmp/wf-approval-batch/approved /tmp/wf-approval-batch/rejected; echo '合规报告-Q1' > /tmp/wf-approval-batch/doc-合规报告-Q1.txt; echo '财务数据-涉密' > /tmp/wf-approval-batch/doc-财务数据-涉密.txt; echo '技术方案-v2' > /tmp/wf-approval-batch/doc-技术方案-v2.txt; echo '已准备 3 个测试文件'",
-        "shell": "bash",
+        "command": "mkdir -p /tmp/wf-approval-batch/approved /tmp/wf-approval-batch/rejected 2>/dev/null; echo '合规报告-Q1' > /tmp/wf-approval-batch/doc-合规报告-Q1.txt; echo '财务数据-涉密' > /tmp/wf-approval-batch/doc-财务数据-涉密.txt; echo '技术方案-v2' > /tmp/wf-approval-batch/doc-技术方案-v2.txt; echo '已准备 3 个测试文件'",
+        "shell": "auto",
         "timeout_secs": 5
       }
     },
@@ -37,7 +37,7 @@
       "type": "script",
       "name": "3.构建审批清单",
       "config": {
-        "script": "#{total: 3, items: []}"
+        "script": "let files = step_2.a2_1;\nlet total = files.len();\nlet items = [];\nfor f in files {\n    items.push(#{file: f.name, path: f.path, risk_level: if f.name.contains(\"涉密\") { \"高\" } else if f.name.contains(\"合规\") { \"中\" } else { \"低\" }});\n}\n#{total: total, items: items}"
       }
     },
     {
@@ -83,7 +83,7 @@
           "id": "body_5_2",
           "type": "script",
           "config": {
-            "script": "#{risk_score: 10, has_secret: false, content_length: 0, preview: \"...\"}"
+            "script": "let content = body_5_1.ab5_1;\nlet has_secret = content.contains(\"涉密\");\nlet risk_score = if has_secret { 90 } else if content.contains(\"合规\") { 30 } else { 10 };\n#{risk_score: risk_score, has_secret: has_secret, content_length: content.len(), preview: content.sub_string(0, 30)}"
           }
         },
         {
@@ -91,22 +91,22 @@
           "type": "approval",
           "config": {
             "title": "文件审批: {{__item.file}}",
-            "message": "风险等级: {{__item.risk_level}}\n风险评分: {{body_script.risk_score}}分\n内容预览: {{body_script.preview}}",
+            "message": "风险等级: {{__item.risk_level}}\n风险评分: {{body_5_2.risk_score}}分\n内容预览: {{body_5_2.preview}}",
             "options": "同意发布,拒绝发布,需修改后重审",
             "require_review": "false",
-            "timeout": 3,
+            "timeout": 5,
             "timeout_behavior": "auto",
             "timeout_action": "recommended",
             "approval_conditions": [
               {
                 "id": "ac1",
-                "left": "{{body_script.risk_score}}",
+                "left": "{{body_5_2.risk_score}}",
                 "op": "lt",
                 "right": "80"
               },
               {
                 "id": "ac2",
-                "left": "{{body_script.has_secret}}",
+                "left": "{{body_5_2.has_secret}}",
                 "op": "equals",
                 "right": "false"
               }
@@ -123,7 +123,7 @@
               "conditions": [
                 {
                   "id": "lc1",
-                  "left": "{{body_approval.decision}}",
+                  "left": "{{body_5_3.decision}}",
                   "op": "equals",
                   "right": "同意发布"
                 }
@@ -136,7 +136,7 @@
           "type": "file",
           "name": "归档已批准文件",
           "runCondition": {
-            "ref": "body_logic",
+            "ref": "body_5_4",
             "when": "true"
           },
           "actions": [
@@ -155,7 +155,7 @@
           "type": "file",
           "name": "归档已拒绝文件",
           "runCondition": {
-            "ref": "body_logic",
+            "ref": "body_5_4",
             "when": "false"
           },
           "actions": [
@@ -197,7 +197,7 @@
       "type": "script",
       "name": "7.统计汇总",
       "config": {
-        "script": "#{approved: 0, rejected: 0, total: 0, summary: \"审批完成: 0通过/0拒绝\"}"
+        "script": "let approved_list = step_6.a6_1;\nlet rejected_list = step_6.a6_2;\nlet approved = approved_list.len();\nlet rejected = rejected_list.len();\nlet total = approved + rejected;\nlet summary = \"审批完成: \" + approved + \"通过/\" + rejected + \"拒绝\";\n#{approved: approved, rejected: rejected, total: total, summary: summary}"
       }
     },
     {
