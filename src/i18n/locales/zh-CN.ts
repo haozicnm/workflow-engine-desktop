@@ -503,7 +503,7 @@ export default {
     cursor: '逐条迭代：每次运行处理一行/一项，游标跨次保存',
     loop: '一次性遍历全部数据，适合小数据内存变换',
     approval: '暂停流程等待人工审核：支持条件推荐、超时自动/手动',
-    shell: '执行任意 Shell 命令（bash/powershell/cmd），支持 {变量}',
+    shell: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用',
     file: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep',
   },
 
