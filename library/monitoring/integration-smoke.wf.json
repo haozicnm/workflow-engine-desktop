@@ -59,7 +59,7 @@
       "type": "script",
       "name": "5.数据统计计算",
       "config": {
-        "script": "#{avg: 0.0, max: 0.0, min: 0.0, count: 3, pass_count: 0, pass_rate: 0.0}"
+        "script": "// Rhai脚本：遍历数据做统计分析\nlet raw = step_4.to_string();\nlet data = parse_json(raw);\n\n// 计算分数统计\nlet total = 0.0;\nlet count = 0;\nlet max = 0.0;\nlet min = 999.0;\nlet pass_count = 0;\n\nfor item in data.items {\n    let score = item.score;\n    total += score;\n    count += 1;\n    if score > max { max = score; }\n    if score < min { min = score; }\n    if item.pass { pass_count += 1; }\n}\n\nlet avg = total / count;\nlet pass_rate = pass_count * 100 / count;\n\n#{ avg: avg, max: max, min: min, count: count, pass_count: pass_count, pass_rate: pass_rate }"
       }
     },
     {
@@ -70,18 +70,8 @@
         "conditionGroup": {
           "combinator": "and",
           "conditions": [
-            {
-              "id": "c1",
-              "left": "{{step_5.avg}}",
-              "op": "gt",
-              "right": "60"
-            },
-            {
-              "id": "c2",
-              "left": "{{step_5.pass_rate}}",
-              "op": "gte",
-              "right": "50"
-            }
+            { "id": "c1", "left": "{{step_5.avg}}", "op": "gt", "right": "60" },
+            { "id": "c2", "left": "{{step_5.pass_rate}}", "op": "gte", "right": "50" }
           ]
         }
       }
@@ -108,45 +98,24 @@
         {
           "id": "a8_1",
           "type": "create",
-          "config": {
-            "headers": "阶段,分数,是否通过"
-          }
+          "config": { "headers": "阶段,分数,是否通过" }
         },
         {
           "id": "a8_2",
           "type": "write",
           "config": {
             "value": [
-              [
-                "需求分析",
-                85,
-                "是"
-              ],
-              [
-                "架构设计",
-                92,
-                "是"
-              ],
-              [
-                "代码审查",
-                78,
-                "是"
-              ],
-              [
-                "集成测试",
-                55,
-                "否"
-              ]
+              ["需求分析", 85, "是"],
+              ["架构设计", 92, "是"],
+              ["代码审查", 78, "是"],
+              ["集成测试", 55, "否"]
             ]
           }
         },
         {
           "id": "a8_3",
           "type": "sort",
-          "config": {
-            "column": "分数",
-            "order": "desc"
-          }
+          "config": { "column": "分数", "order": "desc" }
         }
       ]
     },
@@ -154,16 +123,12 @@
       "id": "step_9",
       "type": "word",
       "name": "9.生成Word总结文档",
-      "config": {
-        "file_path": "/tmp/wf-t1-summary.docx"
-      },
+      "config": { "file_path": "/tmp/wf-t1-summary.docx" },
       "actions": [
         {
           "id": "a9_1",
           "type": "create",
-          "config": {
-            "title": "工作流教学演练 — 数据报告"
-          }
+          "config": { "title": "工作流教学演练 — 数据报告" }
         },
         {
           "id": "a9_2",
@@ -195,15 +160,13 @@
           "id": "body_11_1",
           "type": "script",
           "config": {
-            "script": "#{item_name: __item.name, score: __item.score, status: if __item.pass { \"✅通过\" } else { \"❌未通过\" }}"
+            "script": "let status = if __item.pass { \"✅通过\" } else { \"❌未通过\" };\n#{ item_name: __item.name, score: __item.score, status: status }"
           }
         },
         {
           "id": "body_11_2",
           "type": "delay",
-          "config": {
-            "duration_ms": 150
-          }
+          "config": { "duration_ms": 150 }
         }
       ]
     },
@@ -221,9 +184,7 @@
       "id": "step_13",
       "type": "delay",
       "name": "13.等待收尾",
-      "config": {
-        "duration_ms": 200
-      }
+      "config": { "duration_ms": 200 }
     },
     {
       "id": "step_14",

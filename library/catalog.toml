@@ -1,37 +1,37 @@
-# 工作流模板库 — 索引
-# 每个模板是一个独立的 .wf.json 文件
-
-[[templates]]
-name = "daily-monitor"
-version = "1.0.0"
-description = "每日全栈舆情监控 — HTTP API 数据采集 + Excel 报表 + 通知"
-params = ["hn_api", "github_api", "output_dir"]
-schedule = "0 0 9 * * * *"   # 每天 9:00
-category = "monitoring"
-file = "monitoring/daily-monitor.wf.json"
-
-[[templates]]
-name = "file-batch-approval"
-version = "1.0.0"
-description = "批量文件处理 + 人工审批流水线"
-params = ["data_dir", "file_pattern", "approval_timeout_ms"]
-schedule = ""
-category = "batch"
-file = "batch/file-batch-approval.wf.json"
+# Workflow Engine 模板库索引
+# 运行时路径: ~/.hermes/workflows/
 
 [[templates]]
 name = "integration-smoke"
-version = "1.0.0"
-description = "嵌套容错链冒烟测试 — runCondition + retry + loop + 变量引用全链路"
+version = "2.0.0"
+description = "【教学模板 ①】全类型演练 — 覆盖全部14种节点，数据在每个容器间传递。Shell→JSON解析→文件读写→脚本计算→条件判断→HTTP→Excel→Word→剪贴板→循环→通知→延迟→清理。适合学习变量引用和容器链式调用。"
 params = ["test_dir", "items_list", "delay_ms"]
 schedule = ""
 category = "stress"
 file = "stress/integration-smoke.wf.json"
 
 [[templates]]
+name = "daily-monitor"
+version = "2.0.0"
+description = "【教学模板 ②】每日智能舆情报告 — 多API聚合(HTTP×2)→JSON解析→脚本统计→条件判断→Excel报表(创建/写入/排序)→文件归档→Word摘要→系统通知。演示 HTTP管道、数据转换链、报表生成。"
+params = ["hn_api", "github_api", "output_dir"]
+schedule = "0 0 9 * * * *"
+category = "monitoring"
+file = "monitoring/daily-monitor.wf.json"
+
+[[templates]]
+name = "file-batch-approval"
+version = "2.0.0"
+description = "【教学模板 ③】智能文件审批管道 — Shell创建→文件扫描→脚本分析→条件预判→Cursor游标迭代→文件读取→风险评估→条件审批(approval_conditions动态推荐)→双分支归档→结果统计→通知。演示游标迭代、条件审批、runCondition分支归档。"
+params = ["data_dir", "file_pattern", "approval_timeout_ms"]
+schedule = ""
+category = "batch"
+file = "batch/file-batch-approval.wf.json"
+
+[[templates]]
 name = "http-approval-pipeline"
-version = "1.0.0"
-description = "HTTP 数据审批管道 — 获取数据 → 人工审批(超时自动拒绝) → 分支处理"
+version = "2.0.0"
+description = "【教学模板 ④】API数据审批决策链 — HTTP获取→JSON解析→脚本质量评估→条件预筛选→人工审批(条件推荐+auto超时)→逻辑判断→双分支处理(归档/日志)→分级通知。演示approval_conditions动态推荐、timeout_behavior、runCondition多分支。"
 params = ["api_url", "approval_timeout_ms", "notify_title"]
 schedule = ""
 category = "batch"
@@ -39,18 +39,9 @@ file = "batch/http-approval-pipeline.wf.json"
 
 [[templates]]
 name = "web-monitor-alert"
-version = "1.0.0"
-description = "网页监控告警 — 浏览器抓取 → Rhai 脚本分析 → 条件判断 → 异常通知"
+version = "2.0.0"
+description = "【教学模板 ⑤】多站点健康监控告警 — 状态初始化→文件读取上次状态→Loop多站点HTTP探测→脚本分析(响应/健康度)→趋势对比→异常判断(逻辑)→状态持久化→Excel日志追加→分级通知(异常告警/正常报告)。演示状态持久化、loop批量探测、Excel追加日志、runCondition分级。"
 params = ["target_url", "alert_threshold", "notify_title"]
-schedule = ""
+schedule = "0 */30 * * * * *"
 category = "monitoring"
 file = "monitoring/web-monitor-alert.wf.json"
-
-[[templates]]
-name = "my-test"
-version = "1.0.0"
-description = "嵌套容错链压力测试"
-params = ["test_dir", "items"]
-schedule = ""
-category = "general"
-file = "general/my-test.wf.json"

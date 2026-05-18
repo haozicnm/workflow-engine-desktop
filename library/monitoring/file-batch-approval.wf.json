@@ -37,7 +37,7 @@
       "type": "script",
       "name": "3.构建审批清单",
       "config": {
-        "script": "#{total: 3, items: []}"
+        "script": "let raw = step_2.to_string();\nlet data = parse_json(raw);\nlet entries = data.entries;\n\n// 过滤出文件（排除目录），构建审批项\nlet items = [];\nfor entry in entries {\n    if !entry.is_dir {\n        let filename = entry.name;\n        let is_secret = filename.contains(\"涉密\");\n        let is_compliance = filename.contains(\"合规\");\n        items.push(#{\n            file: filename,\n            path: entry.path,\n            is_secret: is_secret,\n            is_compliance: is_compliance,\n            risk_level: if is_secret { \"高\" } else if is_compliance { \"中\" } else { \"低\" }\n        });\n    }\n}\n#{ total: items.len, items: items }"
       }
     },
     {
@@ -48,12 +48,7 @@
         "conditionGroup": {
           "combinator": "and",
           "conditions": [
-            {
-              "id": "c1",
-              "left": "{{step_3.total}}",
-              "op": "gt",
-              "right": "0"
-            }
+            { "id": "c1", "left": "{{step_3.total}}", "op": "gt", "right": "0" }
           ]
         }
       }
@@ -73,9 +68,7 @@
             {
               "id": "ab5_1",
               "type": "read",
-              "config": {
-                "path": "{{__item.path}}"
-              }
+              "config": { "path": "{{__item.path}}" }
             }
           ]
         },
@@ -83,7 +76,7 @@
           "id": "body_5_2",
           "type": "script",
           "config": {
-            "script": "#{risk_score: 10, has_secret: false, content_length: 0, preview: \"...\"}"
+            "script": "// 分析文件内容风险\nlet file_data = step_body_5_1.to_string();\nlet data = parse_json(file_data);\nlet content = data.content.to_lower();\n\nlet has_secret = content.contains(\"涉密\");\nlet has_compliance = content.contains(\"合规\");\nlet risk_score = if has_secret { 90 } else if has_compliance { 40 } else { 10 };\n\n#{ risk_score: risk_score, has_secret: has_secret, content_length: data.size, preview: content.slice(0, 50) }"
           }
         },
         {
@@ -98,18 +91,8 @@
             "timeout_behavior": "auto",
             "timeout_action": "recommended",
             "approval_conditions": [
-              {
-                "id": "ac1",
-                "left": "{{body_script.risk_score}}",
-                "op": "lt",
-                "right": "80"
-              },
-              {
-                "id": "ac2",
-                "left": "{{body_script.has_secret}}",
-                "op": "equals",
-                "right": "false"
-              }
+              { "id": "ac1", "left": "{{body_script.risk_score}}", "op": "lt", "right": "80" },
+              { "id": "ac2", "left": "{{body_script.has_secret}}", "op": "equals", "right": "false" }
             ]
           }
         },
@@ -121,12 +104,7 @@
             "conditionGroup": {
               "combinator": "and",
               "conditions": [
-                {
-                  "id": "lc1",
-                  "left": "{{body_approval.decision}}",
-                  "op": "equals",
-                  "right": "同意发布"
-                }
+                { "id": "lc1", "left": "{{body_approval.decision}}", "op": "equals", "right": "同意发布" }
               ]
             }
           }
@@ -135,10 +113,7 @@
           "id": "body_5_5",
           "type": "file",
           "name": "归档已批准文件",
-          "runCondition": {
-            "ref": "body_logic",
-            "when": "true"
-          },
+          "runCondition": { "ref": "body_logic", "when": "true" },
           "actions": [
             {
               "id": "ab5_5a",
@@ -154,10 +129,7 @@
           "id": "body_5_6",
           "type": "file",
           "name": "归档已拒绝文件",
-          "runCondition": {
-            "ref": "body_logic",
-            "when": "false"
-          },
+          "runCondition": { "ref": "body_logic", "when": "false" },
           "actions": [
             {
               "id": "ab5_6a",
@@ -179,16 +151,12 @@
         {
           "id": "a6_1",
           "type": "list",
-          "config": {
-            "path": "/tmp/wf-approval-batch/approved"
-          }
+          "config": { "path": "/tmp/wf-approval-batch/approved" }
         },
         {
           "id": "a6_2",
           "type": "list",
-          "config": {
-            "path": "/tmp/wf-approval-batch/rejected"
-          }
+          "config": { "path": "/tmp/wf-approval-batch/rejected" }
         }
       ]
     },
@@ -197,7 +165,7 @@
       "type": "script",
       "name": "7.统计汇总",
       "config": {
-        "script": "#{approved: 0, rejected: 0, total: 0, summary: \"审批完成: 0通过/0拒绝\"}"
+        "script": "let raw = step_6.to_string();\nlet data = parse_json(raw);\n\nlet approved = 0;\nlet rejected = 0;\nfor entry in data.entries {\n    if entry.is_dir { continue; }\n    if entry.name.contains(\"approved\") || entry.path.contains(\"approved\") {\n        approved += 1;\n    } else {\n        rejected += 1;\n    }\n}\n\n// 更简单的计数方式\nlet total = approved + rejected;\n#{ approved: approved, rejected: rejected, total: total, summary: \"审批完成: \" + approved.to_string() + \"通过/\" + rejected.to_string() + \"拒绝\" }"
       }
     },
     {

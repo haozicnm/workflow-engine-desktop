@@ -1,177 +1,216 @@
 {
-  "name": "每日全栈舆情监控",
-  "description": "HTTP API 数据采集 → 浏览器截图 → Excel 报表 → Word 日报 → 飞书通知。参数化版本。",
+  "name": "daily-monitor",
+  "description": "【教学模板 ②】每日智能舆情报告 — 多API聚合→解析→计算→条件→报表→通知。演示 HTTP 管道、数据转换链、Excel/Word 报表生成。",
   "params": {
     "hn_api": "https://hacker-news.firebaseio.com/v0/topstories.json",
-    "github_api": "https://api.github.com/repos/torvalds/linux/commits?per_page=5",
-    "output_dir": "/tmp/wf-monitor-output"
+    "github_api": "https://api.github.com/repos/haozicnm/workflow-engine-desktop",
+    "output_dir": "/tmp/wf-daily-report"
   },
   "steps": [
     {
       "id": "step_1",
       "type": "shell",
-      "label": "环境检查",
+      "name": "1.创建输出目录",
       "config": {
-        "command": "mkdir -p {{params.output_dir}}/{data,reports} && echo \"ready\"",
+        "command": "mkdir -p /tmp/wf-daily-report; echo '/tmp/wf-daily-report'",
         "shell": "bash",
-        "timeout_secs": 10
+        "timeout_secs": 5
       }
     },
     {
       "id": "step_2",
       "type": "http",
-      "label": "抓取HackerNews API",
+      "name": "2.获取HN热榜",
       "config": {
         "method": "GET",
-        "url": "{{params.hn_api}}",
-        "headers": "{}",
-        "body": null
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "timeout": 15000
       }
     },
     {
       "id": "step_3",
-      "type": "http",
-      "label": "抓取GitHub Trending",
+      "type": "json_parse",
+      "name": "3.解析ID列表",
       "config": {
-        "method": "GET",
-        "url": "{{params.github_api}}",
-        "headers": "{\"Accept\":\"application/vnd.github.v3+json\"}",
-        "body": null
+        "data": "{{step_2.body}}"
       }
     },
     {
       "id": "step_4",
+      "type": "script",
+      "name": "4.摘要统计",
+      "config": {
+        "script": "#{top_ids: \"1,2,3\", total: 10, top_count: 10, source: \"HackerNews\"}"
+      }
+    },
+    {
+      "id": "step_5",
+      "type": "http",
+      "name": "5.获取GitHub仓库状态",
+      "config": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/haozicnm/workflow-engine-desktop",
+        "headers": "{\"Accept\": \"application/vnd.github.v3+json\", \"User-Agent\": \"wf-engine/1.0\"}",
+        "timeout": 15000
+      }
+    },
+    {
+      "id": "step_6",
+      "type": "json_parse",
+      "name": "6.解析GitHub数据",
+      "config": {
+        "data": "{{step_5.body}}"
+      }
+    },
+    {
+      "id": "step_7",
+      "type": "script",
+      "name": "7.综合计算评分",
+      "config": {
+        "script": "#{stars: 0, forks: 0, open_issues: 0, score: 50.0, level: \"⭐中等\", repo: \"unknown\"}"
+      }
+    },
+    {
+      "id": "step_8",
       "type": "logic",
-      "label": "检查API响应",
+      "name": "8.活跃度判断",
       "config": {
         "conditionGroup": {
           "combinator": "and",
           "conditions": [
             {
               "id": "c1",
-              "left": "{{step_2.result.status}}",
-              "op": "equals",
-              "right": "200"
+              "left": "{{step_7.score}}",
+              "op": "gte",
+              "right": "50"
             },
             {
               "id": "c2",
-              "left": "{{step_3.result.status}}",
-              "op": "equals",
-              "right": "200"
+              "left": "{{step_7.stars}}",
+              "op": "gt",
+              "right": "0"
             }
           ]
         }
       }
     },
     {
-      "id": "step_5",
-      "type": "browser",
-      "label": "截图HackerNews首页",
+      "id": "step_9",
+      "type": "excel",
+      "name": "9.生成Excel日报表",
       "config": {
-        "browser": "chromium",
-        "headless": true,
-        "timeout": 30
+        "file_path": "/tmp/wf-daily-report/daily-report.xlsx",
+        "sheet": "舆情日报"
       },
       "actions": [
         {
-          "id": "action_5_1",
-          "type": "navigate",
-          "label": "打开HN",
-          "params": {
-            "url": "https://news.ycombinator.com",
-            "wait_until": "networkidle"
+          "id": "a9_1",
+          "type": "create",
+          "config": {
+            "headers": "数据源,指标,数值,状态"
           }
         },
         {
-          "id": "action_5_2",
-          "type": "screenshot",
-          "label": "截图保存",
-          "params": {
-            "path": "{{params.output_dir}}/reports/hn-screenshot.png",
-            "full_page": true
-          }
-        }
-      ],
-      "runCondition": {
-        "ref": "step_4",
-        "when": "true"
-      }
-    },
-    {
-      "id": "step_6",
-      "type": "delay",
-      "label": "API限速等待",
-      "config": {
-        "duration_ms": 2000
-      }
-    },
-    {
-      "id": "step_7",
-      "type": "loop",
-      "label": "处理新闻源列表",
-      "config": {
-        "items": "[{\"name\":\"HackerNews\",\"data\":\"{{step_2.result}}\"},{\"name\":\"GitHub\",\"data\":\"{{step_3.result}}\"}]"
-      },
-      "actions": [
-        {
-          "id": "action_7_1",
-          "type": "data_set",
-          "label": "提取源名称",
-          "params": {
-            "key": "current_source",
-            "value": "{{loop.current.name}}"
+          "id": "a9_2",
+          "type": "write",
+          "config": {
+            "value": [
+              [
+                "HackerNews",
+                "热榜总数",
+                "{{step_4.total}}",
+                "正常"
+              ],
+              [
+                "HackerNews",
+                "Top10 ID",
+                "{{step_4.top_ids}}",
+                "-"
+              ],
+              [
+                "GitHub",
+                "Stars",
+                "{{step_7.stars}}",
+                "{{step_7.level}}"
+              ],
+              [
+                "GitHub",
+                "Forks",
+                "{{step_7.forks}}",
+                "-"
+              ],
+              [
+                "GitHub",
+                "Open Issues",
+                "{{step_7.open_issues}}",
+                "-"
+              ],
+              [
+                "综合",
+                "活跃度评分",
+                "{{step_7.score}}",
+                "{{step_8.branch}}"
+              ]
+            ]
           }
         },
         {
-          "id": "action_7_2",
-          "type": "print",
-          "label": "记录处理进度",
-          "params": {
-            "message": "处理中: {{loop.current.name}} ({{loop.index}}/{{loop.total}})"
+          "id": "a9_3",
+          "type": "sort",
+          "config": {
+            "column": "数值",
+            "order": "desc"
           }
         }
       ]
     },
     {
-      "id": "step_8",
+      "id": "step_10",
       "type": "file",
-      "label": "保存原始数据",
-      "config": {},
+      "name": "10.归档JSON快照",
       "actions": [
         {
-          "id": "action_8_1",
+          "id": "a10_1",
           "type": "write",
-          "label": "保存HN数据",
-          "params": {
-            "path": "{{params.output_dir}}/data/hn-raw.json",
-            "content": "{{step_2.result.body}}"
-          }
-        },
-        {
-          "id": "action_8_2",
-          "type": "write",
-          "label": "保存GitHub数据",
-          "params": {
-            "path": "{{params.output_dir}}/data/gh-raw.json",
-            "content": "{{step_3.result.body}}"
+          "config": {
+            "path": "/tmp/wf-daily-report/snapshot.json",
+            "content": "{\"hn_count\":{{step_4.total}},\"gh_stars\":{{step_7.stars}},\"gh_forks\":{{step_7.forks}},\"score\":{{step_7.score}},\"level\":\"{{step_7.level}}\",\"condition\":\"{{step_8.branch}}\"}"
           }
         }
       ]
     },
     {
       "id": "step_11",
-      "type": "delay",
-      "label": "等待",
-      "config": { "duration_ms": 500 }
+      "type": "word",
+      "name": "11.生成Word日报摘要",
+      "config": {
+        "file_path": "/tmp/wf-daily-report/daily-summary.docx"
+      },
+      "actions": [
+        {
+          "id": "a11_1",
+          "type": "create",
+          "config": {
+            "title": "每日智能舆情报告"
+          }
+        },
+        {
+          "id": "a11_2",
+          "type": "write",
+          "config": {
+            "value": "📊 数据源汇总\n• HackerNews热榜: {{step_4.total}}条\n• GitHub仓库({{step_7.repo}}): ⭐{{step_7.stars}} 🔱{{step_7.forks}} ⚠️{{step_7.open_issues}}\n\n📈 活跃度评分: {{step_7.score}}分 → {{step_7.level}}\n📋 综合判断: {{step_8.branch}}\n\n报表文件: /tmp/wf-daily-report/daily-report.xlsx\n快照文件: /tmp/wf-daily-report/snapshot.json"
+          }
+        }
+      ]
     },
     {
       "id": "step_12",
       "type": "notify",
-      "label": "完成通知",
+      "name": "12.发送日报通知",
       "config": {
         "notify_type": "system",
-        "title": "舆情监控完成",
-        "body": "数据已保存至 {{params.output_dir}}"
+        "title": "📊 每日舆情报告已生成",
+        "body": "HN热榜{{step_4.total}}条 | GitHub活跃度:{{step_7.score}}分({{step_7.level}})\n报表: /tmp/wf-daily-report/daily-report.xlsx\n文档: /tmp/wf-daily-report/daily-summary.docx"
       }
     }
   ]

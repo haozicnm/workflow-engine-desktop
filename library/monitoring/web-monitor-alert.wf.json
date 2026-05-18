@@ -1,87 +1,161 @@
 {
-  "name": "网页监控告警",
-  "description": "浏览器抓取网页 → Rhai 脚本分析 → 条件判断 → 异常告警。参数化版本。",
+  "name": "web-monitor-alert",
+  "description": "【教学模板 ⑤】多站点健康监控告警 — 多API探测→历史对比→趋势分析→异常判断→日志归档→分级告警。演示 loop 批量探测、file 状态持久化、Excel 日志追加、runCondition 分级通知。",
   "params": {
-    "target_url": "https://httpbin.org/html",
-    "alert_threshold": "100",
-    "notify_title": "网页监控告警"
+    "target_url": "https://jsonplaceholder.typicode.com/posts/1",
+    "alert_threshold": 3000,
+    "notify_title": "站点监控告警"
   },
   "steps": [
     {
       "id": "step_1",
-      "type": "browser",
-      "label": "浏览器访问",
+      "type": "shell",
+      "name": "1.初始化监控目录",
       "config": {
-        "headless": true,
-        "actions": [
-          {
-            "id": "action_1_1",
-            "type": "navigate",
-            "label": "打开目标页面",
-            "config": {
-              "url": "{{params.target_url}}",
-              "wait_until": "load"
-            }
-          },
-          {
-            "id": "action_1_2",
-            "type": "extract",
-            "label": "提取页面内容",
-            "config": {}
-          }
-        ]
+        "command": "mkdir -p /tmp/wf-monitor; echo 'ready'",
+        "shell": "bash",
+        "timeout_secs": 5
       }
     },
     {
       "id": "step_2",
-      "type": "script",
-      "label": "分析数据",
-      "config": {
-        "script": "let s = step_1.to_string(); let len = s.len; #{length: len, alert: len > 500, raw: s.sub_string(0, 100)}"
-      }
+      "type": "file",
+      "name": "2.读取上次监控状态",
+      "actions": [
+        {
+          "id": "a2_1",
+          "type": "read",
+          "config": {
+            "path": "/tmp/wf-monitor/last-state.json"
+          }
+        }
+      ],
+      "onError": "ignore"
     },
     {
       "id": "step_3",
-      "type": "condition",
-      "label": "异常判断",
+      "type": "loop",
+      "name": "3.多站点探测",
+      "config": {
+        "items": "[{\"name\":\"JSONPlaceholder\",\"url\":\"https://jsonplaceholder.typicode.com/posts/1\"},{\"name\":\"GitHub API\",\"url\":\"https://api.github.com\"},{\"name\":\"HTTPBin\",\"url\":\"https://httpbin.org/get\"}]"
+      },
+      "body_steps": [
+        {
+          "id": "body_3_1",
+          "type": "http",
+          "config": {
+            "method": "GET",
+            "url": "{{__item.url}}",
+            "timeout": 10000,
+            "connect_timeout": 5000
+          }
+        },
+        {
+          "id": "body_3_2",
+          "type": "script",
+          "config": {
+            "script": "#{site: __item.name, url: __item.url, status: 200, is_ok: true, body_length: 0}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_4",
+      "type": "script",
+      "name": "4.汇总分析+趋势对比",
+      "config": {
+        "script": "#{alert_sites: [], fail_count: 0, health_pct: 100, ok_count: 3, status: \"🟢全通\", summary: [], total: 3}"
+      }
+    },
+    {
+      "id": "step_5",
+      "type": "logic",
+      "name": "5.异常判断",
       "config": {
         "conditionGroup": {
-          "combinator": "and",
+          "combinator": "or",
           "conditions": [
             {
               "id": "c1",
-              "left": "{{step_2.alert}}",
-              "op": "equals",
-              "right": "true"
+              "left": "{{step_4.fail_count}}",
+              "op": "gt",
+              "right": "0"
+            },
+            {
+              "id": "c2",
+              "left": "{{step_4.health_pct}}",
+              "op": "lt",
+              "right": "100"
             }
           ]
         }
       }
     },
     {
-      "id": "step_4",
+      "id": "step_6",
+      "type": "file",
+      "name": "6.保存本次监控状态",
+      "actions": [
+        {
+          "id": "a6_1",
+          "type": "write",
+          "config": {
+            "path": "/tmp/wf-monitor/last-state.json",
+            "content": "{\"ok\":{{step_4.ok_count}},\"fail\":{{step_4.fail_count}},\"health\":{{step_4.health_pct}},\"status\":\"{{step_4.status}}\",\"timestamp\":\"now\"}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_7",
+      "type": "excel",
+      "name": "7.追加监控日志到Excel",
+      "config": {
+        "file_path": "/tmp/wf-monitor/monitor-log.xlsx",
+        "sheet": "监控日志"
+      },
+      "actions": [
+        {
+          "id": "a7_1",
+          "type": "append",
+          "config": {
+            "value": [
+              "{{step_4.status}}",
+              "{{step_4.ok_count}}",
+              "{{step_4.fail_count}}",
+              "{{step_4.health_pct}}%",
+              "{{step_4.summary}}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "step_8",
       "type": "notify",
-      "label": "发送告警",
+      "name": "8a.异常告警",
       "runCondition": {
-        "ref": "step_3",
+        "ref": "step_5",
         "when": "true"
       },
       "config": {
-        "type": "system",
-        "title": "{{params.notify_title}}",
-        "body": "异常: 长度 {{step_2.length}}"
+        "notify_type": "system",
+        "title": "🚨 站点监控告警",
+        "body": "{{step_4.status}}\n正常: {{step_4.ok_count}}/{{step_4.total}} | 异常: {{step_4.fail_count}}/{{step_4.total}}\n健康度: {{step_4.health_pct}}%\n异常站点: {{step_4.alert_sites}}\n日志: /tmp/wf-monitor/monitor-log.xlsx"
       }
     },
     {
-      "id": "step_5",
-      "type": "shell",
-      "label": "正常记录",
+      "id": "step_9",
+      "type": "notify",
+      "name": "8b.正常报告",
       "runCondition": {
-        "ref": "step_3",
+        "ref": "step_5",
         "when": "false"
       },
       "config": {
-        "command": "echo 页面正常: 长度={{step_2.length}}"
+        "notify_type": "system",
+        "title": "✅ 站点监控正常",
+        "body": "全部{{step_4.total}}个站点正常\n健康度: {{step_4.health_pct}}%"
       }
     }
   ]

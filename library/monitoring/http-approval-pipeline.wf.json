@@ -30,7 +30,7 @@
       "type": "script",
       "name": "3.数据质量评估",
       "config": {
-        "script": "#{body_len: 100, fields_ok: 4, id: 1, level: \"优秀\", quality: 80.0, title: \"测试标题\", title_len: 4, userId: 1}"
+        "script": "// 评估API返回数据的完整性和质量\nlet raw = step_2.to_string();\nlet data = parse_json(raw);\n\nlet has_userId = data.userId != ();\nlet has_id = data.id != ();\nlet has_title = data.title != ();\nlet has_body = data.body != ();\n\nlet title_len = if has_title { data.title.len } else { 0 };\nlet body_len = if has_body { data.body.len } else { 0 };\nlet fields_ok = if has_userId && has_id && has_title && has_body { 4 } else { 0 };\n\n// 质量评分: 字段完整度60分 + 内容长度40分\nlet quality = if fields_ok >= 4 { 60.0 + (if title_len > 5 { 20.0 } else { 0.0 }) + (if body_len > 50 { 20.0 } else { 0.0 }) } else { 20.0 };\nlet level = if quality >= 80 { \"优秀\" } else if quality >= 60 { \"合格\" } else { \"不合格\" };\n\n#{ \n    fields_ok: fields_ok, title_len: title_len, body_len: body_len,\n    quality: quality, level: level, \n    title: data.title, userId: data.userId, id: data.id\n}"
       }
     },
     {
@@ -41,18 +41,8 @@
         "conditionGroup": {
           "combinator": "and",
           "conditions": [
-            {
-              "id": "c1",
-              "left": "{{step_3.fields_ok}}",
-              "op": "gte",
-              "right": "4"
-            },
-            {
-              "id": "c2",
-              "left": "{{step_3.quality}}",
-              "op": "gte",
-              "right": "40"
-            }
+            { "id": "c1", "left": "{{step_3.fields_ok}}", "op": "gte", "right": "4" },
+            { "id": "c2", "left": "{{step_3.quality}}", "op": "gte", "right": "40" }
           ]
         }
       }
@@ -71,24 +61,9 @@
         "timeout_behavior": "auto",
         "timeout_action": "recommended",
         "approval_conditions": [
-          {
-            "id": "ac1",
-            "left": "{{step_3.quality}}",
-            "op": "gte",
-            "right": "60"
-          },
-          {
-            "id": "ac2",
-            "left": "{{step_3.fields_ok}}",
-            "op": "gte",
-            "right": "4"
-          },
-          {
-            "id": "ac3",
-            "left": "{{step_3.title_len}}",
-            "op": "gt",
-            "right": "5"
-          }
+          { "id": "ac1", "left": "{{step_3.quality}}", "op": "gte", "right": "60" },
+          { "id": "ac2", "left": "{{step_3.fields_ok}}", "op": "gte", "right": "4" },
+          { "id": "ac3", "left": "{{step_3.title_len}}", "op": "gt", "right": "5" }
         ]
       }
     },
@@ -100,18 +75,8 @@
         "conditionGroup": {
           "combinator": "or",
           "conditions": [
-            {
-              "id": "c1",
-              "left": "{{step_5.decision}}",
-              "op": "equals",
-              "right": "批准发布"
-            },
-            {
-              "id": "c2",
-              "left": "{{step_5.decision}}",
-              "op": "equals",
-              "right": "需修改"
-            }
+            { "id": "c1", "left": "{{step_5.decision}}", "op": "equals", "right": "批准发布" },
+            { "id": "c2", "left": "{{step_5.decision}}", "op": "equals", "right": "需修改" }
           ]
         }
       }
@@ -120,10 +85,7 @@
       "id": "step_7",
       "type": "file",
       "name": "7a.导出批准记录",
-      "runCondition": {
-        "ref": "step_6",
-        "when": "true"
-      },
+      "runCondition": { "ref": "step_6", "when": "true" },
       "actions": [
         {
           "id": "a7_1",
@@ -139,10 +101,7 @@
       "id": "step_8",
       "type": "shell",
       "name": "7b.记录拒绝日志",
-      "runCondition": {
-        "ref": "step_6",
-        "when": "false"
-      },
+      "runCondition": { "ref": "step_6", "when": "false" },
       "config": {
         "command": "echo \"[REJECTED] $(date): {{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}} - 原因:{{step_5.comment}}\" >> /tmp/wf-rejected.log; echo 'logged'",
         "shell": "bash",
@@ -153,10 +112,7 @@
       "id": "step_9",
       "type": "notify",
       "name": "8a.通知批准结果",
-      "runCondition": {
-        "ref": "step_6",
-        "when": "true"
-      },
+      "runCondition": { "ref": "step_6", "when": "true" },
       "config": {
         "notify_type": "system",
         "title": "✅ 数据审批通过",
@@ -167,10 +123,7 @@
       "id": "step_10",
       "type": "notify",
       "name": "8b.通知拒绝结果",
-      "runCondition": {
-        "ref": "step_6",
-        "when": "false"
-      },
+      "runCondition": { "ref": "step_6", "when": "false" },
       "config": {
         "notify_type": "system",
         "title": "❌ 数据审批未通过",
