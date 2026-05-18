@@ -509,20 +509,20 @@ export default {
 
   // ─── 容器输出提示 ───
   nodeOutputHint: {
-    browser: '{ actionId: value, ... }',
-    excel: '{ actionId: value, ... }',
-    word: '{ actionId: value, ... }',
-    logic: '{ branch: "true"/"false", value, result }',
-    http: '{ status, headers, body }',
-    delay: '{ waited: ms }',
-    notify: '{ sent: true }',
+    browser: 'actionId: value, ...',
+    excel: 'actionId: value, ...',
+    word: 'actionId: value, ...',
+    logic: 'branch: true/false, value, result',
+    http: 'status, headers, body',
+    delay: 'waited: ms',
+    notify: 'sent: true',
     script: '脚本返回值',
     clipboard: '剪贴板内容',
-    cursor: '{ done, item, index, total }',
-    loop: '{ count, results[] }',
-    approval: '{ decision: "选项名", comment, item, auto?, recommendation_reason? }',
-    shell: '{ stdout, stderr, exit_code }',
-    file: '{ actionId: result, ... }',
+    cursor: 'done, item, index, total',
+    loop: 'count, results[]',
+    approval: 'decision: 选项名, comment, item, auto?, recommendation_reason?',
+    shell: 'stdout, stderr, exit_code',
+    file: 'actionId: result, ...',
   },
 
   // ─── 动作标签 ───

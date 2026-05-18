@@ -13,24 +13,24 @@ type TFn = (key: string, defaultMsg?: string) => string
 // ─── 容器定义 ───
 
 export const CONTAINER_DEFS: ContainerDef[] = [
-  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#79c0ff', isContainer: true, description: '网页操作：导航、点击、输入、提取', outputHint: '{ actionId: value, ... }', params: [
+  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#79c0ff', isContainer: true, description: '网页操作：导航、点击、输入、提取', outputHint: 'actionId: value, ...', params: [
     { key: 'browser', label: '浏览器', type: 'select', options: [
       { label: 'Chromium', value: 'chromium' }, { label: 'Firefox', value: 'firefox' }, { label: 'WebKit', value: 'webkit' },
     ], default: 'chromium' },
     { key: 'headless', label: '无头模式', type: 'checkbox', default: false },
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
   ]},
-  { type: 'excel', label: 'Excel', icon: 'BarChart3', color: '#3fb950', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', outputHint: '{ actionId: value, ... }', params: [
+  { type: 'excel', label: 'Excel', icon: 'BarChart3', color: '#3fb950', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', outputHint: 'actionId: value, ...', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './data.xlsx' },
     { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
   ]},
-  { type: 'word', label: 'Word', icon: 'FileText', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: '{ actionId: value, ... }', params: [
+  { type: 'word', label: 'Word', icon: 'FileText', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: 'actionId: value, ...', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './document.docx' },
   ]},
-  { type: 'logic', label: '条件判断', icon: 'GitBranch', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: '{ branch: "true"/"false", value, result }', params: [
+  { type: 'logic', label: '条件判断', icon: 'GitBranch', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: 'branch: true/false, value, result', params: [
     { key: 'condition', label: '条件表达式', type: 'text', placeholder: '{{step1.output}} == "异常"' },
   ]},
-  { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: '{ status, headers, body }', params: [
+  { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: 'status, headers, body', params: [
     { key: 'method', label: '方法', type: 'select', options: [
       { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },
       { label: 'PUT', value: 'PUT' }, { label: 'DELETE', value: 'DELETE' },
@@ -42,11 +42,11 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
     { key: 'connect_timeout', label: '连接超时(ms)', type: 'number', default: 10000 },
   ]},
-  { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#adbac7', description: '等待指定时间后继续', outputHint: '{ waited: ms }', params: [
+  { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#adbac7', description: '等待指定时间后继续', outputHint: 'waited: ms', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
     { key: 'max_duration_ms', label: '最大毫秒(随机)', type: 'number', default: 5000 },
   ]},
-  { type: 'notify', label: '通知', icon: 'Bell', color: '#f0883e', description: '发送通知：系统通知/Webhook', outputHint: '{ sent: true }', params: [
+  { type: 'notify', label: '通知', icon: 'Bell', color: '#f0883e', description: '发送通知：系统通知/Webhook', outputHint: 'sent: true', params: [
     { key: 'notify_type', label: '渠道', type: 'select', options: [
       { label: '系统通知', value: 'system' }, { label: 'Webhook', value: 'webhook' },
     ], default: 'system' },
@@ -69,15 +69,15 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     ], default: 'read' },
     { key: 'text', label: '写入内容', type: 'textarea' },
   ]},
-  { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: '{ done, item, index, total }', params: [
+  { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: 'done, item, index, total', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
   ]},
-  { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: '{ count, results[] }', params: [
+  { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: 'count, results[]', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
     { key: 'collect', label: '结果聚合 (JSON)', type: 'textarea', placeholder: '{"field": "id", "method": "concat"}' },
     { key: 'table', label: '表格输出 (JSON)', type: 'textarea', placeholder: '{"columns": ["name","value"]}' },
   ]},
-  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: '{ decision: "选项名", comment, item, auto?, recommendation_reason? }', params: [
+  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: 'decision: 选项名, comment, item, auto?, recommendation_reason?', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
     { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step_1.action_1_1.订单号}}' },
     { key: 'options', label: '审批选项', type: 'text', placeholder: '同意,拒绝,需要更多信息（逗号分隔）', default: '同意,拒绝' },
@@ -97,7 +97,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '标记失败', value: 'fail' },
     ], default: 'recommended' },
   ]},
-  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: '{ stdout, stderr, exit_code }', params: [
+  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: 'stdout, stderr, exit_code', params: [
     { key: 'command', label: '命令', type: 'textarea', placeholder: 'echo "Hello {{name}}"' },
     { key: 'shell', label: 'Shell 类型', type: 'select', options: [
       { label: '自动检测', value: 'auto' },
@@ -108,7 +108,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'cwd', label: '工作目录', type: 'text', placeholder: '/home/user/project' },
     { key: 'timeout_secs', label: '超时(秒)', type: 'number', default: 300 },
   ]},
-  { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: '{ actionId: result, ... }', isContainer: true, params: []},
+  { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: 'actionId: result, ...', isContainer: true, params: []},
 ]
 
 export function getContainerDef(type: string, t?: TFn): ContainerDef {
