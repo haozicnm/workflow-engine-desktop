@@ -10,7 +10,10 @@ import {
   SelectItemIndicator,
   SelectIcon,
 } from 'radix-vue'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 export interface SelectOption {
   value: string
@@ -43,7 +46,7 @@ defineEmits<{
         '[&>span]:line-clamp-1',
       )"
     >
-      <SelectValue :placeholder="placeholder ?? 'Select...'" />
+      <SelectValue :placeholder="placeholder ?? t('common.selectDefault')" />
       <SelectIcon as-child>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground">
           <path d="m6 9 6 6 6-6" />
@@ -55,7 +58,7 @@ defineEmits<{
       position="popper"
       :side-offset="4"
       :class="cn(
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden',
+        'relative z-[60] max-h-96 min-w-[8rem] overflow-hidden',
         'rounded-md border border-border bg-popover shadow-xl',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',

@@ -69,6 +69,7 @@
   --color-popover: #161b22;
   --color-popover-foreground: #e6edf3;
   --color-primary: #58a6ff;
+  --color-primary-badge-bg: rgba(88, 166, 255, 0.2);
   --color-primary-foreground: #0d1117;
   --color-secondary: #21262d;
   --color-secondary-foreground: #e6edf3;

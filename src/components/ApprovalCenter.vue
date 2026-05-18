@@ -145,7 +145,7 @@ onUnmounted(() => {
   <!-- 浮动按钮：显示待审批数量 -->
   <button
     v-if="pendingCount > 0"
-    class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors cursor-pointer"
+    class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors cursor-pointer"
     @click="visible = !visible"
   >
     <Hand class="w-5 h-5" />
@@ -158,7 +158,7 @@ onUnmounted(() => {
     <Transition name="slide">
       <div
         v-if="visible && pendingCount > 0"
-        class="fixed inset-y-0 right-0 z-50 w-[420px] bg-background border-l border-border shadow-2xl flex flex-col"
+        class="fixed inset-y-0 right-0 z-[60] w-[420px] bg-background border-l border-border shadow-2xl flex flex-col"
       >
         <!-- 头部 -->
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">

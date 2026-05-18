@@ -55,6 +55,7 @@ export default {
     required: '必填',
     placeholder: '请输入',
     selectPlaceholder: '请选择',
+    selectDefault: '选择...',
   },
 
   // ─── 导航/侧边栏 ───
@@ -225,6 +226,11 @@ export default {
     noParams: '此动作无需参数',
     dataFrom: '数据来自:',
     noUpstream: '无上游输入',
+    insertVariable: '引用变量',
+    stepLabel: '步骤',
+    outputLabel: '输出:',
+    entireOutput: '整个输出',
+    sameContainerBadge: '容器内',
   },
 
   // ─── 逻辑分支/条件构建器 ───

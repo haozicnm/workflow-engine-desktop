@@ -54,6 +54,7 @@ export default {
     required: 'Required',
     placeholder: 'Enter',
     selectPlaceholder: 'Select',
+    selectDefault: 'Select...',
   },
 
   nav: {
@@ -219,6 +220,11 @@ export default {
     noParams: 'This action has no parameters',
     dataFrom: 'Data from:',
     noUpstream: 'No upstream input',
+    insertVariable: 'Insert Variable',
+    stepLabel: 'Step',
+    outputLabel: 'Output:',
+    entireOutput: 'Entire Output',
+    sameContainerBadge: 'Same Container',
   },
 
   logic: {

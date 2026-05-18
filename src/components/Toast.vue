@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ActionIcon from './ActionIcon.vue'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   message: string
@@ -77,7 +80,7 @@ const iconMap = {
     <button
       class="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 transition-colors"
       @click="dismissNow"
-      :aria-label="$t('common.close')"
+      :aria-label="t('common.close')"
     >✕</button>
   </div>
 </template>

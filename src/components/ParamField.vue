@@ -2,6 +2,7 @@
 // ParamField — 统一参数字段渲染组件
 // 支持 text/number/select/checkbox/textarea，text/textarea 自带变量引用下拉
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Target, Link } from 'lucide-vue-next'
 import type { StepGroup } from '../composables/useVariableRefs'
 import Input from './ui/input/Input.vue'
@@ -10,6 +11,8 @@ import Textarea from './ui/textarea/Textarea.vue'
 import Checkbox from './ui/checkbox/Checkbox.vue'
 import Select from './ui/select/Select.vue'
 import Button from './ui/button/Button.vue'
+
+const { t } = useI18n()
 
 
 
@@ -176,7 +179,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
             class="flex-1 h-6 w-full text-[11px] px-1.5 text-left"
             @click="toggleDropdown"
           >
-            引用变量
+            {{ t('actionRow.insertVariable') }}
           </Button>
           <!-- Backdrop -->
           <div
@@ -188,7 +191,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
           <Teleport to="body">
             <div
               v-if="openDropdown"
-              class="fixed z-[9999] w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md shadow-lg"
+              class="fixed z-[60] w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md shadow-lg"
               :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
             >
             <div
@@ -198,11 +201,11 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
               <!-- Step header -->
               <div class="px-2 py-1.5 text-[11px] font-semibold text-foreground bg-muted/50 border-b border-border/50 flex items-center gap-1.5 sticky top-0">
                 <span>{{ group.stepIcon }}</span>
-                <span>步骤{{ group.stepId.replace('step_', '') }} · {{ group.stepLabel }}</span>
+                <span>{{ t('actionRow.stepLabel') }}{{ group.stepId.replace('step_', '') }} · {{ group.stepLabel }}</span>
               </div>
               <!-- Output hint -->
-              <div v-if="group.outputHint" class="px-2 py-0.5 text-[9px] text-muted-foreground/60 bg-muted/30 font-mono">
-                输出: {{ group.outputHint }}
+              <div v-if="group.outputHint" class="px-2 py-0.5 text-[10px] text-muted-foreground/60 bg-muted/30 font-mono">
+                {{ t('actionRow.outputLabel') }} {{ group.outputHint }}
               </div>
               <!-- Step-level -->
               <Button
@@ -211,7 +214,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
                 class="w-full justify-start h-auto px-2 py-1 pl-5 text-[11px]"
                 @click="selectRef(group.stepRef)"
               >
-                ⚡ 整个输出
+                ⚡ {{ t('actionRow.entireOutput') }}
               </Button>
               <!-- Actions -->
               <Button
@@ -223,7 +226,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
                 @click="selectRef(act.ref)"
               >
                 ⚡ {{ act.label }}
-                <span v-if="act.isSameContainer" class="text-[9px] text-primary/70 ml-0.5">容器内</span>
+                <span v-if="act.isSameContainer" class="text-[10px] text-primary/70 ml-0.5">{{ t('actionRow.sameContainerBadge') }}</span>
               </Button>
             </div>
             </div>
@@ -244,7 +247,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
 
     <!-- Data hint -->
     <div v-if="dataHint" class="text-[11px] px-2 py-1 mt-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
-      数据来自: <span class="font-medium text-foreground">{{ dataHint }}</span>
+      {{ t('actionRow.dataFrom') }} <span class="font-medium text-foreground">{{ dataHint }}</span>
     </div>
   </div>
 </template>

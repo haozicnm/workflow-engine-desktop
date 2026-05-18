@@ -150,7 +150,7 @@ const conditionLabel = computed(() => {
   const refStep = (props.steps || []).find(s => s.id === rc.ref)
   const name = refStep?.label || rc.ref
   if (rc.when === 'both') return `📌 ${name}`
-  if (rc.when === 'merge') return `合并:${name}`
+  if (rc.when === 'merge') return `↔ ${name}`
   return `📌 ${name}=${rc.when === 'true' ? 'T' : 'F'}`
 })
 function setCondition(ref: string, when: 'true' | 'false' | 'both' | 'merge') {
@@ -228,14 +228,14 @@ function closeAllMenus() {
       <Badge
         v-if="step.onError && step.onError !== 'fail'"
         variant="warning"
-        class="text-[10px] px-1.5 py-0 shrink-0"
+        class="text-[10px] px-1.5 py-0.5 shrink-0"
         :title="errStrategyLabel"
       >{{ errStrategyLabel }}</Badge>
 
       <Badge
         v-if="step.runCondition"
         variant="outline"
-        class="text-[10px] px-1.5 py-0 border-warning/40 text-warning bg-warning/10 shrink-0"
+        class="text-[10px] px-1.5 py-0.5 border-warning/40 text-warning bg-warning/10 shrink-0"
         :title="conditionLabel"
       >{{ conditionLabel }}</Badge>
 
@@ -282,7 +282,7 @@ function closeAllMenus() {
       />
       <div
         v-if="showMenu"
-        class="fixed z-50 w-52 bg-background border border-border rounded-md shadow-lg py-1"
+        class="fixed z-[60] w-52 bg-background border border-border rounded-md shadow-lg py-1"
         :style="menuPosStyle"
       >
           <!-- 容器设置 -->
@@ -465,8 +465,8 @@ function closeAllMenus() {
   100% { transform: translateX(350%); }
 }
 @keyframes animate-pulse-step {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 8px 2px var(--color-warning); }
+  0%, 100% { outline: 2px solid transparent; outline-offset: -1px; }
+  50% { outline: 2px solid var(--color-warning); outline-offset: -1px; }
 }
 .animate-progress-slide { animation: animate-progress-slide 1.2s ease-in-out infinite; }
 .animate-pulse-step { animation: animate-pulse-step 1.5s ease-in-out infinite; }

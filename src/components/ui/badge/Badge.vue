@@ -11,12 +11,12 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const variantClasses: Record<string, string> = {
-  default: 'bg-primary/15 text-primary border-primary/30',
+  default: 'bg-primary/20 text-primary border-primary/30',
   secondary: 'bg-secondary text-secondary-foreground border-border',
   destructive: 'bg-destructive/15 text-destructive border-destructive/30',
   outline: 'text-foreground border-border',
-  success: 'bg-success/15 text-success border-success/30',
-  warning: 'bg-warning/15 text-warning border-warning/30',
+  success: 'bg-success/20 text-success border-success/30',
+  warning: 'bg-warning/20 text-warning border-warning/30',
 }
 </script>
 
