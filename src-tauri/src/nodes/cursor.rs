@@ -47,8 +47,7 @@ fn hash_items(items: &[Value]) -> u64 {
 
 /// 获取游标文件路径
 fn cursor_path(step_id: &str) -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join(".workflow-engine").join("cursors").join(format!("{}.json", step_id))
+    crate::data::paths::resolve_data_dir().join("cursors").join(format!("{}.json", step_id))
 }
 
 /// 读取游标状态

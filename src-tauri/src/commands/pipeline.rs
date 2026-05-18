@@ -14,10 +14,7 @@ pub async fn run_pipeline(
     output_path: Option<String>,
     use_browser: Option<bool>,
 ) -> Result<serde_json::Value, String> {
-    let base = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("workflow-engine")
-        .join("examples");
+    let base = crate::data::paths::resolve_data_dir().join("examples");
 
     let script_path = base.join("run_full_pipeline.py");
 
