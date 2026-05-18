@@ -6,7 +6,10 @@
     "scripts":  {
                     "dev":  "vite",
                     "build":  "vue-tsc --noEmit \u0026\u0026 vite build",
-                    "preview":  "vite preview"
+                    "preview":  "vite preview",
+                    "test":  "vitest run",
+                    "test:watch":  "vitest",
+                    "test:coverage":  "vitest run --coverage"
                 },
     "dependencies":  {
                          "@tauri-apps/api":  "2.10.1",
