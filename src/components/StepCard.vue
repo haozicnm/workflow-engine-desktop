@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Settings, Circle, Square, Plus } from 'lucide-vue-next'
 import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
@@ -12,6 +13,8 @@ import Card from './ui/card/Card.vue'
 import Button from './ui/button/Button.vue'
 import Badge from './ui/badge/Badge.vue'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   step: Step
@@ -126,10 +129,10 @@ function toggleMenu() {
 const showErrMenu = ref(false)
 const errStrategyLabel = computed(() => {
   const s = props.step.onError
-  if (!s || s === 'fail') return '终止'
-  if (s === 'ignore') return '忽略'
-  if (typeof s === 'object' && 'branch' in s) return '跳转'
-  return '终止'
+  if (!s || s === 'fail') return t('editor.errorFail')
+  if (s === 'ignore') return t('editor.errorIgnore')
+  if (typeof s === 'object' && 'branch' in s) return t('editor.errorBranch')
+  return t('editor.errorFail')
 })
 
 function setErrStrategy(s: ErrorStrategy) {
@@ -148,7 +151,7 @@ const conditionLabel = computed(() => {
   const name = refStep?.label || rc.ref
   if (rc.when === 'both') return `📌 ${name}`
   if (rc.when === 'merge') return `合并:${name}`
-  return `📌 ${name}=${rc.when === 'true' ? '真' : '假'}`
+  return `📌 ${name}=${rc.when === 'true' ? 'T' : 'F'}`
 })
 function setCondition(ref: string, when: 'true' | 'false' | 'both' | 'merge') {
   if (!ref) {
@@ -308,7 +311,7 @@ function closeAllMenus() {
 
           <!-- 条件执行 -->
           <div v-if="step.type !== 'logic' && logicSteps.length > 0" class="border-t border-border mt-1 pt-1">
-            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">条件执行</div>
+            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.runCondition') }}</div>
             <div
               v-for="ls in logicSteps"
               :key="ls.id"
@@ -319,10 +322,10 @@ function closeAllMenus() {
               </div>
               <button
                 v-for="opt in [
-                  { value: 'true', icon: 'CheckCircle', label: '为真时执行' },
-                  { value: 'false', icon: 'XCircle', label: '为假时执行' },
-                  { value: 'both', icon: 'RefreshCw', label: '始终执行' },
-                  { value: 'merge', icon: 'Merge', label: '合并执行' },
+                  { value: 'true', icon: 'CheckCircle', label: 'True' },
+                  { value: 'false', icon: 'XCircle', label: 'False' },
+                  { value: 'both', icon: 'RefreshCw', label: t('editor.runConditionNone') },
+                  { value: 'merge', icon: 'Merge', label: t('editor.errorBranch') },
                 ]"
                 :key="opt.value"
                 :class="cn(
@@ -345,12 +348,12 @@ function closeAllMenus() {
 
           <!-- 错误策略 -->
           <div class="border-t border-border mt-1 pt-1">
-            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">错误策略</div>
+            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.errorStrategy') }}</div>
             <button
               v-for="(opt, key) in {
-                fail: { icon: 'CircleStop', label: '终止', desc: '步骤失败时终止整个工作流' },
-                ignore: { icon: 'CircleAlert', label: '忽略', desc: '跳过错误，继续下一步' },
-                branch: { icon: 'ArrowRightLeft', label: '跳转', desc: '失败时跳转到指定步骤' },
+                fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: '步骤失败时终止整个工作流' },
+                ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: '跳过错误，继续下一步' },
+                branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: '失败时跳转到指定步骤' },
               }"
               :key="key"
               :class="cn(

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Clock } from 'lucide-vue-next'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
@@ -9,6 +10,8 @@ import Badge from './ui/badge/Badge.vue'
 import Card from './ui/card/Card.vue'
 import CardContent from './ui/card/CardContent.vue'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 interface ScheduleItem {
   id: string
@@ -95,9 +98,9 @@ async function onDelete(item: ScheduleItem) {
 
 function describeCron(expr: string): string {
   const parts = expr.trim().split(/\s+/)
-  if (parts.length !== 5) return '无效的 Cron 表达式'
+  if (parts.length !== 5) return t('error.invalidInput')
   const [min, hour, dom, mon, dow] = parts
-  if (min === '0' && hour === '*' && dom === '*' && mon === '*' && dow === '*') return '每小时整点'
+  if (min === '0' && hour === '*' && dom === '*' && mon === '*' && dow === '*') return '00:00'
   if (hour !== '*' && min !== '*' && dom === '*' && mon === '*' && dow === '*') return `每天 ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
   if (hour !== '*' && min !== '*' && dow === '1-5') return `工作日 ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
   if (dow !== '*' && dow !== '?') return `每${dow} ${hour}:${min}`
@@ -116,7 +119,7 @@ function formatDate(d: string | null): string {
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
       <div>
-        <h2 class="text-base font-semibold text-foreground">定时调度</h2>
+        <h2 class="text-base font-semibold text-foreground">{{ t('schedule.title') }}</h2>
         <p v-if="workflowName" class="text-xs text-muted-foreground mt-0.5">{{ workflowName }}</p>
       </div>
       <div class="flex gap-1.5">
@@ -160,7 +163,7 @@ function formatDate(d: string | null): string {
     <!-- List -->
     <div class="flex-1 overflow-y-auto">
       <div v-if="loading" class="flex items-center justify-center py-8">
-        <span class="text-muted-foreground text-sm">加载中...</span>
+        <span class="text-muted-foreground text-sm">{{ t('common.loading') }}</span>
       </div>
       <div v-else-if="!schedules.length" class="flex flex-col items-center justify-center py-8 text-center">
         <Clock class="w-8 h-8 mb-2 text-muted-foreground" />

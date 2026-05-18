@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import Button from '../components/ui/button/Button.vue'
@@ -12,6 +13,8 @@ import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
 import TabsContent from '../components/ui/tabs/TabsContent.vue'
 import { cn } from '@/lib/utils'
+
+const { t } = useI18n()
 
 const toast = useToast()
 const emit = defineEmits<{ 'back': [] }>()
@@ -217,7 +220,7 @@ const stats = computed(() => {
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3">
         <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">← 返回</Button>
-        <h2 class="text-3xl font-bold tracking-tight">运行历史</h2>
+        <h2 class="text-3xl font-bold tracking-tight">{{ t('history.title') }}</h2>
         <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ runs.length }} 条</Badge>
       </div>
       <div class="flex items-center gap-2">
@@ -242,14 +245,14 @@ const stats = computed(() => {
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center gap-2.5 h-[200px] text-muted-foreground">
       <div class="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
-      <span>加载中...</span>
+      <span>{{ t('common.loading') }}</span>
     </div>
 
     <!-- Empty -->
     <div v-else-if="runs.length === 0" class="flex flex-col items-center justify-center h-[300px] gap-3 text-muted-foreground">
       <div class="text-5xl">📭</div>
-      <div class="text-base text-foreground">暂无运行记录</div>
-      <div class="text-sm">执行工作流后，运行记录会出现在这里</div>
+      <div class="text-base text-foreground">{{ t('history.noHistory') }}</div>
+      <div class="text-sm">{{ t('empty.runWorkflow') }}</div>
     </div>
 
     <!-- Run list -->
@@ -265,7 +268,7 @@ const stats = computed(() => {
         <button
           class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-secondary w-full text-left"
           :aria-expanded="expandedId === run.id"
-          :aria-label="expandedId === run.id ? '收起运行详情' : '展开运行详情'"
+          :aria-label="expandedId === run.id ? t('common.close') : t('common.detail')"
           @click="toggleExpand(run.id)"
         >
           <div class="shrink-0">

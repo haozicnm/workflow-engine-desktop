@@ -22,6 +22,8 @@ import {
   Terminal,
 } from 'lucide-vue-next'
 
+const { t } = useI18n()
+
 withDefaults(defineProps<{
   name: string
   cls?: string

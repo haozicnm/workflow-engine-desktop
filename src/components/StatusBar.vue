@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useGlobalStatus } from '../composables/useGlobalStatus'
+
+const { t } = useI18n()
 
 const { state } = useGlobalStatus()
 
@@ -55,8 +58,8 @@ function formatNextRun(iso: string | null): string {
     <!-- IPC daemon status -->
     <span class="flex items-center gap-1.5" :title="state.ipcOnline ? '守护进程已连接' : '守护进程未连接'">
       <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
-      <span v-if="state.ipcOnline" class="text-muted-foreground/70">守护进程</span>
-      <span v-else class="text-destructive/70">离线</span>
+      <span v-if="state.ipcOnline" class="text-muted-foreground/70">{{ t('dashboard.daemonStatus') }}</span>
+      <span v-else class="text-destructive/70">{{ t('dashboard.daemonOffline') }}</span>
     </span>
 
     <span class="text-border">│</span>

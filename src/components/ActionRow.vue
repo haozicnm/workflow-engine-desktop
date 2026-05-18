@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
 import { getActionDef, getActionLabel, getContainerDef } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
@@ -9,6 +10,8 @@ import { cn } from '@/lib/utils'
 import Button from './ui/button/Button.vue'
 
 import ParamField from './ParamField.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   action: Action

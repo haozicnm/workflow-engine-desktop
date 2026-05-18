@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useStepRunner } from '../composables/useStepRunner'
 import { useToast } from '../composables/useToast'
@@ -25,6 +26,8 @@ import DialogDescription from '../components/ui/dialog/DialogDescription.vue'
 import DialogFooter from '../components/ui/dialog/DialogFooter.vue'
 import type { ContainerType, Step } from '../types/types'
 import { CONTAINER_DEFS, getActionDefs } from '../types/node-registry'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   workflowId?: string | null
@@ -87,9 +90,9 @@ async function onStartRecording(_stepId?: string) {
     await safeInvoke('browser_recording_start', { url: url || null })
     isRecording.value = true
     recordingError.value = ''
-    toast.info(url ? `录制已开始，已打开 ${url}` : '录制已开始，请在浏览器中操作')
+    toast.info(url ? `录制已开始，已打开 ${url}` : t('toast.running'))
   } catch (e: unknown) {
-    recordingError.value = (e as Error).message || '启动录制失败'
+    recordingError.value = (e as Error).message || t('error.generic')
     toast.error('启动录制失败: ' + recordingError.value)
   }
 }
@@ -101,7 +104,7 @@ async function onStopRecording(_stepId?: string) {
     if (result?.workflow_json) {
       toast.success(`录制完成，已捕获 ${Array.isArray(result.actions) ? result.actions.length : 0} 个操作`)
     } else {
-      toast.info('录制已停止')
+      toast.info(t('common.stop'))
     }
   } catch (e: unknown) {
     isRecording.value = false
@@ -138,7 +141,7 @@ watch(() => props.workflowId, async (newId) => {
     await store.loadWorkflow(newId)
   } else if (newId === null || newId === undefined) {
     store.current = {
-      name: '未命名工作流',
+      name: t('editor.untitled'),
       description: '',
       steps: [],
     }
@@ -192,7 +195,7 @@ async function onScheduleClick() {
 async function onSaveAs() {
   if (!workflow.value) return
   const originalName = workflow.value.name
-  workflow.value.name = originalName + ' (副本)'
+  workflow.value.name = originalName +  + ' (' + t('common.copy') + ')'
   workflow.value.id = undefined as unknown as string
   store.dirty = true
   const ok = await store.saveWorkflow()
@@ -200,7 +203,7 @@ async function onSaveAs() {
     toast.show(`已另存为「${workflow.value.name}」`, 'success')
     emit('workflow-updated')
   } else {
-    toast.show('另存失败', 'error')
+    toast.show(t('error.saveFailed'), 'error')
   }
 }
 
@@ -395,7 +398,7 @@ onMounted(async () => {
   }>('step-update', (event) => {
     const { step_id, step_name, status, error } = event.payload
     const level: LogEntry['level'] = status === 'error' ? 'error' : status === 'running' ? 'info' : 'info'
-    const msg = status === 'error' ? (error || '执行失败') : status === 'running' ? '开始执行...' : status === 'success' ? '执行成功' : status
+    const msg = status === 'error' ? (error || t('error.runFailed')) : status === 'running' ? t('toast.running') : status === 'success' ? '执行成功' : status
     enh.addLog({ time: new Date().toLocaleTimeString(), stepId: step_id, stepName: step_name || step_id, status, message: msg, level })
     // Log to unified console
     const detail = status === 'error' ? (error || '') : `step: ${step_name || step_id}`
@@ -414,14 +417,14 @@ onMounted(async () => {
 
   unlistenLogRun = await safeListen<{ run_id: string; status: string; error?: string }>('run-update', (event) => {
     const { status, error } = event.payload
-    enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: '工作流', status, message: status === 'completed' ? '运行完成' : status === 'error' ? `运行失败: ${error}` : status, level: status === 'error' ? 'error' : 'info' })
+    enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: t('nav.workflows'), status, message: status === 'completed' ? '运行完成' : status === 'error' ? `运行失败: ${error}` : status, level: status === 'error' ? 'error' : 'info' })
     // Log to unified console
     ops.addOp({
       source: 'agent',
       category: 'event',
       name: `run: ${status}`,
       status: status === 'failed' ? 'fail' : 'ok',
-      detail: status === 'completed' ? '工作流运行完成' : status === 'failed' ? (error || '未知错误') : status,
+      detail: status === 'completed' ? t('toast.completed') : status === 'failed' ? (error || t('common.unknown')) : status,
     })
     // Unregister from global status when run finishes
     if (currentRunId && (status === 'completed' || status === 'failed' || status === 'cancelled')) {
@@ -461,7 +464,7 @@ onUnmounted(() => {
               :title="isLocked ? '已锁定，无法编辑' : '点击编辑名称'"
               @click="isLocked ? undefined : onStartEditName()"
             >
-              {{ workflow?.name || '未命名工作流' }}
+              {{ workflow?.name || t('editor.untitled') }}
             </span>
             <span v-if="store.dirty" class="text-warning text-xs ml-1">●</span>
             <span v-if="enh.lastSavedAt.value" class="text-xs text-muted-foreground ml-2">{{ enh.lastSavedAt.value }}</span>
@@ -514,12 +517,12 @@ onUnmounted(() => {
     <Teleport to="body">
       <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" />
       <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">保存</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">{{ t('common.save') }}</button>
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">另存为</button>
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">导出</button>
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">定时</button>
         <div class="border-t border-border my-1" />
-        <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">删除</button>
+        <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">{{ t('common.delete') }}</button>
       </div>
     </Teleport>
 
@@ -674,8 +677,8 @@ onUnmounted(() => {
           确定删除「{{ pendingDelete.name }}」？此操作不可撤销。
         </DialogDescription>
         <DialogFooter>
-          <Button variant="ghost" @click="showDeleteConfirm = false">取消</Button>
-          <Button variant="destructive" @click="doDelete">删除</Button>
+          <Button variant="ghost" @click="showDeleteConfirm = false">{{ t('common.cancel') }}</Button>
+          <Button variant="destructive" @click="doDelete">{{ t('common.delete') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

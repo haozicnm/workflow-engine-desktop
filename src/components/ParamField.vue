@@ -2,6 +2,7 @@
 // ParamField — 统一参数字段渲染组件
 // 支持 text/number/select/checkbox/textarea，text/textarea 自带变量引用下拉
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Target, Link } from 'lucide-vue-next'
 import type { StepGroup } from '../composables/useVariableRefs'
 import Input from './ui/input/Input.vue'
@@ -10,6 +11,8 @@ import Textarea from './ui/textarea/Textarea.vue'
 import Checkbox from './ui/checkbox/Checkbox.vue'
 import Select from './ui/select/Select.vue'
 import Button from './ui/button/Button.vue'
+
+const { t } = useI18n()
 
 interface ParamDef {
   key: string

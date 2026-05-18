@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Hand } from 'lucide-vue-next'
 import { safeListen, safeInvoke } from '../utils/tauri'
 import Button from '@/components/ui/button/Button.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
 import Textarea from '@/components/ui/textarea/Textarea.vue'
+
+const { t } = useI18n()
 
 interface ApprovalEntry {
   id: string
@@ -36,16 +39,16 @@ const pendingCount = computed(() => pending.value.length)
 
 // 格式化时间
 function formatElapsed(secs: number): string {
-  if (secs < 60) return `${secs}秒前`
-  if (secs < 3600) return `${Math.floor(secs / 60)}分钟前`
-  return `${Math.floor(secs / 3600)}小时前`
+  if (secs < 60) return `${secs}s`
+  if (secs < 3600) return `${Math.floor(secs / 60)}m`
+  return `${Math.floor(secs / 3600)}h`
 }
 
 // 格式化超时倒计时
 function formatTimeout(entry: PendingItem): string {
-  if (entry.timeout_secs <= 0) return '无超时'
+  if (entry.timeout_secs <= 0) return t('approval.timeout')
   const remaining = entry.timeout_secs - entry.elapsed
-  if (remaining <= 0) return '即将超时'
+  if (remaining <= 0) return t('approval.timeout')
   const m = Math.floor(remaining / 60)
   const s = remaining % 60
   return `${m}:${String(s).padStart(2, '0')}`
@@ -146,7 +149,7 @@ onUnmounted(() => {
     @click="visible = !visible"
   >
     <Hand class="w-5 h-5" />
-    <span class="font-medium">待审批</span>
+    <span class="font-medium">{{ t('approval.pending') }}</span>
     <Badge variant="secondary" class="ml-1">{{ pendingCount }}</Badge>
   </button>
 
@@ -161,7 +164,7 @@ onUnmounted(() => {
         <div class="flex items-center justify-between px-5 py-4 border-b border-border">
           <div class="flex items-center gap-2">
             <Hand class="w-5 h-5" />
-            <h2 class="text-base font-semibold text-foreground">待审批</h2>
+            <h2 class="text-base font-semibold text-foreground">{{ t('approval.pending') }}</h2>
             <Badge variant="secondary">{{ pendingCount }}</Badge>
           </div>
           <button

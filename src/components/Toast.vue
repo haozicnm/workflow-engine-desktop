@@ -77,7 +77,7 @@ const iconMap = {
     <button
       class="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 transition-colors"
       @click="dismissNow"
-      aria-label="关闭通知"
+      :aria-label="t('common.close')"
     >✕</button>
   </div>
 </template>

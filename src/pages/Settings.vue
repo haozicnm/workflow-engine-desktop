@@ -43,10 +43,10 @@ const saving = ref(false)
 const loading = ref(true)
 
 const browserOptions = [
-  { value: 'auto', label: '自动检测', desc: '优先 Edge → Chrome → Playwright Chromium' },
-  { value: 'msedge', label: 'Microsoft Edge', desc: 'Windows 自带，无需额外安装' },
-  { value: 'chrome', label: 'Google Chrome', desc: '需要预装 Chrome 浏览器' },
-  { value: 'chromium', label: 'Playwright Chromium', desc: '使用 Playwright 内置 Chromium' },
+  { value: 'auto', label: 'Auto-detect', desc: 'Priority: Edge → Chrome → Playwright Chromium' },
+  { value: 'msedge', label: 'Microsoft Edge', desc: 'Built into Windows' },
+  { value: 'chrome', label: 'Google Chrome', desc: 'Requires Chrome browser' },
+  { value: 'chromium', label: 'Playwright Chromium', desc: 'Use Playwright bundled Chromium' },
 ]
 
 const logLevelOptions = [
@@ -57,9 +57,9 @@ const logLevelOptions = [
 ]
 
 const themeOptions: { value: Theme; label: string; icon: string; desc: string }[] = [
-  { value: 'light', label: '浅色', icon: 'Sun', desc: '浅色主题，适合明亮环境' },
-  { value: 'dark', label: '深色', icon: 'Moon', desc: '深色主题，护眼舒适' },
-  { value: 'system', label: '跟随系统', icon: 'Monitor', desc: '自动匹配系统设置' },
+  { value: 'light', label: 'Light', icon: 'Sun', desc: 'Light theme, bright environments' },
+  { value: 'dark', label: 'Dark', icon: 'Moon', desc: 'Dark theme, eye comfort' },
+  { value: 'system', label: 'System', icon: 'Monitor', desc: 'Follow system preference' },
 ]
 
 onMounted(async () => {
@@ -68,12 +68,12 @@ onMounted(async () => {
     const s = await safeInvoke<any>('settings_get').catch(() => ({}))
     settings.value = { ...settings.value, ...(s || {}) }
   } catch (e: any) {
-    console.warn('加载设置失败，使用默认值:', e)
+    console.warn('Settings load failed, using defaults:', e)
   }
   try {
     sysInfo.value = await safeInvoke('system_check_browser')
   } catch (e: any) {
-    console.warn('获取系统信息失败:', e)
+    console.warn('System info check failed:', e)
   }
   loading.value = false
 })
@@ -100,16 +100,16 @@ async function openLogDir() {
   try {
     await safeInvoke('open_log_dir')
   } catch (e: any) {
-    toast.error('打开日志目录失败: ' + e)
+    toast.error('Open log dir failed: ' + e)
   }
 }
 
 async function clearLogs() {
   try {
     await safeInvoke('clear_logs')
-    toast.success('日志已清空')
+    toast.success('Logs cleared')
   } catch (e: any) {
-    toast.error('清空日志失败: ' + e)
+    toast.error('Clear logs failed: ' + e)
   }
 }
 
@@ -128,7 +128,7 @@ function downloadSkill() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success('SKILL.md 已下载')
+  toast.success('SKILL.md downloaded')
 }
 </script>
 
@@ -199,12 +199,12 @@ function downloadSkill() {
       <!-- Browser settings -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">浏览器节点</h2>
-          <p class="text-xs text-muted-foreground mb-4">选择浏览器自动化使用的浏览器。内网环境建议选择 Edge。</p>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">Browser节点</h2>
+          <p class="text-xs text-muted-foreground mb-4">Select browser for automation. Edge recommended for intranet.</p>
 
           <div class="space-y-2 mb-4">
-            <Label class="text-xs text-muted-foreground font-semibold">浏览器通道</Label>
-            <div class="flex flex-col gap-2" role="radiogroup" aria-label="浏览器通道">
+            <Label class="text-xs text-muted-foreground font-semibold">Browser channel</Label>
+            <div class="flex flex-col gap-2" role="radiogroup" aria-label="Browser channel">
               <button
                 v-for="(opt, idx) in browserOptions"
                 :key="opt.value"
@@ -235,56 +235,56 @@ function downloadSkill() {
           <!-- System check -->
           <div v-if="sysInfo" class="mt-4 p-3 bg-background rounded-md">
             <h3 class="text-xs text-muted-foreground mb-2.5 flex items-center gap-2">
-              环境检测
+              Environment
               <Badge :variant="sysInfo.ready ? 'success' : 'warning'" class="text-[10px]">
-                {{ sysInfo.ready ? '✓ 就绪' : '⊘ 待配置' }}
+                {{ sysInfo.ready ? '✓ Ready' : '⊘ Not set up' }}
               </Badge>
             </h3>
             <div class="flex flex-col gap-1.5">
               <!-- Python -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">Python 环境</span>
+                <span class="text-foreground">Python</span>
                 <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
-                  {{ sysInfo.python_available ? '✓ 已检测到' : '✗ 未检测到' }}
+                  {{ sysInfo.python_available ? '✓ detected' : '✗ not found' }}
                 </span>
               </div>
               <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ 路径</span>
+                <span class="text-foreground pl-3">↳ Path</span>
                 <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
               </div>
               <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
-                → 请安装 Python 3.8+
-                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">下载 →</a>
+                → Install Python 3.8+
+                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">Download</a>
               </div>
 
               <!-- Playwright -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">Playwright 包</span>
+                <span class="text-foreground">Playwright</span>
                 <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_playwright_pkg ? '✓ 已安装' : '◷ 首次使用自动安装' }}
+                  {{ sysInfo.has_playwright_pkg ? '✓ installed' : '◷ auto-install on first use' }}
                 </span>
               </div>
 
               <!-- Browser -->
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">浏览器</span>
+                <span class="text-foreground">Browser</span>
                 <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_browser ? '✓ 可用' : '—（首次使用自动下载）' }}
+                  {{ sysInfo.has_browser ? '✓ available' : '—（auto-download on first use）' }}
                 </span>
               </div>
               <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ 系统浏览器</span>
+                <span class="text-foreground pl-3">↳ 系统Browser</span>
                 <span class="text-success text-[11px]">
                   {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }} （首选）
                 </span>
               </div>
               <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ 内置 Chromium</span>
-                <span class="text-success text-[11px]">✓ 安装包附带</span>
+                <span class="text-foreground pl-3">↳ Bundled Chromium</span>
+                <span class="text-success text-[11px]">✓ bundled</span>
               </div>
               <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
                 <span class="text-foreground pl-3">↳ Playwright 缓存</span>
-                <span class="text-success text-[11px]">✓ 已下载</span>
+                <span class="text-success text-[11px]">✓ downloaded</span>
               </div>
             </div>
           </div>
@@ -298,13 +298,13 @@ function downloadSkill() {
 
           <div class="space-y-4">
             <div class="space-y-1.5">
-              <Label class="text-xs text-muted-foreground font-semibold">Python 路径 (可选)</Label>
-              <Input v-model="settings.python_path" placeholder="留空使用自动检测" class="h-8 text-xs" />
-              <p class="text-[11px] text-muted-foreground/60">指定 Python 可执行文件完整路径。留空则自动检测。</p>
+              <Label class="text-xs text-muted-foreground font-semibold">Python Path (Optional)</Label>
+              <Input v-model="settings.python_path" placeholder="Leave empty for auto-detect" class="h-8 text-xs" />
+              <p class="text-[11px] text-muted-foreground/60">指定 Python 可执行文件完整Path。留空则自动检测。</p>
             </div>
 
             <div class="space-y-1.5">
-              <Label class="text-xs text-muted-foreground font-semibold">日志级别</Label>
+              <Label class="text-xs text-muted-foreground font-semibold">Log level</Label>
               <Select
                 :model-value="settings.log_level"
                 @update:model-value="v => settings.log_level = v"
@@ -314,7 +314,7 @@ function downloadSkill() {
 
             <div class="flex items-center gap-2.5">
               <Switch v-model="settings.auto_start" />
-              <Label class="text-sm text-foreground cursor-pointer">开机自启</Label>
+              <Label class="text-sm text-foreground cursor-pointer">Auto-start</Label>
             </div>
           </div>
         </div>
@@ -377,7 +377,7 @@ function downloadSkill() {
               { version: 'v6.8.0', desc: 'Shell Command 节点(万能原语) · File Operations 统一容器(10操作+grep) · 节点标准化 · ABCD 四轮交付(35测试)' },
               { version: 'v6.7.0', desc: 'CLI 执行器升级：支持条件分支、错误恢复(Ignore/Branch)、重试机制、步骤延迟、游标迭代 · Import 读取工作流名称' },
               { version: 'v6.6.0', desc: 'GitHub 迁移 · 项目结构整理 · CLI 双模入口(独立二进制) · 调度管理' },
-              { version: 'v6.5.0', desc: '浏览器容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
+              { version: 'v6.5.0', desc: 'Browser容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
               { version: 'v6.4.0', desc: '生产风险修复：启动清理/事务保护/HTTP超时/空选择器校验/整体超时 · 帮助文档' },
               { version: 'v6.3.0', desc: '变量选择器改版（树形分组+点击插入）· 容器内数据流可视化' },
               { version: 'v6.2.0', desc: '引用系统简化（短ID+稳定引用+端口key统一）' },
@@ -385,7 +385,7 @@ function downloadSkill() {
               { version: 'v5.1.1', desc: 'shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计' },
               { version: 'v5.1.0', desc: 'v5 步骤编辑器正式版 · shadcn-vue 组件体系 · 容器模板系统 · 多容器类型' },
               { version: 'v5.0', desc: '去掉 LiteGraph · 自研步骤编辑器 · Steps→Actions 模型 · Vue Draggable' },
-              { version: 'v2.x', desc: 'Grid 布局 · LiteGraph 画布 · 模板系统 · 浏览器自动化' },
+              { version: 'v2.x', desc: 'Grid 布局 · LiteGraph 画布 · 模板系统 · Browser自动化' },
               { version: 'v1.x', desc: 'YAML 工作流引擎原型 · Web 前端 · Playwright 自动化' },
             ]" :key="item.version"
               class="text-xs text-muted-foreground py-1.5"

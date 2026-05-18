@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Link } from 'lucide-vue-next'
 import type { Step, StepRunState, LogicCondition, LogicConditionGroup } from '../types/types'
 import { uid } from '../types/types'
@@ -9,6 +10,8 @@ import { useVariableRefs } from '../composables/useVariableRefs'
 import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'
 import Select from './ui/select/Select.vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   step: Step
@@ -127,7 +130,7 @@ function closeVarPicker() {
   <!-- 条件构建器（无外层壳，直接平铺在 Card body 内） -->
   <div class="mb-3">
     <div class="flex items-center justify-between mb-2">
-      <span class="text-xs text-muted-foreground font-medium">判断条件</span>
+      <span class="text-xs text-muted-foreground font-medium">{{ t('logic.title') }}</span>
       <Button
         variant="ghost"
         size="sm"
@@ -218,7 +221,7 @@ function closeVarPicker() {
   <!-- 输出模板 -->
   <div class="mb-3">
     <div class="flex items-center justify-between mb-1">
-      <span class="text-xs text-muted-foreground font-medium">输出模板</span>
+      <span class="text-xs text-muted-foreground font-medium">{{ t('stepCard.outputLabel') }}</span>
       <span class="text-[10px] text-muted-foreground/60">可选，自定义 value 输出</span>
     </div>
     <Input
@@ -233,7 +236,7 @@ function closeVarPicker() {
 
   <!-- 执行结果 -->
   <div v-if="runState?.output" class="mb-3 bg-muted/30 border border-border rounded px-3 py-2 text-xs font-mono">
-    <div class="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">执行结果</div>
+    <div class="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">{{ t('stepCard.outputLabel') }}</div>
     <div class="flex items-center gap-2">
       <span :class="(runState.output as Record<string, unknown>)?.result ? 'text-success' : 'text-destructive'">
         {{ (runState.output as Record<string, unknown>)?.result ? '✓ 真' : '✗ 假' }}
