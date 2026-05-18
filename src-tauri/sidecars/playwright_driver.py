@@ -71,20 +71,12 @@ _cdp_queue = collections.deque()
 
 
 def _detect_browser_channel() -> str:
-    """自动检测系统可用的 Chromium 内核浏览器"""
-    if sys.platform == "win32":
-        edge_paths = [
-            os.path.join(os.environ.get("PROGRAMFILES(X86)", ""), "Microsoft", "Edge", "Application", "msedge.exe"),
-            os.path.join(os.environ.get("PROGRAMFILES", ""), "Microsoft", "Edge", "Application", "msedge.exe"),
-        ]
-        for p in edge_paths:
-            if os.path.isfile(p):
-                return "msedge"
-
-    if shutil.which("msedge") or shutil.which("microsoft-edge"):
-        return "msedge"
+    """自动检测系统可用的 Chromium 内核浏览器（跳过 Edge，已知兼容性问题）"""
+    # Edge headless 在部分版本上不稳定（exit code 21 崩溃），跳过
     if shutil.which("chrome") or shutil.which("google-chrome"):
         return "chrome"
+    if shutil.which("msedge") or shutil.which("microsoft-edge"):
+        return "msedge"
 
     return ""
 
