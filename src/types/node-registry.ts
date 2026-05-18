@@ -26,15 +26,17 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'logic', label: '条件判断', icon: 'GitBranch', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: '{ branch: "true"/"false", value, result }', params: [
     { key: 'condition', label: '条件表达式', type: 'text', placeholder: '{{step1.output}} == "异常"' },
-  ]},
-  // ─── 新增简单步骤类型（T11） ───
-  { type: 'http', label: 'HTTP 请求', icon: 'Globe', color: '#39d2c0', description: '发送 HTTP 请求：GET/POST/PUT/DELETE', outputHint: '{ status, body, headers }', params: [
+  { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: '{ status, headers, body }', params: [
     { key: 'method', label: '方法', type: 'select', options: [
-      { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' }, { label: 'PUT', value: 'PUT' }, { label: 'DELETE', value: 'DELETE' },
+      { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },
+      { label: 'PUT', value: 'PUT' }, { label: 'DELETE', value: 'DELETE' },
+      { label: 'PATCH', value: 'PATCH' },
     ], default: 'GET' },
     { key: 'url', label: 'URL', type: 'text', placeholder: 'https://api.example.com/data' },
     { key: 'headers', label: '请求头 (JSON)', type: 'textarea', placeholder: '{"Content-Type": "application/json"}' },
     { key: 'body', label: '请求体', type: 'textarea', placeholder: '{"key": "value"}' },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
+    { key: 'connect_timeout', label: '连接超时(ms)', type: 'number', default: 10000 },
   ]},
   { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#adbac7', description: '等待指定时间后继续', outputHint: '{ waited: ms }', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
@@ -47,6 +49,12 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'title', label: '标题', type: 'text' },
     { key: 'body', label: '内容', type: 'textarea' },
     { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.example.com/...' },
+    { key: 'method', label: '请求方法', type: 'select', options: [
+      { label: 'POST', value: 'POST' }, { label: 'PUT', value: 'PUT' },
+      { label: 'PATCH', value: 'PATCH' },
+    ], default: 'POST' },
+    { key: 'headers', label: '请求头 (JSON)', type: 'textarea', placeholder: '{"Authorization": "Bearer xxx"}' },
+    { key: 'data', label: '自定义数据 (JSON)', type: 'textarea', placeholder: '{"text": "Hello"}' },
   ]},
   { type: 'script', label: '脚本', icon: 'ScrollText', color: '#7ee787', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
     { key: 'script', label: '代码', type: 'textarea', placeholder: '// 你的 Rhai 脚本代码' },
@@ -62,6 +70,8 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: '{ count, results[] }', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
+    { key: 'collect', label: '结果聚合 (JSON)', type: 'textarea', placeholder: '{"field": "id", "method": "concat"}' },
+    { key: 'table', label: '表格输出 (JSON)', type: 'textarea', placeholder: '{"columns": ["name","value"]}' },
   ]},
   { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: '{ decision: "选项名", comment, item, auto?, recommendation_reason? }', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
@@ -386,14 +396,17 @@ export const FILE_ACTIONS: ActionDef[] = [
   { type: 'append', label: '追加内容', icon: 'FileUp', params: [
     { key: 'path', label: '文件路径', type: 'text' },
     { key: 'content', label: '追加内容', type: 'textarea' },
+    { key: 'newline', label: '自动换行', type: 'select', options: [
+      { label: '是', value: 'true' }, { label: '否', value: 'false' },
+    ], default: 'true' },
   ]},
   { type: 'copy', label: '复制文件', icon: 'Copy', params: [
-    { key: 'source', label: '源路径', type: 'text' },
-    { key: 'dest', label: '目标路径', type: 'text' },
+    { key: 'from', label: '源路径', type: 'text' },
+    { key: 'to', label: '目标路径', type: 'text' },
   ]},
   { type: 'move', label: '移动/重命名', icon: 'MoveRight', params: [
-    { key: 'source', label: '源路径', type: 'text' },
-    { key: 'dest', label: '目标路径', type: 'text' },
+    { key: 'from', label: '源路径', type: 'text' },
+    { key: 'to', label: '目标路径', type: 'text' },
   ]},
   { type: 'delete', label: '删除', icon: 'Trash2', params: [
     { key: 'path', label: '路径', type: 'text' },
@@ -402,15 +415,20 @@ export const FILE_ACTIONS: ActionDef[] = [
     { key: 'path', label: '目录路径', type: 'text', placeholder: 'C:\\Users\\haozi\\Desktop' },
     { key: 'pattern', label: '过滤', type: 'text', placeholder: '*.txt' },
   ]},
-  { type: 'mkdir', label: '创建目录', icon: 'FolderPlus', params: [
-    { key: 'path', label: '目录路径', type: 'text' },
+  { type: 'glob', label: '模式查找', icon: 'Search', params: [
+    { key: 'pattern', label: '匹配模式', type: 'text', placeholder: '*.rs' },
+    { key: 'path', label: '搜索目录', type: 'text', placeholder: '.' },
+    { key: 'max_depth', label: '最大深度', type: 'number', default: 10 },
   ]},
-  { type: 'exists', label: '检查存在', icon: 'Search', params: [
+  { type: 'exists', label: '检查存在', icon: 'FileCheck', params: [
     { key: 'path', label: '路径', type: 'text' },
   ]},
   { type: 'grep', label: '搜索内容', icon: 'ScanSearch', params: [
     { key: 'path', label: '文件/目录', type: 'text' },
     { key: 'pattern', label: '搜索模式', type: 'text', placeholder: 'regex 或文本' },
+    { key: 'file_pattern', label: '文件过滤', type: 'text', placeholder: '*.rs' },
+    { key: 'max_depth', label: '最大深度', type: 'number', default: 5 },
+    { key: 'max_results', label: '最大结果', type: 'number', default: 100 },
   ]},
 ]
 

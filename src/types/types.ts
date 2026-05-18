@@ -32,6 +32,7 @@ export interface ActionParam {
   placeholder?: string
   default?: unknown
   options?: { label: string; value: string }[]
+  hint?: string
 }
 
 // ─── 逻辑条件 ───
