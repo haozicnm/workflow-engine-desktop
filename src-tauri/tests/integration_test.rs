@@ -44,16 +44,18 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
 async fn test_excel_read() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-excel-read", &Default::default());
-    let step = make_step("excel1", "读取Excel", "excel", json!({
-        "action": "read",
-        "path": test_data("test_data.xlsx"),
-        "sheet": "数据"
+    let step = make_step("excel1", "读取Excel", "excel_container", json!({
+        "file_path": test_data("test_data.xlsx"),
+        "sheet": "数据",
+        "actions": [
+            {"id": "a1", "type": "read", "label": "读取", "config": {}}
+        ]
     }));
 
     let result = executor.execute(&step, &mut ctx).await;
     assert!(result.is_ok(), "Excel read failed: {:?}", result.err());
     let val = result.unwrap();
-    let data = val["data"].as_array().expect("data should be array");
+    let data = val["a1"]["data"].as_array().expect("data should be array");
     assert!(data.len() >= 3, "Should have at least 3 rows, got {}", data.len());
     println!("✅ Excel read OK: {} rows", data.len());
 }
@@ -62,15 +64,18 @@ async fn test_excel_read() {
 async fn test_excel_sheets() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-excel-sheets", &Default::default());
-    let step = make_step("excel2", "列出工作表", "excel", json!({
-        "action": "sheets",
-        "path": test_data("test_data.xlsx")
+    let step = make_step("excel2", "列出工作表", "excel_container", json!({
+        "file_path": test_data("test_data.xlsx"),
+        "sheet": "数据",
+        "actions": [
+            {"id": "a1", "type": "sheets", "label": "列出工作表", "config": {}}
+        ]
     }));
 
     let result = executor.execute(&step, &mut ctx).await;
     assert!(result.is_ok(), "Excel sheets failed: {:?}", result.err());
     let val = result.unwrap();
-    let sheets = val["sheets"].as_array().expect("sheets should be array");
+    let sheets = val["a1"]["sheets"].as_array().expect("sheets should be array");
     assert!(!sheets.is_empty(), "Should have at least 1 sheet");
     println!("✅ Excel sheets OK: {:?}", sheets);
 }
@@ -84,25 +89,19 @@ async fn test_word_replace() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-word-replace", &Default::default());
 
-    let placeholders = json!({
-        "{{DATE}}": "2026-04-22",
-        "{{TOTAL}}": "5",
-        "{{ROW1_NUM}}": "1",
-        "{{ROW1_KEYWORD}}": "Python编程",
-        "{{ROW1_RESULT}}": "编程语言 | 8字符",
-    });
-    ctx.set_var("placeholders".to_string(), placeholders);
-
-    let step = make_step("word1", "替换Word", "word", json!({
-        "action": "replace",
-        "path": test_data("report_template.docx"),
-        "output": test_data("test_report_output.docx"),
-        "replacements": "{{placeholders}}"
+    let step = make_step("word1", "替换Word", "word_container", json!({
+        "file_path": test_data("report_template.docx"),
+        "actions": [
+            {"id": "a1", "type": "replace", "label": "替换", "config": {
+                "old_text": "{{DATE}}",
+                "new_text": "2026-04-22"
+            }}
+        ]
     }));
 
     let result = executor.execute(&step, &mut ctx).await;
     assert!(result.is_ok(), "Word replace failed: {:?}", result.err());
-    println!("✅ Word replace OK: {:?}", result.unwrap()["output"]);
+    println!("✅ Word replace OK: {:?}", result.unwrap());
 }
 
 // ═══════════════════════════════════════════════════
@@ -443,14 +442,16 @@ async fn test_full_pipeline() {
     let mut ctx = ExecutionContext::new("pipeline", &Default::default());
 
     // Step 1: 读取 Excel
-    let step1 = make_step("read_excel", "读取数据", "excel", json!({
-        "action": "read",
-        "path": test_data("test_data.xlsx"),
-        "sheet": "数据"
+    let step1 = make_step("read_excel", "读取数据", "excel_container", json!({
+        "file_path": test_data("test_data.xlsx"),
+        "sheet": "数据",
+        "actions": [
+            {"id": "a1", "type": "read", "label": "读取", "config": {}}
+        ]
     }));
     let r1 = executor.execute(&step1, &mut ctx).await.unwrap();
     ctx.set_output("read_excel", r1.clone());
-    let data = r1["data"].as_array().unwrap();
+    let data = r1["a1"]["data"].as_array().unwrap();
     println!("[1/3] Read Excel: {} rows", data.len());
 
     // Step 2: 循环处理 — 给每行加索引
