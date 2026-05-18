@@ -210,7 +210,7 @@ function isSelectorField(key: string): boolean {
       <!-- Variable name badge -->
       <span
         class="text-[10px] font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded shrink-0"
-        :title="`引用: {{${varName}}}`"
+        :title="`引用: ${varName}`"
       >
         {{ varName }}
       </span>
