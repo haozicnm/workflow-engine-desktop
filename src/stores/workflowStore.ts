@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { deepMerge } from '../lib/utils'
+import { normalizeSteps, validateRefs } from '../composables/useWorkflowValidate'
 import { safeInvoke } from '../utils/tauri'
 import type { Workflow, Step, ContainerType, StepRunState } from '../types/types'
 import { newWorkflow, serializeWorkflow, deserializeWorkflow } from '../types/types'
@@ -53,64 +55,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   // ─── Load ───
 
-  /** 确保所有 step 都有 actions 数组（兼容旧格式/损坏数据） */
-  function normalizeSteps(steps: Step[]) {
-    for (const step of steps) {
-      if (!Array.isArray(step.actions)) step.actions = []
-      // 清理已废弃的嵌套步骤字段
-      delete (step as any).thenSteps
-      delete (step as any).elseSteps
-    }
-  }
-
-  /** 校验变量引用：检查所有 {{...}} 引用的 stepId.actionId 是否存在 */
-  function validateRefs(wf: Workflow): string[] {
-    const warnings: string[] = []
-    const stepIds = new Set(wf.steps.map(s => s.id))
-    const actionIds = new Map<string, Set<string>>()
-    for (const step of wf.steps) {
-      actionIds.set(step.id, new Set((step.actions || []).map(a => a.id)))
-    }
-
-    const refRegex = /\{\{([^}]+)\}\}/g
-    function checkRefs(text: string, context: string) {
-      for (const m of text.matchAll(refRegex)) {
-        const ref = m[1]
-        const dotIdx = ref.indexOf('.')
-        if (dotIdx === -1) {
-          // 步骤级引用
-          if (!stepIds.has(ref)) {
-            warnings.push(`${context}: 引用了不存在的步骤 {{${ref}}}`)
-          }
-        } else {
-          // 动作级引用
-          const refStep = ref.slice(0, dotIdx)
-          const refAction = ref.slice(dotIdx + 1)
-          if (!stepIds.has(refStep)) {
-            warnings.push(`${context}: 引用了不存在的步骤 {{${ref}}}`)
-          } else if (!actionIds.get(refStep)?.has(refAction)) {
-            warnings.push(`${context}: 引用了不存在的动作 {{${ref}}}`)
-          }
-        }
-      }
-    }
-
-    for (const step of wf.steps) {
-      // 检查容器级参数
-      const configStr = JSON.stringify(step.config || {})
-      checkRefs(configStr, step.label)
-      // 检查条件表达式
-      if (step.condition) checkRefs(step.condition, step.label)
-      // 检查动作参数
-      for (const action of (step.actions || [])) {
-        const actionLabel = action.label || action.type
-        const paramsStr = JSON.stringify(action.params || {})
-        checkRefs(paramsStr, `${step.label} › ${actionLabel}`)
-      }
-    }
-    return warnings
-  }
-
   async function loadWorkflow(id: string) {
     loading.value = true
     try {
@@ -139,7 +83,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
       loading.value = false
     }
   }
-
 
   // ─── Save ───
 
@@ -343,23 +286,6 @@ export const useWorkflowStore = defineStore('workflow', () => {
       step.expanded = !step.expanded
     }
   }
-
-  // ─── Deep merge for nested params ───
-  function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-    const result = { ...target }
-    for (const key of Object.keys(source)) {
-      if (
-        result[key] && typeof result[key] === 'object' && !Array.isArray(result[key]) &&
-        source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])
-      ) {
-        result[key] = deepMerge(result[key] as Record<string, unknown>, source[key] as Record<string, unknown>)
-      } else {
-        result[key] = source[key]
-      }
-    }
-    return result
-  }
-
   // ─── Helpers ───
 
   function findStep(stepId: string): Step | null {
