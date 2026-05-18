@@ -9,7 +9,7 @@ defineProps<{
 <template>
   <div
     :class="cn(
-      'rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden',
+      'rounded-xl border bg-card text-card-foreground shadow-none overflow-hidden',
       color ? 'border-l-0' : 'border-border',
       !color && 'border-border',
       $attrs.class,

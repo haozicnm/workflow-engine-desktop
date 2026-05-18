@@ -136,10 +136,7 @@
     color: var(--color-primary-foreground);
   }
 
-  /* Objects in Space design principles: flat cards without shadows */
-  .bg-card {
-    box-shadow: none;
-  }
+  /* Objects in Space design principles: flat card surfaces — shadow handled per-component */
 }
 
 /* Transition presets */

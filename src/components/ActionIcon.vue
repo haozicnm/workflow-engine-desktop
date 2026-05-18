@@ -20,6 +20,8 @@ import {
   Sun, Moon, Monitor, XCircle, Loader,
   Circle, Merge, CircleStop, CircleAlert, ArrowRightLeft,
   Terminal,
+  Network,
+  FileCheck,
 } from 'lucide-vue-next'
 
 
@@ -128,5 +130,7 @@ withDefaults(defineProps<{
   <CircleStop v-else-if="name === 'CircleStop'" :class="cls" />
   <CircleAlert v-else-if="name === 'CircleAlert'" :class="cls" />
   <ArrowRightLeft v-else-if="name === 'ArrowRightLeft'" :class="cls" />
+  <Network v-else-if="name === 'Network'" :class="cls" />
+  <FileCheck v-else-if="name === 'FileCheck'" :class="cls" />
   <span v-else :class="cls || 'text-base'" class="inline-flex items-center justify-center">{{ name }}</span>
 </template>
