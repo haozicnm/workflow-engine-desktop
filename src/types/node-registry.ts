@@ -63,15 +63,19 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: '{ count, results[] }', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
   ]},
-  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持自定义选项和推荐', outputHint: '{ decision: "选项名", comment, item, auto? }', params: [
+  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: '{ decision: "选项名", comment, item, auto?, recommendation_reason? }', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
     { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step_1.action_1_1.订单号}}' },
     { key: 'options', label: '审批选项', type: 'text', placeholder: '同意,拒绝,需要更多信息（逗号分隔）', default: '同意,拒绝' },
-    { key: 'recommended', label: '推荐选项', type: 'text', placeholder: '同意', default: '同意' },
+    { key: 'recommended', label: '推荐选项', type: 'text', placeholder: '同意（条件评估通过时自动覆写）', default: '同意', hint: '如有审批条件，该字段会被条件评估结果自动覆写：全部通过→选项1，否则→选项N' },
     { key: 'require_review', label: '需要人工审核', type: 'select', options: [
       { label: '是', value: 'true' }, { label: '否（自动决策）', value: 'false' },
     ], default: 'true' },
     { key: 'timeout', label: '超时(秒)', type: 'number', default: 300 },
+    { key: 'timeout_behavior', label: '超时行为', type: 'select', options: [
+      { label: '超时自动执行推荐', value: 'auto' },
+      { label: '必须人工审批（永不过期）', value: 'manual' },
+    ], default: 'auto' },
     { key: 'timeout_action', label: '超时策略', type: 'select', options: [
       { label: '执行推荐选项', value: 'recommended' },
       { label: '自动拒绝', value: 'reject' },

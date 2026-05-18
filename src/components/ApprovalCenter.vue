@@ -18,6 +18,7 @@ interface ApprovalEntry {
   timeout_secs: number
   timeout_action: string
   created_at: string
+  recommendation_reason?: string
 }
 
 interface PendingItem extends ApprovalEntry {
@@ -247,6 +248,14 @@ onUnmounted(() => {
               class="text-xs text-muted-foreground"
             >
               💡 推荐: {{ item.recommended }}
+            </p>
+
+            <!-- 条件推荐原因（新增） -->
+            <p
+              v-if="item.recommendation_reason"
+              class="text-xs text-primary whitespace-pre-wrap"
+            >
+              🔍 {{ item.recommendation_reason }}
             </p>
 
             <!-- 审批意见 -->

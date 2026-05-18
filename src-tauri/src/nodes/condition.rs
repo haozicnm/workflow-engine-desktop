@@ -169,9 +169,9 @@ fn resolve_output_template(
     original_value.clone()
 }
 
-// ─── 条件求值 ───
+// ─── 条件求值（pub(crate) 让 approval 等节点可复用） ───
 
-fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_json::Value) -> bool {
+pub(crate) fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_json::Value) -> bool {
     match op {
         "==" | "equals" => left == right,
         "!=" | "not_equals" => left != right,

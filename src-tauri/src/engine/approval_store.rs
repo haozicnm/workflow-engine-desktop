@@ -24,6 +24,9 @@ pub struct ApprovalEntry {
     pub timeout_secs: u64,
     pub timeout_action: String,
     pub created_at: String,
+    /// 条件推荐原因（来自 approval_conditions 评估）
+    #[serde(default)]
+    pub recommendation_reason: Option<String>,
 }
 
 #[derive(Debug, Clone)]

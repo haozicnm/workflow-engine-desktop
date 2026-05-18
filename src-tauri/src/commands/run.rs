@@ -282,6 +282,7 @@ pub async fn approval_list_pending(
                 title: rec.title, message: rec.message, item, options,
                 recommended: rec.recommended, timeout_secs: rec.timeout_secs as u64,
                 timeout_action: rec.timeout_action, created_at: rec.created_at,
+                recommendation_reason: None, // DB 不持久化此字段
             });
         }
     }
