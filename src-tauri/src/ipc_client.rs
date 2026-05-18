@@ -8,15 +8,13 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
-use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{info, warn};
+use tracing;
 
-use crate::App;
-use crate::engine::{parser, scheduler};
+use crate::engine;
 
 const IPC_PORT: u16 = 19527;
-const TOKEN_FILE: &str = ".hermes/daemon-token";
+const _TOKEN_FILE: &str = ".hermes/daemon-token";
 
 /// 尝试连接 IPC daemon。返回 client 或回退错误信息。
 pub struct IpcClient;

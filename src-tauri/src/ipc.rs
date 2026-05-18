@@ -12,7 +12,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
+
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 use tracing::{info, warn, error};
 
@@ -48,8 +48,10 @@ enum IpcResponse {
     #[serde(rename = "ack")]
     Ack { id: String, run_id: Option<String>, message: Option<String> },
     #[serde(rename = "step_update")]
+    #[allow(dead_code)]
     StepUpdate { run_id: String, step_id: String, step_name: String, status: String, output: Option<Value>, error: Option<String> },
     #[serde(rename = "var_snapshot")]
+    #[allow(dead_code)]
     VarSnapshot { run_id: String, variables: Value, step_outputs: Value },
     #[serde(rename = "run_complete")]
     RunComplete { run_id: String, status: String, elapsed_secs: f64, error: Option<String> },
@@ -274,7 +276,7 @@ impl IpcServer {
             return Some(IpcResponse::Error { id, message: format!("创建运行记录失败: {}", e) });
         }
 
-        let total = workflow.steps.len();
+        let _total = workflow.steps.len();
         let _permit = match self.app.run_semaphore.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => return Some(IpcResponse::Error { id, message: "并发限制，请稍后重试".into() }),
