@@ -1,4 +1,7 @@
 # build.ps1 — Build with git commit hash in version
+# Ensure we're in the script's directory (not WSL UNC path)
+Set-Location $PSScriptRoot
+
 $hash = (git rev-parse --short HEAD)
 Write-Host "Build: 6.9.0-$hash"
 # Patch versions (use JSON manipulation to avoid regex escaping issues)
