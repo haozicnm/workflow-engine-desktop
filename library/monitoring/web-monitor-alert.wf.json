@@ -1,0 +1,88 @@
+{
+  "name": "网页监控告警",
+  "description": "浏览器抓取网页 → Rhai 脚本分析 → 条件判断 → 异常告警。参数化版本。",
+  "params": {
+    "target_url": "https://httpbin.org/html",
+    "alert_threshold": "100",
+    "notify_title": "网页监控告警"
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "browser",
+      "label": "浏览器访问",
+      "config": {
+        "headless": true,
+        "actions": [
+          {
+            "id": "action_1_1",
+            "type": "navigate",
+            "label": "打开目标页面",
+            "config": {
+              "url": "{{params.target_url}}",
+              "wait_until": "load"
+            }
+          },
+          {
+            "id": "action_1_2",
+            "type": "extract",
+            "label": "提取页面内容",
+            "config": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "step_2",
+      "type": "script",
+      "label": "分析数据",
+      "config": {
+        "script": "let s = step_1.to_string(); let len = s.len; #{length: len, alert: len > 500, raw: s.sub_string(0, 100)}"
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "condition",
+      "label": "异常判断",
+      "config": {
+        "conditionGroup": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "left": "{{step_2.alert}}",
+              "op": "equals",
+              "right": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "step_4",
+      "type": "notify",
+      "label": "发送告警",
+      "runCondition": {
+        "ref": "step_3",
+        "when": "true"
+      },
+      "config": {
+        "type": "system",
+        "title": "{{params.notify_title}}",
+        "body": "异常: 长度 {{step_2.length}}"
+      }
+    },
+    {
+      "id": "step_5",
+      "type": "shell",
+      "label": "正常记录",
+      "runCondition": {
+        "ref": "step_3",
+        "when": "false"
+      },
+      "config": {
+        "command": "echo 页面正常: 长度={{step_2.length}}"
+      }
+    }
+  ]
+}

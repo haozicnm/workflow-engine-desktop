@@ -1,0 +1,59 @@
+{
+  "name": "HTTP数据审批管道",
+  "description": "HTTP 获取数据 → 人工审批（超时自动拒绝）→ 按决策分支处理。参数化版本。",
+  "params": {
+    "api_url": "https://httpbin.org/json",
+    "approval_timeout_ms": "5000",
+    "notify_title": "审批结果通知"
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "http",
+      "label": "获取数据",
+      "config": {
+        "url": "{{params.api_url}}",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "step_2",
+      "type": "approval",
+      "label": "人工审批",
+      "config": {
+        "title": "数据审批",
+        "message": "请审批以下数据",
+        "options": ["approve", "reject"],
+        "recommended": "approve",
+        "timeout_ms": "{{params.approval_timeout_ms}}",
+        "timeout_action": "reject"
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "shell",
+      "label": "同意-记录日志",
+      "runCondition": {
+        "ref": "step_2",
+        "when": "approve"
+      },
+      "config": {
+        "command": "echo 审批通过:数据已放行"
+      }
+    },
+    {
+      "id": "step_4",
+      "type": "notify",
+      "label": "拒绝-告警通知",
+      "runCondition": {
+        "ref": "step_2",
+        "when": "reject"
+      },
+      "config": {
+        "type": "system",
+        "title": "{{params.notify_title}}",
+        "body": "审批被拒绝"
+      }
+    }
+  ]
+}

@@ -15,7 +15,7 @@ name = "file-batch-approval"
 version = "1.0.0"
 description = "批量文件处理 + 人工审批流水线"
 params = ["data_dir", "file_pattern", "approval_timeout_ms"]
-schedule = ""                 # 手动触发
+schedule = ""
 category = "batch"
 file = "batch/file-batch-approval.wf.json"
 
@@ -24,9 +24,27 @@ name = "integration-smoke"
 version = "1.0.0"
 description = "嵌套容错链冒烟测试 — runCondition + retry + loop + 变量引用全链路"
 params = ["test_dir", "items_list", "delay_ms"]
-schedule = ""                 # 手动触发
+schedule = ""
 category = "stress"
 file = "stress/integration-smoke.wf.json"
+
+[[templates]]
+name = "http-approval-pipeline"
+version = "1.0.0"
+description = "HTTP 数据审批管道 — 获取数据 → 人工审批(超时自动拒绝) → 分支处理"
+params = ["api_url", "approval_timeout_ms", "notify_title"]
+schedule = ""
+category = "batch"
+file = "batch/http-approval-pipeline.wf.json"
+
+[[templates]]
+name = "web-monitor-alert"
+version = "1.0.0"
+description = "网页监控告警 — 浏览器抓取 → Rhai 脚本分析 → 条件判断 → 异常通知"
+params = ["target_url", "alert_threshold", "notify_title"]
+schedule = ""
+category = "monitoring"
+file = "monitoring/web-monitor-alert.wf.json"
 
 [[templates]]
 name = "my-test"
