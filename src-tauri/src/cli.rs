@@ -167,7 +167,7 @@ fn cmd_list(app: &App, json: bool) -> Result<(), String> {
         println!("{}", serde_json::to_string_pretty(&serde_json::json!({
             "workflows": items,
             "count": items.len(),
-        })).unwrap());
+        })).expect("CLI JSON 序列化失败"));
         return Ok(());
     }
     if workflows.is_empty() {
@@ -289,7 +289,7 @@ fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
             "finished_at": detail.run.finished_at,
             "error": detail.run.error,
             "steps": steps,
-        })).unwrap());
+        })).expect("CLI JSON 序列化失败"));
         return Ok(());
     }
 
@@ -376,7 +376,7 @@ fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
             "name": workflow.name,
             "step_count": workflow.steps.len(),
             "steps": steps,
-        })).unwrap());
+        })).expect("CLI JSON 序列化失败"));
         return Ok(());
     }
 
@@ -394,7 +394,7 @@ fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
 /// 输出所有可用步骤类型和动作（JSON），与前端 CONTAINER_DEFS 保持同步
 fn cmd_steps() -> Result<(), String> {
     let manifest = build_step_manifest();
-    println!("{}", serde_json::to_string_pretty(&manifest).unwrap());
+    println!("{}", serde_json::to_string_pretty(&manifest).expect("CLI manifest 序列化失败"));
     Ok(())
 }
 
@@ -680,9 +680,9 @@ fn cmd_schedule_list(app: &App, json: bool) -> Result<(), String> {
             })
         }).collect();
         println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "schedules": items,
+"results": items,
             "count": items.len(),
-        })).unwrap());
+        })).expect("CLI JSON 序列化失败"));
         return Ok(());
     }
     if schedules.is_empty() {
@@ -786,7 +786,7 @@ fn cmd_library_list(json: bool) -> Result<(), String> {
         println!("{}", serde_json::to_string_pretty(&serde_json::json!({
             "templates": items,
             "count": items.len(),
-        })).unwrap());
+        })).expect("CLI JSON 序列化失败"));
         return Ok(());
     }
     if templates.is_empty() {

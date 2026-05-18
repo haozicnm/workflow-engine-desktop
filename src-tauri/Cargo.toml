@@ -39,12 +39,12 @@ log = "0.4"
 tempfile = "3"
 opener = "0.7"
 
-# 鐠恒劌閽╅崣鎷岀翻閸忋儻绱欓柨顕€绱跺Ο鈩冨珯 + 瑜版洖鍩楅惄鎴濇儔閿?
+# Keyboard/mouse simulation + screen recording
 enigo = "0.3"
 rdev = "0.5"
 scraper = "0.26.0"
 
-# 閺傛澘顤冮懞鍌滃仯娓氭繆绂?
+# New node dependencies
 walkdir = "2"
 arboard = "3"
 regex = "1"

@@ -162,7 +162,12 @@ impl IpcServer {
                         id: "unknown".to_string(),
                         message: format!("消息解析失败: {}", e),
                     };
-                    let _ = sender.send(Message::Text(serde_json::to_string(&err).unwrap())).await;
+                    let _ = sender.send(Message::Text(
+                        serde_json::to_string(&err).unwrap_or_else(|e| {
+                            tracing::warn!("序列化 IPC 错误响应失败: {}", e);
+                            r#"{"type":"error","id":"unknown","message":"内部错误"}"#.to_string()
+                        })
+                    )).await;
                     continue;
                 }
             };
@@ -293,7 +298,10 @@ impl IpcServer {
 
         // 发送 ack
         let ack = IpcResponse::Ack { id: id.clone(), run_id: Some(run_id.clone()), message: None };
-        let json = serde_json::to_string(&ack).unwrap();
+        let json = serde_json::to_string(&ack).unwrap_or_else(|e| {
+            tracing::error!("序列化 ack 失败: {}", e);
+            r#"{"type":"error","id":"internal","message":"序列化失败"}"#.to_string()
+        });
         if sender.send(Message::Text(json)).await.is_err() {
             return None;
         }

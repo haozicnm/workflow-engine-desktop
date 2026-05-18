@@ -515,7 +515,7 @@ onUnmounted(() => {
 
     <!-- Card ⋯ Dropdown (teleported) -->
     <Teleport to="body">
-      <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" />
+      <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" @keydown.escape="showCardMenu = false" />
       <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">{{ t('common.save') }}</button>
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">另存为</button>
@@ -602,7 +602,7 @@ onUnmounted(() => {
               </Button>
               <Teleport to="body">
                 <Transition name="fade">
-                  <div v-if="showAddStep" class="fixed inset-0 z-[100]" @click="showAddStep = false">
+                  <div v-if="showAddStep" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="showAddStep = false" @keydown.escape="showAddStep = false">
                     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[260px] shadow-xl" @click.stop>
                       <div
                         v-for="def in CONTAINER_DEFS"

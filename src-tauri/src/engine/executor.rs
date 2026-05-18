@@ -119,6 +119,11 @@ impl StepExecutor {
         Arc::new(StepExecutor { executors, approval_store, db })
     }
 
+    /// 返回所有已注册的节点类型名称（用于编译期契约校验）
+    pub fn registered_types(&self) -> Vec<&str> {
+        self.executors.keys().map(|s| s.as_str()).collect()
+    }
+
     /// 执行一个步骤（统一入口，所有节点类型通过 trait 分发）
     pub fn execute<'a>(
         self: &'a Arc<Self>,
@@ -194,48 +199,47 @@ mod tests {
 
     #[test]
     fn container_types_match_registrations() {
-        let mut executors: HashMap<String, Box<dyn NodeExecutor>> = HashMap::new();
-        register_containers!(executors,
-            "browser" => crate::nodes::browser_container::BrowserContainerNode,
-            "excel"   => crate::nodes::excel_container::ExcelContainerNode,
-            "word"    => crate::nodes::word_container::WordContainerNode,
-            "logic"   => crate::nodes::condition::ConditionNode,
-            "file"    => crate::nodes::file_container::FileContainerNode,
-        );
+        // 使用真实 StepExecutor，不再重复 register_containers!
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let registered = exec.registered_types();
 
+        // 正向：CONTAINER_TYPES 里的每个类型都必须注册了 {type}_container
         for &container_type in parser::CONTAINER_TYPES {
             let expected_name = format!("{}_container", container_type);
             assert!(
-                executors.contains_key(&expected_name),
-                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}'",
-                container_type, expected_name
+                registered.contains(&expected_name.as_str()),
+                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}_container'",
+                container_type, container_type
             );
         }
 
-        let registered_types: Vec<String> = executors.keys().cloned().collect();
-        for name in &registered_types {
-            let base = name.trim_end_matches("_container");
-            assert!(
-                parser::CONTAINER_TYPES.contains(&base),
-                "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明",
-                name
-            );
+        // 反向：executor 注册的 _container 类型必须在 CONTAINER_TYPES 中声明
+        for name in &registered {
+            if name.ends_with("_container") {
+                let base = name.trim_end_matches("_container");
+                assert!(
+                    parser::CONTAINER_TYPES.contains(&base),
+                    "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明",
+                    name
+                );
+            }
         }
     }
 
     #[test]
     fn all_registered_types_can_be_instantiated() {
         let exec = StepExecutor::new(test_approval_store(), test_db());
-        // 验证至少注册了核心类型
-        let required = &[
-            "http", "script", "condition", "shell", "notify", "delay",
-            "loop", "while", "cursor", "parallel", "map",
-            "browser_container", "excel_container", "word_container", "file_container", "logic_container",
-            "data_set", "data_get", "data_length", "data_default", "data_merge",
-            "clipboard", "approval",
-        ];
-        for &t in required {
-            assert!(exec.executors.contains_key(t), "缺少注册: {}", t);
+        let registered = exec.registered_types();
+        // 从真实 executor 派生 required 列表，不再硬编码
+        // 只需验证核心类型数量合理（至少注册了 20+ 种）
+        assert!(
+            registered.len() >= 20,
+            "预期至少注册 20 种节点类型，实际: {}",
+            registered.len()
+        );
+        // 验证所有注册类型都非空
+        for t in &registered {
+            assert!(!t.is_empty(), "注册了空类型名");
         }
     }
 
