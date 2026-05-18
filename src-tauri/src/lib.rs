@@ -34,11 +34,14 @@ fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
         return Ok(());
     }
 
-    info!("正在创建 2 个内置示例工作流...");
+    info!("正在创建 5 个内置教学模板...");
 
     let builtins: &[(&str, &str)] = &[
-        (include_str!("../../templates/order-to-contracts.json"), "订单逐笔生成合同"),
-        (include_str!("../../templates/monitor-to-report.json"), "网页监控 → 条件分流报告"),
+        (include_str!("../../library/stress/integration-smoke.wf.json"), "integration-smoke"),
+        (include_str!("../../library/monitoring/daily-monitor.wf.json"), "daily-monitor"),
+        (include_str!("../../library/batch/file-batch-approval.wf.json"), "file-batch-approval"),
+        (include_str!("../../library/batch/http-approval-pipeline.wf.json"), "http-approval-pipeline"),
+        (include_str!("../../library/monitoring/web-monitor-alert.wf.json"), "web-monitor-alert"),
     ];
 
     for (json_str, default_name) in builtins {
@@ -53,7 +56,7 @@ fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
         info!("  ✅ 已创建: {name}");
     }
 
-    info!("内置示例工作流初始化完成");
+    info!("内置教学模板初始化完成");
     Ok(())
 }
 
