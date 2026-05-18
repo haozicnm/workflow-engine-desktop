@@ -223,7 +223,7 @@ async function onDelete() {
 }
 
 async function doDelete() {
-  const { id, name } = pendingDelete.value
+  const { id } = pendingDelete.value
   await store.deleteWorkflow(id)
   store.current = null
   store.dirty = false
@@ -679,7 +679,7 @@ onUnmounted(() => {
       <DialogContent class="sm:max-w-md">
         <DialogTitle>{{ t('editor.deleteWorkflow') }}</DialogTitle>
         <DialogDescription>
-          {{ t('editor.deleteConfirm', { name: pendingDelete.name }) }}
+          {{ t('editor.deleteWorkflowConfirm', { name: pendingDelete.name }) }}
         </DialogDescription>
         <DialogFooter>
           <Button variant="ghost" @click="showDeleteConfirm = false">{{ t('common.cancel') }}</Button>

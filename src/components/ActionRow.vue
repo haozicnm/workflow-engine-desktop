@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
+
+const { t } = useI18n()
 import { getActionDef, getActionLabel, getContainerDef } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
 import { useVariableRefs } from '../composables/useVariableRefs'
@@ -231,7 +234,7 @@ function isSelectorField(key: string): boolean {
       <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
         <!-- No params message -->
         <div v-if="!hasParams" class="text-[11px] text-muted-foreground/60 py-1 text-center">
-          {{ t('actionRow.noParams') }}
+          {{ t('actionRow.noParamsHint') }}
         </div>
 
         <!-- Data flow hint -->
