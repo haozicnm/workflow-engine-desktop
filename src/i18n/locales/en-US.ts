@@ -488,7 +488,7 @@ export default {
     cursor: 'Iterate one item at a time, cursor persists across runs',
     loop: 'Batch iterate all items, best for small in-memory datasets',
     approval: 'Pause for human review: conditional recommendation, timeout auto/manual',
-    shell: 'Execute shell commands (bash/powershell/cmd) with {{variables}}',
+    shell: 'Execute shell commands (bash/powershell/cmd) with {variables}',
     file: 'Unified file ops: read/write/copy/move/delete/list/search/glob/grep',
   },
 

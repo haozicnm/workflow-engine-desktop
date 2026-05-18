@@ -250,9 +250,9 @@ const stats = computed(() => {
     <!-- Stats -->
     <div v-if="runs.length > 0" class="flex gap-4" role="status" aria-label="运行统计">
       <span class="text-sm text-muted-foreground">{{ t('history.total', { n: stats.total }) }}</span>
-      <span class="text-sm text-success" aria-label="成功 {{ stats.completed }}">✓ {{ stats.completed }}</span>
-      <span class="text-sm text-danger" aria-label="失败 {{ stats.failed }}">✗ {{ stats.failed }}</span>
-      <span v-if="stats.running > 0" class="text-sm text-primary" aria-label="运行中 {{ stats.running }}">◷ {{ stats.running }}</span>
+      <span class="text-sm text-success">✓ {{ stats.completed }}</span>
+      <span class="text-sm text-danger">✗ {{ stats.failed }}</span>
+      <span v-if="stats.running > 0" class="text-sm text-primary">◷ {{ stats.running }}</span>
     </div>
 
     <!-- Loading -->
