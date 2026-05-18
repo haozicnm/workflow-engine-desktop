@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import { useTheme, type Theme } from '../composables/useTheme'
+import { setStoredLocale, type Locale } from '@/i18n'
 import pkg from '../../package.json'
 import Button from '../components/ui/button/Button.vue'
 import Input from '../components/ui/input/Input.vue'
@@ -17,9 +19,15 @@ import SKILL_CONTENT from '../assets/workflow-engine-cli.SKILL.md?raw'
 
 const emit = defineEmits<{ 'back': [] }>()
 
+const { t, locale } = useI18n()
 const toast = useToast()
 const APP_VERSION = pkg.version
 const { theme: currentTheme, setTheme } = useTheme()
+
+const localeOptions: { value: Locale; label: string }[] = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'en-US', label: 'English' },
+]
 
 const settings = ref({
   theme: 'system',
@@ -70,13 +78,19 @@ onMounted(async () => {
   loading.value = false
 })
 
+function setLocale(val: Locale) {
+  locale.value = val
+  setStoredLocale(val)
+  settings.value.language = val
+}
+
 async function save() {
   saving.value = true
   try {
     await safeInvoke('settings_update', { settings: settings.value })
-    toast.success('设置已保存')
+    toast.success(t('toast.saved'))
   } catch (e: any) {
-    toast.error('保存失败: ' + e)
+    toast.error(t('error.saveFailed') + ': ' + e)
   } finally {
     saving.value = false
   }
@@ -122,19 +136,19 @@ function downloadSkill() {
   <div class="max-w-[640px] mx-auto px-5 py-6">
     <!-- Header -->
     <header class="mb-6">
-      <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← 返回</Button>
-      <h1 class="text-xl font-bold text-foreground">设置</h1>
-      <p class="text-sm text-muted-foreground">配置应用行为和浏览器节点</p>
+      <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← {{ t('common.back') }}</Button>
+      <h1 class="text-xl font-bold text-foreground">{{ t('settingsPage.title') }}</h1>
+      <p class="text-sm text-muted-foreground">{{ t('settingsPage.general') }}</p>
     </header>
 
-    <div v-if="loading" class="text-center py-10 text-muted-foreground">加载中...</div>
+    <div v-if="loading" class="text-center py-10 text-muted-foreground">{{ t('common.loading') }}</div>
 
     <div v-else class="space-y-4">
-      <!-- Theme settings -->
+      <!-- Appearance -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🎨 外观</h2>
-          <p class="text-xs text-muted-foreground mb-4">选择界面主题风格。</p>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🎨 {{ t('settingsPage.appearance') }}</h2>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.theme') }}</p>
           <div class="grid grid-cols-3 gap-3">
             <Button
               v-for="opt in themeOptions"
@@ -152,6 +166,31 @@ function downloadSkill() {
               <ActionIcon :name="opt.icon" cls="w-6 h-6" />
               <span class="text-sm font-semibold text-foreground">{{ opt.label }}</span>
               <span class="text-[10px] text-muted-foreground text-center leading-tight">{{ opt.desc }}</span>
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Language -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 {{ t('settingsPage.language') }}</h2>
+          <div class="flex gap-2">
+            <Button
+              v-for="opt in localeOptions"
+              :key="opt.value"
+              variant="outline"
+              size="sm"
+              :aria-pressed="locale === opt.value"
+              :class="cn(
+                'px-4',
+                locale === opt.value
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-border',
+              )"
+              @click="setLocale(opt.value)"
+            >
+              {{ opt.label }}
             </Button>
           </div>
         </div>

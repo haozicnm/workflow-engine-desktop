@@ -26,6 +26,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'logic', label: '条件判断', icon: 'GitBranch', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: '{ branch: "true"/"false", value, result }', params: [
     { key: 'condition', label: '条件表达式', type: 'text', placeholder: '{{step1.output}} == "异常"' },
+  ]},
   { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: '{ status, headers, body }', params: [
     { key: 'method', label: '方法', type: 'select', options: [
       { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },

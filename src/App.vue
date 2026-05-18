@@ -2,6 +2,7 @@
 // App.vue — Single-page layout: Sidebar (workflow list) + Main content (editor/settings/history)
 // + Unified operation console at bottom
 import { ref, provide, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Editor from './pages/Editor.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
@@ -19,6 +20,7 @@ import SidebarProvider from './components/ui/sidebar/SidebarProvider.vue'
 import Sidebar from './components/ui/sidebar/Sidebar.vue'
 import SidebarInset from './components/ui/sidebar/SidebarInset.vue'
 
+const { t } = useI18n()
 const { toasts, remove } = useToast()
 const globalStatus = useGlobalStatus()
 const ops = useOpsConsole()
@@ -179,9 +181,9 @@ function statusColor(status: string): string {
                 <div class="flex justify-center">
                   <ActionIcon name="Settings" cls="w-16 h-16 text-muted-foreground" />
                 </div>
-                <h2 class="text-2xl font-bold tracking-tight text-foreground">欢迎使用 WorkFlow</h2>
+                <h2 class="text-2xl font-bold tracking-tight text-foreground">{{ t('dashboard.createWorkflowToStart') }}</h2>
                 <p class="text-muted-foreground max-w-md">
-                  从左侧选择一个工作流开始编辑，或点击「＋ 新建」创建新的工作流。
+                  {{ t('empty.createWorkflow') }}
                 </p>
               </div>
             </div>
@@ -239,7 +241,7 @@ function statusColor(status: string): string {
               >
                 <div class="flex items-center gap-2">
                   <span class="text-[11px] text-muted-foreground">{{ ops.visible.value ? '▼' : '▶' }}</span>
-                  <span class="text-xs text-foreground">📟 操作控制台</span>
+                  <span class="text-xs text-foreground">📟 {{ t('nav.dashboard') }} {{ t('common.actions') }}</span>
                   <span v-if="ops.logs.value.length" class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5">
                     {{ ops.logs.value.length }}
                   </span>
@@ -250,12 +252,12 @@ function statusColor(status: string): string {
                   v-if="ops.visible.value"
                   class="h-5 text-[10px] text-muted-foreground hover:text-foreground"
                   @click.stop="ops.clearLogs()"
-                >清空</button>
+                >{{ t('common.clear') }}</button>
               </button>
               <Transition name="collapse">
                 <div v-if="ops.visible.value" class="max-h-[200px] overflow-y-auto border-t border-border">
                   <div v-if="!ops.logs.value.length" class="text-muted-foreground text-xs p-3">
-                    暂无操作记录 — 所有操作会自动显示在这里
+                    {{ t('empty.noHistory') }}
                   </div>
                   <div
                     v-for="(log, i) in ops.logs.value"
@@ -284,8 +286,8 @@ function statusColor(status: string): string {
         <div v-if="isDragging" class="fixed inset-0 bg-background/90 z-[100] flex items-center justify-center">
           <div class="text-center p-10 border-2 border-dashed border-primary rounded-2xl bg-primary/10">
             <span class="text-5xl text-muted-foreground">↓</span>
-            <div class="text-base text-foreground mt-2">松开导入工作流</div>
-            <div class="text-xs text-muted-foreground">支持 .json / .yaml 文件</div>
+            <div class="text-base text-foreground mt-2">{{ t('editor.importJson') }}</div>
+            <div class="text-xs text-muted-foreground">.json / .yaml</div>
           </div>
         </div>
       </Transition>
