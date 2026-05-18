@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import { useGlobalStatus } from '../composables/useGlobalStatus'
@@ -14,6 +15,8 @@ import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
 import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 import { inject, type Ref } from 'vue'
+
+const { t } = useI18n()
 
 interface WorkflowItem {
   id: string
@@ -169,17 +172,17 @@ defineExpose({ loadList })
     <Input
       v-if="sidebar?.open.value"
       v-model="searchQuery"
-      placeholder="搜索工作流..."
+      :placeholder="t('nav.searchWorkflow')"
       class="h-8 text-xs"
     />
     <Button v-if="sidebar?.open.value" size="sm" class="bg-primary text-primary-foreground w-full" @click="onNewWorkflow">
-      ＋ 新建
+      ＋ {{ t('common.create') }}
     </Button>
   </SidebarHeader>
 
   <SidebarContent>
     <SidebarGroup>
-      <SidebarGroupLabel label="工作流" />
+      <SidebarGroupLabel :label="t('nav.workflows')" />
 
       <!-- Loading skeleton -->
       <div v-if="loading" class="space-y-2 px-2">
@@ -190,7 +193,7 @@ defineExpose({ loadList })
 
       <!-- Empty state -->
       <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-muted-foreground">
-        暂无工作流
+        {{ t('nav.noWorkflows') }}
       </div>
 
       <template v-else>
@@ -223,7 +226,7 @@ defineExpose({ loadList })
             <circle cx="12" cy="12" r="3" />
           </svg>
         </template>
-        设置
+        {{ t('nav.settings') }}
       </SidebarMenuButton>
     </SidebarMenuItem>
     <SidebarMenuItem>
@@ -235,7 +238,7 @@ defineExpose({ loadList })
             <path d="M12 7v5l4 2" />
           </svg>
         </template>
-        历史
+        {{ t('nav.history') }}
       </SidebarMenuButton>
     </SidebarMenuItem>
     <SidebarMenuItem>
@@ -247,7 +250,7 @@ defineExpose({ loadList })
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
         </template>
-        导入
+        {{ t('common.import') }}
       </SidebarMenuButton>
     </SidebarMenuItem>
   </SidebarFooter>
