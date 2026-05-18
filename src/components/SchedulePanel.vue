@@ -38,14 +38,14 @@ const loading = ref(false)
 
 const showCreate = ref(false)
 const newCron = ref('0 9 * * *')
-const cronPresets = [
-  { label: '每小时', value: '0 * * * *' },
-  { label: '每天 9:00', value: '0 9 * * *' },
-  { label: '每天 18:00', value: '0 18 * * *' },
-  { label: '工作日 9:00', value: '0 9 * * 1-5' },
-  { label: '每周一 9:00', value: '0 9 * * 1' },
-  { label: '每月1号 9:00', value: '0 9 1 * *' },
-]
+const cronPresets = computed(() => [
+  { label: t('cronPreset.everyHour'), value: '0 * * * *' },
+  { label: t('cronPreset.everyDay9'), value: '0 9 * * *' },
+  { label: t('cronPreset.everyDay18'), value: '0 18 * * *' },
+  { label: t('cronPreset.weekday9'), value: '0 9 * * 1-5' },
+  { label: t('cronPreset.monday9'), value: '0 9 * * 1' },
+  { label: t('cronPreset.monthly1st9'), value: '0 9 1 * *' },
+])
 
 const cronDescription = computed(() => describeCron(newCron.value))
 
@@ -65,14 +65,14 @@ async function loadSchedules() {
 
 async function onCreate() {
   if (!props.workflowId) return
-  if (!newCron.value.trim()) { toast.error('请输入 Cron 表达式'); return }
+  if (!newCron.value.trim()) { toast.error(t('schedule.enterCron')); return }
   try {
     await safeInvoke('schedule_create', { workflowId: props.workflowId, cronExpr: newCron.value.trim() })
-    toast.success('定时调度已创建')
+    toast.success(t('toast.created'))
     showCreate.value = false
     await loadSchedules()
   } catch (e: unknown) {
-    toast.error('创建失败: ' + ((e as Error).message || e))
+    toast.error(t('schedule.createFailed') + ': ' + ((e as Error).message || e))
   }
 }
 
@@ -80,9 +80,9 @@ async function onToggle(item: ScheduleItem) {
   try {
     await safeInvoke('schedule_update', { id: item.id, enabled: !item.enabled })
     item.enabled = !item.enabled
-    toast.success(item.enabled ? '已启用' : '已禁用')
+    toast.success(item.enabled ? t('toast.updated') : t('toast.updated'))
   } catch (e: unknown) {
-    toast.error('更新失败: ' + ((e as Error).message || e))
+    toast.error(t('schedule.updateFailed') + ': ' + ((e as Error).message || e))
   }
 }
 
@@ -90,9 +90,9 @@ async function onDelete(item: ScheduleItem) {
   try {
     await safeInvoke('schedule_delete', { id: item.id })
     schedules.value = schedules.value.filter(s => s.id !== item.id)
-    toast.success('已删除')
+    toast.success(t('toast.deleted'))
   } catch (e: unknown) {
-    toast.error('删除失败: ' + ((e as Error).message || e))
+    toast.error(t('schedule.deleteFailed') + ': ' + ((e as Error).message || e))
   }
 }
 
@@ -100,17 +100,17 @@ function describeCron(expr: string): string {
   const parts = expr.trim().split(/\s+/)
   if (parts.length !== 5) return t('error.invalidInput')
   const [min, hour, dom, mon, dow] = parts
-  if (min === '0' && hour === '*' && dom === '*' && mon === '*' && dow === '*') return '00:00'
-  if (hour !== '*' && min !== '*' && dom === '*' && mon === '*' && dow === '*') return `每天 ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
-  if (hour !== '*' && min !== '*' && dow === '1-5') return `工作日 ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
-  if (dow !== '*' && dow !== '?') return `每${dow} ${hour}:${min}`
-  if (dom !== '*') return `每月${dom}号 ${hour}:${min}`
+  if (min === '0' && hour === '*' && dom === '*' && mon === '*' && dow === '*') return `${hour.padStart(2, '0')}:${min.padStart(2, '0')}`
+  if (hour !== '*' && min !== '*' && dom === '*' && mon === '*' && dow === '*') return t('cronDesc.daily', { hour: hour.padStart(2, '0'), min: min.padStart(2, '0') })
+  if (hour !== '*' && min !== '*' && dow === '1-5') return t('cronDesc.weekdays', { hour: hour.padStart(2, '0'), min: min.padStart(2, '0') })
+  if (dow !== '*' && dow !== '?') return t('cronDesc.everyDow', { dow, hour, min })
+  if (dom !== '*') return t('cronDesc.monthly', { dom, hour, min })
   return expr
 }
 
 function formatDate(d: string | null): string {
   if (!d) return '-'
-  return new Date(d).toLocaleString('zh-CN')
+  return new Date(d).toLocaleString()
 }
 </script>
 
@@ -124,9 +124,9 @@ function formatDate(d: string | null): string {
       </div>
       <div class="flex gap-1.5">
         <Button v-if="workflowId" variant="outline" size="sm" class="h-7 text-xs" @click="showCreate = !showCreate">
-          {{ showCreate ? '取消' : '＋ 新建' }}
+          {{ showCreate ? t('common.cancel') : t('schedule.newSchedule') }}
         </Button>
-        <Button variant="ghost" size="icon" class="h-7 w-7" aria-label="关闭" @click="emit('close')">
+        <Button variant="ghost" size="icon" class="h-7 w-7" :aria-label="t('schedule.closeAria')" @click="emit('close')">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </Button>
       </div>
@@ -152,8 +152,8 @@ function formatDate(d: string | null): string {
             >{{ p.label }}</Button>
           </div>
           <div class="flex gap-2 items-center">
-            <Input v-model="newCron" placeholder="Cron 表达式 (分 时 日 月 周)" class="flex-1 h-8 text-xs font-mono" />
-            <Button variant="default" size="sm" class="h-8 text-xs bg-success hover:bg-success/90" @click="onCreate">创建</Button>
+            <Input v-model="newCron" :placeholder="t('schedule.cronPlaceholder')" class="flex-1 h-8 text-xs font-mono" />
+            <Button variant="default" size="sm" class="h-8 text-xs bg-success hover:bg-success/90" @click="onCreate">{{ t('common.create') }}</Button>
           </div>
           <p class="text-[11px] text-muted-foreground">{{ cronDescription }}</p>
         </div>
@@ -167,7 +167,7 @@ function formatDate(d: string | null): string {
       </div>
       <div v-else-if="!schedules.length" class="flex flex-col items-center justify-center py-8 text-center">
         <Clock class="w-8 h-8 mb-2 text-muted-foreground" />
-        <span class="text-muted-foreground text-sm">{{ workflowId ? '此工作流暂无定时调度' : '暂无定时调度' }}</span>
+        <span class="text-muted-foreground text-sm">{{ workflowId ? t('schedule.noSchedulesFor') : t('schedule.noSchedules') }}</span>
       </div>
       <div v-else class="p-4 space-y-3">
         <Card v-for="item in schedules" :key="item.id" class="shadow-none">
@@ -178,7 +178,7 @@ function formatDate(d: string | null): string {
                 <div class="text-xs font-mono text-primary">{{ item.cron_expr }}</div>
                 <div class="text-xs text-muted-foreground">{{ describeCron(item.cron_expr) }}</div>
                 <div class="text-[10px] text-muted-foreground/60">
-                  上次: {{ formatDate(item.last_run) }} · 下次: {{ formatDate(item.next_run) }}
+                  {{ t('schedule.lastNext', { last: formatDate(item.last_run), next: formatDate(item.next_run) }) }}
                 </div>
               </div>
               <div class="flex flex-col gap-1.5 items-end shrink-0">
@@ -186,12 +186,12 @@ function formatDate(d: string | null): string {
                   :variant="item.enabled ? 'success' : 'secondary'"
                   class="cursor-pointer text-[10px]"
                   @click="onToggle(item)"
-                >{{ item.enabled ? '启用' : '禁用' }}</Badge>
+                >{{ item.enabled ? t('schedule.enabled') : t('schedule.disabled') }}</Badge>
                 <Button
                   variant="ghost"
                   size="icon"
                   class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-40 hover:opacity-100 transition-opacity"
-                  aria-label="删除调度"
+                  :aria-label="t('schedule.deleteAria')"
                   @click="onDelete(item)"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>

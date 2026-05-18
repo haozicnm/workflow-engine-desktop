@@ -135,6 +135,8 @@ export default {
     lockWorkflow: '锁定工作流',
     unlockWorkflow: '解锁工作流',
     lockedHint: '已锁定，不可编辑',
+    saveAs: '另存为',
+    schedule: '定时',
   },
 
   // ─── 步骤卡片 ───
@@ -187,6 +189,18 @@ export default {
     noConditions: '暂无条件，点击添加',
     branchTrue: '条件满足',
     branchFalse: '条件不满足',
+    emptyHint: '点击「添加条件」开始构建判断逻辑',
+    varOrValue: '变量或值',
+    compareValue: '比较值',
+    refVariable: '引用变量',
+    deleteConditionAria: '删除条件',
+    customOutputHint: '可选，自定义 value 输出',
+    outputPlaceholder: '留空则透传原始输入值',
+    outputFormatDesc: '输出格式：{ branch: "true/false", value: 模板渲染值, result: true/false }',
+    searchVar: '搜索变量...',
+    resultTrue: '✓ 真',
+    resultFalse: '✗ 假',
+    elapsed: '耗时 {n}ms',
   },
 
   // ─── 审批中心 ───
@@ -212,6 +226,9 @@ export default {
     confirmApprove: '确定同意此审批？',
     confirmReject: '确定拒绝此审批？',
     submitted: '审批已提交',
+    stepLabel: '步骤',
+    viewData: '查看数据',
+    recommendedLabel: '推荐',
   },
 
   // ─── 定时任务 ───
@@ -236,6 +253,16 @@ export default {
     everyHour: '每小时',
     everyDay: '每天',
     everyWeek: '每周',
+    enterCron: '请输入 Cron 表达式',
+    createFailed: '创建失败',
+    updateFailed: '更新失败',
+    deleteFailed: '删除失败',
+    closeAria: '关闭',
+    cronPlaceholder: 'Cron 表达式 (分 时 日 月 周)',
+    noSchedulesFor: '此工作流暂无定时调度',
+    lastNext: '上次: {last} · 下次: {next}',
+    deleteAria: '删除调度',
+    newSchedule: '＋ 新建',
   },
 
   // ─── 运行历史 ───
@@ -278,6 +305,31 @@ export default {
     builtWith: '构建技术',
     author: '作者',
     license: '许可',
+    browserNode: 'Browser 节点',
+    systemBrowser: '↳ 系统 Browser',
+    preferred: '（首选）',
+    installPython: '→ 安装 Python 3.8+',
+    advanced: '🔧 高级',
+    pythonPathHint: '指定 Python 可执行文件完整路径。留空则自动检测。',
+    agentIntegration: '🤖 Agent 集成',
+    agentDesc: 'AI Agent（如 Claude Code、Codex、Hermes）可以通过 CLI 控制 Workflow Engine。下载下方 SKILL.md 文件放入 Agent 的技能目录即可使用。',
+    logSection: '日志',
+    logHint: '查看和清理应用运行日志。',
+    viewLogFile: '📂 查看日志文件',
+    clearLogs: '清空日志',
+    versionInfo: '版本信息',
+    versionHint: '当前版本及更新记录。',
+    changelog: '更新明细',
+    saving: '保存中...',
+    saveSettings: '保存设置',
+    playwrightCache: '↳ Playwright 缓存',
+    autoDownloadNote: '（首次使用时自动下载）',
+    downloadSkill: '📥 下载 SKILL.md',
+    cliComment1: '# 列出工作流（JSON 输出）',
+    cliComment2: '# 运行工作流并注入变量',
+    cliComment3: '# 查询运行状态',
+    cliComment4: '# 管理定时调度',
+    cliDocNote: '完整文档包含 list / run / status / export / import / validate / schedule 七个命令，JSON 输出格式、Agent 调用模式和常见陷阱。',
   },
 
   // ─── 错误和状态 ───
@@ -579,5 +631,31 @@ export default {
     preview: '预览步骤',
     createFromTemplate: '从模板创建',
     noTemplates: '暂无可用模板',
+  },
+
+  // ─── 状态栏 ───
+  statusBar: {
+    daemonConnected: '守护进程已连接',
+    daemonDisconnected: '守护进程未连接',
+    ready: '就绪',
+    scheduledCount: '{n} 个定时任务',
+  },
+
+  // ─── Cron 预设 ───
+  cronPreset: {
+    everyHour: '每小时',
+    everyDay9: '每天 9:00',
+    everyDay18: '每天 18:00',
+    weekday9: '工作日 9:00',
+    monday9: '每周一 9:00',
+    monthly1st9: '每月1号 9:00',
+  },
+
+  // ─── Cron 描述 ───
+  cronDesc: {
+    daily: '每天 {hour}:{min}',
+    weekdays: '工作日 {hour}:{min}',
+    everyDow: '每{dow} {hour}:{min}',
+    monthly: '每月{dom}号 {hour}:{min}',
   },
 }

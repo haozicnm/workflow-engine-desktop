@@ -136,12 +136,12 @@ function closeVarPicker() {
         size="sm"
         class="h-6 text-[11px] px-2"
         @click="addCondition"
-      >＋ 添加条件</Button>
+      >＋ {{ t('logic.addCondition') }}</Button>
     </div>
 
     <!-- 空状态 -->
     <div v-if="conditions.length === 0" class="text-xs text-muted-foreground/60 py-2 text-center border border-dashed border-border rounded">
-      点击「添加条件」开始构建判断逻辑
+      {{ t('logic.emptyHint') }}
     </div>
 
     <!-- 条件列表 -->
@@ -165,15 +165,15 @@ function closeVarPicker() {
         <div class="flex-1 min-w-0 relative">
           <Input
             :model-value="cond.left"
-            placeholder="变量或值"
+            :placeholder="t('logic.varOrValue')"
             class="h-8 text-xs font-mono pr-7"
             @input="updateCondition(cond.id, 'left', ($event.target as HTMLInputElement).value)"
           />
           <button
             class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-foreground transition-colors"
             :class="activeVarField === `${cond.id}:left` ? 'opacity-100 text-primary' : ''"
-            title="引用变量"
-            aria-label="引用变量"
+            :title="t('logic.refVariable')"
+            :aria-label="t('logic.refVariable')"
             @click="openVarPicker($event, cond.id, 'left')"
           ><Link class="w-3 h-3" /></button>
         </div>
@@ -191,15 +191,15 @@ function closeVarPicker() {
         <div v-if="getOpDef(cond.op)?.hasRight" class="flex-1 min-w-0 relative">
           <Input
             :model-value="cond.right"
-            placeholder="比较值"
+            :placeholder="t('logic.compareValue')"
             class="h-8 text-xs font-mono pr-7"
             @input="updateCondition(cond.id, 'right', ($event.target as HTMLInputElement).value)"
           />
           <button
             class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-foreground transition-colors"
             :class="activeVarField === `${cond.id}:right` ? 'opacity-100 text-primary' : ''"
-            title="引用变量"
-            aria-label="引用变量"
+            :title="t('logic.refVariable')"
+            :aria-label="t('logic.refVariable')"
             @click="openVarPicker($event, cond.id, 'right')"
           ><Link class="w-3 h-3" /></button>
         </div>
@@ -209,7 +209,7 @@ function closeVarPicker() {
           variant="ghost"
           size="icon"
           class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-          aria-label="删除条件"
+          :aria-label="t('logic.deleteConditionAria')"
           @click="removeCondition(cond.id)"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -222,15 +222,15 @@ function closeVarPicker() {
   <div class="mb-3">
     <div class="flex items-center justify-between mb-1">
       <span class="text-xs text-muted-foreground font-medium">{{ t('stepCard.outputLabel') }}</span>
-      <span class="text-[10px] text-muted-foreground/60">可选，自定义 value 输出</span>
+      <span class="text-[10px] text-muted-foreground/60">{{ t('logic.customOutputHint') }}</span>
     </div>
     <Input
       v-model="outputTemplate"
-      placeholder="{{left}} 或 {{变量引用}}，留空则透传原始输入值"
+      :placeholder="t('logic.outputPlaceholder')"
       class="h-8 text-xs font-mono"
     />
     <div class="text-[10px] text-muted-foreground/50 mt-1">
-      输出格式：{ branch: "true/false", value: 模板渲染值, result: true/false }
+      {{ t('logic.outputFormatDesc') }}
     </div>
   </div>
 
@@ -239,7 +239,7 @@ function closeVarPicker() {
     <div class="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">{{ t('stepCard.outputLabel') }}</div>
     <div class="flex items-center gap-2">
       <span :class="(runState.output as Record<string, unknown>)?.result ? 'text-success' : 'text-destructive'">
-        {{ (runState.output as Record<string, unknown>)?.result ? '✓ 真' : '✗ 假' }}
+        {{ (runState.output as Record<string, unknown>)?.result ? t('logic.resultTrue') : t('logic.resultFalse') }}
       </span>
       <span class="text-muted-foreground">→</span>
       <span class="text-foreground">branch: {{ (runState.output as Record<string, unknown>)?.branch }}</span>
@@ -251,7 +251,7 @@ function closeVarPicker() {
 
   <!-- 耗时 -->
   <div v-if="runState?.duration" class="mt-2 text-[10px] text-muted-foreground text-right">
-    耗时 {{ runState.duration }}ms
+    {{ t('logic.elapsed', { n: runState.duration }) }}
   </div>
 
   <!-- 变量选择器（Teleport 到 body 避免 overflow 裁剪） -->
@@ -264,7 +264,7 @@ function closeVarPicker() {
       class="fixed z-50 w-72 bg-background border border-border rounded-md shadow-lg overflow-hidden"
       :style="{ top: varDropdownPos.top + 'px', left: varDropdownPos.left + 'px' }"
     >
-      <Input v-model="varSearch" placeholder="搜索变量..." class="h-7 text-xs rounded-none border-0 border-b border-border" />
+      <Input v-model="varSearch" :placeholder="t('logic.searchVar')" class="h-7 text-xs rounded-none border-0 border-b border-border" />
       <div class="max-h-[200px] overflow-y-auto">
         <Button
           v-for="ref in filteredRefs"

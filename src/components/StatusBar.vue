@@ -47,16 +47,16 @@ function formatNextRun(iso: string | null): string {
   if (diff < 3_600_000) return `${Math.ceil(diff / 60_000)}min`
   const today = new Date()
   if (d.toDateString() === today.toDateString()) {
-    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
-  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
 <template>
   <div class="status-bar h-7 border-t border-border bg-card/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-muted-foreground select-none shrink-0">
     <!-- IPC daemon status -->
-    <span class="flex items-center gap-1.5" :title="state.ipcOnline ? '守护进程已连接' : '守护进程未连接'">
+    <span class="flex items-center gap-1.5" :title="state.ipcOnline ? t('statusBar.daemonConnected') : t('statusBar.daemonDisconnected')">
       <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
       <span v-if="state.ipcOnline" class="text-muted-foreground/70">{{ t('dashboard.daemonStatus') }}</span>
       <span v-else class="text-destructive/70">{{ t('dashboard.daemonOffline') }}</span>
@@ -68,7 +68,7 @@ function formatNextRun(iso: string | null): string {
     <template v-if="isIdle">
       <span class="flex items-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-success/70"></span>
-        就绪
+        {{ t('statusBar.ready') }}
       </span>
     </template>
 
@@ -103,7 +103,7 @@ function formatNextRun(iso: string | null): string {
     <template v-if="hasScheduled">
       <div class="flex items-center gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>{{ state.scheduledWorkflows.length }}个定时任务</span>
+        <span>{{ t('statusBar.scheduledCount', { n: state.scheduledWorkflows.length }) }}</span>
         <span v-for="s in state.scheduledWorkflows.slice(0, 3)" :key="s.id" class="flex items-center gap-1 text-muted-foreground/60">
           <span class="max-w-[100px] truncate">{{ s.workflowName }}</span>
           <span class="text-muted-foreground/40">{{ formatNextRun(s.nextRun) }}</span>

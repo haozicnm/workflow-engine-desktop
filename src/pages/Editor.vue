@@ -518,9 +518,9 @@ onUnmounted(() => {
       <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" @keydown.escape="showCardMenu = false" />
       <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
         <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSave(); showCardMenu = false">{{ t('common.save') }}</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">另存为</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">导出</button>
-        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">定时</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onSaveAs(); showCardMenu = false">{{ t('editor.saveAs') }}</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onExport(); showCardMenu = false">{{ t('common.export') }}</button>
+        <button class="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors" @click="onScheduleClick(); showCardMenu = false">{{ t('editor.schedule') }}</button>
         <div class="border-t border-border my-1" />
         <button class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors" @click="onDelete(); showCardMenu = false">{{ t('common.delete') }}</button>
       </div>

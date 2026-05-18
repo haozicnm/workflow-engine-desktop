@@ -199,7 +199,7 @@ function downloadSkill() {
       <!-- Browser settings -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">Browser节点</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.browserNode') }}</h2>
           <p class="text-xs text-muted-foreground mb-4">Select browser for automation. Edge recommended for intranet.</p>
 
           <div class="space-y-2 mb-4">
@@ -253,7 +253,7 @@ function downloadSkill() {
                 <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
               </div>
               <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
-                → Install Python 3.8+
+                {{ t('settingsPage.installPython') }}
                 <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">Download</a>
               </div>
 
@@ -269,13 +269,13 @@ function downloadSkill() {
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">Browser</span>
                 <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_browser ? '✓ available' : '—（auto-download on first use）' }}
+                  {{ sysInfo.has_browser ? '✓ available' : t('settingsPage.autoDownloadNote') }}
                 </span>
               </div>
               <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ 系统Browser</span>
+                <span class="text-foreground pl-3">{{ t('settingsPage.systemBrowser') }}</span>
                 <span class="text-success text-[11px]">
-                  {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }} （首选）
+                  {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }}{{ t('settingsPage.preferred') }}
                 </span>
               </div>
               <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
@@ -283,7 +283,7 @@ function downloadSkill() {
                 <span class="text-success text-[11px]">✓ bundled</span>
               </div>
               <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">↳ Playwright 缓存</span>
+                <span class="text-foreground pl-3">{{ t('settingsPage.playwrightCache') }}</span>
                 <span class="text-success text-[11px]">✓ downloaded</span>
               </div>
             </div>
@@ -294,13 +294,13 @@ function downloadSkill() {
       <!-- Advanced settings -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-4">🔧 高级</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-4">{{ t('settingsPage.advanced') }}</h2>
 
           <div class="space-y-4">
             <div class="space-y-1.5">
               <Label class="text-xs text-muted-foreground font-semibold">Python Path (Optional)</Label>
               <Input v-model="settings.python_path" placeholder="Leave empty for auto-detect" class="h-8 text-xs" />
-              <p class="text-[11px] text-muted-foreground/60">指定 Python 可执行文件完整Path。留空则自动检测。</p>
+              <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.pythonPathHint') }}</p>
             </div>
 
             <div class="space-y-1.5">
@@ -323,41 +323,39 @@ function downloadSkill() {
       <!-- Agent integration -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🤖 Agent 集成</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.agentIntegration') }}</h2>
           <p class="text-xs text-muted-foreground mb-4">
-            AI Agent（如 Claude Code、Codex、Hermes）可以通过 CLI 控制 Workflow Engine。
-            下载下方 SKILL.md 文件放入 Agent 的技能目录即可使用。
+            {{ t('settingsPage.agentDesc') }}
           </p>
 
           <!-- CLI command preview -->
           <div class="bg-muted rounded-md p-3 mb-4 font-mono text-xs space-y-1">
-            <div class="text-muted-foreground"># 列出工作流（JSON 输出）</div>
+            <div class="text-muted-foreground">{{ t('settingsPage.cliComment1') }}</div>
             <div class="text-foreground">wf-cli list --json</div>
-            <div class="text-muted-foreground mt-2"># 运行工作流并注入变量</div>
+            <div class="text-muted-foreground mt-2">{{ t('settingsPage.cliComment2') }}</div>
             <div class="text-foreground">wf-cli run &lt;id&gt; --var url=https://example.com</div>
-            <div class="text-muted-foreground mt-2"># 查询运行状态</div>
+            <div class="text-muted-foreground mt-2">{{ t('settingsPage.cliComment3') }}</div>
             <div class="text-foreground">wf-cli status &lt;run_id&gt; --json</div>
-            <div class="text-muted-foreground mt-2"># 管理定时调度</div>
+            <div class="text-muted-foreground mt-2">{{ t('settingsPage.cliComment4') }}</div>
             <div class="text-foreground">wf-cli schedule list --json</div>
           </div>
 
           <p class="text-xs text-muted-foreground mb-4">
-            完整文档包含 list / run / status / export / import / validate / schedule 七个命令，
-            JSON 输出格式、Agent 调用模式和常见陷阱。
+            {{ t('settingsPage.cliDocNote') }}
           </p>
 
-          <Button variant="outline" size="sm" @click="downloadSkill">📥 下载 SKILL.md</Button>
+          <Button variant="outline" size="sm" @click="downloadSkill">{{ t('settingsPage.downloadSkill') }}</Button>
         </div>
       </Card>
 
       <!-- Log management -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">日志</h2>
-          <p class="text-xs text-muted-foreground mb-4">查看和清理应用运行日志。</p>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.logSection') }}</h2>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.logHint') }}</p>
           <div class="flex gap-2.5 flex-wrap">
-            <Button variant="outline" size="sm" @click="openLogDir">📂 查看日志文件</Button>
-            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">清空日志</Button>
+            <Button variant="outline" size="sm" @click="openLogDir">{{ t('settingsPage.viewLogFile') }}</Button>
+            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">{{ t('settingsPage.clearLogs') }}</Button>
           </div>
         </div>
       </Card>
@@ -365,12 +363,12 @@ function downloadSkill() {
       <!-- Version info -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">版本信息</h2>
-          <p class="text-xs text-muted-foreground mb-4">当前版本及更新记录。</p>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.versionInfo') }}</h2>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.versionHint') }}</p>
           <div class="mb-4">
             <Badge variant="default" class="text-sm px-3 py-1">v{{ APP_VERSION }}</Badge>
           </div>
-          <h3 class="text-sm text-foreground mb-2">更新明细</h3>
+          <h3 class="text-sm text-foreground mb-2">{{ t('settingsPage.changelog') }}</h3>
           <div class="space-y-0">
             <div v-for="(item, i) in [
               { version: 'v6.9.0', desc: '修复 runCondition 被 parser 抹除 · cursor/loop items 变量解析 · 模板库前端浏览+实例化 · IPC 守护进程状态指示' },
@@ -404,7 +402,7 @@ function downloadSkill() {
           :disabled="saving"
           @click="save"
         >
-          {{ saving ? '保存中...' : '保存设置' }}
+          {{ saving ? t('settingsPage.saving') : t('settingsPage.saveSettings') }}
         </Button>
       </div>
     </div>

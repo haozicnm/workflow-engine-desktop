@@ -131,6 +131,8 @@ export default {
     lockWorkflow: 'Lock',
     unlockWorkflow: 'Unlock',
     lockedHint: 'Locked — read only',
+    saveAs: 'Save As',
+    schedule: 'Schedule',
   },
 
   stepCard: {
@@ -180,6 +182,18 @@ export default {
     noConditions: 'No conditions. Click to add.',
     branchTrue: 'True',
     branchFalse: 'False',
+    emptyHint: 'Click "Add Condition" to start building',
+    varOrValue: 'Variable or value',
+    compareValue: 'Compare value',
+    refVariable: 'Reference variable',
+    deleteConditionAria: 'Delete condition',
+    customOutputHint: 'Optional, custom value output',
+    outputPlaceholder: 'Leave empty to pass through',
+    outputFormatDesc: 'Output format: { branch: "true/false", value: rendered template, result: true/false }',
+    searchVar: 'Search variables...',
+    resultTrue: '✓ True',
+    resultFalse: '✗ False',
+    elapsed: 'Elapsed {n}ms',
   },
 
   approval: {
@@ -204,6 +218,9 @@ export default {
     confirmApprove: 'Approve this item?',
     confirmReject: 'Reject this item?',
     submitted: 'Approval submitted',
+    stepLabel: 'Step',
+    viewData: 'View Data',
+    recommendedLabel: 'Recommended',
   },
 
   schedule: {
@@ -227,6 +244,16 @@ export default {
     everyHour: 'Every hour',
     everyDay: 'Every day',
     everyWeek: 'Every week',
+    enterCron: 'Please enter Cron expression',
+    createFailed: 'Create failed',
+    updateFailed: 'Update failed',
+    deleteFailed: 'Delete failed',
+    closeAria: 'Close',
+    cronPlaceholder: 'Cron Expression (min hour day month weekday)',
+    noSchedulesFor: 'No schedules for this workflow',
+    lastNext: 'Last: {last} · Next: {next}',
+    deleteAria: 'Delete schedule',
+    newSchedule: '+ New',
   },
 
   history: {
@@ -267,6 +294,31 @@ export default {
     builtWith: 'Built With',
     author: 'Author',
     license: 'License',
+    browserNode: 'Browser Node',
+    systemBrowser: '↳ System Browser',
+    preferred: ' (preferred)',
+    installPython: '→ Install Python 3.8+',
+    advanced: '🔧 Advanced',
+    pythonPathHint: 'Specify Python executable full path. Leave empty for auto-detect.',
+    agentIntegration: '🤖 Agent Integration',
+    agentDesc: 'AI Agents (Claude Code, Codex, Hermes) can control Workflow Engine via CLI. Download the SKILL.md file and place it in your agent\'s skills directory.',
+    logSection: 'Logs',
+    logHint: 'View and clean application logs.',
+    viewLogFile: '📂 View Log Files',
+    clearLogs: 'Clear Logs',
+    versionInfo: 'Version Info',
+    versionHint: 'Current version and changelog.',
+    changelog: 'Changelog',
+    saving: 'Saving...',
+    saveSettings: 'Save Settings',
+    playwrightCache: '↳ Playwright Cache',
+    autoDownloadNote: '(auto-download on first use)',
+    downloadSkill: '📥 Download SKILL.md',
+    cliComment1: '# List workflows (JSON output)',
+    cliComment2: '# Run workflow with variables',
+    cliComment3: '# Query run status',
+    cliComment4: '# Manage schedules',
+    cliDocNote: 'Full documentation covers list / run / status / export / import / validate / schedule commands, JSON output format, Agent integration patterns, and common pitfalls.',
   },
 
   error: {
@@ -536,5 +588,28 @@ export default {
     preview: 'Preview Steps',
     createFromTemplate: 'Create from Template',
     noTemplates: 'No templates available',
+  },
+
+  statusBar: {
+    daemonConnected: 'Daemon connected',
+    daemonDisconnected: 'Daemon disconnected',
+    ready: 'Ready',
+    scheduledCount: '{n} scheduled',
+  },
+
+  cronPreset: {
+    everyHour: 'Every hour',
+    everyDay9: 'Daily 9:00',
+    everyDay18: 'Daily 18:00',
+    weekday9: 'Weekdays 9:00',
+    monday9: 'Monday 9:00',
+    monthly1st9: '1st of month 9:00',
+  },
+
+  cronDesc: {
+    daily: 'Daily {hour}:{min}',
+    weekdays: 'Weekdays {hour}:{min}',
+    everyDow: 'Every {dow} {hour}:{min}',
+    monthly: 'Monthly {dom} {hour}:{min}',
   },
 }

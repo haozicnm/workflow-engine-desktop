@@ -97,7 +97,7 @@ async function decide(item: PendingItem, option: string) {
   try {
     await safeInvoke('approval_response', {
       approvalId: item.id,
-      approved: option === '同意' || option === item.recommended,
+      approved: option === item.recommended,
       comment: item.comment || null,
       option,
     })
@@ -187,7 +187,7 @@ onUnmounted(() => {
               <div>
                 <h3 class="font-medium text-foreground">{{ item.title }}</h3>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  步骤: {{ item.step_id }} · {{ formatElapsed(item.elapsed) }}
+                  {{ t('approval.stepLabel') }}: {{ item.step_id }} · {{ formatElapsed(item.elapsed) }}
                 </p>
               </div>
               <div
@@ -222,7 +222,7 @@ onUnmounted(() => {
                 class="text-xs text-primary hover:underline py-0.5 cursor-pointer"
                 @click="item.showItem = !item.showItem"
               >
-                {{ item.showItem ? '▼' : '▶' }} 查看数据
+                {{ item.showItem ? '▼' : '▶' }} {{ t('approval.viewData') }}
               </button>
               <pre
                 v-if="item.showItem"
@@ -250,7 +250,7 @@ onUnmounted(() => {
               v-if="item.recommended"
               class="text-xs text-muted-foreground"
             >
-              💡 推荐: {{ item.recommended }}
+              💡 {{ t('approval.recommendedLabel') }}: {{ item.recommended }}
             </p>
 
             <!-- 条件推荐原因（新增） -->
@@ -265,7 +265,7 @@ onUnmounted(() => {
             <Textarea
               v-model="item.comment"
               :rows="1"
-              placeholder="审批意见（可选）"
+              :placeholder="t('approval.commentPlaceholder')"
               class="text-sm"
             />
           </div>
