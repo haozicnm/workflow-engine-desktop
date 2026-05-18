@@ -9,9 +9,6 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing;
-
-use crate::engine;
 
 const IPC_PORT: u16 = 19527;
 const _TOKEN_FILE: &str = ".hermes/daemon-token";
