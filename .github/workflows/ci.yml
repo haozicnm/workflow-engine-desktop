@@ -1,10 +1,16 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Run tests'
+        type: boolean
+        default: true
+      run_clippy:
+        description: 'Run clippy'
+        type: boolean
+        default: true
 
 env:
   CARGO_TERM_COLOR: always
