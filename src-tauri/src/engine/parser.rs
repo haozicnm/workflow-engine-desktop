@@ -123,107 +123,147 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
 }
 
 /// 转换单个步骤：容器类型加 _container，actions 移入 config
-/// 迭代类型（cursor/loop）：actions 转为 body_steps
-///
-/// `is_recursive`: true 表示这是 body step 的递归调用。
-///   此时容器类型仅改 type 名（加 _container 后缀），
-///   不再重复移动 actions（config 中已有）。
-fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
-    let is_container = CONTAINER_TYPES.contains(&step.step_type.as_str());
-    let is_iteration = ITERATION_TYPES.contains(&step.step_type.as_str());
+/// StepParser trait — 责任链模式
+/// 每种节点类型由独立的 parser 处理，替代大段 if/else
+trait StepParser {
+    /// 是否能处理此步骤类型
+    fn can_parse(step_type: &str) -> bool;
+    /// 解析步骤：返回 (new_type, new_config, body_steps)
+    fn parse(step: &Step, is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)>;
+}
 
-    let (new_type, new_config) = if is_container {
+/// 容器 Parser: browser, excel, word, logic, file
+struct ContainerParser;
+impl StepParser for ContainerParser {
+    fn can_parse(step_type: &str) -> bool {
+        CONTAINER_TYPES.contains(&step_type)
+    }
+
+    fn parse(step: &Step, is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
         let container_type = format!("{}_container", step.step_type);
-
-        if is_recursive {
-            // 递归调用：config 中已有 actions，只改类型名
-            // 但仍然需要处理 conditionGroup → condition_group 转换
-            let mut config = step.config.clone();
-            if step.step_type == "logic" {
-                if let Some(cg_json) = step.config.get("conditionGroup") {
-                    if let Value::Object(ref mut map) = config {
-                        map.entry("condition_group".to_string())
-                            .or_insert_with(|| cg_json.clone());
-                    }
-                }
-            }
-            (container_type, config)
+        let config = if is_recursive {
+            Self::parse_recursive(step)
         } else {
-            // 顶层调用：actions 从顶层移入 config
-            // ⚠️ 如果 config 已有 actions（直接编辑 JSON），优先使用
-            let mut config = if step.config.is_object() {
-                step.config.clone()
-            } else {
-                serde_json::json!({})
-            };
+            Self::parse_toplevel(step)
+        };
+        Ok((container_type, config, None))
+    }
+}
 
-            let has_config_actions = config.get("actions").is_some();
-
-            if let Value::Object(ref mut map) = config {
-                if !has_config_actions {
-                    // config 里没有 actions → 从顶层 step.actions 迁移
-                    let actions = step.actions.clone().unwrap_or_default();
-                    let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
-                    map.insert("actions".to_string(), Value::Array(converted_actions));
-                }
-                // else: config 已有 actions，不覆盖（直接编辑 JSON 的方式）
-            }
-
-            // logic 容器：把 condition 和 conditionGroup 放入 config
-            if step.step_type == "logic" {
-                if let Some(cg_json) = step.config.get("conditionGroup") {
-                    if let Value::Object(ref mut map) = config {
-                        map.entry("condition_group".to_string())
-                            .or_insert_with(|| cg_json.clone());
-                    }
-                }
-                if let Some(ref cond) = step.condition {
-                    if let Value::Object(ref mut map) = config {
-                        map.insert("condition".to_string(), Value::String(cond.clone()));
-                    }
-                }
-                if let Some(ref cg) = step.condition_group {
-                    if let Value::Object(ref mut map) = config {
-                        map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
-                    }
+impl ContainerParser {
+    fn parse_recursive(step: &Step) -> Value {
+        let mut config = step.config.clone();
+        if step.step_type == "logic" {
+            if let Some(cg_json) = step.config.get("conditionGroup") {
+                if let Value::Object(ref mut map) = config {
+                    map.entry("condition_group".to_string())
+                        .or_insert_with(|| cg_json.clone());
                 }
             }
-
-            (container_type, config)
         }
-    } else {
-        // 非容器步骤：保持原样
-        (step.step_type.clone(), step.config.clone())
-    };
+        config
+    }
 
-    // 迭代类型：把 actions 转为 body_steps，并递归转换容器类型
-    let body_steps = if is_iteration {
+    fn parse_toplevel(step: &Step) -> Value {
+        let mut config = if step.config.is_object() {
+            step.config.clone()
+        } else {
+            serde_json::json!({})
+        };
+
+        let has_config_actions = config.get("actions").is_some();
+        if let Value::Object(ref mut map) = config {
+            if !has_config_actions {
+                let actions = step.actions.clone().unwrap_or_default();
+                let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
+                map.insert("actions".to_string(), Value::Array(converted_actions));
+            }
+        }
+
+        if step.step_type == "logic" {
+            if let Some(cg_json) = step.config.get("conditionGroup") {
+                if let Value::Object(ref mut map) = config {
+                    map.entry("condition_group".to_string())
+                        .or_insert_with(|| cg_json.clone());
+                }
+            }
+            if let Some(ref cond) = step.condition {
+                if let Value::Object(ref mut map) = config {
+                    map.insert("condition".to_string(), Value::String(cond.clone()));
+                }
+            }
+            if let Some(ref cg) = step.condition_group {
+                if let Value::Object(ref mut map) = config {
+                    map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
+                }
+            }
+        }
+
+        config
+    }
+}
+
+/// 迭代 Parser: cursor, loop
+struct IterationParser;
+impl StepParser for IterationParser {
+    fn can_parse(step_type: &str) -> bool {
+        ITERATION_TYPES.contains(&step_type)
+    }
+
+    fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
         let actions = step.actions.clone().unwrap_or_default();
         let raw_steps: Vec<Step> = if actions.is_empty() {
-            // 没有 actions，保留原有 body_steps（可能来自手动 JSON 编辑的 config.body）
             step.body_steps.clone().unwrap_or_default()
         } else {
-            // 把前端的 Action 对象转为 Step 对象
-            actions
-                .iter()
+            actions.iter()
                 .map(|a| convert_action_to_step(a))
                 .collect::<Result<Vec<_>>>()?
         };
-        // 递归转换每个子步骤：body 内如果有容器类型（browser/excel/word/file/logic），
-        // 需要加 _container 后缀，否则 executor 找不到 handler
-        let converted: Vec<Step> = raw_steps
-            .into_iter()
+
+        let body_steps: Vec<Step> = raw_steps.into_iter()
             .map(|s| convert_step(&s, true))
             .collect::<Result<Vec<_>>>()?;
-        Some(converted)
+
+        Ok((step.step_type.clone(), step.config.clone(), Some(body_steps)))
+    }
+}
+
+/// 简单步骤 Parser: http, shell, script, delay, notify 等
+struct SimpleStepParser;
+impl StepParser for SimpleStepParser {
+    fn can_parse(_step_type: &str) -> bool { true }
+
+    fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
+        Ok((step.step_type.clone(), step.config.clone(), None))
+    }
+}
+
+/// 责任链分派：按顺序尝试 parser
+fn dispatch_parser(step: &Step, is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
+    if ContainerParser::can_parse(&step.step_type) {
+        ContainerParser::parse(step, is_recursive)
+    } else if IterationParser::can_parse(&step.step_type) {
+        IterationParser::parse(step, is_recursive)
     } else {
-        // 非迭代类型也可能有 body_steps（如 sub_workflow），同样递归转换
+        SimpleStepParser::parse(step, is_recursive)
+    }
+}
+
+/// 转换单个步骤（前端格式 → 执行格式）
+///
+/// `is_recursive`: true 表示这是 body step 的递归调用，
+///   此时容器仅改 type 名，不再重复移动 actions。
+fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
+    let (new_type, new_config, parsed_body) = dispatch_parser(step, is_recursive)?;
+
+    // 非迭代类型也可能有 body_steps（如 sub_workflow），同样递归转换
+    let body_steps = parsed_body.or_else(|| {
         step.body_steps.as_ref().map(|steps| {
             steps.iter()
-                    .map(|s| convert_step(s, true))
+                .map(|s| convert_step(s, true))
                 .collect::<Result<Vec<_>>>()
-        }).transpose()?
-    };
+        }).transpose().ok().flatten()
+    });
 
 
     Ok(Step {
