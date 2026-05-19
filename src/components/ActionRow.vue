@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
 
 const { t } = useI18n()
+const toast = useToast()
 import { getActionDef, getActionLabel, getContainerDef } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
 import { useVariableRefs } from '../composables/useVariableRefs'
+import { useToast } from '../composables/useToast'
 import { safeInvoke } from '../utils/tauri'
 import { cn } from '@/lib/utils'
 import Button from './ui/button/Button.vue'
@@ -104,7 +106,7 @@ async function onPickElement(fieldKey: string) {
       const url = getStepUrl()
       const startResult = await safeInvoke<{ success: boolean }>('browser_pick_session_start', { url: url || null })
       if (!startResult?.success) {
-        console.error('启动拾取会话失败')
+        toast.error('Failed to start pick session')
         return
       }
       pickSessionActive = true
@@ -116,7 +118,7 @@ async function onPickElement(fieldKey: string) {
       emit('update-params', { ...localParams.value })
     }
   } catch (e) {
-    console.error('元素选择失败:', e)
+    toast.error('Element selection failed: ' + (e as Error).message)
     pickSessionActive = false
   } finally {
     pickingElement.value = false

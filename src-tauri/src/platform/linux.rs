@@ -14,19 +14,20 @@ pub struct LinuxBackend {
 
 impl Default for LinuxBackend {
     fn default() -> Self {
-        Self::new()
+        // Retain for backward compatibility: callers should use new() instead
+        Self::new().expect("LinuxBackend init failed")
     }
 }
 
 impl LinuxBackend {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let settings = enigo::Settings::default();
         let enigo = enigo::Enigo::new(&settings)
-            .expect("enigo 初始化失败——请确认 X11/Wayland 会话可用");
-        info!("Linux 输入后端初始化完成");
-        LinuxBackend {
+            .map_err(|e| anyhow!("enigo init failed (X11/Wayland not available): {}", e))?;
+        info!("Linux input backend initialized");
+        Ok(LinuxBackend {
             enigo: std::sync::Mutex::new(enigo),
-        }
+        })
     }
 
     fn enigo_lock(&self) -> Result<std::sync::MutexGuard<'_, enigo::Enigo>> {

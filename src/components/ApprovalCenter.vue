@@ -2,12 +2,14 @@
 import { ref, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Hand } from 'lucide-vue-next'
+import { useToast } from '../composables/useToast'
 import { safeListen, safeInvoke } from '../utils/tauri'
 import Button from '@/components/ui/button/Button.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
 import Textarea from '@/components/ui/textarea/Textarea.vue'
 
 const { t } = useI18n()
+const toast = useToast()
 
 interface ApprovalEntry {
   id: string
@@ -86,7 +88,7 @@ async function loadPending() {
       return item
     })
   } catch (e) {
-    console.error('[ApprovalCenter] 加载待审批失败:', e)
+    toast.error('Failed to load approvals: ' + (e as Error).message)
   }
 }
 
@@ -105,7 +107,7 @@ async function decide(item: PendingItem, option: string) {
     if (item.timer) clearInterval(item.timer)
     pending.value = pending.value.filter(p => p.id !== item.id)
   } catch (e) {
-    console.error('[ApprovalCenter] 审批决策失败:', e)
+    toast.error('Failed to submit decision: ' + (e as Error).message)
   } finally {
     item.deciding = false
   }

@@ -1,10 +1,12 @@
 import { ref } from 'vue'
 import { useWorkflowStore } from '../stores/workflowStore'
+import { useToast } from './useToast'
 import type { Workflow, StepRunState } from '../types/types'
 import { safeInvoke, safeListen } from '../utils/tauri'
 
 export function useStepRunner() {
   const store = useWorkflowStore()
+  const toast = useToast()
   const runId = ref<string | null>(null)
   const isRunning = ref(false)
 
@@ -22,12 +24,12 @@ export function useStepRunner() {
     if (!wf.id || store.dirty) {
       const ok = await store.saveWorkflow()
       if (!ok) {
-        console.error('[StepRunner] 保存工作流失败，无法运行')
+        toast.error('Cannot run: workflow save failed')
         return
       }
     }
     if (!wf.id) {
-      console.error('[StepRunner] 工作流无 ID')
+      toast.error('Cannot run: workflow has no ID')
       return
     }
 
@@ -108,7 +110,7 @@ export function useStepRunner() {
           isRunning.value = false
           cleanup()
         } else if (status === 'failed') {
-          console.error('[StepRunner] ❌ 工作流执行失败:', error)
+          toast.error('Workflow execution failed: ' + (error || 'unknown error'))
           isRunning.value = false
           cleanup()
         } else if (status === 'cancelled') {
@@ -122,7 +124,7 @@ export function useStepRunner() {
       // 5. Start execution
       const id = await safeInvoke<string>('run_start', { workflowId: wf.id })
       if (!id) {
-        console.error('[StepRunner] run_start 返回空 ID')
+        toast.error('Failed to start workflow')
         isRunning.value = false
         cleanup()
         return
@@ -131,7 +133,7 @@ export function useStepRunner() {
       // 运行已启动
 
     } catch (e) {
-      console.error('[StepRunner] 启动失败:', e)
+      toast.error('Failed to start workflow: ' + (e as Error).message)
       isRunning.value = false
       cleanup()
     }
@@ -146,7 +148,7 @@ export function useStepRunner() {
       await safeInvoke('run_cancel', { runId: runId.value })
       // 取消请求已发送
     } catch (e) {
-      console.error('[StepRunner] 取消失败:', e)
+      toast.error('Failed to cancel workflow: ' + (e as Error).message)
     }
   }
 

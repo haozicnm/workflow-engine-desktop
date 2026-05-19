@@ -33,12 +33,22 @@ use traits::WindowBackend;
 static PLATFORM: OnceLock<Box<dyn InputBackend + Send + Sync>> = OnceLock::new();
 
 /// 获取全局平台后端（键鼠操作）
+///
+/// Linux: tries enigo first, falls back to graceful error messages if unavailable
 pub fn input() -> &'static (dyn InputBackend + Send + Sync) {
     PLATFORM.get_or_init(|| {
         #[cfg(target_os = "windows")]
         { Box::new(windows::WindowsBackend::new()) }
         #[cfg(target_os = "linux")]
-        { Box::new(linux::LinuxBackend::new()) }
+        {
+            match linux::LinuxBackend::new() {
+                Ok(backend) => Box::new(backend),
+                Err(e) => {
+                    tracing::warn!("Linux input backend unavailable (enigo init failed): {}. Falling back to stub.", e);
+                    Box::new(UnsupportedBackend)
+                }
+            }
+        }
         #[cfg(not(any(target_os = "windows", target_os = "linux")))]
         { Box::new(UnsupportedBackend) }
     }).as_ref()

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { deepMerge } from '../lib/utils'
 import { normalizeSteps, validateRefs } from '../composables/useWorkflowValidate'
 import { safeInvoke } from '../utils/tauri'
+import { useToast } from '../composables/useToast'
 import type { Workflow, Step, ContainerType, StepRunState } from '../types/types'
 import { newWorkflow, serializeWorkflow, deserializeWorkflow } from '../types/types'
 import { newStep, newAction } from '../types/node-registry'
@@ -39,6 +40,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
   const loading = ref(false)
   const saving = ref(false)
   const lastWarnings = ref<string[]>([])
+  const toast = useToast()
 
   // ─── List ───
 
@@ -47,7 +49,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     try {
       workflowList.value = await safeInvoke<WorkflowListItem[]>('workflow_list') || []
     } catch (e) {
-      console.error('获取工作流列表失败:', e)
+      toast.error('Failed to fetch workflow list: ' + (e as Error).message)
     } finally {
       loading.value = false
     }
@@ -78,7 +80,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
         runStates.value = {}
       }
     } catch (e) {
-      console.error('加载工作流失败:', e)
+      toast.error('Failed to load workflow: ' + (e as Error).message)
     } finally {
       loading.value = false
     }
@@ -121,7 +123,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
       dirty.value = false
       return true
     } catch (e) {
-      console.error('保存失败:', e)
+      toast.error('Failed to save workflow: ' + (e as Error).message)
       return false
     } finally {
       saving.value = false
@@ -135,7 +137,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
       await safeInvoke('workflow_delete', { id })
       workflowList.value = workflowList.value.filter(w => w.id !== id)
     } catch (e) {
-      console.error('删除失败:', e)
+      toast.error('Failed to delete workflow: ' + (e as Error).message)
     }
   }
 
@@ -155,7 +157,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
       }
       return newId
     } catch (e) {
-      console.error('克隆失败:', e)
+      toast.error('Failed to clone workflow: ' + (e as Error).message)
       return null
     }
   }
@@ -182,7 +184,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
       }
       return wf
     } catch (e) {
-      console.error('导入失败:', e)
+      toast.error('Failed to import workflow: ' + (e as Error).message)
       return null
     }
   }

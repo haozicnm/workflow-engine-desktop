@@ -1,4 +1,5 @@
 import { reactive, readonly } from 'vue'
+import { useToast } from './useToast'
 import { safeInvoke } from '../utils/tauri'
 
 export interface RunningWorkflow {
@@ -35,6 +36,8 @@ const state = reactive<GlobalStatusState>({
 let scheduleRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 export function useGlobalStatus() {
+  const toast = useToast()
+
   function registerRun(id: string, name: string) {
     state.runningWorkflows.set(id, {
       id,
@@ -74,7 +77,7 @@ export function useGlobalStatus() {
         }))
       state.schedulesLoaded = true
     } catch (e) {
-      console.error('[GlobalStatus] 加载调度失败:', e)
+      toast.error('Failed to load schedules')
     }
   }
 
