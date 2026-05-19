@@ -2,6 +2,7 @@
 use crate::engine::workflow::Workflow;
 use std::collections::HashMap;
 use anyhow::Result;
+use tracing::warn;
 use uuid::Uuid;
 
 /// 执行上下文
@@ -206,9 +207,7 @@ impl ExecutionContext {
                         other => result.push_str(&other.to_string()),
                     }
                 } else {
-                    result.push_str("{{");
-                    result.push_str(key);
-                    result.push_str("}}");
+                    warn!("variable not found: '{}' → replaced with empty string", key);
                 }
                 remaining = &remaining[start + 2 + end + 2..];
             } else {
