@@ -1512,13 +1512,23 @@ async def _inject_picker_js(page) -> None:
 
 
 async def _pick_start(params: dict) -> dict:
-    """开始连续拾取：打开浏览器 + 注入选择器"""
+    """开始连续拾取：复用已有浏览器 或 打开可见浏览器"""
     global _pick_session_active
 
     page = _get_page()
     if page is None:
-        await _launch({"headless": False})
-        page = _get_page()
+        # 浏览器未启动 → 开一个可见的（picker 需要用户交互）
+        if _context is None:
+            await _launch({"headless": False})
+        else:
+            # 浏览器在但没页面 → 新建标签页
+            try:
+                page = await _context.new_page()
+                _pages.append(page)
+            except Exception as e:
+                return {"success": False, "error": f"无法创建新页面: {e}"}
+        if page is None:
+            page = _get_page()
         if page is None:
             return {"success": False, "error": "浏览器未启动"}
 
