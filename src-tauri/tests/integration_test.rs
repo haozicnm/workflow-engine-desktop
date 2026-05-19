@@ -1,5 +1,6 @@
 // tests/integration_test.rs — 端到端集成测试
 // 使用真实的 StepExecutor + NodeExecutor trait 接口
+use std::sync::Arc;
 use serde_json::json;
 use workflow_engine::engine::workflow::Step;
 use workflow_engine::engine::context::ExecutionContext;
@@ -585,4 +586,314 @@ async fn test_delay_node_max_limit() {
     let result = executor.execute(&step, &mut ctx).await;
     assert!(result.is_err(), "超过 max_duration_ms 应返回错误");
     println!("✅ Delay max limit OK: {}", result.unwrap_err());
+}
+
+// ═══════════════════════════════════════════════════
+// Phase 2.1: 核心链路集成测试
+// ═══════════════════════════════════════════════════
+
+/// 模拟 scheduler 执行步骤链：依次执行 steps，每步输出自动存入 ctx.step_outputs
+async fn run_chain(executor: &Arc<StepExecutor>, ctx: &mut ExecutionContext, steps: &[Step]) -> Vec<serde_json::Value> {
+    let mut outputs = Vec::new();
+    for step in steps {
+        let result = executor.execute(step, ctx).await;
+        match result {
+            Ok(output) => {
+                ctx.set_output(&step.id, output.clone());
+                outputs.push(output);
+            }
+            Err(e) => {
+                // onError:ignore 行为
+                if step.on_error.as_ref().map_or(false, |s| matches!(s, workflow_engine::engine::workflow::ErrorStrategy::Ignore)) {
+                    ctx.set_output(&step.id, serde_json::Value::Null);
+                    outputs.push(serde_json::Value::Null);
+                } else {
+                    panic!("Step '{}' failed: {:?}", step.id, e);
+                }
+            }
+        }
+    }
+    outputs
+}
+
+#[tokio::test]
+async fn test_main_chain_shell_to_notify() {
+    // 测试主链路: shell → json_parse → script → logic → notify
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+    let mut ctx = ExecutionContext::new("test-main-chain", &Default::default());
+
+    let steps = [
+        // Step 1: shell 生成 JSON 数据
+        make_step("step_1", "生成数据", "shell", json!({
+            "command": "echo '{\"items\":[{\"name\":\"A\",\"score\":85},{\"name\":\"B\",\"score\":92},{\"name\":\"C\",\"score\":55}]}'",
+            "shell": "auto",
+            "timeout_secs": 5
+        })),
+        // Step 2: json_parse 解析
+        make_step("step_2", "解析JSON", "json_parse", json!({
+            "data": "{{step_1.stdout}}"
+        })),
+        // Step 3: script 统计（json_parse 输出为 {expression, result}，数据在 .result 中）
+        make_step("step_3", "统计", "script", json!({
+            "script": "let data = step_2.result;\nlet items = data.items;\nlet total = items.len();\nlet sum = 0.0;\nfor item in items { sum += item.score; }\nlet avg = sum / total;\n#{total: total, avg: avg}"
+        })),
+        // Step 4: logic 判断 (executor 注册为 logic_container)
+        make_step("step_4", "判断", "logic_container", json!({
+            "condition_group": {
+                "combinator": "and",
+                "conditions": [
+                    {"id": "c1", "left": "{{step_3.avg}}", "op": "gte", "right": "70"}
+                ]
+            }
+        })),
+        // Step 5: notify
+        make_step("step_5", "通知", "notify", json!({
+            "notify_type": "system",
+            "title": "Test Complete",
+            "body": "Total: {{step_3.total}}, Avg: {{step_3.avg}}, Pass: {{step_4.branch}}"
+        })),
+    ];
+
+    let outputs = run_chain(&exec, &mut ctx, &steps).await;
+
+    // 验证 shell 输出有 stdout
+    let shell_out = &outputs[0];
+    assert!(shell_out.get("stdout").and_then(|v| v.as_str()).is_some(), "Shell should have stdout");
+
+    // 验证 json_parse 解析出 items（输出格式: {expression, result}）
+    let parsed = &outputs[1];
+    let data = &parsed["result"];
+    assert!(data.get("items").and_then(|v| v.as_array()).is_some(), "Should parse items array");
+
+    // 验证 script 计算
+    let stats = &outputs[2];
+    assert_eq!(stats["total"].as_i64(), Some(3));
+    let avg = stats["avg"].as_f64().unwrap();
+    assert!(avg > 70.0, "Avg should be > 70");
+
+    // 验证 logic 判断
+    let logic = &outputs[3];
+    assert_eq!(logic["branch"].as_str(), Some("true"), "Logic should pass (avg >= 70)");
+
+    // 验证 notify 成功
+    let notify = &outputs[4];
+    assert!(notify.get("sent").and_then(|v| v.as_bool()).unwrap_or(false) || notify.get("notified").is_some(),
+        "Notify should complete");
+
+    println!("✅ Main chain: shell→json_parse→script→logic→notify OK");
+}
+
+#[tokio::test]
+async fn test_loop_iteration_and_aggregation() {
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+    let mut ctx = ExecutionContext::new("test-loop", &Default::default());
+
+    // 先设置要迭代的数据
+    ctx.set_var("items".to_string(), json!([
+        {"name": "A", "value": 10},
+        {"name": "B", "value": 20},
+        {"name": "C", "value": 30},
+    ]));
+
+    let loop_step = Step {
+        id: "step_1".to_string(),
+        name: "批量处理".to_string(),
+        step_type: "loop".to_string(),
+        config: json!({
+            "items": "{{items}}",
+            "max_iterations": 100
+        }),
+        body_steps: Some(vec![
+            make_step("body_1_1", "计算", "script", json!({
+                "script": "let v = __item.value;\n#{doubled: v * 2, name: __item.name}"
+            })),
+        ]),
+        ..Default::default()
+    };
+
+    let result = exec.execute(&loop_step, &mut ctx).await;
+    assert!(result.is_ok(), "Loop failed: {:?}", result.err());
+    let out = result.unwrap();
+
+    assert_eq!(out["count"].as_i64(), Some(3));
+    let results = out["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    // 验证每轮结果
+    assert_eq!(results[0]["body_1_1"]["doubled"].as_i64(), Some(20));
+    assert_eq!(results[1]["body_1_1"]["doubled"].as_i64(), Some(40));
+    assert_eq!(results[2]["body_1_1"]["doubled"].as_i64(), Some(60));
+
+    println!("✅ Loop iteration + aggregation OK");
+}
+
+#[tokio::test]
+async fn test_loop_max_iterations_limit() {
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+    let mut ctx = ExecutionContext::new("test-loop-limit", &Default::default());
+
+    // 创建 100 项的数组，但 max_iterations 限制为 5
+    let mut items = Vec::new();
+    for i in 0..100 {
+        items.push(json!({"idx": i}));
+    }
+    ctx.set_var("big_list".to_string(), json!(items));
+
+    let loop_step = Step {
+        id: "step_1".to_string(),
+        name: "限制迭代".to_string(),
+        step_type: "loop".to_string(),
+        config: json!({
+            "items": "{{big_list}}",
+            "max_iterations": 5
+        }),
+        body_steps: Some(vec![
+            make_step("body_1_1", "pass", "script", json!({
+                "script": "#{idx: __item.idx}"
+            })),
+        ]),
+        ..Default::default()
+    };
+
+    let result = exec.execute(&loop_step, &mut ctx).await;
+    assert!(result.is_ok(), "Loop with limit failed: {:?}", result.err());
+    let out = result.unwrap();
+
+    assert_eq!(out["count"].as_i64(), Some(5), "Should be limited to 5 iterations");
+    let results = out["results"].as_array().unwrap();
+    assert_eq!(results.len(), 5);
+    assert_eq!(results[0]["body_1_1"]["idx"].as_i64(), Some(0));
+    assert_eq!(results[4]["body_1_1"]["idx"].as_i64(), Some(4));
+
+    println!("✅ Loop max_iterations=5 (of 100 items) OK");
+}
+
+#[tokio::test]
+async fn test_approval_with_conditions_auto() {
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+    let mut ctx = ExecutionContext::new("test-approval-auto", &Default::default());
+
+    // 设置上下文数据（模拟上游步骤输出）
+    // 注意：approval_conditions 的 right 是字符串，left 也应为字符串以确保类型一致
+    ctx.set_var("quality".to_string(), json!("85"));
+
+    let approval_step = make_step("step_1", "审批", "approval", json!({
+        "title": "质量审批",
+        "message": "质量评分: {{quality}}",
+        "options": "通过,驳回,需修改",
+        "recommended": "通过",
+        "require_review": false,
+        "timeout": 5,
+        "timeout_behavior": "auto",
+        "timeout_action": "recommended",
+        "approval_conditions": [
+            {"id": "ac1", "left": "{{quality}}", "op": "gte", "right": "60"}
+        ]
+    }));
+
+    let result = exec.execute(&approval_step, &mut ctx).await;
+    assert!(result.is_ok(), "Approval auto failed: {:?}", result.err());
+    let out = result.unwrap();
+
+    // require_review=false → 自动决策
+    assert_eq!(out["decision"].as_str(), Some("通过"), "Should auto-approve with quality >= 60");
+    assert!(out["comment"].as_str().unwrap_or("").contains("无需审核"), "Comment should mention auto decision");
+
+    println!("✅ Approval auto with conditions OK");
+}
+
+#[tokio::test]
+async fn test_onerror_ignore_resilience() {
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+    let mut ctx = ExecutionContext::new("test-onerror-ignore", &Default::default());
+
+    let steps = [
+        // Step 1: 故意失败的 shell
+        {
+            let mut s = make_step("step_1", "失败步骤", "shell", json!({
+                "command": "exit 1",
+                "shell": "auto",
+                "timeout_secs": 5
+            }));
+            s.on_error = Some(workflow_engine::engine::workflow::ErrorStrategy::Ignore);
+            s
+        },
+        // Step 2: 正常步骤，应该继续执行
+        make_step("step_2", "正常步骤", "script", json!({
+            "script": "let prev = step_1;\n#{has_prev: prev != (), status: \"ok\"}"
+        })),
+    ];
+
+    let outputs = run_chain(&exec, &mut ctx, &steps).await;
+
+    // step_1 因 onError:ignore 返回 Null
+    assert_eq!(outputs[0], serde_json::Value::Null, "Step 1 should output Null (ignored error)");
+
+    // step_2 正常执行
+    let step2 = &outputs[1];
+    assert_eq!(step2["status"].as_str(), Some("ok"), "Step 2 should execute after step 1 failure");
+    assert_eq!(step2["has_prev"].as_bool(), Some(false), "Step 1 output should be null/unit");
+
+    println!("✅ onError:ignore resilience OK");
+}
+
+#[tokio::test]
+async fn test_params_variable_injection() {
+    let exec = StepExecutor::new(
+        std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+    );
+
+    // 模拟 workflow JSON params 被反序列化为 variables
+    let wf = workflow_engine::engine::workflow::Workflow {
+        name: "test-params".into(),
+        variables: Some({
+            let mut m = std::collections::HashMap::new();
+            m.insert("test_dir".to_string(), json!("/tmp/wf-test-params"));
+            m.insert("threshold".to_string(), json!(42));
+            Some(m).unwrap()
+        }),
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext::new("test-params-inject", &wf);
+
+    // shell 中使用 {{params.test_dir}}
+    let shell_step = make_step("step_1", "创建目录", "shell", json!({
+        "command": "mkdir -p {{params.test_dir}} 2>/dev/null; echo 'created'",
+        "shell": "auto",
+        "timeout_secs": 5
+    }));
+
+    let result = exec.execute(&shell_step, &mut ctx).await;
+    assert!(result.is_ok(), "Shell with params failed: {:?}", result.err());
+    let out = result.unwrap();
+    // shell 输出应包含 "created"
+    let stdout = out["stdout"].as_str().unwrap_or("");
+    assert!(stdout.contains("created"), "Shell should execute with resolved path");
+
+    // script 中直接访问 variables（Rhai scope 中 variables 平铺为顶层变量）
+    let script_step = make_step("step_2", "阈值检查", "script", json!({
+        "script": "#{threshold: threshold, pass: threshold >= 40}"
+    }));
+    let result = exec.execute(&script_step, &mut ctx).await;
+    assert!(result.is_ok(), "Script with params failed: {:?}", result.err());
+    let out = result.unwrap();
+    assert_eq!(out["threshold"].as_i64(), Some(42));
+    assert_eq!(out["pass"].as_bool(), Some(true));
+
+    println!("✅ Params variable injection OK");
 }

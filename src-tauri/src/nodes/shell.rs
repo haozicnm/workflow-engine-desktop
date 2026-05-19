@@ -58,7 +58,10 @@ impl NodeExecutor for ShellNode {
             .and_then(|v| v.as_u64())
             .unwrap_or(300);
 
-        // 2. 解析 shell
+        // 2. 跨平台命令适配
+        let command = adapt_command(&command);
+
+        // 3. 解析 shell
         let (shell_cmd, shell_arg) = resolve_shell(shell);
 
         info!(
@@ -136,9 +139,56 @@ fn resolve_shell(shell: &str) -> (String, String) {
         "cmd" => ("cmd".into(), "/C".into()),
         "auto" | _ => {
             #[cfg(target_os = "windows")]
-            { ("powershell".into(), "-Command".into()) }
+            { ("cmd".into(), "/C".into()) }
             #[cfg(not(target_os = "windows"))]
             { ("bash".into(), "-c".into()) }
         }
     }
+}
+
+/// 跨平台命令适配：将常见 Unix 命令转换为 Windows 等价命令
+#[cfg(target_os = "windows")]
+fn adapt_command(cmd: &str) -> String {
+    let mut adapted = cmd.to_string();
+
+    // mkdir -p → mkdir (Windows 自动创建父目录)
+    if adapted.contains("mkdir -p") {
+        adapted = adapted.replace("mkdir -p", "mkdir");
+    }
+
+    // rm -f / rm -rf → del /f /q 或 rmdir /s /q
+    if adapted.contains("rm -rf") {
+        adapted = adapted.replace("rm -rf", "rmdir /s /q");
+    } else if adapted.contains("rm -f") {
+        adapted = adapted.replace("rm -f", "del /f /q");
+    }
+
+    // 2>/dev/null → >NUL 2>&1
+    if adapted.contains("2>/dev/null") {
+        adapted = adapted.replace("2>/dev/null", ">NUL 2>&1");
+    }
+
+    // touch → type NUL >> (create empty file)
+    if adapted.starts_with("touch ") {
+        let path = adapted.trim_start_matches("touch ").trim();
+        // Only convert simple touch; piped commands remain as-is
+        if !path.contains('|') && !path.contains('&') {
+            adapted = format!("type NUL > {}", path);
+        }
+    }
+
+    // echo '...' → echo ... (remove single quotes around echo args)
+    if adapted.starts_with("echo '") && adapted.ends_with('\'') {
+        adapted = format!("echo {}", &adapted[6..adapted.len()-1]);
+    }
+
+    if adapted != cmd {
+        info!("Shell 命令已适配 Windows: \"{}\" → \"{}\"", cmd, adapted);
+    }
+    adapted
+}
+
+#[cfg(not(target_os = "windows"))]
+fn adapt_command(cmd: &str) -> String {
+    cmd.to_string()
 }
