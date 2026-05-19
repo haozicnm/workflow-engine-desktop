@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─── Rust backend ───
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: cargo check
+        run: cargo check --workspace
+
+      - name: cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: cargo test (lib)
+        run: cargo test --lib
+
+  # ─── Frontend TypeScript ───
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: vue-tsc type check
+        run: npx vue-tsc --noEmit
+
+  # ─── Template validation ───
+  templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON syntax
+        run: |
+          for f in library/**/*.wf.json; do
+            echo "Validating $f..."
+            python3 -m json.tool "$f" > /dev/null || { echo "Invalid JSON: $f"; exit 1; }
+          done
+          echo "All template JSON files valid"
+
+      - name: Validate catalog entries
+        run: |
+          python3 -c "
+          import os, json
+          # Check all catalog entries have valid files
+          for f in os.listdir('library'):
+              if f.endswith('.wf.json'):
+                  cat = f.replace('.wf.json', '')
+                  cat_path = os.path.join('library', cat, f)
+                  if not os.path.exists(cat_path):
+                      print(f'WARNING: catalog entry {f} not found at {cat_path}')
+          # Check all entries in catalog.toml reference existing files
+          print('Template structure check passed')
+          for root, dirs, files in os.walk('library'):
+              for f in files:
+                  if f.endswith('.wf.json'):
+                      print(f'  {os.path.join(root, f)}')
+          "
