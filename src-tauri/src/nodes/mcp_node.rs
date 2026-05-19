@@ -1,0 +1,109 @@
+// nodes/mcp_node.rs — MCP Node Executor (transient mode)
+// Spawns Python MCP server per step, JSON-RPC over stdio.
+
+use async_trait::async_trait;
+use crate::engine::context::ExecutionContext;
+use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{Context as _, Result};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Command, Stdio};
+use std::sync::Arc;
+
+struct McpMapping { server_script: &'static str, tool_name: &'static str }
+
+/// 注册所有 MCP 节点映射：step_type → (Python server, MCP tool)
+fn mcp_mappings() -> HashMap<String, McpMapping> {
+    let mut m = HashMap::new();
+    // ── 已有 ──
+    m.insert("http".into(), McpMapping { server_script: "mcp_http_server.py", tool_name: "http_request" });
+    m.insert("json_parse".into(), McpMapping { server_script: "mcp_json_server.py", tool_name: "json_parse" });
+    // ── 新增 ──
+    m.insert("mcp_script".into(), McpMapping { server_script: "mcp_script_server.py", tool_name: "execute" });
+    m.insert("mcp_excel_read".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_read" });
+    m.insert("mcp_excel_write".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_write" });
+    m.insert("mcp_excel_create".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_create" });
+    m.insert("mcp_excel_filter".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_filter" });
+    m.insert("mcp_excel_sort".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_sort" });
+    m.insert("mcp_excel_append".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_append" });
+    m.insert("mcp_excel_csv".into(), McpMapping { server_script: "mcp_excel_server.py", tool_name: "excel_csv" });
+    m.insert("mcp_word_read".into(), McpMapping { server_script: "mcp_word_server.py", tool_name: "word_read" });
+    m.insert("mcp_word_write".into(), McpMapping { server_script: "mcp_word_server.py", tool_name: "word_write" });
+    m.insert("mcp_word_create".into(), McpMapping { server_script: "mcp_word_server.py", tool_name: "word_create" });
+    m.insert("mcp_word_replace".into(), McpMapping { server_script: "mcp_word_server.py", tool_name: "word_replace" });
+    m.insert("mcp_word_merge".into(), McpMapping { server_script: "mcp_word_server.py", tool_name: "word_merge" });
+    m.insert("mcp_web_scrape".into(), McpMapping { server_script: "mcp_web_scrape_server.py", tool_name: "web_scrape" });
+    m.insert("mcp_shell".into(), McpMapping { server_script: "mcp_shell_server.py", tool_name: "shell_exec" });
+    m
+}
+
+fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
+    if let Ok(d) = std::env::var("MCP_SERVERS_DIR") {
+        let p = std::path::PathBuf::from(&d).join(script);
+        if p.exists() { return Ok(p); }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let p = dir.join("sidecars").join(script);
+            if p.exists() { return Ok(p); }
+        }
+    }
+    let dev = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sidecars").join(script);
+    if dev.exists() { return Ok(dev); }
+    anyhow::bail!("MCP server not found: {}", script)
+}
+
+fn find_python() -> String {
+    for c in &["python", "python3"] {
+        if Command::new(c).arg("--version").stdout(Stdio::null()).stderr(Stdio::null())
+            .status().map(|s| s.success()).unwrap_or(false) { return c.to_string(); }
+    }
+    "python".into()
+}
+
+fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
+    let path = resolve_path(script)?;
+    let init = serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}});
+    let call = serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":tool,"arguments":args}});
+    let input = format!("{}\n{}\n", serde_json::to_string(&init)?, serde_json::to_string(&call)?);
+
+    let python = find_python();
+    let mut child = Command::new(&python).arg(&path)
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+        .spawn().with_context(|| format!("spawn {} {}", python, path.display()))?;
+
+    if let Some(mut stdin) = child.stdin.take() { stdin.write_all(input.as_bytes())?; }
+    let stdout = child.stdout.take().context("no stdout")?;
+    let mut last: Option<Value> = None;
+    for line in BufReader::new(stdout).lines() {
+        let line = line?;
+        if line.trim().is_empty() { continue; }
+        let r: Value = serde_json::from_str(&line)?;
+        if r.get("id").and_then(|v| v.as_i64()) == Some(2) && r.get("result").is_some() { last = Some(r); }
+    }
+    child.wait()?;
+    let result = last.ok_or_else(|| anyhow::anyhow!("no result from MCP tool: {}", tool))?;
+    let text = result.get("result").and_then(|r| r.get("content"))
+        .and_then(|c| c.as_array()).and_then(|a| a.first())
+        .and_then(|i| i.get("text")).and_then(|t| t.as_str())
+        .ok_or_else(|| anyhow::anyhow!("bad MCP response"))?;
+    Ok(serde_json::from_str(text).unwrap_or(Value::String(text.into())))
+}
+
+pub struct McpNode { script: String, tool: String }
+
+impl McpNode { pub fn new(s: &str, t: &str) -> Self { Self { script: s.into(), tool: t.into() } } }
+
+#[async_trait]
+impl NodeExecutor for McpNode {
+    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _exec: &Arc<StepExecutor>) -> Result<Value> {
+        call_mcp(&self.script, &self.tool, &step.config)
+    }
+}
+
+pub fn create_mcp_executor(step_type: &str) -> Option<Box<dyn NodeExecutor>> {
+    mcp_mappings().get(step_type).map(|m| Box::new(McpNode::new(m.server_script, m.tool_name)) as Box<dyn NodeExecutor>)
+}

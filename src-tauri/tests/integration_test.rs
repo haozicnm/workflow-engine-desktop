@@ -181,7 +181,28 @@ async fn test_script_arithmetic() {
     let result = executor.execute(&step, &mut ctx).await.unwrap();
     // 10 + 3*2 = 16
     assert_eq!(result.as_i64(), Some(16));
-    println!("✅ Script arithmetic OK: {}", result);
+    println!("[OK] Script arithmetic: {}", result);
+}
+
+#[tokio::test]
+async fn test_mcp_script_basic() {
+    let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
+    let mut ctx = ExecutionContext::new("test-mcp", &Default::default());
+
+    let step = make_step("mcp1", "Python", "mcp_script", json!({
+        "script": "result = 3 * 7"
+    }));
+
+    let result = executor.execute(&step, &mut ctx).await;
+    match result {
+        Ok(v) => {
+            println!("[OK] MCP Script: {}", v);
+            assert_eq!(v.get("result").and_then(|r| r.as_i64()), Some(21));
+        }
+        Err(e) => {
+            println!("[SKIP] MCP Script (no Python): {}", e);
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════

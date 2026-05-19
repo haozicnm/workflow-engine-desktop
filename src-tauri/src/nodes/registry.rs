@@ -438,5 +438,82 @@ pub fn all_nodes() -> Vec<NodeManifest> {
             description: "打印信息到后端日志和前端控制台",
             icon: "terminal", default_config: serde_json::json!({ "message": "", "level": "info" }),
         },
+
+        // ── MCP 节点（Python 实现，需 Python 环境）──
+        NodeManifest {
+            node_type: "script", label: "🔌 脚本 (Python)",
+            description: "执行 Python 脚本，支持全部 Python 标准库和第三方库",
+            icon: "code", default_config: serde_json::json!({ "script": "# Python 脚本\nresult = 2 + 2\n" }),
+        },
+        NodeManifest {
+            node_type: "excel_read", label: "🔌 读取表格 (Python)",
+            description: "读取 Excel 工作表（openpyxl，支持公式计算值）",
+            icon: "file-spreadsheet", default_config: serde_json::json!({ "path": "", "sheet": "" }),
+        },
+        NodeManifest {
+            node_type: "excel_write", label: "🔌 写入表格 (Python)",
+            description: "写入数据到 Excel（openpyxl，支持对象数组）",
+            icon: "file-spreadsheet", default_config: serde_json::json!({ "path": "", "sheet": "Sheet1", "data": [] }),
+        },
+        NodeManifest {
+            node_type: "excel_create", label: "🔌 创建表格 (Python)",
+            description: "新建 Excel 工作簿（openpyxl）",
+            icon: "file-plus", default_config: serde_json::json!({ "path": "新表格.xlsx", "sheet": "Sheet1", "headers": [] }),
+        },
+        NodeManifest {
+            node_type: "excel_filter", label: "🔌 筛选数据 (Python)",
+            description: "内存筛选 Excel 数据（8种运算符）",
+            icon: "filter", default_config: serde_json::json!({ "data": [], "column": "", "op": "==", "value": "" }),
+        },
+        NodeManifest {
+            node_type: "excel_sort", label: "🔌 排序数据 (Python)",
+            description: "内存排序 Excel 数据",
+            icon: "arrow-up-down", default_config: serde_json::json!({ "data": [], "column": "", "order": "asc" }),
+        },
+        NodeManifest {
+            node_type: "excel_append", label: "🔌 追加行 (Python)",
+            description: "追加数据行到现有 Excel 文件",
+            icon: "list-plus", default_config: serde_json::json!({ "path": "", "sheet": "Sheet1", "data": [] }),
+        },
+        NodeManifest {
+            node_type: "excel_csv", label: "🔌 CSV 互转 (Python)",
+            description: "CSV ↔ Excel 格式互转",
+            icon: "arrow-left-right", default_config: serde_json::json!({ "path": "", "direction": "csv_to_xlsx", "output": "" }),
+        },
+        NodeManifest {
+            node_type: "word_read", label: "🔌 读取文档 (Python)",
+            description: "提取 Word 文档文本和表格（python-docx）",
+            icon: "file-text", default_config: serde_json::json!({ "path": "" }),
+        },
+        NodeManifest {
+            node_type: "word_write", label: "🔌 写入文档 (Python)",
+            description: "写入内容到 Word 文档",
+            icon: "file-plus", default_config: serde_json::json!({ "path": "", "content": "", "mode": "overwrite" }),
+        },
+        NodeManifest {
+            node_type: "word_create", label: "🔌 创建文档 (Python)",
+            description: "新建 Word 文档（标题+内容）",
+            icon: "file-plus", default_config: serde_json::json!({ "path": "新文档.docx", "title": "", "content": "" }),
+        },
+        NodeManifest {
+            node_type: "word_replace", label: "🔌 查找替换 (Python)",
+            description: "Word 占位符替换 {{name}} → value",
+            icon: "replace", default_config: serde_json::json!({ "path": "", "find": "", "replace": "" }),
+        },
+        NodeManifest {
+            node_type: "word_merge", label: "🔌 合并文档 (Python)",
+            description: "多个 Word 文档合并为单个（加分页）",
+            icon: "combine", default_config: serde_json::json!({ "files": [], "output": "合并文档.docx" }),
+        },
+        NodeManifest {
+            node_type: "web_scrape", label: "🔌 网页抓取 (Python)",
+            description: "BeautifulSoup 提取网页数据，支持 CSS 选择器",
+            icon: "scissors", default_config: serde_json::json!({ "url": "", "fields": {}, "list": null }),
+        },
+        NodeManifest {
+            node_type: "mcp_shell", label: "🔌 Shell 命令 (Python)",
+            description: "执行跨平台 Shell 命令（bash/powershell/cmd 自适应）",
+            icon: "terminal", default_config: serde_json::json!({ "command": "", "shell": "auto", "timeout_secs": 300 }),
+        },
     ]
 }

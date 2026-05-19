@@ -112,6 +112,25 @@ impl StepExecutor {
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
 
+        // ── MCP 节点（Python 实现，优先走 MCP server）──
+        {
+            use crate::nodes::mcp_node::create_mcp_executor;
+            let mcp_types = &[
+                "mcp_script",
+                "mcp_excel_read", "mcp_excel_write", "mcp_excel_create",
+                "mcp_excel_filter", "mcp_excel_sort", "mcp_excel_append", "mcp_excel_csv",
+                "mcp_word_read", "mcp_word_write", "mcp_word_create", "mcp_word_replace", "mcp_word_merge",
+                "mcp_web_scrape",
+                "mcp_shell",
+            ];
+            for t in mcp_types {
+                if let Some(ex) = create_mcp_executor(t) {
+                    executors.insert(t.to_string(), ex);
+                    debug!("节点注册 (MCP): {}", t);
+                }
+            }
+        }
+
         for type_name in executors.keys() {
             debug!("节点注册: {}", type_name);
         }

@@ -37,3 +37,4 @@ pub mod file_save;
 pub mod cursor;
 pub mod shell;
 pub mod file_container;
+pub mod mcp_node;
