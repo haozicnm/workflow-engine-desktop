@@ -138,13 +138,18 @@ impl IpcServer {
 
         let (mut sender, mut receiver) = ws.split();
 
-        // 等待第一个消息（认证或直接请求——当前版本不做强制认证，token 仅用于未来扩展）
+        // 认证阶段：等待第一个消息，必须包含正确的 token
+        let mut authenticated = false;
         while let Some(msg) = receiver.next().await {
             let msg = msg.map_err(|e| format!("WS read error: {}", e))?;
 
             let text = match msg {
                 Message::Text(t) => t,
                 Message::Close(_) => {
+                    if !authenticated {
+                        warn!("IPC client disconnected without authentication");
+                        return Err("Not authenticated".to_string());
+                    }
                     info!("IPC 客户端断开");
                     break;
                 }
@@ -155,17 +160,51 @@ impl IpcServer {
                 _ => continue,
             };
 
+            // 解析消息中的 token（所有请求类型的公共字段）
+            let raw_msg: serde_json::Value = match serde_json::from_str(&text) {
+                Ok(v) => v,
+                Err(e) => {
+                    let err = IpcResponse::Error {
+                        id: "unknown".to_string(),
+                        message: format!("Invalid JSON: {}", e),
+                    };
+                    let _ = sender.send(Message::Text(
+                        serde_json::to_string(&err).unwrap_or_default(),
+                    )).await;
+                    continue;
+                }
+            };
+
+            // Token 认证：首条消息必须包含正确的 token
+            if !authenticated {
+                let client_token = raw_msg.get("token").and_then(|v| v.as_str()).unwrap_or("");
+                if client_token != self.token {
+                    warn!("IPC authentication failed: token mismatch");
+                    let err = IpcResponse::Error {
+                        id: raw_msg.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                        message: "Authentication failed: invalid token".to_string(),
+                    };
+                    let _ = sender.send(Message::Text(
+                        serde_json::to_string(&err).unwrap_or_default(),
+                    )).await;
+                    let _ = sender.close().await;
+                    return Err("Authentication failed".to_string());
+                }
+                authenticated = true;
+                info!("IPC 客户端认证成功");
+            }
+
             let request: IpcRequest = match serde_json::from_str(&text) {
                 Ok(r) => r,
                 Err(e) => {
                     let err = IpcResponse::Error {
                         id: "unknown".to_string(),
-                        message: format!("消息解析失败: {}", e),
+                        message: format!("Message parse error: {}", e),
                     };
                     let _ = sender.send(Message::Text(
                         serde_json::to_string(&err).unwrap_or_else(|e| {
                             tracing::warn!("序列化 IPC 错误响应失败: {}", e);
-                            r#"{"type":"error","id":"unknown","message":"内部错误"}"#.to_string()
+                            r#"{"type":"error","id":"unknown","message":"Internal error"}"#.to_string()
                         })
                     )).await;
                     continue;
@@ -264,13 +303,13 @@ impl IpcServer {
     ) -> Option<IpcResponse> {
         let yaml = match self.app.db.get_workflow_yaml(&workflow_id) {
             Ok(Some(y)) => y,
-            Ok(None) => return Some(IpcResponse::Error { id, message: "工作流不存在".into() }),
+            Ok(None) => return Some(IpcResponse::Error { id, message: "Workflow not found".into() }),
             Err(e) => return Some(IpcResponse::Error { id, message: e.to_string() }),
         };
 
         let workflow = match parser::parse_workflow(&yaml) {
             Ok(w) => w,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("解析失败: {}", e) }),
+            Err(e) => return Some(IpcResponse::Error { id, message: format!("Parse error: {}", e) }),
         };
 
         let run_id = uuid::Uuid::new_v4().to_string();
@@ -278,7 +317,7 @@ impl IpcServer {
         let workflow_name = workflow.name.clone();
 
         if let Err(e) = self.app.db.create_run(&run_id, &workflow_id, &workflow_name, &now) {
-            return Some(IpcResponse::Error { id, message: format!("创建运行记录失败: {}", e) });
+            return Some(IpcResponse::Error { id, message: format!("Failed to create run record: {}", e) });
         }
 
         let _total = workflow.steps.len();
@@ -300,7 +339,7 @@ impl IpcServer {
         let ack = IpcResponse::Ack { id: id.clone(), run_id: Some(run_id.clone()), message: None };
         let json = serde_json::to_string(&ack).unwrap_or_else(|e| {
             tracing::error!("序列化 ack 失败: {}", e);
-            r#"{"type":"error","id":"internal","message":"序列化失败"}"#.to_string()
+            r#"{"type":"error","id":"internal","message":"Serialization failed"}"#.to_string()
         });
         if sender.send(Message::Text(json)).await.is_err() {
             return None;
@@ -375,7 +414,7 @@ impl IpcServer {
         let catalog_path = library_dir.join("catalog.toml");
         let catalog_content = match std::fs::read_to_string(&catalog_path) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("读取 catalog.toml 失败: {}", e) }),
+            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to read catalog.toml: {}", e) }),
         };
 
         #[derive(Deserialize)]
@@ -385,18 +424,18 @@ impl IpcServer {
 
         let catalog: Catalog = match toml::from_str(&catalog_content) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("解析 catalog.toml 失败: {}", e) }),
+            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to parse catalog.toml: {}", e) }),
         };
 
         let entry = match catalog.templates.iter().find(|t| t.name == template_name) {
             Some(e) => e,
-            None => return Some(IpcResponse::Error { id, message: format!("模板 '{}' 不存在", template_name) }),
+            None => return Some(IpcResponse::Error { id, message: format!("Template '{}' not found", template_name) }),
         };
 
         let file_path = library_dir.join(&entry.file);
         let mut content = match std::fs::read_to_string(&file_path) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("读取模板失败: {}", e) }),
+            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to read template: {}", e) }),
         };
 
         // 参数替换
@@ -411,10 +450,10 @@ impl IpcServer {
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         if let Err(e) = self.app.db.create_workflow(&workflow_id, &template_name, "", &now, &now) {
-            return Some(IpcResponse::Error { id, message: format!("导入失败: {}", e) });
+            return Some(IpcResponse::Error { id, message: format!("Import failed: {}", e) });
         }
         if let Err(e) = self.app.db.save_workflow_yaml(&workflow_id, &content) {
-            return Some(IpcResponse::Error { id, message: format!("保存失败: {}", e) });
+            return Some(IpcResponse::Error { id, message: format!("Save failed: {}", e) });
         }
 
         self.handle_run(id, workflow_id, None, sender).await

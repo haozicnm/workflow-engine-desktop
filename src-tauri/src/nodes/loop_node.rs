@@ -41,9 +41,15 @@ impl NodeExecutor for LoopNode {
         let items = crate::engine::common::resolve_iteration_items(items_value, ctx, "循环")?;
         let body_steps = parse_body_steps(step)?;
 
+        // 安全上限：最大迭代次数
+        let max_iter = step.config.get("max_iterations")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1000) as usize;
+        let total = items.len().min(max_iter);
+
         // 逐轮执行
         let mut results = Vec::new();
-        for (i, item) in items.iter().enumerate() {
+        for (i, item) in items.iter().enumerate().take(total) {
             ctx.set_var("__item".to_string(), item.clone());
             ctx.set_var("__index".to_string(), json!(i));
             ctx.set_var("__index1".to_string(), json!(i + 1));

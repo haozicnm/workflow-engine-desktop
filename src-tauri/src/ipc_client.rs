@@ -11,7 +11,22 @@ use serde_json::Value;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 const IPC_PORT: u16 = 19527;
-const _TOKEN_FILE: &str = ".hermes/daemon-token";
+const TOKEN_FILE: &str = ".hermes/daemon-token";
+
+/// 读取 IPC token（从 ~/.hermes/daemon-token 或 WF_DAEMON_TOKEN 环境变量）
+fn read_token() -> Option<String> {
+    if let Ok(t) = std::env::var("WF_DAEMON_TOKEN") {
+        if !t.is_empty() { return Some(t); }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(TOKEN_FILE);
+        if let Ok(t) = std::fs::read_to_string(&path) {
+            let trimmed = t.trim().to_string();
+            if !trimmed.is_empty() { return Some(trimmed); }
+        }
+    }
+    None
+}
 
 /// 尝试连接 IPC daemon。返回 client 或回退错误信息。
 pub struct IpcClient;
@@ -21,10 +36,7 @@ impl IpcClient {
     pub async fn is_daemon_available() -> bool {
         let url = format!("ws://127.0.0.1:{}", IPC_PORT);
         match tokio::time::timeout(Duration::from_secs(2), connect_async(&url)).await {
-            Ok(Ok((_ws, _))) => {
-                // 连接成功，但需要验证 token（暂跳过，token 用于未来权限控制）
-                true
-            }
+            Ok(Ok((_ws, _))) => true,
             _ => false,
         }
     }
@@ -34,17 +46,19 @@ impl IpcClient {
         workflow_id: &str,
         vars: Option<HashMap<String, String>>,
     ) -> Result<(), String> {
+        let token = read_token().unwrap_or_default();
         let url = format!("ws://127.0.0.1:{}", IPC_PORT);
         let (ws, _resp) = connect_async(&url)
             .await
-            .map_err(|e| format!("无法连接到桌面 daemon (ws://127.0.0.1:{}): {}\n请确保桌面应用正在运行", IPC_PORT, e))?;
+            .map_err(|e| format!("Cannot connect to daemon (ws://127.0.0.1:{}): {}\nEnsure the desktop app is running", IPC_PORT, e))?;
 
         let (mut sender, mut receiver) = ws.split();
 
-        // 发送 run 请求
+        // 发送 run 请求（含 token 认证）
         let request = serde_json::json!({
             "type": "run",
             "id": uuid::Uuid::new_v4().to_string(),
+            "token": token,
             "workflow_id": workflow_id,
             "vars": vars.unwrap_or_default(),
         });
@@ -118,16 +132,18 @@ impl IpcClient {
         template: &str,
         params: Option<HashMap<String, String>>,
     ) -> Result<(), String> {
+        let token = read_token().unwrap_or_default();
         let url = format!("ws://127.0.0.1:{}", IPC_PORT);
         let (ws, _resp) = connect_async(&url)
             .await
-            .map_err(|e| format!("无法连接到桌面 daemon: {}", e))?;
+            .map_err(|e| format!("Cannot connect to daemon: {}", e))?;
 
         let (mut sender, mut receiver) = ws.split();
 
         let request = serde_json::json!({
             "type": "library_run",
             "id": uuid::Uuid::new_v4().to_string(),
+            "token": token,
             "template": template,
             "params": params.unwrap_or_default(),
         });

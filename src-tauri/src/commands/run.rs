@@ -6,6 +6,7 @@ use tauri::{State, AppHandle, Emitter};
 use crate::App;
 use crate::data::models::{RunHistoryItem, RunDetail, StepLogEntry};
 use tracing::{info, warn, error};
+use anyhow;
 
 
 #[derive(Debug, Serialize)]
@@ -97,9 +98,21 @@ pub async fn run_start(
             step_mode_flag,
             debug_snapshots,
         };
-        let result = crate::engine::scheduler::run_workflow(
-            &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl,
+        // 全局超时（默认 30 分钟）
+        let global_timeout = std::time::Duration::from_secs(30 * 60);
+        let result = tokio::time::timeout(
+            global_timeout,
+            crate::engine::scheduler::run_workflow(
+                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl,
+            ),
         ).await;
+        let result = match result {
+            Ok(r) => r,
+            Err(_elapsed) => {
+                warn!("Workflow global timeout (30min): {}", run_id_clone);
+                Err(anyhow::anyhow!("Workflow execution timeout (exceeded 30 minutes)"))
+            }
+        };
 
         // 清理标志和令牌
         cancel_flags.write().await.remove(&run_id_clone);
