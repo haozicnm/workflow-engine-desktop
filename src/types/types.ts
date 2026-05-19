@@ -182,10 +182,16 @@ export function deserializeWorkflow(json: string): Workflow {
     throw new Error('Invalid workflow: "steps" must be an array')
   }
   // 确保每个步骤都有 actions 数组
+  // 归一化: JSON 中 step 名可能是 "name"（旧格式）或 "label"（新格式）
   for (const step of wf.steps) {
     if (step && typeof step === 'object') {
       const s = step as Record<string, unknown>
       if (!Array.isArray(s.actions)) s.actions = []
+      // name → label 归一化
+      if (s.name !== undefined && s.label === undefined) {
+        s.label = s.name
+        delete s.name
+      }
     }
   }
   return wf as unknown as Workflow

@@ -11,7 +11,7 @@
     {
       "id": "step_1",
       "type": "file",
-      "name": "2.读取上次监控状态",
+      "label": "2.读取上次监控状态",
       "onError": "ignore",
       "actions": [
         {
@@ -26,7 +26,7 @@
     {
       "id": "step_2",
       "type": "json_parse",
-      "name": "3.解析历史状态",
+      "label": "3.解析历史状态",
       "onError": "ignore",
       "config": {
         "data": "{{step_1.a1_1.content}}"
@@ -35,7 +35,7 @@
     {
       "id": "step_3",
       "type": "loop",
-      "name": "4.多站点探测",
+      "label": "4.多站点探测",
       "config": {
         "items": "[{\"name\":\"JSONPlaceholder\",\"url\":\"{{params.target_url}}\"},{\"name\":\"GitHub API\",\"url\":\"https://api.github.com\"},{\"name\":\"HTTPBin\",\"url\":\"https://httpbin.org/get\"}]"
       },
@@ -63,7 +63,7 @@
     {
       "id": "step_4",
       "type": "script",
-      "name": "5.汇总分析+趋势对比",
+      "label": "5.汇总分析+趋势对比",
       "config": {
         "script": "let results = step_4.results;\nlet total = results.len();\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n\n// 趋势对比：读取上次持久化状态\nlet prev_health = 100.0;\nlet prev_status = \"首次运行\";\nlet trend = \"→首次\";\nif step_2 != () {\n    if step_2.health != () { prev_health = step_2.health; }\n    if step_2.status != () { prev_status = step_2.status; }\n    if health_pct > prev_health { trend = \"↑改善\"; }\n    else if health_pct < prev_health { trend = \"↓恶化\"; }\n    else { trend = \"→持平\"; }\n}\nlet alert_sites_str = alert_sites.join(\", \");\n\n#{alert_sites: alert_sites, alert_sites_str: alert_sites_str, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total, trend: trend, prev_health: prev_health, prev_status: prev_status}"
       }
@@ -71,7 +71,7 @@
     {
       "id": "step_5",
       "type": "logic",
-      "name": "6.异常判断",
+      "label": "6.异常判断",
       "config": {
         "conditionGroup": {
           "combinator": "or",
@@ -95,7 +95,7 @@
     {
       "id": "step_6",
       "type": "file",
-      "name": "7.保存本次监控状态",
+      "label": "7.保存本次监控状态",
       "actions": [
         {
           "id": "a6_1",
@@ -110,7 +110,7 @@
     {
       "id": "step_7",
       "type": "excel",
-      "name": "8.追加监控日志到Excel",
+      "label": "8.追加监控日志到Excel",
       "onError": "ignore",
       "config": {
         "file_path": "{{params.work_dir}}/monitor-log.xlsx",
@@ -137,7 +137,7 @@
     {
       "id": "step_8",
       "type": "notify",
-      "name": "9a.异常告警",
+      "label": "9a.异常告警",
       "runCondition": {
         "ref": "step_5",
         "when": "true"
@@ -151,7 +151,7 @@
     {
       "id": "step_9",
       "type": "notify",
-      "name": "9b.正常报告",
+      "label": "9b.正常报告",
       "runCondition": {
         "ref": "step_5",
         "when": "false"

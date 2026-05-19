@@ -10,7 +10,7 @@
     {
       "id": "step_1",
       "type": "http",
-      "name": "2.获取HN热榜",
+      "label": "2.获取HN热榜",
       "onError": "ignore",
       "config": {
         "method": "GET",
@@ -21,7 +21,7 @@
     {
       "id": "step_2",
       "type": "json_parse",
-      "name": "3.解析ID列表",
+      "label": "3.解析ID列表",
       "config": {
         "data": "{{step_1.body}}"
       }
@@ -29,7 +29,7 @@
     {
       "id": "step_3",
       "type": "script",
-      "name": "4.摘要统计",
+      "label": "4.摘要统计",
       "config": {
         "script": "let ids = step_2;\nlet total = ids.len();\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
       }
@@ -37,7 +37,7 @@
     {
       "id": "step_4",
       "type": "http",
-      "name": "5.获取GitHub仓库状态",
+      "label": "5.获取GitHub仓库状态",
       "onError": "ignore",
       "config": {
         "method": "GET",
@@ -49,7 +49,7 @@
     {
       "id": "step_5",
       "type": "json_parse",
-      "name": "6.解析GitHub数据",
+      "label": "6.解析GitHub数据",
       "config": {
         "data": "{{step_4.body}}"
       }
@@ -57,7 +57,7 @@
     {
       "id": "step_6",
       "type": "script",
-      "name": "7.综合计算评分",
+      "label": "7.综合计算评分",
       "config": {
         "script": "let repo = step_5;\nlet stars = repo.stargazers_count;\nlet forks = repo.forks_count;\nlet issues = repo.open_issues_count;\nlet name = repo.full_name;\nlet score = stars + forks * 2;\nlet level = if score > 100 { \"🔥热门\" } else if score > 50 { \"⭐活跃\" } else { \"💤休眠\" };\n#{stars: stars, forks: forks, open_issues: issues, score: score, level: level, repo: name}"
       }
@@ -65,7 +65,7 @@
     {
       "id": "step_7",
       "type": "logic",
-      "name": "8.活跃度判断",
+      "label": "8.活跃度判断",
       "config": {
         "conditionGroup": {
           "combinator": "and",
@@ -89,7 +89,7 @@
     {
       "id": "step_8",
       "type": "excel",
-      "name": "9.生成Excel日报表",
+      "label": "9.生成Excel日报表",
       "config": {
         "file_path": "{{params.output_dir}}/daily-report.xlsx",
         "actions": [
@@ -158,7 +158,7 @@
     {
       "id": "step_9",
       "type": "file",
-      "name": "10.归档JSON快照",
+      "label": "10.归档JSON快照",
       "actions": [
         {
           "id": "a9_1",
@@ -173,7 +173,7 @@
     {
       "id": "step_10",
       "type": "word",
-      "name": "11.生成Word日报摘要",
+      "label": "11.生成Word日报摘要",
       "config": {
         "file_path": "{{params.output_dir}}/daily-summary.docx",
         "actions": [
@@ -197,7 +197,7 @@
     {
       "id": "step_11",
       "type": "notify",
-      "name": "12.发送日报通知",
+      "label": "12.发送日报通知",
       "config": {
         "notify_type": "system",
         "title": "📊 每日舆情报告已生成",

@@ -10,7 +10,7 @@
     {
       "id": "step_1",
       "type": "script",
-      "name": "1.生成测试数据",
+      "label": "1.生成测试数据",
       "config": {
         "script": "\"{\\\"project\\\":\\\"WF教学演练\\\",\\\"items\\\":[{\\\"id\\\":1,\\\"name\\\":\\\"需求分析\\\",\\\"score\\\":85,\\\"pass\\\":true},{\\\"id\\\":2,\\\"name\\\":\\\"架构设计\\\",\\\"score\\\":92,\\\"pass\\\":true},{\\\"id\\\":3,\\\"name\\\":\\\"代码审查\\\",\\\"score\\\":78,\\\"pass\\\":true},{\\\"id\\\":4,\\\"name\\\":\\\"集成测试\\\",\\\"score\\\":55,\\\"pass\\\":false}]}\""
       }
@@ -18,7 +18,7 @@
     {
       "id": "step_2",
       "type": "json_parse",
-      "name": "2.解析JSON数据",
+      "label": "2.解析JSON数据",
       "config": {
         "data": "{{step_1}}"
       }
@@ -26,7 +26,7 @@
     {
       "id": "step_3",
       "type": "file",
-      "name": "3.存档原始数据",
+      "label": "3.存档原始数据",
       "actions": [
         {
           "id": "a3_1",
@@ -41,7 +41,7 @@
     {
       "id": "step_4",
       "type": "file",
-      "name": "4.回读验证存档",
+      "label": "4.回读验证存档",
       "actions": [
         {
           "id": "a4_1",
@@ -55,7 +55,7 @@
     {
       "id": "step_5",
       "type": "script",
-      "name": "5.数据统计计算",
+      "label": "5.数据统计计算",
       "config": {
         "script": "let items = step_2.items;\nlet count = items.len();\nlet max = 0.0;\nlet min = 100.0;\nlet sum = 0.0;\nlet pass_count = 0;\nfor item in items {\n    if item.score > max { max = item.score; }\n    if item.score < min { min = item.score; }\n    sum += item.score;\n    if item.pass { pass_count += 1; }\n}\nlet avg = sum / count;\nlet pass_rate = pass_count * 100 / count;\n#{avg: avg, max: max, min: min, count: count, pass_count: pass_count, pass_rate: pass_rate}"
       }
@@ -63,7 +63,7 @@
     {
       "id": "step_6",
       "type": "logic",
-      "name": "6.判断通过率",
+      "label": "6.判断通过率",
       "config": {
         "conditionGroup": {
           "combinator": "and",
@@ -87,7 +87,7 @@
     {
       "id": "step_7",
       "type": "http",
-      "name": "7.获取外部基准数据",
+      "label": "7.获取外部基准数据",
       "onError": "ignore",
       "config": {
         "method": "GET",
@@ -98,7 +98,7 @@
     {
       "id": "step_8",
       "type": "excel",
-      "name": "8.生成Excel报表",
+      "label": "8.生成Excel报表",
       "config": {
         "file_path": "{{params.test_dir}}/t1-report.xlsx",
         "actions": [
@@ -151,7 +151,7 @@
     {
       "id": "step_9",
       "type": "word",
-      "name": "9.生成Word总结文档",
+      "label": "9.生成Word总结文档",
       "config": {
         "file_path": "{{params.test_dir}}/t1-summary.docx",
         "actions": [
@@ -175,7 +175,7 @@
     {
       "id": "step_10",
       "type": "clipboard",
-      "name": "10.复制摘要到剪贴板",
+      "label": "10.复制摘要到剪贴板",
       "config": {
         "action": "write",
         "text": "[WF教学演练] 平均分{{step_5.avg}} 通过率{{step_5.pass_rate}}% 状态:{{step_6.branch}}"
@@ -184,7 +184,7 @@
     {
       "id": "step_11",
       "type": "loop",
-      "name": "11.逐项处理通知",
+      "label": "11.逐项处理通知",
       "config": {
         "items": "{{step_2.items}}"
       },
@@ -208,7 +208,7 @@
     {
       "id": "step_12",
       "type": "notify",
-      "name": "12.发送完成通知",
+      "label": "12.发送完成通知",
       "config": {
         "notify_type": "system",
         "title": "教学演练完成",
@@ -218,7 +218,7 @@
     {
       "id": "step_13",
       "type": "delay",
-      "name": "13.等待收尾",
+      "label": "13.等待收尾",
       "config": {
         "duration_ms": "{{params.delay_ms}}"
       }
@@ -226,7 +226,7 @@
     {
       "id": "step_14",
       "type": "file",
-      "name": "14.清理临时文件",
+      "label": "14.清理临时文件",
       "actions": [
         {
           "id": "a14_1",

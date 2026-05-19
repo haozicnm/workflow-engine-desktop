@@ -11,7 +11,7 @@
     {
       "id": "step_1",
       "type": "http",
-      "name": "1.获取待审批数据",
+      "label": "1.获取待审批数据",
       "onError": "ignore",
       "config": {
         "method": "GET",
@@ -22,7 +22,7 @@
     {
       "id": "step_2",
       "type": "json_parse",
-      "name": "2.解析API响应",
+      "label": "2.解析API响应",
       "config": {
         "data": "{{step_1.body}}"
       }
@@ -30,7 +30,7 @@
     {
       "id": "step_3",
       "type": "script",
-      "name": "3.数据质量评估",
+      "label": "3.数据质量评估",
       "config": {
         "script": "let data = step_2;\nlet id = data.id;\nlet userId = data.userId;\nlet title = data.title;\nlet body = data.body;\nlet body_len = body.len;\nlet title_len = title.len;\nlet fields_ok = 4;\nlet quality = if body_len > 50 { 80.0 } else if body_len > 20 { 50.0 } else { 30.0 };\nlet level = if quality > 70 { \"优秀\" } else if quality > 40 { \"合格\" } else { \"差\" };\n#{id: id, userId: userId, title: title, body_len: body_len, title_len: title_len, fields_ok: fields_ok, quality: quality, level: level}"
       }
@@ -38,7 +38,7 @@
     {
       "id": "step_4",
       "type": "logic",
-      "name": "4.质量预筛选",
+      "label": "4.质量预筛选",
       "config": {
         "conditionGroup": {
           "combinator": "and",
@@ -62,7 +62,7 @@
     {
       "id": "step_5",
       "type": "approval",
-      "name": "5.人工审批决策",
+      "label": "5.人工审批决策",
       "config": {
         "title": "数据发布审批",
         "message": "📊 数据质量: {{step_3.level}}（{{step_3.quality}}分）\n📝 标题: {{step_3.title}}\n🔑 ID: {{step_3.id}} | 用户: {{step_3.userId}}\n📏 字段完整: {{step_3.fields_ok}}/4 | 标题长度: {{step_3.title_len}} | 正文长度: {{step_3.body_len}}\n\n预筛选结果: {{step_4.branch}}",
@@ -97,7 +97,7 @@
     {
       "id": "step_6",
       "type": "logic",
-      "name": "6.判断审批结果",
+      "label": "6.判断审批结果",
       "config": {
         "conditionGroup": {
           "combinator": "or",
@@ -121,7 +121,7 @@
     {
       "id": "step_7",
       "type": "file",
-      "name": "7a.导出批准记录",
+      "label": "7a.导出批准记录",
       "runCondition": {
         "ref": "step_6",
         "when": "true"
@@ -140,7 +140,7 @@
     {
       "id": "step_8",
       "type": "file",
-      "name": "7b.记录拒绝日志",
+      "label": "7b.记录拒绝日志",
       "runCondition": {
         "ref": "step_6",
         "when": "false"
@@ -161,7 +161,7 @@
     {
       "id": "step_9",
       "type": "notify",
-      "name": "8a.通知批准结果",
+      "label": "8a.通知批准结果",
       "runCondition": {
         "ref": "step_6",
         "when": "true"
@@ -175,7 +175,7 @@
     {
       "id": "step_10",
       "type": "notify",
-      "name": "8b.通知拒绝结果",
+      "label": "8b.通知拒绝结果",
       "runCondition": {
         "ref": "step_6",
         "when": "false"

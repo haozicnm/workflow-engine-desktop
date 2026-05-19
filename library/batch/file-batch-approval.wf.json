@@ -10,7 +10,7 @@
     {
       "id": "step_1",
       "type": "file",
-      "name": "1.准备测试文件集",
+      "label": "1.准备测试文件集",
       "config": {},
       "actions": [
         {
@@ -53,7 +53,7 @@
     {
       "id": "step_2",
       "type": "file",
-      "name": "2.扫描文件列表",
+      "label": "2.扫描文件列表",
       "actions": [
         {
           "id": "a2_1",
@@ -68,7 +68,7 @@
     {
       "id": "step_3",
       "type": "script",
-      "name": "3.构建审批清单",
+      "label": "3.构建审批清单",
       "config": {
         "script": "let files = step_2.a2_1;\nlet total = files.len();\nlet items = [];\nfor f in files {\n    items.push(#{file: f.name, path: f.path, risk_level: if f.name.contains(\"涉密\") { \"高\" } else if f.name.contains(\"合规\") { \"中\" } else { \"低\" }});\n}\n#{total: total, items: items}"
       }
@@ -76,7 +76,7 @@
     {
       "id": "step_4",
       "type": "logic",
-      "name": "4.判断是否有待审批文件",
+      "label": "4.判断是否有待审批文件",
       "config": {
         "conditionGroup": {
           "combinator": "and",
@@ -94,7 +94,7 @@
     {
       "id": "step_5",
       "type": "cursor",
-      "name": "5.逐项审批处理",
+      "label": "5.逐项审批处理",
       "config": {
         "items": "{{step_3.items}}"
       },
@@ -149,7 +149,7 @@
         {
           "id": "body_5_4",
           "type": "logic",
-          "name": "判断审批结果",
+          "label": "判断审批结果",
           "config": {
             "conditionGroup": {
               "combinator": "and",
@@ -167,7 +167,7 @@
         {
           "id": "body_5_5",
           "type": "file",
-          "name": "归档已批准文件",
+          "label": "归档已批准文件",
           "runCondition": {
             "ref": "body_5_4",
             "when": "true"
@@ -186,7 +186,7 @@
         {
           "id": "body_5_6",
           "type": "file",
-          "name": "归档已拒绝文件",
+          "label": "归档已拒绝文件",
           "runCondition": {
             "ref": "body_5_4",
             "when": "false"
@@ -207,7 +207,7 @@
     {
       "id": "step_6",
       "type": "file",
-      "name": "6.汇总审批结果",
+      "label": "6.汇总审批结果",
       "actions": [
         {
           "id": "a6_1",
@@ -228,7 +228,7 @@
     {
       "id": "step_7",
       "type": "script",
-      "name": "7.统计汇总",
+      "label": "7.统计汇总",
       "config": {
         "script": "let approved_list = step_6.a6_1;\nlet rejected_list = step_6.a6_2;\nlet approved = approved_list.len();\nlet rejected = rejected_list.len();\nlet total = approved + rejected;\nlet summary = \"审批完成: \" + approved + \"通过/\" + rejected + \"拒绝\";\n#{approved: approved, rejected: rejected, total: total, summary: summary}"
       }
@@ -236,7 +236,7 @@
     {
       "id": "step_8",
       "type": "notify",
-      "name": "8.发送审批汇总",
+      "label": "8.发送审批汇总",
       "config": {
         "notify_type": "system",
         "title": "📋 批量审批完成",

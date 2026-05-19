@@ -104,9 +104,9 @@ async function onPickElement(fieldKey: string) {
     // 如果没有活跃的拾取会话，先启动
     if (!pickSessionActive) {
       const url = getStepUrl()
-      const startResult = await safeInvoke<{ success: boolean }>('browser_pick_session_start', { url: url || null })
+      const startResult = await safeInvoke<{ success: boolean; error?: string }>('browser_pick_session_start', { url: url || null })
       if (!startResult?.success) {
-        toast.error('Failed to start pick session')
+        toast.error('Failed to start pick session' + (startResult?.error ? ': ' + startResult.error : ''))
         return
       }
       pickSessionActive = true
@@ -118,7 +118,8 @@ async function onPickElement(fieldKey: string) {
       emit('update-params', { ...localParams.value })
     }
   } catch (e) {
-    toast.error('Element selection failed: ' + (e as Error).message)
+    const errMsg = e instanceof Error ? e.message : (typeof e === 'string' ? e : String(e || ''))
+    toast.error('Element selection failed: ' + errMsg)
     pickSessionActive = false
   } finally {
     pickingElement.value = false
