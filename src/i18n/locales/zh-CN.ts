@@ -250,7 +250,7 @@ export default {
     deleteConditionAria: '删除条件',
     customOutputHint: '可选，自定义 value 输出',
     outputPlaceholder: '留空则透传原始输入值',
-    outputFormatDesc: '输出格式：{ branch: "true/false", value: 模板渲染值, result: true/false }',
+    outputFormatDesc: '输出格式：branch: true/false, value: 模板渲染值, result: true/false',
     searchVar: '搜索变量...',
     resultTrue: '✓ 真',
     resultFalse: '✗ 假',

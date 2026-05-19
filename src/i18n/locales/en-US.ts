@@ -243,7 +243,7 @@ export default {
     deleteConditionAria: 'Delete condition',
     customOutputHint: 'Optional, custom value output',
     outputPlaceholder: 'Leave empty to pass through',
-    outputFormatDesc: 'Output format: { branch: "true/false", value: rendered template, result: true/false }',
+    outputFormatDesc: 'Output format: branch: true/false, value: rendered template, result: true/false',
     searchVar: 'Search variables...',
     resultTrue: '✓ True',
     resultFalse: '✗ False',
