@@ -9,16 +9,6 @@
   "steps": [
     {
       "id": "step_1",
-      "type": "shell",
-      "name": "1.创建输出目录",
-      "config": {
-        "command": "mkdir -p {{params.output_dir}} 2>/dev/null; echo '{{params.output_dir}}'",
-        "shell": "auto",
-        "timeout_secs": 5
-      }
-    },
-    {
-      "id": "step_2",
       "type": "http",
       "name": "2.获取HN热榜",
       "onError": "ignore",
@@ -29,23 +19,23 @@
       }
     },
     {
-      "id": "step_3",
+      "id": "step_2",
       "type": "json_parse",
       "name": "3.解析ID列表",
       "config": {
-        "data": "{{step_2.body}}"
+        "data": "{{step_1.body}}"
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "script",
+      "name": "4.摘要统计",
+      "config": {
+        "script": "let ids = step_2;\nlet total = ids.len();\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
       }
     },
     {
       "id": "step_4",
-      "type": "script",
-      "name": "4.摘要统计",
-      "config": {
-        "script": "let ids = step_3;\nlet total = ids.len();\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
-      }
-    },
-    {
-      "id": "step_5",
       "type": "http",
       "name": "5.获取GitHub仓库状态",
       "onError": "ignore",
@@ -57,23 +47,23 @@
       }
     },
     {
-      "id": "step_6",
+      "id": "step_5",
       "type": "json_parse",
       "name": "6.解析GitHub数据",
       "config": {
-        "data": "{{step_5.body}}"
+        "data": "{{step_4.body}}"
+      }
+    },
+    {
+      "id": "step_6",
+      "type": "script",
+      "name": "7.综合计算评分",
+      "config": {
+        "script": "let repo = step_5;\nlet stars = repo.stargazers_count;\nlet forks = repo.forks_count;\nlet issues = repo.open_issues_count;\nlet name = repo.full_name;\nlet score = stars + forks * 2;\nlet level = if score > 100 { \"🔥热门\" } else if score > 50 { \"⭐活跃\" } else { \"💤休眠\" };\n#{stars: stars, forks: forks, open_issues: issues, score: score, level: level, repo: name}"
       }
     },
     {
       "id": "step_7",
-      "type": "script",
-      "name": "7.综合计算评分",
-      "config": {
-        "script": "let repo = step_6;\nlet stars = repo.stargazers_count;\nlet forks = repo.forks_count;\nlet issues = repo.open_issues_count;\nlet name = repo.full_name;\nlet score = stars + forks * 2;\nlet level = if score > 100 { \"🔥热门\" } else if score > 50 { \"⭐活跃\" } else { \"💤休眠\" };\n#{stars: stars, forks: forks, open_issues: issues, score: score, level: level, repo: name}"
-      }
-    },
-    {
-      "id": "step_8",
       "type": "logic",
       "name": "8.活跃度判断",
       "config": {
@@ -82,13 +72,13 @@
           "conditions": [
             {
               "id": "c1",
-              "left": "{{step_7.score}}",
+              "left": "{{step_6.score}}",
               "op": "gte",
               "right": "50"
             },
             {
               "id": "c2",
-              "left": "{{step_7.stars}}",
+              "left": "{{step_6.stars}}",
               "op": "gt",
               "right": "0"
             }
@@ -97,7 +87,7 @@
       }
     },
     {
-      "id": "step_9",
+      "id": "step_8",
       "type": "excel",
       "name": "9.生成Excel日报表",
       "config": {
@@ -115,12 +105,42 @@
             "type": "write",
             "config": {
               "value": [
-                ["HackerNews", "热榜总数", "{{step_4.total}}", "正常"],
-                ["HackerNews", "Top10 ID", "{{step_4.top_ids}}", "-"],
-                ["GitHub", "Stars", "{{step_7.stars}}", "{{step_7.level}}"],
-                ["GitHub", "Forks", "{{step_7.forks}}", "-"],
-                ["GitHub", "Open Issues", "{{step_7.open_issues}}", "-"],
-                ["综合", "活跃度评分", "{{step_7.score}}", "{{step_8.branch}}"]
+                [
+                  "HackerNews",
+                  "热榜总数",
+                  "{{step_3.total}}",
+                  "正常"
+                ],
+                [
+                  "HackerNews",
+                  "Top10 ID",
+                  "{{step_3.top_ids}}",
+                  "-"
+                ],
+                [
+                  "GitHub",
+                  "Stars",
+                  "{{step_6.stars}}",
+                  "{{step_6.level}}"
+                ],
+                [
+                  "GitHub",
+                  "Forks",
+                  "{{step_6.forks}}",
+                  "-"
+                ],
+                [
+                  "GitHub",
+                  "Open Issues",
+                  "{{step_6.open_issues}}",
+                  "-"
+                ],
+                [
+                  "综合",
+                  "活跃度评分",
+                  "{{step_6.score}}",
+                  "{{step_7.branch}}"
+                ]
               ]
             }
           },
@@ -136,22 +156,22 @@
       }
     },
     {
-      "id": "step_10",
+      "id": "step_9",
       "type": "file",
       "name": "10.归档JSON快照",
       "actions": [
         {
-          "id": "a10_1",
+          "id": "a9_1",
           "type": "write",
           "config": {
             "path": "{{params.output_dir}}/snapshot.json",
-            "content": "{\"hn_count\":{{step_4.total}},\"gh_stars\":{{step_7.stars}},\"gh_forks\":{{step_7.forks}},\"score\":{{step_7.score}},\"level\":\"{{step_7.level}}\",\"condition\":\"{{step_8.branch}}\"}"
+            "content": "{\"hn_count\":{{step_2.total}},\"gh_stars\":{{step_5.stars}},\"gh_forks\":{{step_5.forks}},\"score\":{{step_5.score}},\"level\":\"{{step_6.level}}\",\"condition\":\"{{step_6.branch}}\"}"
           }
         }
       ]
     },
     {
-      "id": "step_11",
+      "id": "step_10",
       "type": "word",
       "name": "11.生成Word日报摘要",
       "config": {
@@ -168,20 +188,20 @@
             "id": "a11_2",
             "type": "write",
             "config": {
-              "value": "📊 数据源汇总\n• HackerNews热榜: {{step_4.total}}条\n• GitHub仓库({{step_7.repo}}): ⭐{{step_7.stars}} 🔱{{step_7.forks}} ⚠️{{step_7.open_issues}}\n\n📈 活跃度评分: {{step_7.score}}分 → {{step_7.level}}\n📋 综合判断: {{step_8.branch}}\n\n报表文件: {{params.output_dir}}/daily-report.xlsx\n快照文件: {{params.output_dir}}/snapshot.json"
+              "value": "📊 数据源汇总\n• HackerNews热榜: {{step_2.total}}条\n• GitHub仓库({{step_5.repo}}): ⭐{{step_5.stars}} 🔱{{step_5.forks}} ⚠️{{step_5.open_issues}}\n\n📈 活跃度评分: {{step_5.score}}分 → {{step_5.level}}\n📋 综合判断: {{step_6.branch}}\n\n报表文件: {{params.output_dir}}/daily-report.xlsx\n快照文件: {{params.output_dir}}/snapshot.json"
             }
           }
         ]
       }
     },
     {
-      "id": "step_12",
+      "id": "step_11",
       "type": "notify",
       "name": "12.发送日报通知",
       "config": {
         "notify_type": "system",
         "title": "📊 每日舆情报告已生成",
-        "body": "HN热榜{{step_4.total}}条 | GitHub活跃度:{{step_7.score}}分({{step_7.level}})\n报表: {{params.output_dir}}/daily-report.xlsx\n文档: {{params.output_dir}}/daily-summary.docx"
+        "body": "HN热榜{{step_2.total}}条 | GitHub活跃度:{{step_5.score}}分({{step_5.level}})\n报表: {{params.output_dir}}/daily-report.xlsx\n文档: {{params.output_dir}}/daily-summary.docx"
       }
     }
   ]

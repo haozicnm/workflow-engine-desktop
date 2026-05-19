@@ -65,9 +65,9 @@ impl NodeExecutor for ShellNode {
         let (shell_cmd, shell_arg) = resolve_shell(shell);
 
         info!(
-            "Shell 执行: shell={}, cmd=\"{}\", timeout={}s",
-            shell_cmd,
-            if command.len() > 80 { format!("{}...", &command[..77]) } else { command.clone() },
+            "Shell 执行: shell={} (resolved from '{}'), cmd=\"{}\", timeout={}s",
+            shell_cmd, shell,
+            if command.len() > 80 { format!("{}...", truncate_str(&command, 77)) } else { command.clone() },
             timeout_secs
         );
 
@@ -93,8 +93,11 @@ impl NodeExecutor for ShellNode {
             .map_err(|e| anyhow!("Shell 命令执行失败: {}", e))?
             .map_err(|e| anyhow!("Shell 命令启动失败: {}", e))?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stdout_raw = String::from_utf8_lossy(&output.stdout);
+        let stdout = stdout_raw.trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        info!("Shell stdout raw (first 100 chars): {}", truncate_str(&stdout_raw, 100));
+        info!("Shell stdout trimmed (first 100 chars): {}", truncate_str(&stdout, 100));
         let exit_code = output.status.code().unwrap_or(-1);
 
         // 4. 记录并返回
@@ -102,7 +105,7 @@ impl NodeExecutor for ShellNode {
             warn!(
                 "Shell 命令非零退出: exit_code={}, stderr={}",
                 exit_code,
-                if stderr.len() > 200 { format!("{}...", &stderr[..197]) } else { stderr.clone() }
+                if stderr.len() > 200 { format!("{}...", truncate_str(&stderr, 197)) } else { stderr.clone() }
             );
             // 非零退出码仍然返回结果，由上层 onError 策略决定是否继续
         }
@@ -129,6 +132,11 @@ impl NodeExecutor for ShellNode {
             Ok(result)
         }
     }
+}
+
+/// UTF-8 safe string truncation at byte boundary
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    s.chars().take(max_chars).collect()
 }
 
 /// 解析 shell 类型 → (shell_binary, flag_for_command)
@@ -177,7 +185,7 @@ fn adapt_command(cmd: &str) -> String {
         }
     }
 
-    // echo '...' → echo ... (remove single quotes around echo args)
+    // echo '...' → strip single quotes (cmd doesn't understand them)
     if adapted.starts_with("echo '") && adapted.ends_with('\'') {
         adapted = format!("echo {}", &adapted[6..adapted.len()-1]);
     }

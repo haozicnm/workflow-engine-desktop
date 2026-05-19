@@ -112,7 +112,13 @@ impl ExecutionContext {
             }
 
             let result = engine.eval_with_scope::<rhai::Dynamic>(&mut scope, expr)
-                .map_err(|e| format!("表达式求值失败: {}", e))?;
+                .map_err(|e| {
+                    eprintln!("[eval_expr DEBUG] expr='{}'", expr);
+                    for (k, _, _) in scope.iter() {
+                        eprintln!("  scope.{}", k);
+                    }
+                    format!("表达式求值失败: {}", e)
+                })?;
 
             Ok(rhai_to_json(&result))
         })

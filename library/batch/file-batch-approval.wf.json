@@ -2,20 +2,53 @@
   "name": "file-batch-approval",
   "description": "【教学模板 ③】智能文件审批管道 — 文件扫描→条件筛选→逐项审批（条件推荐）→归档通知。演示 Cursor 游标迭代、approval_conditions 条件推荐、runCondition 分支。",
   "params": {
-    "data_dir": "/tmp/wf-approval-batch",
+    "data_dir": "C:\\Users\\haozi\\AppData\\Local\\Temp\\wf-approval-batch",
     "file_pattern": "doc-*.txt",
     "approval_timeout_ms": 5
   },
   "steps": [
     {
       "id": "step_1",
-      "type": "shell",
+      "type": "file",
       "name": "1.准备测试文件集",
-      "config": {
-        "command": "mkdir -p {{params.data_dir}}/approved {{params.data_dir}}/rejected 2>/dev/null; echo '合规报告-Q1' > {{params.data_dir}}/doc-合规报告-Q1.txt; echo '财务数据-涉密' > {{params.data_dir}}/doc-财务数据-涉密.txt; echo '技术方案-v2' > {{params.data_dir}}/doc-技术方案-v2.txt; echo '已准备 3 个测试文件'",
-        "shell": "auto",
-        "timeout_secs": 5
-      }
+      "config": {},
+      "actions": [
+        {
+          "id": "a1_1",
+          "type": "write",
+          "label": "创建合规报告Q1",
+          "params": {
+            "path": "{{params.data_dir}}/合规报告-Q1.txt",
+            "content": "合规报告-Q1\n需审批项: 3\n风险等级: 低"
+          }
+        },
+        {
+          "id": "a1_2",
+          "type": "write",
+          "label": "创建合规报告Q2",
+          "params": {
+            "path": "{{params.data_dir}}/合规报告-Q2.txt",
+            "content": "合规报告-Q2\n需审批项: 1\n风险等级: 低"
+          }
+        },
+        {
+          "id": "a1_3",
+          "type": "write",
+          "label": "创建风险评估Q3",
+          "params": {
+            "path": "{{params.data_dir}}/风险评估-Q3.txt",
+            "content": "风险评估-Q3\n问题数量: 5\n关键风险: 2个\n风险等级: 高"
+          }
+        },
+        {
+          "id": "a1_4",
+          "type": "exists",
+          "label": "验证文件创建",
+          "params": {
+            "path": "{{params.data_dir}}"
+          }
+        }
+      ]
     },
     {
       "id": "step_2",

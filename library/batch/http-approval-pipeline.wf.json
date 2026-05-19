@@ -5,7 +5,7 @@
     "api_url": "https://jsonplaceholder.typicode.com/posts/1",
     "approval_timeout_ms": 10,
     "notify_title": "API数据审批",
-    "work_dir": "/tmp/wf-approval-pipeline"
+    "work_dir": "C:\\Users\\haozi\\AppData\\Local\\Temp\\wf-approval-pipeline"
   },
   "steps": [
     {
@@ -32,7 +32,7 @@
       "type": "script",
       "name": "3.数据质量评估",
       "config": {
-        "script": "let data = step_2;\nlet id = data.id;\nlet userId = data.userId;\nlet title = data.title;\nlet body = data.body;\nlet body_len = body.len();\nlet title_len = title.len();\nlet fields_ok = 4;\nlet quality = if body_len > 50 { 80.0 } else if body_len > 20 { 50.0 } else { 30.0 };\nlet level = if quality > 70 { \"优秀\" } else if quality > 40 { \"合格\" } else { \"差\" };\n#{id: id, userId: userId, title: title, body_len: body_len, title_len: title_len, fields_ok: fields_ok, quality: quality, level: level}"
+        "script": "let data = step_2;\nlet id = data.id;\nlet userId = data.userId;\nlet title = data.title;\nlet body = data.body;\nlet body_len = body.len;\nlet title_len = title.len;\nlet fields_ok = 4;\nlet quality = if body_len > 50 { 80.0 } else if body_len > 20 { 50.0 } else { 30.0 };\nlet level = if quality > 70 { \"优秀\" } else if quality > 40 { \"合格\" } else { \"差\" };\n#{id: id, userId: userId, title: title, body_len: body_len, title_len: title_len, fields_ok: fields_ok, quality: quality, level: level}"
       }
     },
     {
@@ -139,17 +139,24 @@
     },
     {
       "id": "step_8",
-      "type": "shell",
+      "type": "file",
       "name": "7b.记录拒绝日志",
       "runCondition": {
         "ref": "step_6",
         "when": "false"
       },
-      "config": {
-        "command": "echo \"[REJECTED] ID:{{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}}\" >> {{params.work_dir}}/wf-rejected.log 2>/dev/null; echo 'logged'",
-        "shell": "auto",
-        "timeout_secs": 5
-      }
+      "config": {},
+      "actions": [
+        {
+          "id": "a8_1",
+          "type": "append",
+          "label": "记录拒绝日志",
+          "params": {
+            "path": "{{params.work_dir}}/wf-rejected.log",
+            "content": "[REJECTED] ID:{{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}}"
+          }
+        }
+      ]
     },
     {
       "id": "step_9",

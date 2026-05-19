@@ -171,9 +171,12 @@ impl ContainerParser {
             serde_json::json!({})
         };
 
-        let has_config_actions = config.get("actions").is_some();
         if let Value::Object(ref mut map) = config {
-            if !has_config_actions {
+            if let Some(existing) = map.get("actions").and_then(|v| v.as_array()) {
+                // Ensure all actions have label fields (convert_action adds defaults)
+                let converted: Vec<Value> = existing.iter().map(|a| convert_action(a)).collect();
+                map.insert("actions".to_string(), Value::Array(converted));
+            } else {
                 let actions = step.actions.clone().unwrap_or_default();
                 let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
                 map.insert("actions".to_string(), Value::Array(converted_actions));

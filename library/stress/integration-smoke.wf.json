@@ -9,12 +9,10 @@
   "steps": [
     {
       "id": "step_1",
-      "type": "shell",
+      "type": "script",
       "name": "1.生成测试数据",
       "config": {
-        "command": "echo '{\"project\":\"WF教学演练\",\"items\":[{\"id\":1,\"name\":\"需求分析\",\"score\":85,\"pass\":true},{\"id\":2,\"name\":\"架构设计\",\"score\":92,\"pass\":true},{\"id\":3,\"name\":\"代码审查\",\"score\":78,\"pass\":true},{\"id\":4,\"name\":\"集成测试\",\"score\":55,\"pass\":false}]}'",
-        "shell": "auto",
-        "timeout_secs": 5
+        "script": "\"{\\\"project\\\":\\\"WF教学演练\\\",\\\"items\\\":[{\\\"id\\\":1,\\\"name\\\":\\\"需求分析\\\",\\\"score\\\":85,\\\"pass\\\":true},{\\\"id\\\":2,\\\"name\\\":\\\"架构设计\\\",\\\"score\\\":92,\\\"pass\\\":true},{\\\"id\\\":3,\\\"name\\\":\\\"代码审查\\\",\\\"score\\\":78,\\\"pass\\\":true},{\\\"id\\\":4,\\\"name\\\":\\\"集成测试\\\",\\\"score\\\":55,\\\"pass\\\":false}]}\""
       }
     },
     {
@@ -22,7 +20,7 @@
       "type": "json_parse",
       "name": "2.解析JSON数据",
       "config": {
-        "data": "{{step_1.stdout}}"
+        "data": "{{step_1}}"
       }
     },
     {
@@ -35,7 +33,7 @@
           "type": "write",
           "config": {
             "path": "{{params.test_dir}}/t1-raw.json",
-            "content": "{{step_1.stdout}}"
+            "content": "{{step_1}}"
           }
         }
       ]
@@ -116,10 +114,26 @@
             "type": "write",
             "config": {
               "value": [
-                ["需求分析", 85, "是"],
-                ["架构设计", 92, "是"],
-                ["代码审查", 78, "是"],
-                ["集成测试", 55, "否"]
+                [
+                  "需求分析",
+                  85,
+                  "是"
+                ],
+                [
+                  "架构设计",
+                  92,
+                  "是"
+                ],
+                [
+                  "代码审查",
+                  78,
+                  "是"
+                ],
+                [
+                  "集成测试",
+                  55,
+                  "否"
+                ]
               ]
             }
           },
@@ -211,13 +225,34 @@
     },
     {
       "id": "step_14",
-      "type": "shell",
+      "type": "file",
       "name": "14.清理临时文件",
-      "config": {
-        "command": "rm -f {{params.test_dir}}/t1-raw.json {{params.test_dir}}/t1-report.xlsx {{params.test_dir}}/t1-summary.docx 2>/dev/null; echo 'cleaned'",
-        "shell": "auto",
-        "timeout_secs": 5
-      }
+      "actions": [
+        {
+          "id": "a14_1",
+          "type": "delete",
+          "label": "清理存档文件",
+          "params": {
+            "path": "{{params.test_dir}}/t1-raw.json"
+          }
+        },
+        {
+          "id": "a14_2",
+          "type": "delete",
+          "label": "清理报表文件",
+          "params": {
+            "path": "{{params.test_dir}}/t1-report.xlsx"
+          }
+        },
+        {
+          "id": "a14_3",
+          "type": "delete",
+          "label": "清理文档文件",
+          "params": {
+            "path": "{{params.test_dir}}/t1-summary.docx"
+          }
+        }
+      ]
     }
   ]
 }
