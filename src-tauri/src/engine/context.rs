@@ -89,13 +89,24 @@ impl ExecutionContext {
 
         RHAI_ENGINE.with(|engine| {
             let mut scope = rhai::Scope::new();
-            for (k, v) in &self.variables {
-                let dynamic = json_to_rhai(v);
-                scope.push(k.clone(), dynamic);
+
+            // v7.1: 迭代变量（__item/__index/__index1/loop）注入顶层作用域
+            // 这些是循环体内临时变量，生命周期仅一次迭代，不会与步骤输出冲突
+            let iter_keys: &[&str] = &["__item", "__index", "__index1", "loop"];
+            for k in iter_keys {
+                if let Some(v) = self.variables.get(*k) {
+                    scope.push(k.to_string(), json_to_rhai(v));
+                }
             }
+            let mut vars_map = rhai::Map::new();
+            for (k, v) in &self.variables {
+                vars_map.insert(k.clone().into(), json_to_rhai(v));
+            }
+            scope.push("__vars__".to_string(), rhai::Dynamic::from(vars_map));
+
+            // 步骤输出保持 step_ 前缀
             for (k, v) in &self.step_outputs {
                 let dynamic = json_to_rhai(v);
-                // 去重 step_ 前缀（step_outputs key 可能已是 "step_1"，也可能只是 "1"）
                 let stem = k.strip_prefix("step_").unwrap_or(k);
                 scope.push(format!("step_{}", stem), dynamic);
             }
@@ -163,8 +174,7 @@ impl ExecutionContext {
         let parts: Vec<&str> = key.split('.').collect();
         let root_key = parts[0];
 
-        // 特殊处理：{{params.X.Y}} — workflow params 以 flat map 存储，
-        // 所以 params.data_dir 应直接查 variables["data_dir"] 而非 variables["params"]["data_dir"]
+        // 特殊处理：{{params.X.Y}} — workflow params 以 flat map 存储
         if root_key == "params" && parts.len() >= 2 {
             if let Some(root) = self.variables.get(parts[1]) {
                 let mut current = root;
@@ -175,22 +185,55 @@ impl ExecutionContext {
             }
         }
 
-        // 查找根值：按优先级依次尝试
-        //   1. 完整 key 查 step_outputs（模板引用：{{step_abc123.actionLabel}}）
-        //   2. 完整 key 查 variables（工作流变量：{{myVar.field}}）
-        //   3. strip step_ 前缀查 step_outputs（Rhai 兼容：step_xxx → xxx）
-        let root = self.step_outputs.get(root_key)
-            .or_else(|| self.variables.get(root_key))
-            .or_else(|| {
-                root_key.strip_prefix("step_")
-                    .and_then(|stripped| self.step_outputs.get(stripped))
-            });
-
-        let mut current = root?;
-        for part in &parts[1..] {
-            current = current.get(*part)?;
+        // v7.1: 新命名空间 {{vars.xxx}} — 显式引用用户变量
+        if root_key == "vars" && parts.len() >= 2 {
+            if let Some(root) = self.variables.get(parts[1]) {
+                let mut current = root;
+                for part in &parts[2..] {
+                    current = current.get(*part)?;
+                }
+                return Some(current);
+            }
         }
-        Some(current)
+
+        // 显式 step_ 前缀：只从 step_outputs 查找
+        if let Some(step_id) = root_key.strip_prefix("step_") {
+            // 1. 完整 key 查 step_outputs（如 step_1）
+            if let Some(root) = self.step_outputs.get(root_key) {
+                let mut current = root;
+                for part in &parts[1..] {
+                    current = current.get(*part)?;
+                }
+                return Some(current);
+            }
+            // 2. strip 后的 key 查 step_outputs（如 "1"）
+            if let Some(root) = self.step_outputs.get(step_id) {
+                let mut current = root;
+                for part in &parts[1..] {
+                    current = current.get(*part)?;
+                }
+                return Some(current);
+            }
+            return None;
+        }
+
+        // 旧语法兼容：无前缀 key（如 {{body}}）→ 先查 step_outputs，再查 variables
+        // 这样模板中 {{body}} 仍然能找到，但不会和 step_3.body 的 body 字段冲突
+        if let Some(root) = self.step_outputs.get(root_key) {
+            let mut current = root;
+            for part in &parts[1..] {
+                current = current.get(*part)?;
+            }
+            return Some(current);
+        }
+        if let Some(root) = self.variables.get(root_key) {
+            let mut current = root;
+            for part in &parts[1..] {
+                current = current.get(*part)?;
+            }
+            return Some(current);
+        }
+        None
     }
 
     fn interpolate(&self, s: &str) -> String {

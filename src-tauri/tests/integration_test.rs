@@ -175,7 +175,7 @@ async fn test_script_arithmetic() {
     ctx.set_var("y".to_string(), json!(3));
 
     let step = make_step("script1", "计算", "script", json!({
-        "script": "x + y * 2"
+        "script": "__vars__.x + __vars__.y * 2"
     }));
 
     let result = executor.execute(&step, &mut ctx).await.unwrap();
@@ -887,7 +887,7 @@ async fn test_params_variable_injection() {
 
     // script 中直接访问 variables（Rhai scope 中 variables 平铺为顶层变量）
     let script_step = make_step("step_2", "阈值检查", "script", json!({
-        "script": "#{threshold: threshold, pass: threshold >= 40}"
+        "script": "#{threshold: __vars__.threshold, pass: __vars__.threshold >= 40}"
     }));
     let result = exec.execute(&script_step, &mut ctx).await;
     assert!(result.is_ok(), "Script with params failed: {:?}", result.err());

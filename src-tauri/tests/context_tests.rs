@@ -254,7 +254,7 @@ fn resolve_config_nested_array_in_object() {
 #[test]
 fn eval_expr_arithmetic_addition() {
     let ctx = new_ctx_with_vars(vec![("x", json!(10)), ("y", json!(3))]);
-    let result = ctx.eval_expr("x + y");
+    let result = ctx.eval_expr("__vars__.x + __vars__.y");
     assert_eq!(result.unwrap(), json!(13));
 }
 
@@ -263,28 +263,28 @@ fn eval_expr_arithmetic_complex() {
     let ctx = new_ctx_with_vars(vec![("a", json!(10)), ("b", json!(3)), ("c", json!(2))]);
 
     // 乘除优先
-    assert_eq!(ctx.eval_expr("a + b * c").unwrap(), json!(16));
+    assert_eq!(ctx.eval_expr("__vars__.a + __vars__.b * __vars__.c").unwrap(), json!(16));
 
     // 括号
-    assert_eq!(ctx.eval_expr("(a + b) * c").unwrap(), json!(26));
+    assert_eq!(ctx.eval_expr("(__vars__.a + __vars__.b) * __vars__.c").unwrap(), json!(26));
 
     // 减法
-    assert_eq!(ctx.eval_expr("a - b").unwrap(), json!(7));
+    assert_eq!(ctx.eval_expr("__vars__.a - __vars__.b").unwrap(), json!(7));
 
     // 除法
-    assert_eq!(ctx.eval_expr("a / b").unwrap(), json!(3)); // 整数除法
+    assert_eq!(ctx.eval_expr("__vars__.a / __vars__.b").unwrap(), json!(3)); // 整数除法
 }
 
 #[test]
 fn eval_expr_comparison() {
     let ctx = new_ctx_with_vars(vec![("x", json!(10)), ("y", json!(20))]);
 
-    assert_eq!(ctx.eval_expr("x < y").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("x > y").unwrap(), json!(false));
-    assert_eq!(ctx.eval_expr("x == 10").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("x != y").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("x >= 10").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("x <= 5").unwrap(), json!(false));
+    assert_eq!(ctx.eval_expr("__vars__.x < __vars__.y").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.x > __vars__.y").unwrap(), json!(false));
+    assert_eq!(ctx.eval_expr("__vars__.x == 10").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.x != __vars__.y").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.x >= 10").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.x <= 5").unwrap(), json!(false));
 }
 
 #[test]
@@ -294,10 +294,10 @@ fn eval_expr_boolean_logic() {
         ("b", json!(false)),
     ]);
 
-    assert_eq!(ctx.eval_expr("a && b").unwrap(), json!(false));
-    assert_eq!(ctx.eval_expr("a || b").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("!b").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("a && !b").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.a && __vars__.b").unwrap(), json!(false));
+    assert_eq!(ctx.eval_expr("__vars__.a || __vars__.b").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("!__vars__.b").unwrap(), json!(true));
+    assert_eq!(ctx.eval_expr("__vars__.a && !__vars__.b").unwrap(), json!(true));
 }
 
 #[test]
@@ -308,10 +308,10 @@ fn eval_expr_variable_substitution() {
     ]);
 
     // 字符串拼接
-    assert_eq!(ctx.eval_expr("`hello ${name}`").unwrap(), json!("hello test"));
+    assert_eq!(ctx.eval_expr("`hello ${__vars__.name}`").unwrap(), json!("hello test"));
 
     // 数值运算
-    assert_eq!(ctx.eval_expr("count * 2").unwrap(), json!(10));
+    assert_eq!(ctx.eval_expr("__vars__.count * 2").unwrap(), json!(10));
 }
 
 #[test]
@@ -335,7 +335,7 @@ fn eval_expr_ternary_like() {
     let ctx = new_ctx_with_vars(vec![("score", json!(85))]);
 
     // Rhai 支持 if 表达式
-    let result = ctx.eval_expr("if score >= 60 { \"pass\" } else { \"fail\" }");
+    let result = ctx.eval_expr("if __vars__.score >= 60 { \"pass\" } else { \"fail\" }");
     assert_eq!(result.unwrap(), json!("pass"));
 }
 
