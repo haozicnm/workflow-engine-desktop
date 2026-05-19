@@ -72,6 +72,8 @@ export default defineConfig({
 
   resolve: {
     alias: {
+      // 使用 runtime-only 构建，避免 CSP unsafe-eval
+      'vue': 'vue/dist/vue.runtime.esm-bundler.js',
       '@': path.resolve(__dirname, "src"),
     },
   },
