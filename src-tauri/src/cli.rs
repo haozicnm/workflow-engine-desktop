@@ -64,6 +64,128 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// 创建新的工作流文件
+    New {
+        /// 工作流名称
+        name: String,
+        /// 输出文件路径（默认：<name>.wf.json）
+        #[arg(short = 'o', long)]
+        output: Option<String>,
+        /// 工作流描述
+        #[arg(long, default_value = "")]
+        description: String,
+    },
+    /// 管理工作流步骤
+    #[command(subcommand)]
+    Step(StepCommand),
+    /// 管理容器动作（仅 browser/excel/word/file 容器）
+    #[command(subcommand)]
+    Action(ActionCommand),
+    /// 查看工作流文件详情
+    Show {
+        /// 工作流文件路径
+        file: String,
+    },
+    /// 从文件直接运行工作流（无需先导入）
+    RunFile {
+        /// 工作流文件路径
+        file: String,
+        /// 注入变量 (可多次使用: --var key=value --var key2=value2)
+        #[arg(short = 'v', long = "var", value_parser = parse_var)]
+        vars: Vec<(String, String)>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum StepCommand {
+    /// 添加步骤
+    Add {
+        /// 工作流文件路径
+        file: String,
+        /// 步骤类型 (http|script|condition|browser_container|file|excel|word|...)
+        #[arg(short = 't', long = "type")]
+        step_type: String,
+        /// 步骤标签
+        #[arg(short = 'n', long)]
+        name: String,
+        /// 步骤配置 JSON
+        #[arg(short = 'c', long, default_value = "{}")]
+        config: String,
+        /// 步骤 ID（默认自动生成 step_N）
+        #[arg(long)]
+        id: Option<String>,
+        /// 插入位置（0-based，默认追加到末尾）
+        #[arg(long)]
+        position: Option<usize>,
+    },
+    /// 列出步骤
+    List {
+        /// 工作流文件路径
+        file: String,
+    },
+    /// 删除步骤
+    Remove {
+        /// 工作流文件路径
+        file: String,
+        /// 步骤 ID
+        id: String,
+    },
+    /// 查看步骤详情
+    Show {
+        /// 工作流文件路径
+        file: String,
+        /// 步骤 ID
+        id: String,
+    },
+    /// 编辑步骤配置
+    Edit {
+        /// 工作流文件路径
+        file: String,
+        /// 步骤 ID
+        id: String,
+        /// 新的步骤名称
+        #[arg(short = 'n', long)]
+        name: Option<String>,
+        /// 合并式更新配置 (JSON，只更新指定字段)
+        #[arg(short = 'c', long)]
+        config: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ActionCommand {
+    /// 向容器步骤添加动作
+    Add {
+        /// 工作流文件路径
+        file: String,
+        /// 容器步骤 ID
+        step_id: String,
+        /// 动作类型 (navigate|click|fill|extract|screenshot|wait|scroll|read|write|...)
+        #[arg(short = 't', long = "type")]
+        action_type: String,
+        /// 动作配置 JSON
+        #[arg(short = 'c', long, default_value = "{}")]
+        config: String,
+        /// 动作 ID（默认自动生成 a<步序号>_<序号>）
+        #[arg(long)]
+        id: Option<String>,
+    },
+    /// 列出容器步骤的所有动作
+    List {
+        /// 工作流文件路径
+        file: String,
+        /// 容器步骤 ID
+        step_id: String,
+    },
+    /// 删除容器动作
+    Remove {
+        /// 工作流文件路径
+        file: String,
+        /// 容器步骤 ID
+        step_id: String,
+        /// 动作 ID
+        id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -151,6 +273,11 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Schedule(sub) => cmd_schedule(&app, sub),
         Commands::Library(sub) => cmd_library(&app, sub).await,
         Commands::Steps { json: _ } => cmd_steps(),
+        Commands::New { name, output, description } => cmd_new(&name, output.as_deref(), &description),
+        Commands::Step(sub) => cmd_step(sub),
+        Commands::Action(sub) => cmd_action(sub),
+        Commands::Show { file } => cmd_show(&file),
+        Commands::RunFile { file, vars } => cmd_run_file(&app, &file, &vars).await,
     }
 }
 
@@ -1084,5 +1211,286 @@ async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_jso
     println!("  Cron:     {}", cron_expr);
     println!("  工作流ID: {}", workflow_id);
     println!("  调度ID:   {}", schedule_id);
+    Ok(())
+}
+// ═══════════════════════════════════════════════════
+// v8: 工作流文件编辑命令（CLI 拥有和人一样的操作能力）
+// ═══════════════════════════════════════════════════
+
+/// 读取工作流 JSON 文件
+fn read_workflow_file(file: &str) -> Result<(String, serde_json::Value), String> {
+    let content = std::fs::read_to_string(file)
+        .map_err(|e| format!("无法读取文件 '{}': {}", file, e))?;
+    let wf: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("JSON 格式错误: {}", e))?;
+    Ok((content, wf))
+}
+
+/// 写入工作流 JSON 文件
+fn write_workflow_file(file: &str, wf: &serde_json::Value) -> Result<(), String> {
+    let content = serde_json::to_string_pretty(wf)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(file, &content)
+        .map_err(|e| format!("无法写入文件 '{}': {}", file, e))?;
+    Ok(())
+}
+
+/// 获取或创建 steps 数组
+fn get_steps_mut(wf: &mut serde_json::Value) -> &mut Vec<serde_json::Value> {
+    if wf.get("steps").is_none() {
+        wf["steps"] = serde_json::json!([]);
+    }
+    wf["steps"].as_array_mut().unwrap()
+}
+
+/// 生成下一个步骤 ID (step_N, N = 当前最大 + 1)
+fn next_step_id(steps: &[serde_json::Value]) -> String {
+    let max_n = steps.iter()
+        .filter_map(|s| s["id"].as_str())
+        .filter_map(|id| id.strip_prefix("step_"))
+        .filter_map(|n| n.parse::<usize>().ok())
+        .max()
+        .unwrap_or(0);
+    format!("step_{}", max_n + 1)
+}
+
+fn cmd_new(name: &str, output: Option<&str>, description: &str) -> Result<(), String> {
+    let default_file = format!("{}.wf.json", name);
+    let file = output.unwrap_or(&default_file);
+    if std::path::Path::new(file).exists() {
+        return Err(format!("文件已存在: {}", file));
+    }
+    let wf = serde_json::json!({
+        "name": name,
+        "description": description,
+        "params": {},
+        "steps": []
+    });
+    let content = serde_json::to_string_pretty(&wf)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(file, &content)
+        .map_err(|e| format!("写入失败: {}", e))?;
+    println!("✓ 已创建: {}", file);
+    println!("  名称: {}", name);
+    if !description.is_empty() {
+        println!("  描述: {}", description);
+    }
+    Ok(())
+}
+
+fn cmd_step(sub: StepCommand) -> Result<(), String> {
+    match sub {
+        StepCommand::Add { file, step_type, name, config, id, position } => {
+            let (_, mut wf) = read_workflow_file(&file)?;
+            let steps = get_steps_mut(&mut wf);
+            let config_val: serde_json::Value = serde_json::from_str(&config)
+                .map_err(|e| format!("--config JSON 解析失败: {}", e))?;
+            let step_id = id.unwrap_or_else(|| next_step_id(steps));
+            let mut step = serde_json::json!({
+                "id": step_id,
+                "type": step_type,
+                "label": name,
+                "config": config_val,
+            });
+            let container_types = ["browser_container", "excel_container", "word_container", "file_container", "logic_container"];
+            if container_types.contains(&step_type.as_str()) {
+                step["actions"] = serde_json::json!([]);
+            }
+            if let Some(pos) = position {
+                steps.insert(pos.min(steps.len()), step);
+            } else {
+                steps.push(step);
+            }
+            write_workflow_file(&file, &wf)?;
+            println!(" 已添加步骤: {} ({})", name, step_type);
+        }
+        StepCommand::List { file } => {
+            let (_, wf) = read_workflow_file(&file)?;
+            let steps_arr = wf["steps"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
+            if steps_arr.is_empty() {
+                println!("(空)");
+            } else {
+                for step in steps_arr {
+                    let id = step["id"].as_str().unwrap_or("?");
+                    let t = step["type"].as_str().unwrap_or("?");
+                    let label = step["label"].as_str().unwrap_or("");
+                    let has_actions = step.get("actions").and_then(|a| a.as_array()).map(|a| a.len()).unwrap_or(0);
+                    if has_actions > 0 {
+                        println!("  {}  [{:30}]  {}  (+{} )", id, t, label, has_actions);
+                    } else {
+                        println!("  {}  [{:30}]  {}", id, t, label);
+                    }
+                }
+            }
+        }
+        StepCommand::Remove { file, id } => {
+            let (_, mut wf) = read_workflow_file(&file)?;
+            let steps = get_steps_mut(&mut wf);
+            let idx = steps.iter().position(|s| s["id"].as_str() == Some(&id))
+                .ok_or_else(|| format!("找不到步骤: {}", id))?;
+            let removed = steps.remove(idx);
+            write_workflow_file(&file, &wf)?;
+            println!(" 已删除步骤: {} ({})", id, removed["label"].as_str().unwrap_or(""));
+        }
+        StepCommand::Show { file, id } => {
+            let (_, wf) = read_workflow_file(&file)?;
+            let step = wf["steps"].as_array()
+                .and_then(|a| a.iter().find(|s| s["id"].as_str() == Some(&id)))
+                .ok_or_else(|| format!("找不到步骤: {}", id))?;
+            println!("{}", serde_json::to_string_pretty(step).unwrap_or_default());
+        }
+        StepCommand::Edit { file, id, name, config } => {
+            let (_, mut wf) = read_workflow_file(&file)?;
+            let steps = get_steps_mut(&mut wf);
+            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&id))
+                .ok_or_else(|| format!("找不到步骤: {}", id))?;
+            if let Some(n) = name {
+                step["label"] = serde_json::Value::String(n);
+            }
+            if let Some(c) = config {
+                let update: serde_json::Value = serde_json::from_str(&c)
+                    .map_err(|e| format!("--config JSON 解析失败: {}", e))?;
+                if let (Some(obj), Some(update_obj)) = (step["config"].as_object_mut(), update.as_object()) {
+                    for (k, v) in update_obj {
+                        obj.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            write_workflow_file(&file, &wf)?;
+            println!(" 已更新步骤: {}", id);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_action(sub: ActionCommand) -> Result<(), String> {
+    match sub {
+        ActionCommand::Add { file, step_id, action_type, config, id } => {
+            let (_, mut wf) = read_workflow_file(&file)?;
+            let steps = get_steps_mut(&mut wf);
+            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&step_id))
+                .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
+            let config_val: serde_json::Value = serde_json::from_str(&config)
+                .map_err(|e| format!("--config JSON 解析失败: {}", e))?;
+            let actions = match step.get_mut("actions") {
+                Some(a) => a.as_array_mut().ok_or("actions 不是数组")?,
+                None => {
+                    step["actions"] = serde_json::json!([]);
+                    step["actions"].as_array_mut().unwrap()
+                }
+            };
+            let action_id = id.unwrap_or_else(|| {
+                let n = actions.len() + 1;
+                let step_num = step_id.strip_prefix("step_").unwrap_or(&step_id);
+                format!("a{}_{}", step_num, n)
+            });
+            let action = serde_json::json!({
+                "id": action_id,
+                "type": action_type,
+                "config": config_val,
+            });
+            actions.push(action);
+            write_workflow_file(&file, &wf)?;
+            println!(" 已添加动作: {} -> {} ({})", step_id, action_id, action_type);
+        }
+        ActionCommand::List { file, step_id } => {
+            let (_, wf) = read_workflow_file(&file)?;
+            let step = wf["steps"].as_array()
+                .and_then(|a| a.iter().find(|s| s["id"].as_str() == Some(&step_id)))
+                .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
+            let actions = step.get("actions").and_then(|a| a.as_array());
+            match actions {
+                Some(a) if !a.is_empty() => {
+                    println!("步骤 {} ({}) :", step_id, step["label"].as_str().unwrap_or(""));
+                    for action in a {
+                        let id = action["id"].as_str().unwrap_or("?");
+                        let t = action["type"].as_str().unwrap_or("?");
+                        println!("  {}  [{}]", id, t);
+                    }
+                }
+                _ => println!("()"),
+            }
+        }
+        ActionCommand::Remove { file, step_id, id } => {
+            let (_, mut wf) = read_workflow_file(&file)?;
+            let steps = get_steps_mut(&mut wf);
+            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&step_id))
+                .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
+            let actions = step.get_mut("actions").and_then(|a| a.as_array_mut())
+                .ok_or_else(|| format!("步骤 {} 没有 actions", step_id))?;
+            let idx = actions.iter().position(|a| a["id"].as_str() == Some(&id))
+                .ok_or_else(|| format!("找不到动作: {}", id))?;
+            actions.remove(idx);
+            write_workflow_file(&file, &wf)?;
+            println!(" 已删除动作: {} 中的 {}", step_id, id);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_show(file: &str) -> Result<(), String> {
+    let (content, _) = read_workflow_file(file)?;
+    println!("{}", content);
+    Ok(())
+}
+
+async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Result<(), String> {
+    let (content, _) = read_workflow_file(file)?;
+    // 注入变量
+    let mut resolved_content = content.clone();
+    if !vars.is_empty() {
+        for (key, val) in vars {
+            let placeholder = format!("{{{{{{params.{}}}}}}}", key);
+            resolved_content = resolved_content.replace(&placeholder, val);
+        }
+    }
+    let workflow = parser::parse_workflow(&resolved_content)
+        .map_err(|e| format!("解析失败: {e}"))?;
+
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let workflow_name = workflow.name.clone();
+    app.db.create_run(&run_id, "runfile", &workflow_name, &now)
+        .map_err(|e| format!("创建运行记录失败: {e}"))?;
+
+    let _permit = app.run_semaphore.clone().try_acquire_owned()
+        .map_err(|_| "已达到最大并发工作流数限制".to_string())?;
+
+    let ctrl = scheduler::RunControl {
+        cancel_flag: Arc::new(AtomicBool::new(false)),
+        cancel_token: tokio_util::sync::CancellationToken::new(),
+        pause_flag: Arc::new(AtomicBool::new(false)),
+        breakpoint_flag: Arc::new(AtomicBool::new(false)),
+        step_mode_flag: Arc::new(AtomicBool::new(false)),
+        debug_snapshots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+    };
+
+    let total = workflow.steps.len();
+    println!("  {} (共 {} 步)", workflow_name, total);
+    let start = std::time::Instant::now();
+
+    let result = scheduler::run_workflow(
+        &workflow,
+        &run_id,
+        None,
+        &app.db,
+        app.approval_store.clone(),
+        "auto",
+        vars,
+        &ctrl,
+    ).await;
+
+    match result {
+        Ok(_) => {
+            app.db.update_run_status(&run_id, "completed", None)
+                .map_err(|e| e.to_string())?;
+            println!("  完成 ({:.1}s)", start.elapsed().as_secs_f64());
+        }
+        Err(e) => {
+            app.db.update_run_status(&run_id, "failed", Some(&e.to_string()))
+                .map_err(|e2| e2.to_string())?;
+            println!("  失败: {}", e);
+        }
+    }
     Ok(())
 }
