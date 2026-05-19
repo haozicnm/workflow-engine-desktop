@@ -223,6 +223,10 @@ export default {
     sameContainerBadge: 'Same Container',
   },
 
+  containerConfig: {
+    noParams: 'This container has no configurable parameters',
+  },
+
   logic: {
     title: 'Condition Builder',
     addCondition: 'Add Condition',

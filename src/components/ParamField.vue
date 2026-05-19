@@ -23,6 +23,7 @@ interface ParamDef {
   placeholder?: string
   default?: unknown
   options?: { label: string; value: string }[]
+  hint?: string
 }
 
 const props = defineProps<{
@@ -107,6 +108,8 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
   <div>
     <!-- Label -->
     <Label class="text-[11px] text-muted-foreground block mb-1">{{ param.label }}</Label>
+    <!-- Hint -->
+    <div v-if="param.hint" class="text-[10px] text-muted-foreground/70 mb-1.5">{{ param.hint }}</div>
 
     <!-- Text input -->
     <div v-if="param.type === 'text'" class="flex gap-1">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Step } from '../types/types'
 import { getContainerDef } from '../types/node-registry'
 import { useVariableRefs } from '../composables/useVariableRefs'
@@ -19,6 +20,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   steps: () => [],
 })
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   'update-config': [config: { [key: string]: unknown }]
@@ -74,7 +77,7 @@ function onParamChange(key: string, value: unknown) {
 
       <!-- No params -->
       <div v-else class="text-center text-muted-foreground text-sm py-3">
-        此容器没有可配置的参数
+        {{ t('containerConfig.noParams') }}
       </div>
     </CardContent>
   </Card>

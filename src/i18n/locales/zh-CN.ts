@@ -229,6 +229,10 @@ export default {
     sameContainerBadge: '容器内',
   },
 
+  containerConfig: {
+    noParams: '此容器没有可配置的参数',
+  },
+
   // ─── 逻辑分支/条件构建器 ───
   logic: {
     title: '条件构建器',
