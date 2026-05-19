@@ -3,17 +3,19 @@
   "description": "【教学模板 ④】API数据审批决策链 — HTTP获取→JSON解析→脚本评估→条件审批（动态条件推荐）→分支处理→导出归档。演示 approval_conditions 动态推荐 + runCondition 双分支。",
   "params": {
     "api_url": "https://jsonplaceholder.typicode.com/posts/1",
-    "approval_timeout_ms": 5000,
-    "notify_title": "API数据审批"
+    "approval_timeout_ms": 10,
+    "notify_title": "API数据审批",
+    "work_dir": "/tmp/wf-approval-pipeline"
   },
   "steps": [
     {
       "id": "step_1",
       "type": "http",
       "name": "1.获取待审批数据",
+      "onError": "ignore",
       "config": {
         "method": "GET",
-        "url": "https://jsonplaceholder.typicode.com/posts/1",
+        "url": "{{params.api_url}}",
         "timeout": 10000
       }
     },
@@ -66,8 +68,8 @@
         "message": "📊 数据质量: {{step_3.level}}（{{step_3.quality}}分）\n📝 标题: {{step_3.title}}\n🔑 ID: {{step_3.id}} | 用户: {{step_3.userId}}\n📏 字段完整: {{step_3.fields_ok}}/4 | 标题长度: {{step_3.title_len}} | 正文长度: {{step_3.body_len}}\n\n预筛选结果: {{step_4.branch}}",
         "options": "批准发布,拒绝发布,需修改",
         "recommended": "批准发布",
-        "require_review": "true",
-        "timeout": 10,
+        "require_review": true,
+        "timeout": "{{params.approval_timeout_ms}}",
         "timeout_behavior": "auto",
         "timeout_action": "recommended",
         "approval_conditions": [
@@ -129,7 +131,7 @@
           "id": "a7_1",
           "type": "write",
           "config": {
-            "path": "/tmp/wf-approval-decision.json",
+            "path": "{{params.work_dir}}/approval-decision.json",
             "content": "{\"id\":{{step_3.id}},\"title\":\"{{step_3.title}}\",\"decision\":\"{{step_5.decision}}\",\"quality\":{{step_3.quality}},\"comment\":\"{{step_5.comment}}\"}"
           }
         }
@@ -144,7 +146,7 @@
         "when": "false"
       },
       "config": {
-        "command": "echo \"[REJECTED] ID:{{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}}\" >> /tmp/wf-rejected.log 2>/dev/null; echo 'logged'",
+        "command": "echo \"[REJECTED] ID:{{step_3.id}} - {{step_3.title}} - 决策:{{step_5.decision}}\" >> {{params.work_dir}}/wf-rejected.log 2>/dev/null; echo 'logged'",
         "shell": "auto",
         "timeout_secs": 5
       }
@@ -159,7 +161,7 @@
       },
       "config": {
         "notify_type": "system",
-        "title": "✅ 数据审批通过",
+        "title": "✅ {{params.notify_title}} — 通过",
         "body": "ID={{step_3.id}} 标题={{step_3.title}}\n质量={{step_3.quality}}分({{step_3.level}})\n决策={{step_5.decision}}"
       }
     },
@@ -173,7 +175,7 @@
       },
       "config": {
         "notify_type": "system",
-        "title": "❌ 数据审批未通过",
+        "title": "❌ {{params.notify_title}} — 未通过",
         "body": "ID={{step_3.id}} 标题={{step_3.title}}\n决策={{step_5.decision}} 意见={{step_5.comment}}"
       }
     }

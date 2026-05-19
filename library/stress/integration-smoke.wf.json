@@ -34,7 +34,7 @@
           "id": "a3_1",
           "type": "write",
           "config": {
-            "path": "/tmp/wf-t1-raw.json",
+            "path": "{{params.test_dir}}/t1-raw.json",
             "content": "{{step_1.stdout}}"
           }
         }
@@ -49,7 +49,7 @@
           "id": "a4_1",
           "type": "read",
           "config": {
-            "path": "/tmp/wf-t1-raw.json"
+            "path": "{{params.test_dir}}/t1-raw.json"
           }
         }
       ]
@@ -90,6 +90,7 @@
       "id": "step_7",
       "type": "http",
       "name": "7.获取外部基准数据",
+      "onError": "ignore",
       "config": {
         "method": "GET",
         "url": "https://jsonplaceholder.typicode.com/posts/1",
@@ -100,56 +101,62 @@
       "id": "step_8",
       "type": "excel",
       "name": "8.生成Excel报表",
-      "actions": [
-        {
-          "id": "a8_1",
-          "type": "create",
-          "config": {
-            "headers": "阶段,分数,是否通过"
+      "config": {
+        "file_path": "{{params.test_dir}}/t1-report.xlsx",
+        "actions": [
+          {
+            "id": "a8_1",
+            "type": "create",
+            "config": {
+              "headers": "阶段,分数,是否通过"
+            }
+          },
+          {
+            "id": "a8_2",
+            "type": "write",
+            "config": {
+              "value": [
+                ["需求分析", 85, "是"],
+                ["架构设计", 92, "是"],
+                ["代码审查", 78, "是"],
+                ["集成测试", 55, "否"]
+              ]
+            }
+          },
+          {
+            "id": "a8_3",
+            "type": "sort",
+            "config": {
+              "column": "分数",
+              "order": "desc"
+            }
           }
-        },
-        {
-          "id": "a8_2",
-          "type": "write",
-          "config": {
-            "value": [
-              ["需求分析", 85, "是"],
-              ["架构设计", 92, "是"],
-              ["代码审查", 78, "是"],
-              ["集成测试", 55, "否"]
-            ]
-          }
-        },
-        {
-          "id": "a8_3",
-          "type": "sort",
-          "config": {
-            "column": "分数",
-            "order": "desc"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
       "id": "step_9",
       "type": "word",
       "name": "9.生成Word总结文档",
-      "actions": [
-        {
-          "id": "a9_1",
-          "type": "create",
-          "config": {
-            "title": "工作流教学演练 — 数据报告"
+      "config": {
+        "file_path": "{{params.test_dir}}/t1-summary.docx",
+        "actions": [
+          {
+            "id": "a9_1",
+            "type": "create",
+            "config": {
+              "title": "工作流教学演练 — 数据报告"
+            }
+          },
+          {
+            "id": "a9_2",
+            "type": "write",
+            "config": {
+              "value": "项目：WF教学演练\n平均分：{{step_5.avg}}分 | 最高：{{step_5.max}}分 | 最低：{{step_5.min}}分\n通过率：{{step_5.pass_rate}}%（{{step_5.pass_count}}/{{step_5.count}}）\n状态：{{step_6.branch}}（条件判断结果）\n外部API响应：HTTP {{step_7.status}}"
+            }
           }
-        },
-        {
-          "id": "a9_2",
-          "type": "write",
-          "config": {
-            "value": "项目：WF教学演练\n平均分：{{step_5.avg}}分 | 最高：{{step_5.max}}分 | 最低：{{step_5.min}}分\n通过率：{{step_5.pass_rate}}%（{{step_5.pass_count}}/{{step_5.count}}）\n状态：{{step_6.branch}}（条件判断结果）\n外部API响应：HTTP {{step_7.status}}"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
       "id": "step_10",
@@ -179,7 +186,7 @@
           "id": "body_11_2",
           "type": "delay",
           "config": {
-            "duration_ms": 150
+            "duration_ms": "{{params.delay_ms}}"
           }
         }
       ]
@@ -191,7 +198,7 @@
       "config": {
         "notify_type": "system",
         "title": "教学演练完成",
-        "body": "全部{{step_5.count}}项已处理\n通过率: {{step_5.pass_rate}}%\n报表: /tmp/wf-t1-report.xlsx\n文档: /tmp/wf-t1-summary.docx"
+        "body": "全部{{step_5.count}}项已处理\n通过率: {{step_5.pass_rate}}%\n报表: {{params.test_dir}}/t1-report.xlsx\n文档: {{params.test_dir}}/t1-summary.docx"
       }
     },
     {
@@ -199,7 +206,7 @@
       "type": "delay",
       "name": "13.等待收尾",
       "config": {
-        "duration_ms": 200
+        "duration_ms": "{{params.delay_ms}}"
       }
     },
     {
@@ -207,7 +214,7 @@
       "type": "shell",
       "name": "14.清理临时文件",
       "config": {
-        "command": "rm -f /tmp/wf-t1-raw.json /tmp/wf-t1-report.xlsx /tmp/wf-t1-summary.docx 2>/dev/null; echo 'cleaned'",
+        "command": "rm -f {{params.test_dir}}/t1-raw.json {{params.test_dir}}/t1-report.xlsx {{params.test_dir}}/t1-summary.docx 2>/dev/null; echo 'cleaned'",
         "shell": "auto",
         "timeout_secs": 5
       }

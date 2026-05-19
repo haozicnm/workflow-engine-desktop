@@ -3,8 +3,8 @@
   "description": "【教学模板 ③】智能文件审批管道 — 文件扫描→条件筛选→逐项审批（条件推荐）→归档通知。演示 Cursor 游标迭代、approval_conditions 条件推荐、runCondition 分支。",
   "params": {
     "data_dir": "/tmp/wf-approval-batch",
-    "file_pattern": "*.txt",
-    "approval_timeout_ms": 5000
+    "file_pattern": "doc-*.txt",
+    "approval_timeout_ms": 5
   },
   "steps": [
     {
@@ -12,7 +12,7 @@
       "type": "shell",
       "name": "1.准备测试文件集",
       "config": {
-        "command": "mkdir -p /tmp/wf-approval-batch/approved /tmp/wf-approval-batch/rejected 2>/dev/null; echo '合规报告-Q1' > /tmp/wf-approval-batch/doc-合规报告-Q1.txt; echo '财务数据-涉密' > /tmp/wf-approval-batch/doc-财务数据-涉密.txt; echo '技术方案-v2' > /tmp/wf-approval-batch/doc-技术方案-v2.txt; echo '已准备 3 个测试文件'",
+        "command": "mkdir -p {{params.data_dir}}/approved {{params.data_dir}}/rejected 2>/dev/null; echo '合规报告-Q1' > {{params.data_dir}}/doc-合规报告-Q1.txt; echo '财务数据-涉密' > {{params.data_dir}}/doc-财务数据-涉密.txt; echo '技术方案-v2' > {{params.data_dir}}/doc-技术方案-v2.txt; echo '已准备 3 个测试文件'",
         "shell": "auto",
         "timeout_secs": 5
       }
@@ -26,8 +26,8 @@
           "id": "a2_1",
           "type": "list",
           "config": {
-            "path": "/tmp/wf-approval-batch",
-            "pattern": "doc-*.txt"
+            "path": "{{params.data_dir}}",
+            "pattern": "{{params.file_pattern}}"
           }
         }
       ]
@@ -93,8 +93,8 @@
             "title": "文件审批: {{__item.file}}",
             "message": "风险等级: {{__item.risk_level}}\n风险评分: {{body_5_2.risk_score}}分\n内容预览: {{body_5_2.preview}}",
             "options": "同意发布,拒绝发布,需修改后重审",
-            "require_review": "false",
-            "timeout": 5,
+            "require_review": false,
+            "timeout": "{{params.approval_timeout_ms}}",
             "timeout_behavior": "auto",
             "timeout_action": "recommended",
             "approval_conditions": [
@@ -145,7 +145,7 @@
               "type": "copy",
               "config": {
                 "from": "{{__item.path}}",
-                "to": "/tmp/wf-approval-batch/approved/{{__item.file}}"
+                "to": "{{params.data_dir}}/approved/{{__item.file}}"
               }
             }
           ]
@@ -164,7 +164,7 @@
               "type": "copy",
               "config": {
                 "from": "{{__item.path}}",
-                "to": "/tmp/wf-approval-batch/rejected/{{__item.file}}"
+                "to": "{{params.data_dir}}/rejected/{{__item.file}}"
               }
             }
           ]
@@ -180,14 +180,14 @@
           "id": "a6_1",
           "type": "list",
           "config": {
-            "path": "/tmp/wf-approval-batch/approved"
+            "path": "{{params.data_dir}}/approved"
           }
         },
         {
           "id": "a6_2",
           "type": "list",
           "config": {
-            "path": "/tmp/wf-approval-batch/rejected"
+            "path": "{{params.data_dir}}/rejected"
           }
         }
       ]
@@ -207,7 +207,7 @@
       "config": {
         "notify_type": "system",
         "title": "📋 批量审批完成",
-        "body": "{{step_7.summary}}\n已批准目录: /tmp/wf-approval-batch/approved/\n已拒绝目录: /tmp/wf-approval-batch/rejected/"
+        "body": "{{step_7.summary}}\n已批准目录: {{params.data_dir}}/approved/\n已拒绝目录: {{params.data_dir}}/rejected/"
       }
     }
   ]

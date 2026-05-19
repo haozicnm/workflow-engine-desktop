@@ -12,7 +12,7 @@
       "type": "shell",
       "name": "1.创建输出目录",
       "config": {
-        "command": "mkdir -p /tmp/wf-daily-report 2>/dev/null; echo '/tmp/wf-daily-report'",
+        "command": "mkdir -p {{params.output_dir}} 2>/dev/null; echo '{{params.output_dir}}'",
         "shell": "auto",
         "timeout_secs": 5
       }
@@ -21,9 +21,10 @@
       "id": "step_2",
       "type": "http",
       "name": "2.获取HN热榜",
+      "onError": "ignore",
       "config": {
         "method": "GET",
-        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "url": "{{params.hn_api}}",
         "timeout": 15000
       }
     },
@@ -47,9 +48,10 @@
       "id": "step_5",
       "type": "http",
       "name": "5.获取GitHub仓库状态",
+      "onError": "ignore",
       "config": {
         "method": "GET",
-        "url": "https://api.github.com/repos/haozicnm/workflow-engine-desktop",
+        "url": "{{params.github_api}}",
         "headers": "{\"Accept\": \"application/vnd.github.v3+json\", \"User-Agent\": \"wf-engine/1.0\"}",
         "timeout": 15000
       }
@@ -98,37 +100,40 @@
       "id": "step_9",
       "type": "excel",
       "name": "9.生成Excel日报表",
-      "actions": [
-        {
-          "id": "a9_1",
-          "type": "create",
-          "config": {
-            "headers": "数据源,指标,数值,状态"
+      "config": {
+        "file_path": "{{params.output_dir}}/daily-report.xlsx",
+        "actions": [
+          {
+            "id": "a9_1",
+            "type": "create",
+            "config": {
+              "headers": "数据源,指标,数值,状态"
+            }
+          },
+          {
+            "id": "a9_2",
+            "type": "write",
+            "config": {
+              "value": [
+                ["HackerNews", "热榜总数", "{{step_4.total}}", "正常"],
+                ["HackerNews", "Top10 ID", "{{step_4.top_ids}}", "-"],
+                ["GitHub", "Stars", "{{step_7.stars}}", "{{step_7.level}}"],
+                ["GitHub", "Forks", "{{step_7.forks}}", "-"],
+                ["GitHub", "Open Issues", "{{step_7.open_issues}}", "-"],
+                ["综合", "活跃度评分", "{{step_7.score}}", "{{step_8.branch}}"]
+              ]
+            }
+          },
+          {
+            "id": "a9_3",
+            "type": "sort",
+            "config": {
+              "column": "数值",
+              "order": "desc"
+            }
           }
-        },
-        {
-          "id": "a9_2",
-          "type": "write",
-          "config": {
-            "value": [
-              ["HackerNews", "热榜总数", "{{step_4.total}}", "正常"],
-              ["HackerNews", "Top10 ID", "{{step_4.top_ids}}", "-"],
-              ["GitHub", "Stars", "{{step_7.stars}}", "{{step_7.level}}"],
-              ["GitHub", "Forks", "{{step_7.forks}}", "-"],
-              ["GitHub", "Open Issues", "{{step_7.open_issues}}", "-"],
-              ["综合", "活跃度评分", "{{step_7.score}}", "{{step_8.branch}}"]
-            ]
-          }
-        },
-        {
-          "id": "a9_3",
-          "type": "sort",
-          "config": {
-            "column": "数值",
-            "order": "desc"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
       "id": "step_10",
@@ -139,7 +144,7 @@
           "id": "a10_1",
           "type": "write",
           "config": {
-            "path": "/tmp/wf-daily-report/snapshot.json",
+            "path": "{{params.output_dir}}/snapshot.json",
             "content": "{\"hn_count\":{{step_4.total}},\"gh_stars\":{{step_7.stars}},\"gh_forks\":{{step_7.forks}},\"score\":{{step_7.score}},\"level\":\"{{step_7.level}}\",\"condition\":\"{{step_8.branch}}\"}"
           }
         }
@@ -149,22 +154,25 @@
       "id": "step_11",
       "type": "word",
       "name": "11.生成Word日报摘要",
-      "actions": [
-        {
-          "id": "a11_1",
-          "type": "create",
-          "config": {
-            "title": "每日智能舆情报告"
+      "config": {
+        "file_path": "{{params.output_dir}}/daily-summary.docx",
+        "actions": [
+          {
+            "id": "a11_1",
+            "type": "create",
+            "config": {
+              "title": "每日智能舆情报告"
+            }
+          },
+          {
+            "id": "a11_2",
+            "type": "write",
+            "config": {
+              "value": "📊 数据源汇总\n• HackerNews热榜: {{step_4.total}}条\n• GitHub仓库({{step_7.repo}}): ⭐{{step_7.stars}} 🔱{{step_7.forks}} ⚠️{{step_7.open_issues}}\n\n📈 活跃度评分: {{step_7.score}}分 → {{step_7.level}}\n📋 综合判断: {{step_8.branch}}\n\n报表文件: {{params.output_dir}}/daily-report.xlsx\n快照文件: {{params.output_dir}}/snapshot.json"
+            }
           }
-        },
-        {
-          "id": "a11_2",
-          "type": "write",
-          "config": {
-            "value": "📊 数据源汇总\n• HackerNews热榜: {{step_4.total}}条\n• GitHub仓库({{step_7.repo}}): ⭐{{step_7.stars}} 🔱{{step_7.forks}} ⚠️{{step_7.open_issues}}\n\n📈 活跃度评分: {{step_7.score}}分 → {{step_7.level}}\n📋 综合判断: {{step_8.branch}}\n\n报表文件: /tmp/wf-daily-report/daily-report.xlsx\n快照文件: /tmp/wf-daily-report/snapshot.json"
-          }
-        }
-      ]
+        ]
+      }
     },
     {
       "id": "step_12",
@@ -173,7 +181,7 @@
       "config": {
         "notify_type": "system",
         "title": "📊 每日舆情报告已生成",
-        "body": "HN热榜{{step_4.total}}条 | GitHub活跃度:{{step_7.score}}分({{step_7.level}})\n报表: /tmp/wf-daily-report/daily-report.xlsx\n文档: /tmp/wf-daily-report/daily-summary.docx"
+        "body": "HN热榜{{step_4.total}}条 | GitHub活跃度:{{step_7.score}}分({{step_7.level}})\n报表: {{params.output_dir}}/daily-report.xlsx\n文档: {{params.output_dir}}/daily-summary.docx"
       }
     }
   ]

@@ -4,7 +4,8 @@
   "params": {
     "target_url": "https://jsonplaceholder.typicode.com/posts/1",
     "alert_threshold": 3000,
-    "notify_title": "站点监控告警"
+    "notify_title": "站点监控告警",
+    "work_dir": "/tmp/wf-monitor"
   },
   "steps": [
     {
@@ -12,7 +13,7 @@
       "type": "shell",
       "name": "1.初始化监控目录",
       "config": {
-        "command": "mkdir -p /tmp/wf-monitor 2>/dev/null; echo 'ready'",
+        "command": "mkdir -p {{params.work_dir}} 2>/dev/null; echo 'ready'",
         "shell": "auto",
         "timeout_secs": 5
       }
@@ -21,28 +22,38 @@
       "id": "step_2",
       "type": "file",
       "name": "2.读取上次监控状态",
+      "onError": "ignore",
       "actions": [
         {
           "id": "a2_1",
           "type": "read",
           "config": {
-            "path": "/tmp/wf-monitor/last-state.json"
+            "path": "{{params.work_dir}}/last-state.json"
           }
         }
-      ],
-      "onError": "ignore"
+      ]
     },
     {
       "id": "step_3",
-      "type": "loop",
-      "name": "3.多站点探测",
+      "type": "json_parse",
+      "name": "3.解析历史状态",
+      "onError": "ignore",
       "config": {
-        "items": "[{\"name\":\"JSONPlaceholder\",\"url\":\"https://jsonplaceholder.typicode.com/posts/1\"},{\"name\":\"GitHub API\",\"url\":\"https://api.github.com\"},{\"name\":\"HTTPBin\",\"url\":\"https://httpbin.org/get\"}]"
+        "data": "{{step_2.a2_1.content}}"
+      }
+    },
+    {
+      "id": "step_4",
+      "type": "loop",
+      "name": "4.多站点探测",
+      "config": {
+        "items": "[{\"name\":\"JSONPlaceholder\",\"url\":\"{{params.target_url}}\"},{\"name\":\"GitHub API\",\"url\":\"https://api.github.com\"},{\"name\":\"HTTPBin\",\"url\":\"https://httpbin.org/get\"}]"
       },
       "body_steps": [
         {
-          "id": "body_3_1",
+          "id": "body_4_1",
           "type": "http",
+          "onError": "ignore",
           "config": {
             "method": "GET",
             "url": "{{__item.url}}",
@@ -51,39 +62,39 @@
           }
         },
         {
-          "id": "body_3_2",
+          "id": "body_4_2",
           "type": "script",
           "config": {
-            "script": "let resp_len = body_3_1.body.len();\nlet status = body_3_1.status;\nlet is_ok = status >= 200 && status < 400;\n#{site: __item.name, url: __item.url, status: status, is_ok: is_ok, body_length: resp_len}"
+            "script": "let resp_len = body_4_1.body.len();\nlet status = body_4_1.status;\nlet is_ok = status >= 200 && status < 400;\n#{site: __item.name, url: __item.url, status: status, is_ok: is_ok, body_length: resp_len}"
           }
         }
       ]
     },
     {
-      "id": "step_4",
+      "id": "step_5",
       "type": "script",
-      "name": "4.汇总分析+趋势对比",
+      "name": "5.汇总分析+趋势对比",
       "config": {
-        "script": "let results = step_3.results;\nlet total = results.len();\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n#{alert_sites: alert_sites, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total}"
+        "script": "let results = step_4.results;\nlet total = results.len();\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n\n// 趋势对比：读取上次持久化状态\nlet prev_health = 100.0;\nlet prev_status = \"首次运行\";\nlet trend = \"→首次\";\nif step_3 != () {\n    if step_3.health != () { prev_health = step_3.health; }\n    if step_3.status != () { prev_status = step_3.status; }\n    if health_pct > prev_health { trend = \"↑改善\"; }\n    else if health_pct < prev_health { trend = \"↓恶化\"; }\n    else { trend = \"→持平\"; }\n}\nlet alert_sites_str = alert_sites.join(\", \");\n\n#{alert_sites: alert_sites, alert_sites_str: alert_sites_str, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total, trend: trend, prev_health: prev_health, prev_status: prev_status}"
       }
     },
     {
-      "id": "step_5",
+      "id": "step_6",
       "type": "logic",
-      "name": "5.异常判断",
+      "name": "6.异常判断",
       "config": {
         "conditionGroup": {
           "combinator": "or",
           "conditions": [
             {
               "id": "c1",
-              "left": "{{step_4.fail_count}}",
+              "left": "{{step_5.fail_count}}",
               "op": "gt",
               "right": "0"
             },
             {
               "id": "c2",
-              "left": "{{step_4.health_pct}}",
+              "left": "{{step_5.health_pct}}",
               "op": "lt",
               "right": "100"
             }
@@ -92,61 +103,66 @@
       }
     },
     {
-      "id": "step_6",
-      "type": "file",
-      "name": "6.保存本次监控状态",
-      "actions": [
-        {
-          "id": "a6_1",
-          "type": "write",
-          "config": {
-            "path": "/tmp/wf-monitor/last-state.json",
-            "content": "{\"ok\":{{step_4.ok_count}},\"fail\":{{step_4.fail_count}},\"health\":{{step_4.health_pct}},\"status\":\"{{step_4.status}}\"}"
-          }
-        }
-      ]
-    },
-    {
       "id": "step_7",
-      "type": "excel",
-      "name": "7.追加监控日志到Excel",
-      "onError": "ignore",
+      "type": "file",
+      "name": "7.保存本次监控状态",
       "actions": [
         {
           "id": "a7_1",
-          "type": "append",
+          "type": "write",
           "config": {
-            "value": ["{{step_4.status}}", "{{step_4.ok_count}}", "{{step_4.fail_count}}", "{{step_4.health_pct}}%", "{{step_4.summary}}"]
+            "path": "{{params.work_dir}}/last-state.json",
+            "content": "{\"ok\":{{step_5.ok_count}},\"fail\":{{step_5.fail_count}},\"health\":{{step_5.health_pct}},\"status\":\"{{step_5.status}}\"}"
           }
         }
       ]
     },
     {
       "id": "step_8",
-      "type": "notify",
-      "name": "8a.异常告警",
-      "runCondition": {
-        "ref": "step_5",
-        "when": "true"
-      },
+      "type": "excel",
+      "name": "8.追加监控日志到Excel",
+      "onError": "ignore",
       "config": {
-        "notify_type": "system",
-        "title": "🚨 站点监控告警",
-        "body": "{{step_4.status}}\n正常: {{step_4.ok_count}}/{{step_4.total}} | 异常: {{step_4.fail_count}}/{{step_4.total}}\n健康度: {{step_4.health_pct}}%\n异常站点: {{step_4.alert_sites}}\n日志: /tmp/wf-monitor/monitor-log.xlsx"
+        "file_path": "{{params.work_dir}}/monitor-log.xlsx",
+        "actions": [
+          {
+            "id": "a8_1",
+            "type": "append",
+            "config": {
+              "value": [
+                ["{{step_5.status}}", "{{step_5.ok_count}}", "{{step_5.fail_count}}", "{{step_5.health_pct}}", "{{step_5.summary}}", "{{step_5.trend}}"]
+              ]
+            }
+          }
+        ]
       }
     },
     {
       "id": "step_9",
       "type": "notify",
-      "name": "8b.正常报告",
+      "name": "9a.异常告警",
       "runCondition": {
-        "ref": "step_5",
+        "ref": "step_6",
+        "when": "true"
+      },
+      "config": {
+        "notify_type": "system",
+        "title": "🚨 {{params.notify_title}}",
+        "body": "{{step_5.status}}\n正常: {{step_5.ok_count}}/{{step_5.total}} | 异常: {{step_5.fail_count}}/{{step_5.total}}\n健康度: {{step_5.health_pct}}%（趋势: {{step_5.trend}}）\n异常站点: {{step_5.alert_sites_str}}\n日志: {{params.work_dir}}/monitor-log.xlsx"
+      }
+    },
+    {
+      "id": "step_10",
+      "type": "notify",
+      "name": "9b.正常报告",
+      "runCondition": {
+        "ref": "step_6",
         "when": "false"
       },
       "config": {
         "notify_type": "system",
         "title": "✅ 站点监控正常",
-        "body": "全部{{step_4.total}}个站点正常\n健康度: {{step_4.health_pct}}%"
+        "body": "全部{{step_5.total}}个站点正常\n健康度: {{step_5.health_pct}}%（趋势: {{step_5.trend}}）\n上次: {{step_5.prev_status}}（{{step_5.prev_health}}%）"
       }
     }
   ]
