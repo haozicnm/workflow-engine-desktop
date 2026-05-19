@@ -225,9 +225,9 @@ fn resolve_config_non_string_passthrough() {
 fn resolve_config_unresolved_variable_preserved() {
     let ctx = new_ctx();
 
-    // 未定义变量保留原始模板
+    // 未定义变量替换为空字符串（避免 {{...}} 字面量泄漏到 shell 命令等场景）
     let result = ctx.resolve_config(&json!("Hello, {{unknown}}!"));
-    assert_eq!(result, json!("Hello, {{unknown}}!"));
+    assert_eq!(result, json!("Hello, !"));
 }
 
 #[test]

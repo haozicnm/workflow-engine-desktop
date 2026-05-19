@@ -133,8 +133,21 @@ pub async fn workflow_save_yaml(
     id: String,
     yaml: String,
 ) -> Result<(), String> {
+    // 语义校验
+    let wf = crate::engine::parser::parse_workflow(&yaml)
+        .map_err(|e| format!("Failed to parse workflow YAML: {e}"))?;
+    let validation = crate::engine::validate::validate_workflow(&wf);
+    if !validation.valid {
+        return Err(format!("Workflow validation failed:\n{}", validation.errors.join("\n")));
+    }
+    if !validation.warnings.is_empty() {
+        for w in &validation.warnings {
+            tracing::warn!("Workflow validation warning: {}", w);
+        }
+    }
+
     app.db.save_workflow_yaml(&id, &yaml)
-        .map_err(|e| format!("保存工作流 YAML 失败 (id={id}): {e}"))?;
+        .map_err(|e| format!("Failed to save workflow YAML (id={id}): {e}"))?;
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "save",
         "workflow_id": &id,
@@ -180,7 +193,7 @@ pub async fn workflow_create_from_recording(
     );
 
     if conversion.yaml.is_empty() {
-        return Err("录制的操作为空，无法生成工作流".to_string());
+        return Err("Recording is empty, cannot generate workflow".to_string());
     }
 
     // 创建并保存工作流到数据库
@@ -189,7 +202,7 @@ pub async fn workflow_create_from_recording(
     app.db.create_workflow(&id, &workflow_name, "由录制操作生成", &now, &now)
         .map_err(|e| format!("Failed to create workflow: {e}"))?;
     app.db.save_workflow_yaml(&id, &conversion.yaml)
-        .map_err(|e| format!("保存工作流 YAML 失败: {e}"))?;
+        .map_err(|e| format!("Failed to save workflow YAML: {e}"))?;
 
     Ok(serde_json::json!({
         "id": id,
