@@ -41,10 +41,8 @@ impl ValidationResult {
 pub fn validate_workflow(workflow: &Workflow) -> ValidationResult {
     let mut result = ValidationResult::new();
 
-    // 收集所有步骤 ID
-    let step_ids: HashSet<&str> = workflow.steps.iter()
-        .map(|s| s.id.as_str())
-        .collect();
+    // 收集所有步骤 ID（含 body_steps）
+    let step_ids: HashSet<String> = collect_all_step_ids(&workflow.steps);
 
     if workflow.steps.is_empty() {
         result.warn("Workflow has no steps".into());
@@ -57,14 +55,26 @@ pub fn validate_workflow(workflow: &Workflow) -> ValidationResult {
     result
 }
 
+/// 递归收集所有步骤 ID
+fn collect_all_step_ids(steps: &[Step]) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    for step in steps {
+        ids.insert(step.id.clone());
+        if let Some(ref body) = step.body_steps {
+            ids.extend(collect_all_step_ids(body));
+        }
+    }
+    ids
+}
+
 /// 校验单个步骤
-fn validate_step(step: &Step, step_ids: &HashSet<&str>) -> ValidationResult {
+fn validate_step(step: &Step, all_step_ids: &HashSet<String>) -> ValidationResult {
     let mut result = ValidationResult::new();
     let ctx = format!("step '{}' ({})", step.name, step.id);
 
-    // 1. 校验 runCondition.ref
+    // 1. 校验 runCondition.ref（在所有步骤中查找，包括 body_steps）
     if let Some(ref rc) = step.run_condition {
-        if !step_ids.contains(rc.ref_step.as_str()) {
+        if !all_step_ids.contains(rc.ref_step.as_str()) {
             result.error(format!(
                 "{}: runCondition.ref '{}' does not exist in workflow steps",
                 ctx, rc.ref_step
@@ -78,10 +88,10 @@ fn validate_step(step: &Step, step_ids: &HashSet<&str>) -> ValidationResult {
     // 3. 校验变量格式
     result.merge(validate_variable_refs(step, &ctx));
 
-    // 4. 递归校验 body_steps（loop/cursor 的子步骤）
+    // 4. 递归校验 body_steps（loop/cursor 的子步骤），共用同一个 ID 池
     if let Some(ref body) = step.body_steps {
         for body_step in body {
-            result.merge(validate_step(body_step, step_ids));
+            result.merge(validate_step(body_step, all_step_ids));
         }
     }
 
