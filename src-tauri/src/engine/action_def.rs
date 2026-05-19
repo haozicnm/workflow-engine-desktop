@@ -399,6 +399,20 @@ pub fn clipboard_actions() -> &'static [ActionDef] {
 // TypeScript 生成
 // ═══════════════════════════════════════
 
+/// PascalCase → snake_case conversion
+fn to_snake_case(s: &str) -> String {
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() {
+            if i > 0 { result.push('_'); }
+            result.push(c.to_lowercase().next().unwrap());
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 /// 生成 TypeScript 类型定义
 pub fn generate_ts_metadata() -> String {
     let container_actions: &[(&str, &[ActionDef])] = &[
@@ -424,7 +438,7 @@ pub fn generate_ts_metadata() -> String {
         for action in *actions {
             ts.push_str(&format!("    {{\n      action_type: '{}',\n      label: '{}',\n      category: '{}',\n      description: '{}',\n      params: [\n",
                 action.action_type, action.label,
-                serde_json::to_string(&action.category).unwrap_or_default().trim_matches('"'),
+                to_snake_case(&serde_json::to_string(&action.category).unwrap_or_default().trim_matches('"')),
                 action.description));
             for param in action.params {
                 let opts_str = if let Some(opts) = param.options {
@@ -435,7 +449,7 @@ pub fn generate_ts_metadata() -> String {
                 ts.push_str(&format!(
                     "        {{ key: '{}', label: '{}', param_type: '{}', required: {}, default_value: {}, placeholder: {}, options: {}, hint: {} }},\n",
                     param.key, param.label,
-                    serde_json::to_string(&param.param_type).unwrap_or_default().trim_matches('"'),
+                    to_snake_case(&serde_json::to_string(&param.param_type).unwrap_or_default().trim_matches('"')),
                     param.required,
                     param.default_value.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "undefined".to_string()),
                     param.placeholder.map(|s| format!("'{}'", s)).unwrap_or_else(|| "undefined".to_string()),
