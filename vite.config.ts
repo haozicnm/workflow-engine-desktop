@@ -74,6 +74,8 @@ export default defineConfig({
     alias: {
       // 使用 runtime-only 构建，避免 CSP unsafe-eval
       'vue': 'vue/dist/vue.runtime.esm-bundler.js',
+      // vue-i18n runtime 构建不含 message compiler (new Function)，兼容 CSP
+      'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.mjs',
       '@': path.resolve(__dirname, "src"),
     },
   },
