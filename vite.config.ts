@@ -21,6 +21,13 @@ export default defineConfig({
           const url = (req.url || "").split("?")[0];
           const templateId = url.replace("/api/templates", "").replace(/^\/+/, "");
 
+          // Prevent path traversal attacks
+          if (templateId.includes('/') || templateId.includes('\\') || templateId.includes('..') || templateId.includes('~')) {
+            res.statusCode = 400;
+            res.end("Invalid template ID");
+            return;
+          }
+
           if (!templateId) {
             const files = fs.readdirSync(templatesDir).filter(f => f.endsWith(".json"));
             const list = files.map(f => {

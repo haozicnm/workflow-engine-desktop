@@ -13,11 +13,14 @@ import Select from './ui/select/Select.vue'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   step: Step
   runState?: StepRunState
   steps?: Step[]
-}>()
+}>(), {
+  runState: undefined,
+  steps: () => [],
+})
 
 const emit = defineEmits<{
   'update-condition': [stepId: string, condition: string]

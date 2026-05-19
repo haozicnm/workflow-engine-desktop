@@ -9,7 +9,6 @@ use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
-use regex::Regex;
 
 #[derive(Default)]
 pub struct TextTemplateNode;
@@ -33,8 +32,11 @@ impl NodeExecutor for TextTemplateNode {
 }
 
 fn resolve_template(template: &str, ctx: &ExecutionContext) -> String {
-    let re = Regex::new(r"\{\{(\w+(?:\.\w+)*)\}\}").expect("template regex");
-    re.replace_all(template, |caps: &regex::Captures| {
+    use std::sync::LazyLock;
+    static RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"\{\{(\w+(?:\.\w+)*)\}\}").expect("template regex")
+    });
+    RE.replace_all(template, |caps: &regex::Captures| {
         let path = caps.get(1).expect("capture").as_str();
         resolve_var(path, ctx)
     }).to_string()

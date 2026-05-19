@@ -578,7 +578,7 @@ steps:
                 "type": "browser",
                 "label": "browse",
                 "config": {"browser": "chromium"},
-                "actions": [{"id": "a1", "type": "navigate", "label": "nav", "params": {"url": "http://x.com"}}]
+                "actions": [{"id": "a1", "type": "navigate", "label": "nav", "params": {"url": "https://example.com/api"}}]
             }]
         }"#;
         let wf = parse_workflow(json).unwrap();
@@ -618,7 +618,7 @@ steps:
                 "id": "s1",
                 "type": "http",
                 "label": "req",
-                "config": {"method": "GET", "url": "http://x.com"},
+                "config": {"method": "GET", "url": "https://example.com/api"},
                 "retry": {"max": 3, "delay_ms": 500}
             }]
         }"#;

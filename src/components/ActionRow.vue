@@ -15,7 +15,7 @@ import ParamField from './ParamField.vue'
 
 
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   action: Action
   containerType: ContainerType
   status?: ActionStatus
@@ -24,7 +24,14 @@ const props = defineProps<{
   steps?: Step[]
   expanded?: boolean
   siblingActions?: Action[]
-}>()
+}>(), {
+  status: undefined,
+  stepId: undefined,
+  stepLabel: undefined,
+  steps: () => [],
+  expanded: true,
+  siblingActions: () => [],
+})
 
 // Find the action immediately before the current one
 const prevAction = computed(() => {

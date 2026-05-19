@@ -152,7 +152,7 @@ export function nextActionId(stepId: string, existingActions: Action[]): string 
 
 export function newWorkflow(): Workflow {
   return {
-    name: '未命名工作流',
+    name: '',
     description: '',
     steps: [],
   }
@@ -165,12 +165,28 @@ export function serializeWorkflow(wf: Workflow): string {
 }
 
 export function deserializeWorkflow(json: string): Workflow {
-  const wf = JSON.parse(json) as Workflow
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch (e) {
+    throw new Error(`Invalid workflow JSON: ${e instanceof Error ? e.message : String(e)}`)
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid workflow: expected an object')
+  }
+  const wf = parsed as Record<string, unknown>
+  if (typeof wf.name !== 'string') {
+    throw new Error('Invalid workflow: missing "name" field')
+  }
+  if (!Array.isArray(wf.steps)) {
+    throw new Error('Invalid workflow: "steps" must be an array')
+  }
   // 确保每个步骤都有 actions 数组
-  if (wf.steps) {
-    for (const step of wf.steps) {
-      if (!step.actions) step.actions = []
+  for (const step of wf.steps) {
+    if (step && typeof step === 'object') {
+      const s = step as Record<string, unknown>
+      if (!Array.isArray(s.actions)) s.actions = []
     }
   }
-  return wf
+  return wf as unknown as Workflow
 }

@@ -13,10 +13,12 @@ import CardContent from './ui/card/CardContent.vue'
 
 
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   step: Step
   steps?: Step[]
-}>()
+}>(), {
+  steps: () => [],
+})
 
 const emit = defineEmits<{
   'update-config': [config: { [key: string]: unknown }]

@@ -7,9 +7,9 @@ import Textarea from './ui/textarea/Textarea.vue'
 
 
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   workflow: Workflow
-}>()
+}>(), {})
 
 const emit = defineEmits<{
   'update:workflow': [wf: Workflow]

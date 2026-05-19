@@ -20,7 +20,7 @@ pub struct WorkflowListItem {
 pub async fn workflow_list(
     app: State<'_, App>,
 ) -> Result<Vec<WorkflowListItem>, String> {
-    app.db.list_workflows().map_err(|e| format!("查询工作流列表失败: {e}"))
+    app.db.list_workflows().map_err(|e| format!("Failed to list workflows: {e}"))
 }
 
 #[tauri::command]
@@ -34,7 +34,7 @@ pub async fn workflow_create(
     let now = chrono::Utc::now().to_rfc3339();
 
     app.db.create_workflow(&id, &name, description.as_deref().unwrap_or(""), &now, &now)
-        .map_err(|e| format!("创建工作流失败 (name={name}): {e}"))?;
+        .map_err(|e| format!("Failed to create workflow (name={name}): {e}"))?;
 
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "create",
@@ -49,7 +49,7 @@ pub async fn workflow_get(
     app: State<'_, App>,
     id: String,
 ) -> Result<Option<WorkflowMeta>, String> {
-    app.db.get_workflow(&id).map_err(|e| format!("获取工作流失败 (id={id}): {e}"))
+    app.db.get_workflow(&id).map_err(|e| format!("Failed to get workflow (id={id}): {e}"))
 }
 
 #[tauri::command]
@@ -63,7 +63,7 @@ pub async fn workflow_update(
 ) -> Result<(), String> {
     let now = chrono::Utc::now().to_rfc3339();
     app.db.update_workflow(&id, name.as_deref(), description.as_deref(), enabled, &now)
-        .map_err(|e| format!("更新工作流失败 (id={id}): {e}"))?;
+        .map_err(|e| format!("Failed to update workflow (id={id}): {e}"))?;
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "update",
         "workflow_id": &id,
@@ -79,11 +79,11 @@ pub async fn workflow_delete(
 ) -> Result<(), String> {
     // 检查是否锁定
     let wf = app.db.get_workflow(&id).map_err(|e| e.to_string())?
-        .ok_or_else(|| "工作流不存在".to_string())?;
+        .ok_or_else(|| "Workflow not found".to_string())?;
     if wf.locked {
-        return Err("工作流已锁定，无法删除".to_string());
+        return Err("Workflow is locked, cannot delete".to_string());
     }
-    app.db.delete_workflow(&id).map_err(|e| format!("删除工作流失败 (id={id}): {e}"))?;
+    app.db.delete_workflow(&id).map_err(|e| format!("Failed to delete workflow (id={id}): {e}"))?;
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "delete",
         "workflow_id": &id,
@@ -99,7 +99,7 @@ pub async fn workflow_lock(
     locked: bool,
 ) -> Result<(), String> {
     app.db.set_workflow_locked(&id, locked)
-        .map_err(|e| format!("{}工作流失败: {e}", if locked { "锁定" } else { "解锁" }))?;
+        .map_err(|e| format!("Failed to {} workflow: {e}", if locked { "lock" } else { "unlock" }))?;
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": if locked { "lock" } else { "unlock" },
         "workflow_id": &id,
@@ -187,7 +187,7 @@ pub async fn workflow_create_from_recording(
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     app.db.create_workflow(&id, &workflow_name, "由录制操作生成", &now, &now)
-        .map_err(|e| format!("创建工作流失败: {e}"))?;
+        .map_err(|e| format!("Failed to create workflow: {e}"))?;
     app.db.save_workflow_yaml(&id, &conversion.yaml)
         .map_err(|e| format!("保存工作流 YAML 失败: {e}"))?;
 
@@ -282,7 +282,7 @@ pub async fn export_workflow(
         .iter()
         .map(|n| {
             let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("未命名");
+            let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
             let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
             let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
 
@@ -359,7 +359,7 @@ pub async fn export_workflow(
     // 确保目录存在
     if let Some(parent) = final_path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
     std::fs::write(&final_path, &yaml_str)

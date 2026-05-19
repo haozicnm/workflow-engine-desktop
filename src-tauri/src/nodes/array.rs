@@ -267,8 +267,11 @@ fn apply_map_template(template: &str, item: &serde_json::Value, index: usize, fi
     let mut result = template.to_string();
     result = result.replace("{{__index}}", &index.to_string());
 
-    let re = regex::Regex::new(r"\{\{__item\.(\w+(?:\.\w+)*)\}\}").expect("regex compile");
-    result = re.replace_all(&result, |caps: &regex::Captures| {
+    use std::sync::LazyLock;
+    static RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"\{\{__item\.(\w+(?:\.\w+)*)\}\}").expect("regex compile")
+    });
+    result = RE.replace_all(&result, |caps: &regex::Captures| {
         let path = caps.get(1).expect("capture").as_str();
         let val = extract_field(item, Some(path));
         match val { serde_json::Value::String(s) => s.clone(), other => other.to_string() }
