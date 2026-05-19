@@ -688,7 +688,10 @@ impl NodeExecutor for BrowserContainerNode {
             return Err(anyhow!("浏览器容器执行失败: {}", err));
         }
 
-        // 返回 output_ports 供下游节点使用
-        Ok(serde_json::to_value(&result.output_ports).unwrap_or(Value::Null))
+        // 返回 output_ports（含元数据）供下游节点使用
+        let mut output = result.output_ports.clone();
+        output.insert("_container_type".to_string(), Value::String("browser".to_string()));
+        output.insert("_step_name".to_string(), Value::String(step.name.clone()));
+        Ok(serde_json::to_value(&output).unwrap_or(Value::Null))
     }
 }

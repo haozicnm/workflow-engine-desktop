@@ -82,6 +82,8 @@ impl NodeExecutor for FileContainerNode {
             }
         }
 
+        results.insert("_container_type".to_string(), json!("file"));
+        results.insert("_step_name".to_string(), json!(step.name.clone()));
         Ok(Value::Object(results))
     }
 }
