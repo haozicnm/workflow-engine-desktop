@@ -1,6 +1,6 @@
 # Workflow Engine Desktop — User Guide
 
-> Version 7.0.0 | Updated: 2026-05-19
+> Version 8.0 | Updated: 2026-05-20
 
 ## Quick Start
 
