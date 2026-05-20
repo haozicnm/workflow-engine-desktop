@@ -94,6 +94,17 @@ pub enum Commands {
         #[arg(short = 'v', long = "var", value_parser = parse_var)]
         vars: Vec<(String, String)>,
     },
+    /// 查看工作流执行预览
+    Preview {
+        /// run_id、"latest"（最近一次执行）、或 "list"（列出所有有预览的执行）
+        #[arg(default_value = "latest")]
+        run_or_action: String,
+        /// 指定 step_id 查看该步详情（不指定则列出所有步骤）
+        step_id: Option<String>,
+        /// 输出 JSON 格式
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -278,6 +289,7 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Action(sub) => cmd_action(sub),
         Commands::Show { file } => cmd_show(&file),
         Commands::RunFile { file, vars } => cmd_run_file(&app, &file, &vars).await,
+        Commands::Preview { run_or_action, step_id, json } => cmd_preview(&run_or_action, step_id.as_deref(), json),
     }
 }
 
@@ -1493,4 +1505,110 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
         }
     }
     Ok(())
+}
+
+fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result<(), String> {
+    use crate::engine::preview;
+
+    match run_or_action {
+        "list" => {
+            let runs = preview::list_preview_runs();
+            if runs.is_empty() {
+                if json {
+                    println!("{{\"runs\": []}}");
+                } else {
+                    println!("(无预览数据)");
+                }
+                return Ok(());
+            }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                    "runs": runs,
+                    "count": runs.len(),
+                })).unwrap());
+            } else {
+                println!("{:<40} {}", "Run ID", "步骤数");
+                println!("{}", "-".repeat(60));
+                for run_id in &runs {
+                    let steps = preview::read_trajectory(run_id).len();
+                    println!("{:<40} {} 步", run_id, steps);
+                }
+                println!("\n共 {} 次执行", runs.len());
+            }
+        }
+        "latest" => {
+            let mut runs = preview::list_preview_runs();
+            if runs.is_empty() {
+                eprintln!("没有找到预览数据。先运行一个工作流。");
+                return Ok(());
+            }
+            runs.sort();
+            let run_id = runs.last().unwrap();
+            print_preview(run_id, step_id, json)?;
+        }
+        run_id => {
+            print_preview(run_id, step_id, json)?;
+        }
+    }
+    Ok(())
+}
+
+fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), String> {
+    use crate::engine::preview;
+
+    let trajectory = preview::read_trajectory(run_id);
+    if trajectory.is_empty() {
+        eprintln!("运行 {} 没有预览数据", run_id);
+        return Ok(());
+    }
+
+    if let Some(sid) = step_id {
+        if let Some(preview) = trajectory.iter().find(|p| p.step_id == sid) {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&serde_json::json!(preview)).unwrap());
+            } else {
+                println!("步骤: {} ({})", preview.step_name, preview.step_id);
+                println!("类型: {}", preview.step_type);
+                println!("状态: {} ({}ms)", preview.status, preview.duration_ms);
+                println!("摘要: {}", preview.summary);
+                println!("详情: {}", serde_json::to_string_pretty(&preview.detail).unwrap());
+            }
+        } else {
+            eprintln!("步骤 {} 在运行 {} 中未找到", sid, run_id);
+        }
+    } else {
+        if json {
+            println!("{}", serde_json::to_string_pretty(&trajectory).unwrap());
+        } else {
+            println!("运行: {}", run_id);
+            println!("{:<4} {:<18} {:<12} {:<8} {}", "#", "步骤名称", "类型", "状态", "摘要");
+            println!("{}", "-".repeat(90));
+            for (i, p) in trajectory.iter().enumerate() {
+                let status_icon = match p.status.as_str() {
+                    "completed" => "✓",
+                    "failed" => "✗",
+                    "skipped" => "⏭",
+                    _ => "?",
+                };
+                println!(
+                    "{:<4} {:<18} {:<12} {:<8} {}",
+                    i + 1,
+                    truncate(&p.step_name, 18),
+                    truncate(&p.step_type, 12),
+                    format!("{} {}", status_icon, p.status),
+                    p.summary,
+                );
+            }
+            println!("\n共 {} 步", trajectory.len());
+        }
+    }
+    Ok(())
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max.saturating_sub(1)])
+    }
 }

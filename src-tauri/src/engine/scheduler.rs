@@ -4,9 +4,11 @@ use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::state::RunState;
 use crate::engine::approval_store::ApprovalStore;
+use crate::engine::preview;
 use crate::data::db::Database;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Instant;
 use anyhow::Result;
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
@@ -182,6 +184,9 @@ pub async fn run_workflow(
                 ctx.set_output(&current_id, serde_json::json!({"skipped": true, "reason": "condition"}));
                 emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "skipped", None);
                 emit_variable_snapshot(app_handle, run_id, &ctx);
+                // Preview: 记录跳过步骤
+                let skipped = preview::generate_skipped_preview(step, "runCondition 不满足");
+                preview::append_trajectory(run_id, &skipped);
                 // 跳转到下一步
                 current_id = match determine_next_step(step, workflow, &ctx) {
                     Some(next_id) => next_id,
@@ -197,7 +202,9 @@ pub async fn run_workflow(
         }
 
         // 执行步骤（带重试 + 超时）
+        let step_start = Instant::now();
         let result = execute_with_retry(&executor, step, &mut ctx).await;
+        let elapsed_ms = step_start.elapsed().as_millis() as u64;
 
         match result {
             Ok(output) => {
@@ -205,6 +212,10 @@ pub async fn run_workflow(
                 state.mark_step_completed(&current_id);
                 if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) { warn!("DB complete_step failed: {}", e); }
                 emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
+
+                // Preview: 生成步骤预览
+                let preview = preview::generate_step_preview(step, &output, elapsed_ms);
+                preview::append_trajectory(run_id, &preview);
 
                 // 更新调试快照
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
@@ -233,6 +244,10 @@ pub async fn run_workflow(
                 state.mark_step_failed(&current_id);
                 if let Err(e) = db.complete_step_run(run_id, &current_id, None, Some(&err_msg)) { warn!("DB complete_step failed: {}", e); }
                 emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
+
+                // Preview: 记录失败步骤
+                let failed = preview::generate_failed_preview(step, &err_msg, elapsed_ms);
+                preview::append_trajectory(run_id, &failed);
 
                 // 更新调试快照（含错误信息）
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
