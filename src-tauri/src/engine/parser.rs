@@ -1,15 +1,9 @@
-// engine/parser.rs — 工作流解析（v5 容器/动作格式 → 执行格式）
+// engine/parser.rs — 工作流解析（v8: 1:1 透传，砍掉中间转换层）
 //
-// 前端发送的新格式：
+// 前端 JSON 与后端 Step 严格一一对应：
 //   { type: "browser", actions: [{ id, type: "navigate", params: { url } }] }
 //
-// 后端执行器期望的格式：
-//   { type: "browser_container", config: { actions: [{ id, type, label, config }] } }
-//
-// 本解析器负责：
-//   1. 容器类型加 _container 后缀
-//   2. actions 从顶层移入 config.actions
-//   3. action.params → action.config
+// parser 只做验证和 body step 递归处理，不再做类型名/字段名转换。
 
 
 use crate::engine::workflow::{Step, Workflow};
@@ -133,76 +127,16 @@ trait StepParser {
 }
 
 /// 容器 Parser: browser, excel, word, logic, file
+/// v8: 不再加 _container 后缀，不再搬运 actions——JSON 与 Step 1:1 对应
 struct ContainerParser;
 impl StepParser for ContainerParser {
     fn can_parse(step_type: &str) -> bool {
         CONTAINER_TYPES.contains(&step_type)
     }
 
-    fn parse(step: &Step, is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
-        let container_type = format!("{}_container", step.step_type);
-        let config = if is_recursive {
-            Self::parse_recursive(step)
-        } else {
-            Self::parse_toplevel(step)
-        };
-        Ok((container_type, config, None))
-    }
-}
-
-impl ContainerParser {
-    fn parse_recursive(step: &Step) -> Value {
-        let mut config = step.config.clone();
-        if step.step_type == "logic" {
-            if let Some(cg_json) = step.config.get("conditionGroup") {
-                if let Value::Object(ref mut map) = config {
-                    map.entry("condition_group".to_string())
-                        .or_insert_with(|| cg_json.clone());
-                }
-            }
-        }
-        config
-    }
-
-    fn parse_toplevel(step: &Step) -> Value {
-        let mut config = if step.config.is_object() {
-            step.config.clone()
-        } else {
-            serde_json::json!({})
-        };
-
-        if let Value::Object(ref mut map) = config {
-            if let Some(existing) = map.get("actions").and_then(|v| v.as_array()) {
-                // Ensure all actions have label fields (convert_action adds defaults)
-                let converted: Vec<Value> = existing.iter().map(|a| convert_action(a)).collect();
-                map.insert("actions".to_string(), Value::Array(converted));
-            } else {
-                let actions = step.actions.clone().unwrap_or_default();
-                let converted_actions: Vec<Value> = actions.iter().map(convert_action).collect();
-                map.insert("actions".to_string(), Value::Array(converted_actions));
-            }
-        }
-
-        if step.step_type == "logic" {
-            if let Some(cg_json) = step.config.get("conditionGroup") {
-                if let Value::Object(ref mut map) = config {
-                    map.entry("condition_group".to_string())
-                        .or_insert_with(|| cg_json.clone());
-                }
-            }
-            if let Some(ref cond) = step.condition {
-                if let Value::Object(ref mut map) = config {
-                    map.insert("condition".to_string(), Value::String(cond.clone()));
-                }
-            }
-            if let Some(ref cg) = step.condition_group {
-                if let Value::Object(ref mut map) = config {
-                    map.insert("condition_group".to_string(), serde_json::to_value(cg).unwrap_or_default());
-                }
-            }
-        }
-
-        config
+    fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
+        // v8: 类型名透传，不加 _container
+        Ok((step.step_type.clone(), step.config.clone(), None))
     }
 }
 
@@ -281,7 +215,7 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
         breakpoint: step.breakpoint,
         delay: step.delay,
         on_error: step.on_error.clone(),
-        actions: None, // 已移入 config 或 body_steps
+        actions: step.actions.clone(), // v8: 保持原位，不再移到 config
         expanded: None,
         condition: step.condition.clone(),
         condition_group: step.condition_group.clone().or_else(|| {
@@ -317,41 +251,57 @@ fn convert_action_to_step(action: &Value) -> Result<Step> {
         .unwrap_or(&step_type)
         .to_string();
 
-    // params → config（与 convert_action 一致）
-    let config = map.get("params")
+    // params → config
+    let mut config = map.get("params")
         .cloned()
         .or_else(|| map.get("config").cloned())
         .unwrap_or(serde_json::json!({}));
+
+    // v8: 提取容器类型的 actions — 从 params.actions 中提取并放在 Step.actions
+    let actions = if CONTAINER_TYPES.contains(&step_type.as_str()) {
+        config.as_object()
+            .and_then(|c| c.get("actions"))
+            .and_then(|v| v.as_array())
+            .map(|a| a.clone())
+    } else {
+        None
+    };
+    // 从 config 中移除 actions（避免重复，归一化时 executor 会重新注入）
+    if let Some(obj) = config.as_object_mut() {
+        obj.remove("actions");
+    }
 
     Ok(Step {
         id,
         name,
         step_type,
         config,
+        actions,
         ..Default::default()
     })
 }
 
-/// 转换单个 action：params → config，补 label
-fn convert_action(action: &Value) -> Value {
-    let mut a = action.clone();
-
-    // params → config
-    if let Value::Object(ref mut map) = a {
-        if let Some(params) = map.remove("params") {
-            map.insert("config".to_string(), params);
+/// 归一化 action：params → config，补 label
+/// v8: 从 parser 私有 fn 提升为 pub，供 executor 在容器节点前调用
+pub fn normalize_actions(actions: &[Value]) -> Vec<Value> {
+    actions.iter().map(|action| {
+        let mut a = action.clone();
+        if let Value::Object(ref mut map) = a {
+            if let Some(params) = map.remove("params") {
+                map.insert("config".to_string(), params);
+            }
+            // 补 label
+            if !map.contains_key("label") {
+                let action_type = map.get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                map.insert("label".to_string(), Value::String(action_type.to_string()));
+            }
         }
-        // 补 label（如果没有）
-        if !map.contains_key("label") {
-            let action_type = map.get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            map.insert("label".to_string(), Value::String(action_type.to_string()));
-        }
-    }
-
-    a
+        a
+    }).collect()
 }
+
 
 /// 递归收集所有步骤（包括子步骤）
 fn flatten_all_steps(steps: &[Step]) -> Vec<&Step> {
@@ -539,8 +489,12 @@ mod tests {
         assert_eq!(loop_step.step_type, "loop");
         let body = loop_step.body_steps.as_ref().unwrap();
         assert_eq!(body.len(), 1);
-        assert_eq!(body[0].step_type, "browser_container");
-        assert!(body[0].config.get("actions").is_some());
+        assert_eq!(body[0].step_type, "browser");
+        // v8: actions 从 params 提取到 step.actions
+        // 该测试的 actions: [] 为空数组，但 container 类型会保留空 actions
+        let has_actions = body[0].actions.as_ref().map(|a| !a.is_empty()).unwrap_or(false);
+        // body step 容器类型需要 actions（执行时由 executor 归一化补充）
+        assert!(body[0].actions.is_some(), "container body step should have actions field");
     }
 
     #[test]
@@ -613,7 +567,7 @@ steps:
     }
 
     #[test]
-    fn container_type_suffix_added() {
+    fn container_type_passthrough() {
         let json = r#"{
             "name": "test",
             "steps": [{
@@ -625,10 +579,11 @@ steps:
             }]
         }"#;
         let wf = parse_workflow(json).unwrap();
-        assert_eq!(wf.steps[0].step_type, "browser_container");
-        let config = &wf.steps[0].config;
-        assert!(config.get("actions").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0) > 0,
-            "config.actions should contain converted actions");
+        // v8: 类型名透传，不再加 _container 后缀
+        assert_eq!(wf.steps[0].step_type, "browser");
+        // v8: actions 保持在 step.actions，不再移到 config
+        let actions = wf.steps[0].actions.as_ref().unwrap();
+        assert!(actions.len() > 0, "step.actions should be preserved");
     }
 
     #[test]
@@ -648,9 +603,10 @@ steps:
             }]
         }"#;
         let wf = parse_workflow(json).unwrap();
-        assert_eq!(wf.steps[0].step_type, "logic_container");
-        let config = &wf.steps[0].config;
-        assert!(config.get("condition_group").is_some(), "condition_group should be in config");
+        // v8: 类型名透传
+        assert_eq!(wf.steps[0].step_type, "logic");
+        // v8: condition_group 由 convert_step 提升到 step 级别
+        assert!(wf.steps[0].condition_group.is_some(), "condition_group should be on step");
     }
 
     #[test]

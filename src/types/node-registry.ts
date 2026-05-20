@@ -276,7 +276,7 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   ]},
 ]
 
-// Excel 动作（与后端 excel_container.rs 对齐）
+// Excel 动作（与后端 excel.rs / excel_container.rs 对齐）
 export const EXCEL_ACTIONS: ActionDef[] = [
   { type: 'read', label: '读取整表', icon: 'BookOpen', params: [] },
   { type: 'write', label: '写入数据', icon: 'Pencil', params: [

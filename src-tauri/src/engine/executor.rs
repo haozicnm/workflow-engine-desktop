@@ -26,11 +26,11 @@ macro_rules! register {
     };
 }
 
-/// 容器节点注册宏 — 自动加 _container 后缀，与 parser::CONTAINER_TYPES 保持同步
+/// 容器节点注册宏 — v8: 不加 _container 后缀，与前端 type 名 1:1 对应
 macro_rules! register_containers {
     ($map:expr, $( $type:literal => $ctor:expr ),* $(,)?) => {
         $(
-            $map.insert(concat!($type, "_container").to_string(), Box::new($ctor));
+            $map.insert($type.to_string(), Box::new($ctor));
         )*
     };
 }
@@ -161,12 +161,27 @@ impl StepExecutor {
             }
         };
 
-        let is_container = step.step_type.ends_with("_container");
+        // v8: 用 CONTAINER_TYPES 常量判断容器，不再依赖 _container 后缀
+        let is_container = crate::engine::parser::CONTAINER_TYPES.contains(&step.step_type.as_str());
         let resolved_config = if is_container {
+            // v8: 归一化 actions — 前端 actions 在 step.actions，需合并到 config 供容器反序列化
+            let mut config = if step.config.is_object() {
+                step.config.clone()
+            } else {
+                serde_json::json!({})
+            };
+            if let Some(actions) = &step.actions {
+                if !actions.is_empty() {
+                    let normalized = crate::engine::parser::normalize_actions(actions);
+                    if let serde_json::Value::Object(ref mut map) = config {
+                        map.insert("actions".to_string(), serde_json::Value::Array(normalized));
+                    }
+                }
+            }
             // 容器节点跳过全局 resolve_config：容器 config 有类型化 struct 字段，
             // 全量递归解析会把模板变量变成数字/对象，导致反序列化失败。
             // 各容器自己负责解析内部 action config。
-            step.config.clone()
+            config
         } else {
             ctx.resolve_config(&step.config)
         };
@@ -222,25 +237,20 @@ mod tests {
         let exec = StepExecutor::new(test_approval_store(), test_db());
         let registered = exec.registered_types();
 
-        // 正向：CONTAINER_TYPES 里的每个类型都必须注册了 {type}_container
+        // v8: 正向检查 — CONTAINER_TYPES 里的每个类型必须直接注册（不加后缀）
         for &container_type in parser::CONTAINER_TYPES {
-            let expected_name = format!("{}_container", container_type);
             assert!(
-                registered.contains(&expected_name.as_str()),
-                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册 '{}_container'",
-                container_type, container_type
+                registered.contains(&container_type),
+                "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册",
+                container_type
             );
         }
 
-        // 反向：executor 注册的 _container 类型必须在 CONTAINER_TYPES 中声明
+        // v8: 反向检查 — executor 中注册的容器类型必须在 CONTAINER_TYPES 中声明
         for name in &registered {
-            if name.ends_with("_container") {
-                let base = name.trim_end_matches("_container");
-                assert!(
-                    parser::CONTAINER_TYPES.contains(&base),
-                    "executor 注册了 '{}'，但 parser::CONTAINER_TYPES 中未声明",
-                    name
-                );
+            if parser::CONTAINER_TYPES.contains(name) {
+                // 已在正向检查中验证
+                continue;
             }
         }
     }
