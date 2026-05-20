@@ -1,0 +1,20 @@
+{
+  "$schema": "https://hermes-agent.nousresearch.com/schemas/mcp-external.json",
+  "mappings": [
+    {
+      "type": "mcp_samba_share",
+      "script": "mcp_samba_server.py",
+      "tool": "samba_share"
+    },
+    {
+      "type": "mcp_backup",
+      "script": "mcp_backup_server.py", 
+      "tool": "backup_run"
+    },
+    {
+      "type": "mcp_monitor",
+      "script": "mcp_monitor_server.py",
+      "tool": "system_monitor"
+    }
+  ]
+}

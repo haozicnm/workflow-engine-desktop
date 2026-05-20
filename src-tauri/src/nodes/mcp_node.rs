@@ -1,5 +1,6 @@
 // nodes/mcp_node.rs — MCP Node Executor (transient mode)
 // Spawns Python MCP server per step, JSON-RPC over stdio.
+// Supports external plugins via ~/.hermes/mcp-external.json
 
 use async_trait::async_trait;
 use crate::engine::context::ExecutionContext;
@@ -7,11 +8,25 @@ use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::Step;
 use crate::nodes::traits::NodeExecutor;
 use anyhow::{Context as _, Result};
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+
+#[derive(Debug, Clone, Deserialize)]
+struct ExternalMapping {
+    #[serde(rename = "type")]
+    node_type: String,
+    script: String,
+    tool: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ExternalConfig {
+    mappings: Vec<ExternalMapping>,
+}
 
 struct McpMapping { server_script: &'static str, tool_name: &'static str }
 
@@ -38,6 +53,49 @@ fn mcp_mappings() -> HashMap<String, McpMapping> {
     m.insert("mcp_web_scrape".into(), McpMapping { server_script: "mcp_web_scrape_server.py", tool_name: "web_scrape" });
     m.insert("mcp_shell".into(), McpMapping { server_script: "mcp_shell_server.py", tool_name: "shell_exec" });
     m
+}
+
+/// 从 ~/.hermes/mcp-external.json 加载外挂 MCP 映射
+fn load_external_mappings() -> Vec<(String, ExternalMapping)> {
+    let path = dirs_next().join("mcp-external.json");
+    if !path.exists() {
+        return Vec::new();
+    }
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            match serde_json::from_str::<ExternalConfig>(&content) {
+                Ok(cfg) => cfg.mappings.into_iter().map(|m| (m.node_type.clone(), m)).collect(),
+                Err(e) => {
+                    tracing::warn!("MCP external config parse error in {}: {}", path.display(), e);
+                    Vec::new()
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("MCP external config read error: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// 返回所有已知 MCP 类型（内置 + 外挂）
+pub fn get_all_mcp_types() -> Vec<String> {
+    let mut types: Vec<String> = mcp_mappings().keys().cloned().collect();
+    for (t, _) in load_external_mappings() {
+        if !types.contains(&t) {
+            types.push(t);
+        }
+    }
+    types
+}
+
+fn dirs_next() -> std::path::PathBuf {
+    if let Ok(d) = std::env::var("HERMES_HOME") {
+        return std::path::PathBuf::from(d);
+    }
+    dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".hermes")
 }
 
 fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
@@ -105,5 +163,18 @@ impl NodeExecutor for McpNode {
 }
 
 pub fn create_mcp_executor(step_type: &str) -> Option<Box<dyn NodeExecutor>> {
-    mcp_mappings().get(step_type).map(|m| Box::new(McpNode::new(m.server_script, m.tool_name)) as Box<dyn NodeExecutor>)
+    // 先查内置映射
+    if let Some(m) = mcp_mappings().get(step_type) {
+        return Some(Box::new(McpNode::new(m.server_script, m.tool_name)) as Box<dyn NodeExecutor>);
+    }
+    // 再查外挂映射
+    for (t, ext) in load_external_mappings() {
+        if t == step_type {
+            // 外挂脚本支持相对路径（相对于 sidecars/）和绝对路径
+            return Some(Box::new(McpNode::new(
+                &ext.script, &ext.tool
+            )) as Box<dyn NodeExecutor>);
+        }
+    }
+    None
 }

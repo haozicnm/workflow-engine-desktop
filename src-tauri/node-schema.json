@@ -64,7 +64,22 @@
     { "type": "excel",              "label": "Excel 容器",      "category": "office",   "icon": "container",   "is_container": true,  "desc": "在一个 Excel 文件内按顺序执行多个操作" },
     { "type": "word",               "label": "Word 容器",       "category": "office",   "icon": "container",   "is_container": true,  "desc": "在一个 Word 文件内按顺序执行多个操作" },
     { "type": "logic",              "label": "逻辑判断",        "category": "flow",     "icon": "git-branch",  "is_container": true,  "desc": "逻辑判断容器，输出 true/false 分支" },
-    { "type": "file",               "label": "文件容器",        "category": "file",     "icon": "container",   "is_container": true,  "desc": "在一个目录内按顺序执行多个文件操作" }
+    { "type": "file",               "label": "文件容器",        "category": "file",     "icon": "container",   "is_container": true,  "desc": "在一个目录内按顺序执行多个文件操作" },
+    { "type": "mcp_script",         "label": "MCP 脚本",       "category": "mcp",      "icon": "code",        "is_container": false, "desc": "通过 MCP 执行 Python 脚本" },
+    { "type": "mcp_shell",          "label": "MCP Shell",      "category": "mcp",      "icon": "terminal",    "is_container": false, "desc": "通过 MCP 执行 Shell 命令" },
+    { "type": "mcp_excel_read",     "label": "MCP 读Excel",    "category": "mcp",      "icon": "file-spreadsheet","is_container": false,"desc": "通过 MCP 读取 Excel 文件" },
+    { "type": "mcp_excel_write",    "label": "MCP 写Excel",    "category": "mcp",      "icon": "file-spreadsheet","is_container": false,"desc": "通过 MCP 写入 Excel 文件" },
+    { "type": "mcp_excel_create",   "label": "MCP 创建Excel",  "category": "mcp",      "icon": "file-spreadsheet","is_container": false,"desc": "通过 MCP 创建 Excel 文件" },
+    { "type": "mcp_excel_filter",   "label": "MCP 过滤Excel",  "category": "mcp",      "icon": "filter",      "is_container": false, "desc": "通过 MCP 过滤 Excel 数据" },
+    { "type": "mcp_excel_sort",     "label": "MCP 排序Excel",  "category": "mcp",      "icon": "arrow-up-down","is_container": false,"desc": "通过 MCP 排序 Excel 数据" },
+    { "type": "mcp_excel_append",   "label": "MCP 追加Excel",  "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 追加 Excel 数据" },
+    { "type": "mcp_excel_csv",      "label": "MCP Excel转CSV", "category": "mcp",      "icon": "file-text",   "is_container": false, "desc": "通过 MCP 将 Excel 转为 CSV" },
+    { "type": "mcp_word_read",      "label": "MCP 读Word",     "category": "mcp",      "icon": "file-text",   "is_container": false, "desc": "通过 MCP 读取 Word 文档" },
+    { "type": "mcp_word_write",     "label": "MCP 写Word",     "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 写入 Word 文档" },
+    { "type": "mcp_word_create",    "label": "MCP 创建Word",   "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 创建 Word 文档" },
+    { "type": "mcp_word_replace",   "label": "MCP 替换Word",   "category": "mcp",      "icon": "replace",     "is_container": false, "desc": "通过 MCP 替换 Word 文本" },
+    { "type": "mcp_word_merge",     "label": "MCP 合并Word",   "category": "mcp",      "icon": "git-merge",   "is_container": false, "desc": "通过 MCP 合并 Word 文档" },
+    { "type": "mcp_web_scrape",     "label": "MCP 网页抓取",   "category": "mcp",      "icon": "globe",       "is_container": false, "desc": "通过 MCP 提取网页内容" }
   ],
   "categories": {
     "core":    { "label": "核心",     "order": 1 },
@@ -76,7 +91,8 @@
     "browser": { "label": "浏览器",   "order": 7 },
     "office":  { "label": "办公",     "order": 8 },
     "desktop": { "label": "桌面",     "order": 9 },
-    "ai":      { "label": "AI",       "order": 10 }
+    "ai":      { "label": "AI",       "order": 10 },
+    "mcp":     { "label": "MCP 扩展", "order": 11 }
   },
   "container_types": ["browser", "excel", "word", "logic", "file", "clipboard", "cursor", "loop", "while"]
 }
