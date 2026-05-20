@@ -1572,6 +1572,17 @@ fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), 
                 println!("状态: {} ({}ms)", preview.status, preview.duration_ms);
                 println!("摘要: {}", preview.summary);
                 println!("详情: {}", serde_json::to_string_pretty(&preview.detail).unwrap());
+                if let Some(ref bundle_path) = preview.bundle_path {
+                    println!("\nBundle: {}", bundle_path);
+                    if let Ok(entries) = std::fs::read_dir(bundle_path) {
+                        println!("  文件:");
+                        for entry in entries.flatten() {
+                            let name = entry.file_name().to_string_lossy().to_string();
+                            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                            println!("    {} ({}B)", name, size);
+                        }
+                    }
+                }
             }
         } else {
             eprintln!("步骤 {} 在运行 {} 中未找到", sid, run_id);

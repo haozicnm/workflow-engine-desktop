@@ -137,14 +137,6 @@ fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
     anyhow::bail!("MCP server not found: {}", script)
 }
 
-fn find_python() -> String {
-    for c in &["python", "python3"] {
-        if Command::new(c).arg("--version").stdout(Stdio::null()).stderr(Stdio::null())
-            .status().map(|s| s.success()).unwrap_or(false) { return c.to_string(); }
-    }
-    "python".into()
-}
-
 fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
     let path = resolve_path(script)?;
     let init = serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}});

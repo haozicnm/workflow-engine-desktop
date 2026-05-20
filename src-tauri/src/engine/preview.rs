@@ -28,6 +28,9 @@ pub struct StepPreview {
     pub summary: String,
     /// Structured detail (varies by step type).
     pub detail: Value,
+    /// Path to immutable bundle snapshot directory (None if no bundle generated).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundle_path: Option<String>,
 }
 
 /// Generate a preview from a completed step's output.
@@ -42,6 +45,7 @@ pub fn generate_step_preview(step: &Step, output: &Value, duration_ms: u64) -> S
         duration_ms,
         summary,
         detail,
+        bundle_path: None,
     }
 }
 
@@ -55,6 +59,7 @@ pub fn generate_failed_preview(step: &Step, error: &str, duration_ms: u64) -> St
         duration_ms,
         summary: format!("✗ 失败: {}", truncate_str(error, 80)),
         detail: serde_json::json!({"error": error}),
+        bundle_path: None,
     }
 }
 
@@ -68,6 +73,7 @@ pub fn generate_skipped_preview(step: &Step, reason: &str) -> StepPreview {
         duration_ms: 0,
         summary: format!("⏭ 跳过: {}", reason),
         detail: serde_json::json!({"reason": reason}),
+        bundle_path: None,
     }
 }
 
@@ -412,6 +418,181 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", &s[..max_len])
+    }
+}
+
+// ── Bundle snapshot generation ──
+
+/// Generate an immutable bundle snapshot for a step's output.
+/// Returns the path to the bundle directory, or None if bundle not applicable.
+pub fn bundle_step_output(run_id: &str, step: &Step, output: &Value) -> Option<PathBuf> {
+    let bundle_dir = preview_dir(run_id).join("bundles").join(&step.id);
+    if let Err(e) = fs::create_dir_all(&bundle_dir) {
+        warn!("无法创建 bundle 目录 {:?}: {}", bundle_dir, e);
+        return None;
+    }
+
+    let ok = match step.step_type.as_str() {
+        "http" => bundle_http(&bundle_dir, step, output),
+        "shell" => bundle_shell(&bundle_dir, output),
+        "script" => bundle_script(&bundle_dir, output),
+        "json_parse" => bundle_json(&bundle_dir, output),
+        "text_template" => bundle_text(&bundle_dir, output),
+        "notify" => bundle_json(&bundle_dir, output),
+        t if t.contains("browser") => bundle_browser(&bundle_dir, output),
+        t if t.contains("file") => bundle_file(&bundle_dir, step, output),
+        t if t.contains("excel") => bundle_json(&bundle_dir, output),
+        t if t.contains("word") => bundle_json(&bundle_dir, output),
+        _ => bundle_generic(&bundle_dir, output),
+    };
+
+    if ok { Some(bundle_dir) } else { None }
+}
+
+fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
+    let status = output.get("status").and_then(|v| v.as_u64()).unwrap_or(0);
+    let body = output.get("body").and_then(|v| v.as_str()).unwrap_or("");
+    let headers = output.get("headers");
+
+    let response_json = serde_json::json!({
+        "status_code": status,
+        "headers": headers,
+        "body_preview": truncate_str(body, 500),
+    });
+
+    let mut ok = true;
+    if let Err(e) = fs::write(dir.join("response.json"), serde_json::to_string_pretty(&response_json).unwrap_or_default()) {
+        warn!("bundle http response.json: {}", e);
+        ok = false;
+    }
+    if !body.is_empty() {
+        if let Err(e) = fs::write(dir.join("body.txt"), body) {
+            warn!("bundle http body.txt: {}", e);
+            ok = false;
+        }
+    }
+    ok
+}
+
+fn bundle_shell(dir: &PathBuf, output: &Value) -> bool {
+    let stdout = output.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
+    let stderr = output.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
+    let exit_code = output.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+
+    let mut ok = true;
+    if let Err(e) = fs::write(dir.join("stdout.txt"), stdout) {
+        warn!("bundle shell stdout: {}", e);
+        ok = false;
+    }
+    if !stderr.is_empty() {
+        if let Err(e) = fs::write(dir.join("stderr.txt"), stderr) {
+            warn!("bundle shell stderr: {}", e);
+            ok = false;
+        }
+    }
+    if let Err(e) = fs::write(dir.join("exit_code.txt"), exit_code.to_string()) {
+        warn!("bundle shell exit_code: {}", e);
+        ok = false;
+    }
+    ok
+}
+
+fn bundle_script(dir: &PathBuf, output: &Value) -> bool {
+    match serde_json::to_string_pretty(output) {
+        Ok(json) => {
+            if let Err(e) = fs::write(dir.join("result.json"), json) {
+                warn!("bundle script result.json: {}", e);
+                false
+            } else {
+                true
+            }
+        }
+        Err(e) => {
+            warn!("bundle script serialize: {}", e);
+            false
+        }
+    }
+}
+
+fn bundle_json(dir: &PathBuf, output: &Value) -> bool {
+    bundle_script(dir, output) // same behavior: write output as pretty JSON
+}
+
+fn bundle_text(dir: &PathBuf, output: &Value) -> bool {
+    let text = output.get("result").and_then(|v| v.as_str()).unwrap_or("");
+    if let Err(e) = fs::write(dir.join("output.txt"), text) {
+        warn!("bundle text output.txt: {}", e);
+        false
+    } else {
+        true
+    }
+}
+
+fn bundle_browser(dir: &PathBuf, output: &Value) -> bool {
+    let mut ok = true;
+    // Save screenshot if present
+    if let Some(screenshot_path) = output.get("screenshot_path").and_then(|v| v.as_str()) {
+        let src = std::path::Path::new(screenshot_path);
+        if src.exists() {
+            let dst = dir.join("screenshot.png");
+            if let Err(e) = fs::copy(src, &dst) {
+                warn!("bundle browser screenshot copy: {}", e);
+                // Non-fatal: screenshot may not exist in headless env
+            }
+        }
+    }
+    // Save extraction results
+    if let Some(extracted) = output.get("extracted") {
+        if let Ok(json) = serde_json::to_string_pretty(extracted) {
+            if let Err(e) = fs::write(dir.join("extracted.json"), json) {
+                warn!("bundle browser extracted.json: {}", e);
+                ok = false;
+            }
+        }
+    }
+    // Save page metadata
+    let meta = serde_json::json!({
+        "url": output.get("url").and_then(|v| v.as_str()).unwrap_or(""),
+        "title": output.get("title").and_then(|v| v.as_str()).unwrap_or(""),
+    });
+    if let Err(e) = fs::write(dir.join("meta.json"), serde_json::to_string_pretty(&meta).unwrap_or_default()) {
+        warn!("bundle browser meta.json: {}", e);
+        ok = false;
+    }
+    ok
+}
+
+fn bundle_file(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
+    match serde_json::to_string_pretty(output) {
+        Ok(json) => {
+            if let Err(e) = fs::write(dir.join("file_list.json"), json) {
+                warn!("bundle file file_list.json: {}", e);
+                false
+            } else {
+                true
+            }
+        }
+        Err(e) => {
+            warn!("bundle file serialize: {}", e);
+            false
+        }
+    }
+}
+
+fn bundle_generic(dir: &PathBuf, output: &Value) -> bool {
+    match serde_json::to_string_pretty(output) {
+        Ok(json) => {
+            if let Err(e) = fs::write(dir.join("output.json"), json) {
+                warn!("bundle generic output.json: {}", e);
+                false
+            } else {
+                true
+            }
+        }
+        Err(e) => {
+            warn!("bundle generic serialize: {}", e);
+            false
+        }
     }
 }
 

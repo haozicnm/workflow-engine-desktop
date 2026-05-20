@@ -92,7 +92,6 @@ impl StepExecutor {
             "logic"   => crate::nodes::condition::ConditionNode,
             "file"    => crate::nodes::file_container::FileContainerNode,
         );
-        register!(executors, "condition", crate::nodes::condition::ConditionNode);
 
         // ── 其他节点 ──
         register!(executors, "notify", crate::nodes::notify::NotifyNode);

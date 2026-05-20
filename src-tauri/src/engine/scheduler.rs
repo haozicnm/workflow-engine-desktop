@@ -213,8 +213,11 @@ pub async fn run_workflow(
                 if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) { warn!("DB complete_step failed: {}", e); }
                 emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
 
-                // Preview: 生成步骤预览
-                let preview = preview::generate_step_preview(step, &output, elapsed_ms);
+                // Preview: 生成步骤预览 + bundle 快照
+                let mut preview = preview::generate_step_preview(step, &output, elapsed_ms);
+                if let Some(bundle_path) = preview::bundle_step_output(run_id, step, &output) {
+                    preview.bundle_path = Some(bundle_path.to_string_lossy().to_string());
+                }
                 preview::append_trajectory(run_id, &preview);
 
                 // 更新调试快照
