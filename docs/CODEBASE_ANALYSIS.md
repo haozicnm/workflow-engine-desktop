@@ -81,7 +81,7 @@ Editor.vue 点击「运行」  → useStepRunner → safeInvoke('run_start', { w
 | `commands/browser_recording.rs` | 浏览器录制命令 |
 | `commands/system.rs` | 系统设置命令 |
 | `commands/template.rs` | 模板管理命令 |
-| `engine/parser.rs` | 前端 JSON → 后端 Step 转换（容器加 _container 后缀，actions 移入 config） |
+| `engine/parser.rs` | 前端 JSON → 后端 Step 转换（容器类型名透传（v8），actions 移入 config） |
 | `engine/scheduler.rs` | 顺序调度器（loop 执行步骤，支持断点/暂停/取消/错误策略） |
 | `engine/executor.rs` | 步骤执行器（60+ 节点注册表，resolve_config 变量替换后分发到 NodeExecutor） |
 | `engine/context.rs` | 执行上下文（variables + step_outputs + resolve_var 三层查找） |
@@ -144,7 +144,7 @@ Editor.vue 点击「运行」  → useStepRunner → safeInvoke('run_start', { w
 
 后端 Step:
 {
-  "step_type": "browser_container",    ← 加 _container 后缀
+  "step_type": "browser_container",    ← 类型名透传（v8）
   "name": "浏览器操作",                 ← label → name
   "config": {
     "actions": [                        ← actions 移入 config

@@ -127,7 +127,7 @@ export const ACTION_METADATA: Record<string, ActionMeta> = {
 **现状问题**：
 - `parser.rs` 的 `convert_step()` 用大量 if/else 判断类型：
   ```
-  if is_container → 加 _container 后缀
+  if is_container → 类型名透传（v8）
   if is_iteration → 处理 body_steps
   if is_recursive → 跳过 actions 迁移
   if logic → conditionGroup 转换
