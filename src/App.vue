@@ -7,6 +7,7 @@ import Editor from './pages/Editor.vue'
 import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
 import RunHistory from './pages/RunHistory.vue'
+import Plugins from './pages/Plugins.vue'
 import ActionIcon from './components/ActionIcon.vue'
 import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -34,7 +35,7 @@ onUnmounted(() => {
   ops.unsubscribe()
 })
 
-type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template'
+type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template' | 'plugins'
 
 const currentView = ref<MainView>('welcome')
 const selectedWorkflowId = ref<string | null>(null)
@@ -83,6 +84,10 @@ function onOpenSettings() {
 
 function onOpenHistory() {
   currentView.value = 'history'
+}
+
+function onOpenPlugins() {
+  currentView.value = 'plugins'
 }
 
 function onBackToMain() {
@@ -159,6 +164,7 @@ function statusColor(status: string): string {
               @open-workflow="onOpenWorkflow"
               @open-settings="onOpenSettings"
               @open-history="onOpenHistory"
+              @open-plugins="onOpenPlugins"
               @workflow-created="onWorkflowCreated"
             />
           </Sidebar>
@@ -188,10 +194,10 @@ function statusColor(status: string): string {
               </div>
             </div>
 
-            <!-- Backdrop overlay for panels -->
+            <!-- Background overlay -->
             <Transition name="fade">
               <div
-                v-if="currentView === 'settings' || currentView === 'history'"
+                v-if="currentView === 'settings' || currentView === 'history' || currentView === 'plugins'"
                 class="fixed inset-0 bg-black/20 z-40"
                 @click="onBackToMain"
               />
@@ -214,6 +220,16 @@ function statusColor(status: string): string {
                 class="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
               >
                 <RunHistory @back="onBackToMain" />
+              </div>
+            </Transition>
+
+            <!-- Plugins panel overlay -->
+            <Transition name="slide-right">
+              <div
+                v-if="currentView === 'plugins'"
+                class="fixed top-0 right-0 bottom-0 w-[520px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+              >
+                <Plugins @back="onBackToMain" />
               </div>
             </Transition>
 

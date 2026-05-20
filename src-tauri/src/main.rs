@@ -143,6 +143,11 @@ fn main() {
             workflow_engine::commands::preview::preview_word,
             // Workflow lock/unlock
             workflow_engine::commands::workflow::workflow_lock,
+            // Plugin system
+            workflow_engine::commands::plugin::plugin_pick_file,
+            workflow_engine::commands::plugin::plugin_install,
+            workflow_engine::commands::plugin::plugin_uninstall,
+            workflow_engine::commands::plugin::plugin_list,
             // IPC health
             workflow_engine::commands::system::check_ipc,
         ])

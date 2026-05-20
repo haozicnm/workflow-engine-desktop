@@ -11,4 +11,5 @@ pub mod approval_store;
 pub mod common;
 pub mod validate;
 pub mod action_def;
+pub mod plugin_manager;
 

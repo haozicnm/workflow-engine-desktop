@@ -1,10 +1,11 @@
 // nodes/mcp_node.rs — MCP Node Executor (transient mode)
 // Spawns Python MCP server per step, JSON-RPC over stdio.
-// Supports external plugins via ~/.hermes/mcp-external.json
+// Supports external plugins via plugin system (plugins/<name>/sidecars/)
 
 use async_trait::async_trait;
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
+use crate::engine::plugin_manager;
 use crate::engine::workflow::Step;
 use crate::nodes::traits::NodeExecutor;
 use anyhow::{Context as _, Result};
@@ -55,25 +56,35 @@ fn mcp_mappings() -> HashMap<String, McpMapping> {
     m
 }
 
-/// 从 ~/.hermes/mcp-external.json 加载外挂 MCP 映射
+/// 从 ~/.config/workflow-engine/mcp-external.json 加载外挂 MCP 映射
+/// 兼容旧路径 ~/.hermes/mcp-external.json
 fn load_external_mappings() -> Vec<(String, ExternalMapping)> {
-    let path = dirs_next().join("mcp-external.json");
-    if !path.exists() {
-        return Vec::new();
-    }
-    match std::fs::read_to_string(&path) {
+    // 优先新路径
+    let path = plugin_manager::mcp_external_path();
+    if let Some(result) = try_load(&path) { return result; }
+
+    // 回退旧路径
+    let legacy = plugin_manager::legacy_hermes_dir().join("mcp-external.json");
+    if let Some(result) = try_load(&legacy) { return result; }
+
+    Vec::new()
+}
+
+fn try_load(path: &std::path::Path) -> Option<Vec<(String, ExternalMapping)>> {
+    if !path.exists() { return None; }
+    match std::fs::read_to_string(path) {
         Ok(content) => {
             match serde_json::from_str::<ExternalConfig>(&content) {
-                Ok(cfg) => cfg.mappings.into_iter().map(|m| (m.node_type.clone(), m)).collect(),
+                Ok(cfg) => Some(cfg.mappings.into_iter().map(|m| (m.node_type.clone(), m)).collect()),
                 Err(e) => {
                     tracing::warn!("MCP external config parse error in {}: {}", path.display(), e);
-                    Vec::new()
+                    None
                 }
             }
         }
         Err(e) => {
             tracing::warn!("MCP external config read error: {}", e);
-            Vec::new()
+            None
         }
     }
 }
@@ -89,26 +100,38 @@ pub fn get_all_mcp_types() -> Vec<String> {
     types
 }
 
-fn dirs_next() -> std::path::PathBuf {
-    if let Ok(d) = std::env::var("HERMES_HOME") {
-        return std::path::PathBuf::from(d);
+fn find_python() -> String {
+    for c in &["python", "python3"] {
+        if Command::new(c).arg("--version").stdout(Stdio::null()).stderr(Stdio::null())
+            .status().map(|s| s.success()).unwrap_or(false) { return c.to_string(); }
     }
-    dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".hermes")
+    "python".into()
 }
 
 fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
+    // 1. 环境变量
     if let Ok(d) = std::env::var("MCP_SERVERS_DIR") {
         let p = std::path::PathBuf::from(&d).join(script);
         if p.exists() { return Ok(p); }
     }
+    // 2. 可执行文件同级 sidecars/
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join("sidecars").join(script);
             if p.exists() { return Ok(p); }
         }
     }
+    // 3. 已安装插件的 sidecars/
+    let plugins_dir = plugin_manager::plugins_dir();
+    if plugins_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path().join("sidecars").join(script);
+                if p.exists() { return Ok(p); }
+            }
+        }
+    }
+    // 4. 开发模式（CARGO_MANIFEST_DIR）
     let dev = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sidecars").join(script);
     if dev.exists() { return Ok(dev); }
     anyhow::bail!("MCP server not found: {}", script)

@@ -91,6 +91,11 @@ impl App {
             tracing::warn!("清理 running 状态失败: {}", e);
         }
 
+        // 迁移旧数据 (v7 → v8: ~/.hermes/ → ~/.config/workflow-engine/)
+        if let Err(e) = engine::plugin_manager::migrate_from_legacy() {
+            tracing::warn!("旧数据迁移失败（非致命）: {}", e);
+        }
+
         let config = data::config::AppConfig::load_default().unwrap_or_default();
         let max_concurrent = std::env::var("MAX_CONCURRENT_WORKFLOWS")
             .ok()
