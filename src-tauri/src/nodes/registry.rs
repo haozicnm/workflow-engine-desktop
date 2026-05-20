@@ -13,6 +13,7 @@ struct SchemaNode {
     node_type: String,
     label: String,
     #[serde(default)]
+    #[allow(dead_code)]
     category: String,
     #[serde(default)]
     icon: String,

@@ -11,7 +11,6 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 // v8: 容器类型从 registry（node-schema.json）读取，不再硬编码
-use crate::nodes::registry;
 // 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
 const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 
