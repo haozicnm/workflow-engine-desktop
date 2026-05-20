@@ -10,9 +10,8 @@ use crate::engine::workflow::{Step, Workflow};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
-// 容器类型列表 — 新增容器类型时只需改这一处
-// executor.rs 的注册宏依赖此列表，通过编译期测试保证一致性
-pub const CONTAINER_TYPES: &[&str] = &["browser", "excel", "word", "logic", "file"];
+// v8: 容器类型从 registry（node-schema.json）读取，不再硬编码
+use crate::nodes::registry;
 // 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
 const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 
@@ -131,7 +130,7 @@ trait StepParser {
 struct ContainerParser;
 impl StepParser for ContainerParser {
     fn can_parse(step_type: &str) -> bool {
-        CONTAINER_TYPES.contains(&step_type)
+        crate::nodes::registry::is_container(&step_type)
     }
 
     fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
@@ -177,10 +176,10 @@ impl StepParser for SimpleStepParser {
 
 /// 责任链分派：按顺序尝试 parser
 fn dispatch_parser(step: &Step, is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
-    if ContainerParser::can_parse(&step.step_type) {
-        ContainerParser::parse(step, is_recursive)
-    } else if IterationParser::can_parse(&step.step_type) {
+    if IterationParser::can_parse(&step.step_type) {
         IterationParser::parse(step, is_recursive)
+    } else if ContainerParser::can_parse(&step.step_type) {
+        ContainerParser::parse(step, is_recursive)
     } else {
         SimpleStepParser::parse(step, is_recursive)
     }
@@ -258,7 +257,7 @@ fn convert_action_to_step(action: &Value) -> Result<Step> {
         .unwrap_or(serde_json::json!({}));
 
     // v8: 提取容器类型的 actions — 从 params.actions 中提取并放在 Step.actions
-    let actions = if CONTAINER_TYPES.contains(&step_type.as_str()) {
+    let actions = if crate::nodes::registry::is_container(&step_type.as_str()) {
         config.as_object()
             .and_then(|c| c.get("actions"))
             .and_then(|v| v.as_array())

@@ -84,7 +84,7 @@ impl StepExecutor {
         register!(executors, "json_parse", crate::nodes::json_parse::JsonParseNode);
         register!(executors, "text_template", crate::nodes::text_template::TextTemplateNode);
 
-        // ── 容器节点（由 register_containers! 统一注册，与 parser::CONTAINER_TYPES 对应）──
+        // ── 容器节点（由 register_containers! 统一注册，与 registry (node-schema.json) 对应）──
         register_containers!(executors,
             "browser" => crate::nodes::browser_container::BrowserContainerNode,
             "excel"   => crate::nodes::excel_container::ExcelContainerNode,
@@ -161,8 +161,8 @@ impl StepExecutor {
             }
         };
 
-        // v8: 用 CONTAINER_TYPES 常量判断容器，不再依赖 _container 后缀
-        let is_container = crate::engine::parser::CONTAINER_TYPES.contains(&step.step_type.as_str());
+        // v8: 用 registry::is_container() 判断容器，不再依赖 _container 后缀
+        let is_container = crate::nodes::registry::is_container(&step.step_type);
         let resolved_config = if is_container {
             // v8: 归一化 actions — 前端 actions 在 step.actions，需合并到 config 供容器反序列化
             let mut config = if step.config.is_object() {
@@ -238,9 +238,9 @@ mod tests {
         let registered = exec.registered_types();
 
         // v8: 正向检查 — CONTAINER_TYPES 里的每个类型必须直接注册（不加后缀）
-        for &container_type in parser::CONTAINER_TYPES {
+        for container_type in crate::nodes::registry::container_types() {
             assert!(
-                registered.contains(&container_type),
+                registered.contains(&container_type.as_str()),
                 "parser::CONTAINER_TYPES 包含 '{}'，但 executor 未注册",
                 container_type
             );
@@ -248,7 +248,7 @@ mod tests {
 
         // v8: 反向检查 — executor 中注册的容器类型必须在 CONTAINER_TYPES 中声明
         for name in &registered {
-            if parser::CONTAINER_TYPES.contains(name) {
+            if crate::nodes::registry::is_container(name) {
                 // 已在正向检查中验证
                 continue;
             }
