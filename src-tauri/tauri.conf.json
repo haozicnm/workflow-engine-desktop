@@ -28,12 +28,22 @@
                    "active":  true,
                    "targets":  [
                                    "appimage",
+                                   "deb",
                                    "nsis"
                                ],
                    "linux":  {
                                  "appimage":  {
                                                   "bundleMediaFramework":  true
-                                              }
+                                              },
+                                 "deb":  {
+                                             "depends":  [
+                                                             "libwebkit2gtk-4.1-0",
+                                                             "libgtk-3-0",
+                                                             "libssl3",
+                                                             "libsoup-3.0-0",
+                                                             "libjavascriptcoregtk-4.1-0"
+                                                         ]
+                                         }
                              },
                    "windows":  {
                                    "webviewInstallMode":  {
