@@ -96,7 +96,7 @@ async fn test_exec_template2_logic_routing() {
     }));
     println!("  page contains '异常' → expected branch=true");
 
-    // Step 1: logic_container
+    // Step 1: logic
     println!("\n=== Step 1: Logic 条件判断 ===");
     let r1 = executor.execute(&steps[1], &mut ctx).await.unwrap();
     ctx.set_output(&steps[1].id, r1.clone());
@@ -108,7 +108,7 @@ async fn test_exec_template2_logic_routing() {
     assert_eq!(branch, "true");
     assert!(result);
 
-    // Step 2: excel_container (runCondition: when=true → executes)
+    // Step 2: excel (runCondition: when=true → executes)
     println!("\n=== Step 2: Excel 异常报告 ===");
     let r2 = executor.execute(&steps[2], &mut ctx).await;
     assert!(r2.is_ok(), "Excel 异常报告应执行成功（create+append 动作不产 output port）");

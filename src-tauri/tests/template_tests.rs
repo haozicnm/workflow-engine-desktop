@@ -47,7 +47,7 @@ fn test_template1_order_to_contracts() {
     assert!(wf.is_ok(), "Parser 转换失败: {:?}", wf.err());
     let wf = wf.unwrap();
     assert_eq!(wf.steps.len(), 3);
-    assert_eq!(wf.steps[0].step_type, "excel_container");
+    assert_eq!(wf.steps[0].step_type, "excel");
     assert_eq!(wf.steps[1].step_type, "cursor");  // 不做容器转换
     assert_eq!(wf.steps[2].step_type, "notify");
 
@@ -99,8 +99,8 @@ fn test_template2_monitor_to_report() {
     assert!(wf.is_ok(), "Parser 转换失败: {:?}", wf.err());
     let wf = wf.unwrap();
     assert_eq!(wf.steps.len(), 5);
-    assert_eq!(wf.steps[0].step_type, "browser_container");
-    assert_eq!(wf.steps[1].step_type, "logic_container");
+    assert_eq!(wf.steps[0].step_type, "browser");
+    assert_eq!(wf.steps[1].step_type, "logic");
 
     println!("✅ 模板2: browser_container → logic_container → excel/word 分支");
 }

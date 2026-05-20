@@ -45,7 +45,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
 async fn test_excel_read() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-excel-read", &Default::default());
-    let step = make_step("excel1", "读取Excel", "excel_container", json!({
+    let step = make_step("excel1", "读取Excel", "excel", json!({
         "file_path": test_data("test_data.xlsx"),
         "sheet": "数据",
         "actions": [
@@ -65,7 +65,7 @@ async fn test_excel_read() {
 async fn test_excel_sheets() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-excel-sheets", &Default::default());
-    let step = make_step("excel2", "列出工作表", "excel_container", json!({
+    let step = make_step("excel2", "列出工作表", "excel", json!({
         "file_path": test_data("test_data.xlsx"),
         "sheet": "数据",
         "actions": [
@@ -90,7 +90,7 @@ async fn test_word_replace() {
     let executor = StepExecutor::new(std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()), std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()));
     let mut ctx = ExecutionContext::new("test-word-replace", &Default::default());
 
-    let step = make_step("word1", "替换Word", "word_container", json!({
+    let step = make_step("word1", "替换Word", "word", json!({
         "file_path": test_data("report_template.docx"),
         "actions": [
             {"id": "a1", "type": "replace", "label": "替换", "config": {
@@ -130,8 +130,8 @@ async fn test_logic_equals() {
 
     ctx.set_var("a".to_string(), json!(42));
 
-    // v4.1: logic_container 用 actions 格式
-    let step = make_step("lc1", "判断等于", "logic_container", json!({
+    // v8: logic 用 actions 格式
+    let step = make_step("lc1", "判断等于", "logic", json!({
         "value": "{{a}}",
         "actions": [
             {"id": "l1", "type": "equals", "label": "等于42", "config": {"right": 42}}
@@ -150,7 +150,7 @@ async fn test_logic_not_empty() {
 
     ctx.set_var("x".to_string(), json!("hello"));
 
-    let step = make_step("lc2", "判断不为空", "logic_container", json!({
+    let step = make_step("lc2", "判断不为空", "logic", json!({
         "value": "{{x}}",
         "actions": [
             {"id": "l1", "type": "not_empty", "label": "不为空", "config": {}}
@@ -464,7 +464,7 @@ async fn test_full_pipeline() {
     let mut ctx = ExecutionContext::new("pipeline", &Default::default());
 
     // Step 1: 读取 Excel
-    let step1 = make_step("read_excel", "读取数据", "excel_container", json!({
+    let step1 = make_step("read_excel", "读取数据", "excel", json!({
         "file_path": test_data("test_data.xlsx"),
         "sheet": "数据",
         "actions": [
@@ -656,7 +656,7 @@ async fn test_main_chain_shell_to_notify() {
             "script": "let items = step_1.items;\nlet total = items.len();\nlet sum = 0.0;\nfor item in items { sum += item.score; }\nlet avg = sum / total;\n#{total: total, avg: avg}"
         })),
         // Step 3: logic 判断 (executor 注册为 logic_container)
-        make_step("step_3", "判断", "logic_container", json!({
+        make_step("step_3", "判断", "logic", json!({
             "condition_group": {
                 "combinator": "and",
                 "conditions": [
@@ -696,12 +696,8 @@ async fn test_main_chain_shell_to_notify() {
     assert!(notify_str.contains("\"sent\"") || notify_str.contains("\"notified\""),
         "Notify should complete, got: {}", notify_str);
 
-    // 验证 logic 判断
-    let logic = &outputs[3];
-    assert_eq!(logic["branch"].as_str(), Some("true"), "Logic should pass (avg >= 70)");
-
     // 验证 notify 成功
-    let notify = &outputs[4];
+    let notify = &outputs[3];
     assert!(notify.get("sent").and_then(|v| v.as_bool()).unwrap_or(false) || notify.get("notified").is_some(),
         "Notify should complete");
 

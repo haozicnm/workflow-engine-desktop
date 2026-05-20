@@ -1,7 +1,7 @@
 // tests/parser_tests.rs — Parser 转换测试
 //
 // 测试范围：
-//   - Container type gets _container suffix
+//   - Container type stays unchanged (v8)
 //   - Actions moved into config
 //   - action.params → action.config
 //   - logic container gets condition_group in config
@@ -24,7 +24,7 @@ fn parse_steps(steps_json: serde_json::Value) -> Vec<workflow_engine::engine::wo
 }
 
 // ═══════════════════════════════════════════════════
-// 容器类型加 _container 后缀
+// 容器类型保持原名（v8 透传）
 // ═══════════════════════════════════════════════════
 
 #[test]
@@ -32,7 +32,7 @@ fn container_type_browser_gets_suffix() {
     let steps = parse_steps(json!([
         {"id": "b1", "name": "Browser", "type": "browser", "config": {}, "actions": []}
     ]));
-    assert_eq!(steps[0].step_type, "browser_container");
+    assert_eq!(steps[0].step_type, "browser");
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn container_type_excel_gets_suffix() {
     let steps = parse_steps(json!([
         {"id": "e1", "name": "Excel", "type": "excel", "config": {}, "actions": []}
     ]));
-    assert_eq!(steps[0].step_type, "excel_container");
+    assert_eq!(steps[0].step_type, "excel");
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn container_type_word_gets_suffix() {
     let steps = parse_steps(json!([
         {"id": "w1", "name": "Word", "type": "word", "config": {}, "actions": []}
     ]));
-    assert_eq!(steps[0].step_type, "word_container");
+    assert_eq!(steps[0].step_type, "word");
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn container_type_logic_gets_suffix() {
     let steps = parse_steps(json!([
         {"id": "l1", "name": "Logic", "type": "logic", "config": {}, "actions": []}
     ]));
-    assert_eq!(steps[0].step_type, "logic_container");
+    assert_eq!(steps[0].step_type, "logic");
 }
 
 // ═══════════════════════════════════════════════════
@@ -337,10 +337,10 @@ fn mixed_container_and_non_container_steps() {
         ]}
     ]));
 
-    assert_eq!(steps[0].step_type, "browser_container");
-    assert_eq!(steps[1].step_type, "logic_container");
+    assert_eq!(steps[0].step_type, "browser");
+    assert_eq!(steps[1].step_type, "logic");
     assert_eq!(steps[2].step_type, "http");
-    assert_eq!(steps[3].step_type, "excel_container");
+    assert_eq!(steps[3].step_type, "excel");
 
     // browser action params → config
     assert_eq!(steps[0].config["actions"][0]["config"]["url"], json!("https://example.com"));
