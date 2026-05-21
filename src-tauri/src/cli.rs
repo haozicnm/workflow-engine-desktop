@@ -105,6 +105,14 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// 从工作流生成 SKILL.md
+    Skill {
+        /// 工作流文件路径 或 ID
+        file_or_id: String,
+        /// 输出文件路径 (默认: stdout)
+        #[arg(short = 'o', long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -290,6 +298,7 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Show { file } => cmd_show(&file),
         Commands::RunFile { file, vars } => cmd_run_file(&app, &file, &vars).await,
         Commands::Preview { run_or_action, step_id, json } => cmd_preview(&run_or_action, step_id.as_deref(), json),
+        Commands::Skill { file_or_id, output } => cmd_skill(&app, &file_or_id, output.as_deref()),
     }
 }
 
@@ -1691,11 +1700,32 @@ fn print_live_status(session: &crate::engine::preview::LiveSession) {
                 _ => "?",
             };
             println!("  {} {} {} — {}",
-                i + 1,
-                icon,
-                entry.step_id,
-                entry.summary,
-            );
+                i + 1, icon, entry.step_id, entry.summary);
         }
     }
+}
+
+fn cmd_skill(app: &App, file_or_id: &str, output: Option<&str>) -> Result<(), String> {
+    use crate::engine::{parser, skill_generator};
+
+    // Try as file first, then as workflow ID
+    let workflow = if let Ok(content) = std::fs::read_to_string(file_or_id) {
+        parser::parse_workflow(&content).map_err(|e| format!("解析失败: {}", e))?
+    } else {
+        let yaml = app.db.get_workflow_yaml(file_or_id)
+            .map_err(|e| format!("获取工作流失败: {}", e))?
+            .ok_or_else(|| format!("工作流不存在: {}", file_or_id))?;
+        parser::parse_workflow(&yaml).map_err(|e| format!("解析失败: {}", e))?
+    };
+
+    let skill_md = skill_generator::generate_skill(&workflow);
+
+    match output {
+        Some(path) => {
+            std::fs::write(path, &skill_md).map_err(|e| format!("写入失败: {}", e))?;
+            println!("✓ SKILL.md 已生成: {}", path);
+        }
+        None => println!("{}", skill_md),
+    }
+    Ok(())
 }

@@ -1,0 +1,92 @@
+{
+  "version": "1.0.0",
+  "description": "Workflow Engine tool registry — discoverable sidecars and built-in workflows",
+  "sidecars": [
+    {
+      "name": "script",
+      "version": "1.0.0",
+      "description": "Execute Python code with workflow variables",
+      "server": "mcp_script_server.py",
+      "tools": ["execute"]
+    },
+    {
+      "name": "shell",
+      "version": "1.0.0",
+      "description": "Run shell commands and capture stdout/stderr",
+      "server": "mcp_shell_server.py",
+      "tools": ["shell_exec"]
+    },
+    {
+      "name": "http",
+      "version": "1.0.0",
+      "description": "Make HTTP requests with configurable method, headers, body",
+      "server": "mcp_http_server.py",
+      "tools": ["http_request"]
+    },
+    {
+      "name": "excel",
+      "version": "1.0.0",
+      "description": "Read, write, create, filter, sort Excel files via openpyxl",
+      "server": "mcp_excel_server.py",
+      "tools": ["excel_read", "excel_write", "excel_create", "excel_filter", "excel_sort", "excel_append", "excel_csv"]
+    },
+    {
+      "name": "word",
+      "version": "1.0.0",
+      "description": "Read, write, create Word documents via python-docx",
+      "server": "mcp_word_server.py",
+      "tools": ["word_read", "word_write", "word_create"]
+    },
+    {
+      "name": "json",
+      "version": "1.0.0",
+      "description": "Parse JSON strings, query with JSONPath",
+      "server": "mcp_json_server.py",
+      "tools": ["json_parse"]
+    },
+    {
+      "name": "web_scrape",
+      "version": "1.0.0",
+      "description": "Scrape web pages via Playwright/CDP with element extraction",
+      "server": "mcp_web_scrape_server.py",
+      "tools": ["web_scrape"]
+    }
+  ],
+  "builtin_workflows": [
+    {
+      "id": "integration-smoke",
+      "name": "集成冒烟测试",
+      "description": "14-step workflow exercising all core node types",
+      "file": "library/stress/integration-smoke.wf.json",
+      "category": "stress"
+    },
+    {
+      "id": "daily-monitor",
+      "name": "每日监控",
+      "description": "HTTP-based monitoring workflow with conditional alerting",
+      "file": "library/monitoring/daily-monitor.wf.json",
+      "category": "monitoring"
+    },
+    {
+      "id": "web-monitor-alert",
+      "name": "Web监控告警",
+      "description": "Browser-based web monitoring with screenshot capture",
+      "file": "library/monitoring/web-monitor-alert.wf.json",
+      "category": "monitoring"
+    },
+    {
+      "id": "file-batch-approval",
+      "name": "文件批量审批",
+      "description": "File batch processing with human approval step",
+      "file": "library/batch/file-batch-approval.wf.json",
+      "category": "batch"
+    },
+    {
+      "id": "http-approval-pipeline",
+      "name": "HTTP审批流水线",
+      "description": "HTTP request chain with conditional approval gates",
+      "file": "library/batch/http-approval-pipeline.wf.json",
+      "category": "batch"
+    }
+  ]
+}
