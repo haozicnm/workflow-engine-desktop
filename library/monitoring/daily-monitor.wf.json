@@ -31,7 +31,7 @@
       "type": "script",
       "label": "4.摘要统计",
       "config": {
-        "script": "let ids = step_2;\nlet total = ids.len();\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
+        "script": "let ids = step_2;\nlet total = ids.len;\nlet top_n = if total > 10 { 10 } else { total };\nlet top_ids = [];\nfor i in 0..top_n {\n    top_ids.push(ids[i].to_string());\n}\n#{top_ids: top_ids.join(\",\"), total: total, top_count: top_n, source: \"HackerNews\"}"
       }
     },
     {

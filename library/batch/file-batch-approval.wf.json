@@ -70,7 +70,7 @@
       "type": "script",
       "label": "3.构建审批清单",
       "config": {
-        "script": "let files = step_2.a2_1;\nlet total = files.len();\nlet items = [];\nfor f in files {\n    items.push(#{file: f.name, path: f.path, risk_level: if f.name.contains(\"涉密\") { \"高\" } else if f.name.contains(\"合规\") { \"中\" } else { \"低\" }});\n}\n#{total: total, items: items}"
+        "script": "let files = step_2.a2_1;\nlet total = files.len;\nlet items = [];\nfor f in files {\n    items.push(#{file: f.name, path: f.path, risk_level: if f.name.contains(\"涉密\") { \"高\" } else if f.name.contains(\"合规\") { \"中\" } else { \"低\" }});\n}\n#{total: total, items: items}"
       }
     },
     {
@@ -116,7 +116,7 @@
           "id": "body_5_2",
           "type": "script",
           "config": {
-            "script": "let content = body_5_1.ab5_1;\nlet has_secret = content.contains(\"涉密\");\nlet risk_score = if has_secret { 90 } else if content.contains(\"合规\") { 30 } else { 10 };\n#{risk_score: risk_score, has_secret: has_secret, content_length: content.len(), preview: content.sub_string(0, 30)}"
+            "script": "let content = body_5_1.ab5_1;\nlet has_secret = content.contains(\"涉密\");\nlet risk_score = if has_secret { 90 } else if content.contains(\"合规\") { 30 } else { 10 };\n#{risk_score: risk_score, has_secret: has_secret, content_length: content.len, preview: content.sub_string(0, 30)}"
           }
         },
         {
@@ -230,7 +230,7 @@
       "type": "script",
       "label": "7.统计汇总",
       "config": {
-        "script": "let approved_list = step_6.a6_1;\nlet rejected_list = step_6.a6_2;\nlet approved = approved_list.len();\nlet rejected = rejected_list.len();\nlet total = approved + rejected;\nlet summary = \"审批完成: \" + approved + \"通过/\" + rejected + \"拒绝\";\n#{approved: approved, rejected: rejected, total: total, summary: summary}"
+        "script": "let approved_list = step_6.a6_1;\nlet rejected_list = step_6.a6_2;\nlet approved = approved_list.len;\nlet rejected = rejected_list.len;\nlet total = approved + rejected;\nlet summary = \"审批完成: \" + approved + \"通过/\" + rejected + \"拒绝\";\n#{approved: approved, rejected: rejected, total: total, summary: summary}"
       }
     },
     {

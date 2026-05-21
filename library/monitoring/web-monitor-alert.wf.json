@@ -55,7 +55,7 @@
           "id": "body_4_2",
           "type": "script",
           "config": {
-            "script": "let resp_len = body_4_1.body.len();\nlet status = body_4_1.status;\nlet is_ok = status >= 200 && status < 400;\n#{site: __item.name, url: __item.url, status: status, is_ok: is_ok, body_length: resp_len}"
+            "script": "let resp_len = body_4_1.body.len;\nlet status = body_4_1.status;\nlet is_ok = status >= 200 && status < 400;\n#{site: __item.name, url: __item.url, status: status, is_ok: is_ok, body_length: resp_len}"
           }
         }
       ]
@@ -65,7 +65,7 @@
       "type": "script",
       "label": "5.汇总分析+趋势对比",
       "config": {
-        "script": "let results = step_4.results;\nlet total = results.len();\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n\n// 趋势对比：读取上次持久化状态\nlet prev_health = 100.0;\nlet prev_status = \"首次运行\";\nlet trend = \"→首次\";\nif step_2 != () {\n    if step_2.health != () { prev_health = step_2.health; }\n    if step_2.status != () { prev_status = step_2.status; }\n    if health_pct > prev_health { trend = \"↑改善\"; }\n    else if health_pct < prev_health { trend = \"↓恶化\"; }\n    else { trend = \"→持平\"; }\n}\nlet alert_sites_str = alert_sites.join(\", \");\n\n#{alert_sites: alert_sites, alert_sites_str: alert_sites_str, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total, trend: trend, prev_health: prev_health, prev_status: prev_status}"
+        "script": "let results = step_4.results;\nlet total = results.len;\nlet ok_count = 0;\nlet fail_count = 0;\nlet alert_sites = [];\nfor r in results {\n    if r.is_ok { ok_count += 1; } else { fail_count += 1; alert_sites.push(r.site); }\n}\nlet health_pct = ok_count * 100 / total;\nlet status = if fail_count > 0 { \"🔴异常\" } else { \"🟢全通\" };\nlet summary = [];\nfor r in results {\n    summary.push(r.site + \":\" + (if r.is_ok { \"OK\" } else { \"FAIL\" }));\n}\n\n// 趋势对比：读取上次持久化状态\nlet prev_health = 100.0;\nlet prev_status = \"首次运行\";\nlet trend = \"→首次\";\nif step_2 != () {\n    if step_2.health != () { prev_health = step_2.health; }\n    if step_2.status != () { prev_status = step_2.status; }\n    if health_pct > prev_health { trend = \"↑改善\"; }\n    else if health_pct < prev_health { trend = \"↓恶化\"; }\n    else { trend = \"→持平\"; }\n}\nlet alert_sites_str = alert_sites.join(\", \");\n\n#{alert_sites: alert_sites, alert_sites_str: alert_sites_str, fail_count: fail_count, health_pct: health_pct, ok_count: ok_count, status: status, summary: summary.join(\", \"), total: total, trend: trend, prev_health: prev_health, prev_status: prev_status}"
       }
     },
     {

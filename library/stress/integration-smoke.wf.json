@@ -57,7 +57,7 @@
       "type": "script",
       "label": "5.数据统计计算",
       "config": {
-        "script": "let items = step_2.items;\nlet count = items.len();\nlet max = 0.0;\nlet min = 100.0;\nlet sum = 0.0;\nlet pass_count = 0;\nfor item in items {\n    if item.score > max { max = item.score; }\n    if item.score < min { min = item.score; }\n    sum += item.score;\n    if item.pass { pass_count += 1; }\n}\nlet avg = sum / count;\nlet pass_rate = pass_count * 100 / count;\n#{avg: avg, max: max, min: min, count: count, pass_count: pass_count, pass_rate: pass_rate}"
+        "script": "let items = step_2.items;\nlet count = items.len;\nlet max = 0.0;\nlet min = 100.0;\nlet sum = 0.0;\nlet pass_count = 0;\nfor item in items {\n    if item.score > max { max = item.score; }\n    if item.score < min { min = item.score; }\n    sum += item.score;\n    if item.pass { pass_count += 1; }\n}\nlet avg = sum / count;\nlet pass_rate = pass_count * 100 / count;\n#{avg: avg, max: max, min: min, count: count, pass_count: pass_count, pass_rate: pass_rate}"
       }
     },
     {

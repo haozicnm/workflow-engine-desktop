@@ -28,7 +28,12 @@ impl NodeExecutor for JsonParseNode {
         };
 
         let result = json_path_query(&root, expression);
-        Ok(serde_json::json!({ "expression": expression, "result": result }))
+        // When querying root ($), return parsed value directly for compatibility
+        if expression == "$" {
+            Ok(result)
+        } else {
+            Ok(serde_json::json!({ "expression": expression, "result": result }))
+        }
     }
 }
 
