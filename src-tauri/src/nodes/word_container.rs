@@ -29,6 +29,7 @@ pub struct ContainerAction {
     pub id: String,
     #[serde(rename = "type")]
     pub action_type: String,
+    #[serde(default)]
     pub label: String,
     #[serde(default)]
     pub config: HashMap<String, Value>,

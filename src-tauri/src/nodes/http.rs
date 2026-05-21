@@ -46,11 +46,26 @@ impl NodeExecutor for HttpNode {
             _ => return Err(anyhow!("不支持的 HTTP 方法: {}", method)),
         };
 
-        // 添加 headers
-        if let Some(headers) = config.get("headers").and_then(|v| v.as_object()) {
-            for (k, v) in headers {
-                if let Some(val) = v.as_str() {
-                    req = req.header(k, val);
+        // 添加 headers（兼容字符串和对象两种格式）
+        if let Some(headers) = config.get("headers") {
+            // 1. 对象格式：{"Accept": "application/json"}
+            if let Some(obj) = headers.as_object() {
+                for (k, v) in obj {
+                    if let Some(val) = v.as_str() {
+                        req = req.header(k, val);
+                    }
+                }
+            }
+            // 2. 字符串格式：解析为 JSON
+            else if let Some(s) = headers.as_str() {
+                if let Ok(obj) = serde_json::from_str::<serde_json::Value>(s) {
+                    if let Some(map) = obj.as_object() {
+                        for (k, v) in map {
+                            if let Some(val) = v.as_str() {
+                                req = req.header(k, val);
+                            }
+                        }
+                    }
                 }
             }
         }
