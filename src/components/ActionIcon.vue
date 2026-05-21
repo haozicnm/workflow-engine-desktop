@@ -22,6 +22,7 @@ import {
   Terminal,
   Network,
   FileCheck,
+  CodeXml, Braces, ListFilter, Replace, GitMerge,
 } from 'lucide-vue-next'
 
 
@@ -132,5 +133,10 @@ withDefaults(defineProps<{
   <ArrowRightLeft v-else-if="name === 'ArrowRightLeft'" :class="cls" />
   <Network v-else-if="name === 'Network'" :class="cls" />
   <FileCheck v-else-if="name === 'FileCheck'" :class="cls" />
+  <CodeXml v-else-if="name === 'Code'" :class="cls" />
+  <Braces v-else-if="name === 'Braces'" :class="cls" />
+  <ListFilter v-else-if="name === 'Filter'" :class="cls" />
+  <Replace v-else-if="name === 'Replace'" :class="cls" />
+  <GitMerge v-else-if="name === 'GitMerge'" :class="cls" />
   <span v-else :class="cls || 'text-base'" class="inline-flex items-center justify-center">{{ name }}</span>
 </template>
