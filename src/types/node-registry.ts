@@ -109,11 +109,99 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'timeout_secs', label: '超时(秒)', type: 'number', default: 300 },
   ]},
   { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: 'actionId: result, ...', isContainer: true, params: []},
+
+  // ─── MCP 扩展节点（Python sidecar 驱动）───
+  { type: 'mcp_script',       label: 'MCP 脚本',        icon: 'Code',          color: '#a5d6ff', description: '通过 MCP 执行 Python 脚本',               outputHint: '脚本返回值', params: [
+    { key: 'script', label: 'Python 代码', type: 'textarea', placeholder: 'print("hello")' },
+  ]},
+  { type: 'mcp_shell',        label: 'MCP Shell',        icon: 'Terminal',      color: '#a5d6ff', description: '通过 MCP 执行 Shell 命令',                outputHint: 'stdout, stderr, exit_code', params: [
+    { key: 'command', label: '命令', type: 'text', placeholder: 'echo hello' },
+    { key: 'cwd', label: '工作目录', type: 'text' },
+  ]},
+  { type: 'mcp_excel_read',   label: 'MCP 读取Excel',    icon: 'BookOpen',      color: '#a5d6ff', description: '通过 MCP 读取 Excel 文件',                outputHint: 'rows, cols, data', params: [
+    { key: 'file_path', label: '文件路径', type: 'text', placeholder: './data.xlsx' },
+    { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
+  ]},
+  { type: 'mcp_excel_write',  label: 'MCP 写入Excel',    icon: 'Pencil',        color: '#a5d6ff', description: '通过 MCP 写入 Excel 文件',                outputHint: 'rows_written', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
+    { key: 'data', label: '数据', type: 'textarea', placeholder: '[["A","B"],[1,2]]' },
+  ]},
+  { type: 'mcp_excel_create', label: 'MCP 创建Excel',    icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 创建 Excel 文件',                outputHint: 'created: true', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
+    { key: 'headers', label: '表头', type: 'text', placeholder: '姓名,年龄' },
+  ]},
+  { type: 'mcp_excel_filter', label: 'MCP 筛选Excel',    icon: 'Filter',         color: '#a5d6ff', description: '通过 MCP 筛选 Excel 数据',                outputHint: 'data, filtered_count', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'column', label: '列', type: 'text' },
+    { key: 'op', label: '条件', type: 'text', placeholder: 'equals / contains / gt' },
+    { key: 'value', label: '值', type: 'text' },
+  ]},
+  { type: 'mcp_excel_sort',   label: 'MCP 排序Excel',    icon: 'ArrowUpDown',   color: '#a5d6ff', description: '通过 MCP 排序 Excel 数据',                outputHint: 'data, sorted_count', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'column', label: '列', type: 'text' },
+    { key: 'order', label: '顺序', type: 'select', options: [{ label: '升序', value: 'asc' }, { label: '降序', value: 'desc' }], default: 'asc' },
+  ]},
+  { type: 'mcp_excel_append', label: 'MCP 追加Excel',    icon: 'FilePlus',       color: '#a5d6ff', description: '通过 MCP 追加行到 Excel',                outputHint: 'appended_rows', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
+    { key: 'data', label: '数据', type: 'textarea', placeholder: '[["new row"]]' },
+  ]},
+  { type: 'mcp_excel_csv',    label: 'MCP Excel↔CSV',    icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 转换 Excel 与 CSV',              outputHint: 'path, rows', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'direction', label: '方向', type: 'select', options: [{ label: 'CSV→Excel', value: 'csv_to_xlsx' }, { label: 'Excel→CSV', value: 'xlsx_to_csv' }], default: 'csv_to_xlsx' },
+  ]},
+  { type: 'mcp_word_read',    label: 'MCP 读取Word',     icon: 'BookOpen',      color: '#a5d6ff', description: '通过 MCP 读取 Word 文档内容',            outputHint: 'paragraphs', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+  ]},
+  { type: 'mcp_word_write',   label: 'MCP 写入Word',     icon: 'Pencil',        color: '#a5d6ff', description: '通过 MCP 写入 Word 文档',                outputHint: 'saved: true', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'content', label: '内容', type: 'textarea' },
+  ]},
+  { type: 'mcp_word_create',  label: 'MCP 创建Word',     icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 创建 Word 文档',                outputHint: 'created: true', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'title', label: '标题', type: 'text', placeholder: '文档标题' },
+  ]},
+  { type: 'mcp_word_replace', label: 'MCP 替换Word',     icon: 'Replace',        color: '#a5d6ff', description: '通过 MCP 查找替换 Word 文本',            outputHint: 'replaced_count', params: [
+    { key: 'file_path', label: '文件路径', type: 'text' },
+    { key: 'old_text', label: '查找', type: 'text' },
+    { key: 'new_text', label: '替换为', type: 'text' },
+  ]},
+  { type: 'mcp_word_merge',   label: 'MCP 合并Word',     icon: 'GitMerge',      color: '#a5d6ff', description: '通过 MCP 合并多个 Word 文档',            outputHint: 'merged: true', params: [
+    { key: 'output', label: '输出路径', type: 'text' },
+    { key: 'files', label: '文件列表 (JSON)', type: 'textarea', placeholder: '["a.docx","b.docx"]' },
+  ]},
+  { type: 'mcp_web_scrape',   label: 'MCP 网页抓取',     icon: 'Globe',         color: '#a5d6ff', description: '通过 MCP 提取网页内容',                  outputHint: 'title, text, links', params: [
+    { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com' },
+    { key: 'selector', label: 'CSS选择器 (可选)', type: 'text' },
+  ]},
 ]
 
+/** 动态注册的后端节点类型（插件安装后由 node_list_types 同步） */
+const _dynamicDefs: ContainerDef[] = []
+
+/** 合并静态 + 动态定义的容器列表 */
+export function allContainerDefs(): ContainerDef[] {
+  return [...CONTAINER_DEFS, ..._dynamicDefs]
+}
+
+/** 注册插件提供的动态节点类型 */
+export function registerDynamicNode(def: ContainerDef) {
+  if (!CONTAINER_DEFS.some(d => d.type === def.type) && !_dynamicDefs.some(d => d.type === def.type)) {
+    _dynamicDefs.push(def)
+  }
+}
+
+/** 清空动态注册（插件卸载时） */
+export function clearDynamicNodes() {
+  _dynamicDefs.length = 0
+}
+
 export function getContainerDef(type: string, t?: TFn): ContainerDef {
-  const found = CONTAINER_DEFS.find(d => d.type === type)
-  const def = found || CONTAINER_DEFS[0]
+  const all = allContainerDefs()
+  const found = all.find(d => d.type === type)
+  const def = found || all[0]
   if (!found) console.warn(`getContainerDef: 未知类型 "${type}"，使用 fallback`)
   if (!t) return def
   return {

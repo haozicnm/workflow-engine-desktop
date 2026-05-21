@@ -156,6 +156,8 @@ fn main() {
             workflow_engine::commands::plugin::plugin_list,
             // IPC health
             workflow_engine::commands::system::check_ipc,
+            // Node type registry
+            workflow_engine::commands::system::node_list_types,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

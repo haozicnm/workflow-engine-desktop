@@ -6,9 +6,13 @@
  * source of truth for type/icon/color/params structure.
  */
 import { useI18n } from 'vue-i18n'
+import { safeInvoke } from '@/utils/tauri'
 import type { ContainerDef, ActionDef, ContainerType, Action, Step } from '@/types/types'
 import {
   CONTAINER_DEFS,
+  allContainerDefs,
+  registerDynamicNode,
+  clearDynamicNodes,
   BROWSER_ACTIONS,
   EXCEL_ACTIONS,
   WORD_ACTIONS,
@@ -69,7 +73,7 @@ const _cache = new Map<string, {
 
 function buildCache(locale: string, t: (key: string) => string) {
   const result = {
-    containerDefs: CONTAINER_DEFS.map(d => localizeContainerDef(d, t)),
+    containerDefs: allContainerDefs().map(d => localizeContainerDef(d, t)),
     browserActions: BROWSER_ACTIONS.map(a => localizeActionDef(a, t)),
     excelActions: EXCEL_ACTIONS.map(a => localizeActionDef(a, t)),
     wordActions: WORD_ACTIONS.map(a => localizeActionDef(a, t)),
@@ -147,6 +151,30 @@ export function useRegistry() {
     return cache!.logicOperators
   }
 
+  /** 从后端同步动态节点类型（插件安装后调用） */
+  async function refreshDynamicTypes() {
+    try {
+      const types = await safeInvoke<string[]>('node_list_types')
+      if (!types || !Array.isArray(types)) return
+      clearDynamicNodes()
+      for (const t of types) {
+        if (!CONTAINER_DEFS.some(d => d.type === t)) {
+          registerDynamicNode({
+            type: t as ContainerType,
+            label: t,
+            icon: 'Package',
+            color: '#a5d6ff',
+            description: `Plugin: ${t}`,
+            isContainer: false,
+            params: [{ key: 'config', label: '参数 (JSON)', type: 'textarea' as const }],
+          })
+        }
+      }
+      // Invalidate cache so next access rebuilds with dynamic types
+      _cache.delete(loc)
+    } catch (_) { /* backend may not have command yet */ }
+  }
+
   return {
     containerDefs: cache!.containerDefs,
     getContainerDef,
@@ -158,6 +186,7 @@ export function useRegistry() {
     getLogicOperators,
     newAction,
     newStep,
+    refreshDynamicTypes,
     // Raw exports for cases where we need non-UI data
     raw: {
       CONTAINER_DEFS,

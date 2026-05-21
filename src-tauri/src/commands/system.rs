@@ -231,3 +231,17 @@ pub async fn check_ipc() -> Result<bool, String> {
         _ => Ok(false),
     }
 }
+
+/// 返回所有已知节点类型（内置 + MCP 内置 + 插件外挂），供前端动态合并到节点面板
+#[tauri::command]
+pub async fn node_list_types() -> Result<Vec<String>, String> {
+    let mut types: Vec<String> = crate::nodes::registry::all_nodes()
+        .into_iter().map(|n| n.node_type).collect();
+    // 追加 MCP 外挂类型（插件安装的动态类型）
+    for t in crate::nodes::mcp_node::get_all_mcp_types() {
+        if !types.contains(&t) {
+            types.push(t);
+        }
+    }
+    Ok(types)
+}

@@ -7,6 +7,7 @@ import { useToast } from '../composables/useToast'
 import { useEditorEnhancements, type LogEntry } from '../composables/useEditorEnhancements'
 import { useGlobalStatus } from '../composables/useGlobalStatus'
 import { useOpsConsole } from '../composables/useOpsConsole'
+import { useRegistry } from '../composables/useRegistry'
 import { safeInvoke, safeListen } from '../utils/tauri'
 import StepCard from '../components/StepCard.vue'
 import ActionIcon from '../components/ActionIcon.vue'
@@ -45,6 +46,7 @@ const toast = useToast()
 const enh = useEditorEnhancements()
 const globalStatus = useGlobalStatus()
 const ops = useOpsConsole()
+const registry = useRegistry()
 
 let currentRunId: string | null = null
 
@@ -401,6 +403,9 @@ let unlistenLogStep: (() => void) | null = null
 let unlistenLogRun: (() => void) | null = null
 
 onMounted(async () => {
+  // 同步后端动态节点类型（插件安装的 MCP 类型等）
+  registry.refreshDynamicTypes()
+  
   unlistenLogStep = await safeListen<{
     run_id: string; step_id: string; step_name: string; status: string; output?: unknown; error?: string | null
   }>('step-update', (event) => {
