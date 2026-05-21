@@ -67,8 +67,11 @@ fn main() {
                 app,
                 tauri_app.handle().clone(),
             ));
-            tauri::async_runtime::spawn(async move {
-                ipc_server.start().await;
+            // block_on 确保 IPC 端口在 Tauri setup 返回前已绑定，
+            // 消除前端 onMounted → check_ipc 与 bind 之间的竞态。
+            let ipc = ipc_server.clone();
+            tauri::async_runtime::block_on(async move {
+                ipc.start().await;
             });
 
             Ok(())
