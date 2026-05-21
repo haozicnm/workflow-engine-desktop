@@ -1546,6 +1546,49 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
             let run_id = runs.last().unwrap();
             print_preview(run_id, step_id, json)?;
         }
+        "live" => {
+            match step_id.as_deref() {
+                Some("list") | None => {
+                    let sessions = preview::list_live_sessions();
+                    if sessions.is_empty() {
+                        if json {
+                            println!("{{\"sessions\": []}}");
+                        } else {
+                            println!("(无活跃会话)");
+                        }
+                        return Ok(());
+                    }
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&sessions).unwrap());
+                    } else {
+                        println!("{:<40} {:<20} {:<10} {}/{}", "Run ID", "工作流", "状态", "进度", "总步数");
+                        println!("{}", "-".repeat(90));
+                        for s in &sessions {
+                            println!("{:<40} {:<20} {:<10} {}/{}",
+                                s.run_id,
+                                truncate(&s.workflow_name, 20),
+                                s.status,
+                                s.step_index,
+                                s.total_steps,
+                            );
+                        }
+                        println!("\n共 {} 个活跃会话", sessions.len());
+                    }
+                }
+                Some(run_id) => {
+                    match preview::get_live_status(run_id) {
+                        Some(session) => {
+                            if json {
+                                println!("{}", serde_json::to_string_pretty(&session).unwrap());
+                            } else {
+                                print_live_status(&session);
+                            }
+                        }
+                        None => eprintln!("会话 {} 不存在或已结束", run_id),
+                    }
+                }
+            }
+        }
         run_id => {
             print_preview(run_id, step_id, json)?;
         }
@@ -1621,5 +1664,38 @@ fn truncate(s: &str, max: usize) -> String {
         s.to_string()
     } else {
         format!("{}…", &s[..max.saturating_sub(1)])
+    }
+}
+
+fn print_live_status(session: &crate::engine::preview::LiveSession) {
+    println!("Run ID:      {}", session.run_id);
+    println!("工作流:      {}", session.workflow_name);
+    println!("状态:        {}", session.status);
+    println!("进度:        {}/{}", session.step_index, session.total_steps);
+    if let Some(ref id) = session.current_step_id {
+        println!("当前步骤:    {} ({})",
+            session.current_step_name.as_deref().unwrap_or("?"),
+            id
+        );
+    }
+    if let Some(ref bundle) = session.latest_bundle_path {
+        println!("最新 Bundle: {}", bundle);
+    }
+    if !session.trajectory_summary.is_empty() {
+        println!("\n步骤轨迹:");
+        for (i, entry) in session.trajectory_summary.iter().enumerate() {
+            let icon = match entry.status.as_str() {
+                "completed" => "✓",
+                "failed" => "✗",
+                "skipped" => "⏭",
+                _ => "?",
+            };
+            println!("  {} {} {} — {}",
+                i + 1,
+                icon,
+                entry.step_id,
+                entry.summary,
+            );
+        }
     }
 }

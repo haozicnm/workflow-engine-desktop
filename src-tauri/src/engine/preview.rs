@@ -33,6 +33,32 @@ pub struct StepPreview {
     pub bundle_path: Option<String>,
 }
 
+/// Live session tracking state for Agent introspection.
+/// Stored in session.json in the run's preview directory.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiveSession {
+    pub run_id: String,
+    pub workflow_name: String,
+    pub status: String,          // "running" | "paused" | "completed" | "failed" | "cancelled"
+    pub step_index: usize,
+    pub total_steps: usize,
+    pub current_step_id: Option<String>,
+    pub current_step_name: Option<String>,
+    pub current_step_type: Option<String>,
+    pub latest_bundle_path: Option<String>,
+    pub trajectory_summary: Vec<TrajectoryEntry>,
+}
+
+/// Compact step→preview mapping for trajectory_summary (avoids reading full trajectory.json).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrajectoryEntry {
+    pub step_id: String,
+    pub step_type: String,
+    pub status: String,
+    pub summary: String,
+    pub bundle_path: Option<String>,
+}
+
 /// Generate a preview from a completed step's output.
 pub fn generate_step_preview(step: &Step, output: &Value, duration_ms: u64) -> StepPreview {
     let (summary, detail) = build_preview(step, output);
@@ -670,4 +696,103 @@ pub fn list_preview_runs() -> Vec<String> {
     }
     runs.sort();
     runs
+}
+
+// ── Live session management ──
+
+fn session_path(run_id: &str) -> PathBuf {
+    preview_dir(run_id).join("session.json")
+}
+
+/// Start a live session for a workflow run.
+pub fn start_live_session(run_id: &str, workflow_name: &str, total_steps: usize) {
+    let session = LiveSession {
+        run_id: run_id.to_string(),
+        workflow_name: workflow_name.to_string(),
+        status: "running".to_string(),
+        step_index: 0,
+        total_steps,
+        current_step_id: None,
+        current_step_name: None,
+        current_step_type: None,
+        latest_bundle_path: None,
+        trajectory_summary: Vec::new(),
+    };
+    write_session(run_id, &session);
+}
+
+/// Update live session after a step completes.
+pub fn update_live_session(run_id: &str, preview: &StepPreview, step_index: usize) {
+    let mut session = match read_session(run_id) {
+        Some(s) => s,
+        None => return,
+    };
+    session.step_index = step_index + 1;
+    session.current_step_id = Some(preview.step_id.clone());
+    session.current_step_name = Some(preview.step_name.clone());
+    session.current_step_type = Some(preview.step_type.clone());
+    session.latest_bundle_path = preview.bundle_path.clone();
+    session.trajectory_summary.push(TrajectoryEntry {
+        step_id: preview.step_id.clone(),
+        step_type: preview.step_type.clone(),
+        status: preview.status.clone(),
+        summary: preview.summary.clone(),
+        bundle_path: preview.bundle_path.clone(),
+    });
+    write_session(run_id, &session);
+}
+
+/// Get live session status (for Agent introspection via wf-cli).
+pub fn get_live_status(run_id: &str) -> Option<LiveSession> {
+    read_session(run_id)
+}
+
+/// Mark live session as completed/failed/cancelled.
+pub fn stop_live_session(run_id: &str, final_status: &str) {
+    let mut session = match read_session(run_id) {
+        Some(s) => s,
+        None => return,
+    };
+    session.status = final_status.to_string();
+    write_session(run_id, &session);
+}
+
+/// List all active (running/paused) sessions.
+pub fn list_live_sessions() -> Vec<LiveSession> {
+    let base = crate::engine::plugin_manager::workflow_engine_dir().join("previews");
+    let mut sessions = Vec::new();
+    if let Ok(entries) = fs::read_dir(&base) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let sp = entry.path().join("session.json");
+                if sp.exists() {
+                    if let Ok(content) = fs::read_to_string(&sp) {
+                        if let Ok(session) = serde_json::from_str::<LiveSession>(&content) {
+                            if session.status == "running" || session.status == "paused" {
+                                sessions.push(session);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    sessions.sort_by(|a, b| b.run_id.cmp(&a.run_id));
+    sessions
+}
+
+fn read_session(run_id: &str) -> Option<LiveSession> {
+    let path = session_path(run_id);
+    let content = fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn write_session(run_id: &str, session: &LiveSession) {
+    let dir = preview_dir(run_id);
+    let _ = fs::create_dir_all(&dir);
+    if let Ok(json) = serde_json::to_string_pretty(session) {
+        let tmp = session_path(run_id).with_extension("tmp");
+        let _ = fs::write(&tmp, json);
+        let _ = fs::rename(&tmp, session_path(run_id));
+    }
 }

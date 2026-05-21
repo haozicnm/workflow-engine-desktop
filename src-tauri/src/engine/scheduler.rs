@@ -64,6 +64,9 @@ pub async fn run_workflow(
     let mut current_id = workflow.steps[0].id.clone();
     let total_steps = workflow.steps.len();
 
+    // Live session: start tracking
+    preview::start_live_session(run_id, &workflow_name, total_steps);
+
     // 预构建步骤 ID → 索引映射，避免循环中 O(n) 查找
     let step_index: std::collections::HashMap<&str, usize> = workflow.steps.iter()
         .enumerate()
@@ -78,6 +81,7 @@ pub async fn run_workflow(
             state.mark_failed();
             if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
             emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
+            preview::stop_live_session(run_id, "cancelled");
             return Err(anyhow::anyhow!("cancelled"));
         }
 
@@ -187,6 +191,11 @@ pub async fn run_workflow(
                 // Preview: 记录跳过步骤
                 let skipped = preview::generate_skipped_preview(step, "runCondition 不满足");
                 preview::append_trajectory(run_id, &skipped);
+
+                // Live session: update after skipped step
+                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
+                preview::update_live_session(run_id, &skipped, step_idx);
+
                 // 跳转到下一步
                 current_id = match determine_next_step(step, workflow, &ctx) {
                     Some(next_id) => next_id,
@@ -220,6 +229,10 @@ pub async fn run_workflow(
                 }
                 preview::append_trajectory(run_id, &preview);
 
+                // Live session: update after step
+                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
+                preview::update_live_session(run_id, &preview, step_idx);
+
                 // 更新调试快照
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
@@ -252,6 +265,10 @@ pub async fn run_workflow(
                 let failed = preview::generate_failed_preview(step, &err_msg, elapsed_ms);
                 preview::append_trajectory(run_id, &failed);
 
+                // Live session: update after failed step
+                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
+                preview::update_live_session(run_id, &failed, step_idx);
+
                 // 更新调试快照（含错误信息）
                 update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
@@ -262,6 +279,7 @@ pub async fn run_workflow(
                         state.mark_failed();
                         if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) { warn!("DB update failed: {}", e); }
                         emit_run_update(app_handle, run_id, &workflow_name, "failed");
+                        preview::stop_live_session(run_id, "failed");
                         return Err(e);
                     }
                     crate::engine::workflow::ErrorStrategy::Ignore => {
@@ -302,6 +320,7 @@ pub async fn run_workflow(
                 state.mark_completed();
                 if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
                 emit_run_update(app_handle, run_id, &workflow_name, "completed");
+                preview::stop_live_session(run_id, "completed");
                 return Ok(state);
             }
         }
