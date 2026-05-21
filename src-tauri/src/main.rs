@@ -141,6 +141,9 @@ fn main() {
             // Preview
             workflow_engine::commands::preview::preview_excel,
             workflow_engine::commands::preview::preview_word,
+            workflow_engine::commands::preview::get_trajectory,
+            workflow_engine::commands::preview::get_bundle_files,
+            workflow_engine::commands::preview::read_bundle_file,
             // Workflow lock/unlock
             workflow_engine::commands::workflow::workflow_lock,
             // Plugin system

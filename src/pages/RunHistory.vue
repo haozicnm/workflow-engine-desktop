@@ -7,6 +7,7 @@ import Button from '../components/ui/button/Button.vue'
 import Badge from '../components/ui/badge/Badge.vue'
 import Card from '../components/ui/card/Card.vue'
 import ActionIcon from '../components/ActionIcon.vue'
+import TrajectoryTimeline from '../components/TrajectoryTimeline.vue'
 import Select from '../components/ui/select/Select.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
@@ -64,7 +65,7 @@ const expandedId = ref<string | null>(null)
 const detailCache = ref<Record<string, RunDetail>>({})
 const logCache = ref<Record<string, StepLogEntry[]>>({})
 const loadingDetail = ref<string | null>(null)
-const detailTab = ref<'steps' | 'logs'>('steps')
+const detailTab = ref<'steps' | 'logs' | 'preview'>('steps')
 const workflowList = ref<{ id: string; name: string }[]>([])
 
 onMounted(async () => {
@@ -127,7 +128,7 @@ async function loadLogs(runId: string) {
 }
 
 function onTabChange(tab: string) {
-  detailTab.value = tab as 'steps' | 'logs'
+  detailTab.value = tab as 'steps' | 'logs' | 'preview'
   if (tab === 'logs' && expandedId.value) {
     loadLogs(expandedId.value)
   }
@@ -316,6 +317,7 @@ const stats = computed(() => {
               <TabsList>
                 <TabsTrigger value="steps">{{ t('history.stepsTab', { n: detailCache[run.id].steps.length }) }}</TabsTrigger>
                 <TabsTrigger value="logs">{{ t('history.logsTab', { n: logCache[run.id]?.length ?? 0 }) }}</TabsTrigger>
+                <TabsTrigger value="preview">预览</TabsTrigger>
               </TabsList>
 
               <TabsContent value="steps">
@@ -358,6 +360,11 @@ const stats = computed(() => {
                   <span class="text-muted-foreground/50 whitespace-nowrap shrink-0">{{ formatTime(log.timestamp) }}</span>
                   <span class="break-all">{{ log.message }}</span>
                 </div>
+              </TabsContent>
+
+              <!-- Preview trajectory -->
+              <TabsContent value="preview">
+                <TrajectoryTimeline :run-id="run.id" />
               </TabsContent>
             </Tabs>
           </div>
