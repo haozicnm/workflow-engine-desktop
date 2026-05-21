@@ -12,6 +12,9 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcp_protocol import McpServer, McpTool, log_stderr
+from repl_skin import ReplSkin
+
+skin = ReplSkin("json", version="1.0.0")
 
 
 class JsonParseTool(McpTool):

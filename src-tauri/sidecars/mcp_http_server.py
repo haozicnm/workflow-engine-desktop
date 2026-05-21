@@ -18,6 +18,9 @@ import os
 # Ensure we can import mcp_protocol from same directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcp_protocol import McpServer, McpTool, log_stderr
+from repl_skin import ReplSkin
+
+skin = ReplSkin("http", version="1.0.0")
 
 
 class HttpRequestTool(McpTool):

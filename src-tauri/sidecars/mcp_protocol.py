@@ -8,10 +8,15 @@ import sys
 import json
 import traceback
 
+from repl_skin import ReplSkin
+
+# Default skin (sidecars can override for accent colors)
+_skin = ReplSkin("protocol", version="1.0.0")
+
 
 def log_stderr(msg: str):
     """Write debug log to stderr (doesn't interfere with stdout protocol)."""
-    print(f"[mcp] {msg}", file=sys.stderr, flush=True)
+    _skin.debug(msg)
 
 
 class McpTool:
@@ -53,8 +58,8 @@ class McpServer:
 
     def run(self):
         """Main loop: read JSON-RPC from stdin, write responses to stdout."""
-        log_stderr(f"Starting MCP server: {self.name} v{self.version}")
-        log_stderr(f"Tools: {[t.name for t in self.tools]}")
+        _skin.info(f"Starting: {self.name} v{self.version}")
+        _skin.debug(f"Tools: {[t.name for t in self.tools]}")
 
         for line in sys.stdin:
             line = line.strip()
@@ -81,7 +86,7 @@ class McpServer:
             else:
                 self._send_error(req_id, -32601, f"Method not found: {method}")
 
-        log_stderr("MCP server shutting down")
+        _skin.info("Shutting down")
 
     def _send_response(self, req_id, result: dict):
         resp = {"jsonrpc": "2.0", "id": req_id, "result": result}
@@ -131,5 +136,6 @@ class McpServer:
                 },
             )
         except Exception as e:
-            log_stderr(f"Tool {tool_name} failed: {traceback.format_exc()}")
+            _skin.error(f"Tool {tool_name} failed: {e}")
+            log_stderr(traceback.format_exc())
             self._send_error(req_id, -32000, f"Tool execution failed: {e}")
