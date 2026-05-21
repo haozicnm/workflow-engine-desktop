@@ -111,11 +111,15 @@ impl StepExecutor {
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
 
-        // ── MCP 节点（Python 实现，优先走 MCP server）──
+        // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {
             use crate::nodes::mcp_node::{create_mcp_executor, get_all_mcp_types};
             let mcp_types = get_all_mcp_types();
             for t in &mcp_types {
+                if executors.contains_key(t) {
+                    debug!("节点跳过 (MCP 不覆盖原生): {}", t);
+                    continue;
+                }
                 if let Some(ex) = create_mcp_executor(t) {
                     executors.insert(t.to_string(), ex);
                     debug!("节点注册 (MCP): {}", t);
