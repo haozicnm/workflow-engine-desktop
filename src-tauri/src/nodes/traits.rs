@@ -14,4 +14,11 @@ pub trait NodeExecutor: Send + Sync {
         ctx: &mut ExecutionContext,
         executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value>;
+
+    /// 是否由节点自行解析 config 中的模板变量。
+    /// 返回 true 时，executor 跳过全局 `ctx.resolve_config(&step.config)`，
+    /// 由节点在迭代期间自行处理（如 map 节点的 `{{__item}}` 模板）。
+    fn resolve_config_self(&self) -> bool {
+        false
+    }
 }

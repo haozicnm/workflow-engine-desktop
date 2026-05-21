@@ -65,6 +65,12 @@ pub async fn execute_excel_container(
         tracing::info!("Excel action: {} ({})", action.label, action.action_type);
 
         match action.action_type.as_str() {
+            "sheets" => {
+                match crate::nodes::excel::excel_sheets(&config.file_path).await {
+                    Ok(data) => { output_ports.insert(action.id.clone(), data); }
+                    Err(e) => record_error(&mut output_ports, &action.id, "Excel sheets failed", &e),
+                }
+            }
             "read" => {
                 let read_cfg = serde_json::json!({ "sheet": config.sheet });
                 match crate::nodes::excel::excel_read(&config.file_path, &read_cfg).await {

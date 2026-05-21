@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useToast } from '@/composables/useToast'
 import ActionIcon from '@/components/ActionIcon.vue'
 
-const { toast } = useToast()
+const { show: toast } = useToast()
 
 interface PluginInfo {
   name: string
@@ -28,7 +28,7 @@ async function loadPlugins() {
     const result: any = await invoke('plugin_list')
     plugins.value = result.plugins || []
   } catch (e: any) {
-    toast({ message: `加载插件列表失败: ${e}`, type: 'error' })
+    toast(`加载插件列表失败: ${e}`, 'error')
   } finally {
     loading.value = false
   }
@@ -41,10 +41,10 @@ async function installPlugin() {
 
     installing.value = true
     const result: any = await invoke('plugin_install', { wfplugPath: filePath })
-    toast({ message: `插件 ${result.plugin.title} v${result.plugin.version} 安装成功`, type: 'success' })
+    toast(`插件 ${result.plugin.title} v${result.plugin.version} 安装成功`, 'success')
     await loadPlugins()
   } catch (e: any) {
-    toast({ message: `安装失败: ${e}`, type: 'error' })
+    toast(`安装失败: ${e}`, 'error')
   } finally {
     installing.value = false
   }
@@ -55,10 +55,10 @@ async function uninstallPlugin(plugin: PluginInfo) {
 
   try {
     await invoke('plugin_uninstall', { name: plugin.name })
-    toast({ message: `插件 ${plugin.title} 已卸载`, type: 'success' })
+    toast(`插件 ${plugin.title} 已卸载`, 'success')
     await loadPlugins()
   } catch (e: any) {
-    toast({ message: `卸载失败: ${e}`, type: 'error' })
+    toast(`卸载失败: ${e}`, 'error')
   }
 }
 

@@ -159,7 +159,9 @@ impl StepExecutor {
 
         // v8: 用 registry::is_container() 判断容器，不再依赖 _container 后缀
         let is_container = crate::nodes::registry::is_container(&step.step_type);
-        let resolved_config = if is_container {
+        // v8.1: 节点可声明自行解析模板变量（如 map 的 {{__item}}），跳过全局预解析
+        let resolve_self = executor.resolve_config_self();
+        let resolved_config = if is_container || resolve_self {
             // v8: 归一化 actions — 前端 actions 在 step.actions，需合并到 config 供容器反序列化
             let mut config = if step.config.is_object() {
                 step.config.clone()

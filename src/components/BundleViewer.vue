@@ -9,15 +9,6 @@ const props = defineProps<{
 const isJson = computed(() => props.filename.endsWith('.json'))
 const isImage = computed(() => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(props.filename))
 
-const prettyContent = computed(() => {
-  if (!isJson.value) return props.content
-  try {
-    return JSON.stringify(JSON.parse(props.content), null, 2)
-  } catch {
-    return props.content
-  }
-})
-
 const truncated = computed(() => {
   if (props.content.length <= 5000) return props.content
   return props.content.slice(0, 5000) + '\n... (内容已截断)'

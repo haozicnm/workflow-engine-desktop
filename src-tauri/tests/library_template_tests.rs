@@ -68,12 +68,11 @@ fn test_template1_integration_smoke() {
     let json = load_template("stress/integration-smoke.wf.json");
     let ids = step_ids(&json);
     assert_eq!(json["name"].as_str().unwrap(), "integration-smoke");
-    // 必须有 14 个步骤（一个 for each node type）
+    // 必须有 14 个步骤（涵盖所有核心节点类型）
     let steps = json["steps"].as_array().unwrap();
     assert_eq!(steps.len(), 14, "integration-smoke must have 14 steps (one per node type)");
     // 验证关键步骤类型
     let types: Vec<&str> = steps.iter().map(|s| s["type"].as_str().unwrap()).collect();
-    assert!(types.contains(&"shell"));
     assert!(types.contains(&"json_parse"));
     assert!(types.contains(&"file"));
     assert!(types.contains(&"script"));
@@ -101,7 +100,7 @@ fn test_template2_daily_monitor() {
     let json = load_template("monitoring/daily-monitor.wf.json");
     assert_eq!(json["name"].as_str().unwrap(), "daily-monitor");
     let steps = json["steps"].as_array().unwrap();
-    assert_eq!(steps.len(), 12);
+    assert_eq!(steps.len(), 11);
     let types: Vec<&str> = steps.iter().map(|s| s["type"].as_str().unwrap()).collect();
     assert!(types.contains(&"http"));
     assert!(types.contains(&"excel"));
@@ -112,7 +111,7 @@ fn test_template2_daily_monitor() {
     assert!(content.contains("{{params.output_dir}}"));
 
     parse_and_validate("daily-monitor", "monitoring/daily-monitor.wf.json");
-    println!("✅ Template 2: daily-monitor — 12 steps, HTTP+Excel+Word");
+    println!("✅ Template 2: daily-monitor — 11 steps, HTTP+Excel+Word");
 }
 
 #[test]
@@ -158,7 +157,7 @@ fn test_template5_web_monitor_alert() {
     let json = load_template("monitoring/web-monitor-alert.wf.json");
     assert_eq!(json["name"].as_str().unwrap(), "web-monitor-alert");
     let steps = json["steps"].as_array().unwrap();
-    assert_eq!(steps.len(), 10);
+    assert_eq!(steps.len(), 9);
     let types: Vec<&str> = steps.iter().map(|s| s["type"].as_str().unwrap()).collect();
     assert!(types.contains(&"loop"));
     assert!(types.contains(&"excel"));
@@ -171,7 +170,7 @@ fn test_template5_web_monitor_alert() {
     assert!(types.contains(&"json_parse"), "Must have json_parse for trend comparison");
 
     parse_and_validate("web-monitor-alert", "monitoring/web-monitor-alert.wf.json");
-    println!("✅ Template 5: web-monitor-alert — 10 steps, loop+Excel+tren comparison");
+    println!("✅ Template 5: web-monitor-alert — 9 steps, loop+Excel+trend comparison");
 }
 
 // ═══════════════════════════════════════

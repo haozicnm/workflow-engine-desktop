@@ -27,6 +27,12 @@ pub struct MapNode;
 
 #[async_trait]
 impl NodeExecutor for MapNode {
+    /// map 节点的 template 包含 {{__item}} 等迭代变量，
+    /// 必须在迭代期间由节点自行解析，不能由 executor 提前 resolve。
+    fn resolve_config_self(&self) -> bool {
+        true
+    }
+
     async fn execute(&self, step: &Step, ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
         let config = &step.config;
 

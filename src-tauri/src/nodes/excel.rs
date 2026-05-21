@@ -217,7 +217,7 @@ pub async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_
 }
 
 /// 读取工作表名称列表
-async fn excel_sheets(path: &str) -> Result<serde_json::Value> {
+pub async fn excel_sheets(path: &str) -> Result<serde_json::Value> {
     let path = path.to_string();
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let workbook: calamine::Xlsx<_> = calamine::open_workbook(&path)
