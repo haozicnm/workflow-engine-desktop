@@ -146,6 +146,16 @@ const translatedContainerDefs = computed(() =>
   }))
 )
 
+/** 按分类分组节点：内置节点在上，MCP 扩展折叠 */
+const groupedContainerDefs = computed(() => {
+  const all = translatedContainerDefs.value
+  const mcpNodes = all.filter(d => d.type.startsWith('mcp_'))
+  const baseNodes = all.filter(d => !d.type.startsWith('mcp_'))
+  return { baseNodes, mcpNodes }
+})
+
+const showMcpNodes = ref(false)
+
 watch(() => props.workflowId, async (newId) => {
   if (newId) {
     await store.loadWorkflow(newId)
@@ -621,9 +631,10 @@ onUnmounted(() => {
               <Teleport to="body">
                 <Transition name="fade">
                   <div v-if="showAddStep" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="showAddStep = false" @keydown.escape="showAddStep = false">
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[260px] shadow-xl" @click.stop>
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[280px] max-h-[70vh] overflow-y-auto shadow-xl" @click.stop>
+                      <!-- 基础节点 -->
                       <div
-                        v-for="def in translatedContainerDefs"
+                        v-for="def in groupedContainerDefs.baseNodes"
                         :key="def.type"
                         class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-secondary"
                         @click="onAddStep(def.type)"
@@ -632,6 +643,31 @@ onUnmounted(() => {
                         <div class="flex-1 min-w-0">
                           <div class="text-sm font-medium text-foreground">{{ def.label }}</div>
                           <div class="text-[11px] text-muted-foreground truncate">{{ def.description }}</div>
+                        </div>
+                      </div>
+
+                      <!-- MCP 扩展分隔 + 折叠 -->
+                      <div v-if="groupedContainerDefs.mcpNodes.length" class="border-t border-border mt-1 pt-1">
+                        <button
+                          class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs text-muted-foreground hover:bg-secondary transition-colors"
+                          @click="showMcpNodes = !showMcpNodes"
+                        >
+                          <span class="transition-transform duration-150" :class="showMcpNodes ? 'rotate-90' : ''">▶</span>
+                          <span>MCP 扩展 ({{ groupedContainerDefs.mcpNodes.length }})</span>
+                        </button>
+                        <div v-if="showMcpNodes" class="space-y-0.5">
+                          <div
+                            v-for="def in groupedContainerDefs.mcpNodes"
+                            :key="def.type"
+                            class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-secondary ml-4"
+                            @click="onAddStep(def.type)"
+                          >
+                            <ActionIcon :name="def.icon" cls="w-4 h-4 shrink-0" />
+                            <div class="flex-1 min-w-0">
+                              <div class="text-sm text-foreground">{{ def.label }}</div>
+                              <div class="text-[10px] text-muted-foreground truncate">{{ def.description }}</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

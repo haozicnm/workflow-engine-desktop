@@ -14,6 +14,7 @@ export interface ContainerDef {
   params: ActionParam[]
   isContainer?: boolean  // true = 有 actions 列表的容器，false/undefined = 简单步骤
   outputHint?: string    // 输出格式提示，显示在变量选择器中
+  category?: string      // 分组: 'core' | 'data' | 'file' | 'flow' | 'browser' | 'office' | 'system' | 'mcp'
 }
 
 // ─── 动作定义 ───

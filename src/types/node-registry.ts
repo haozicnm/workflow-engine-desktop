@@ -13,7 +13,7 @@ type TFn = (key: string, defaultMsg?: string) => string
 // ─── 容器定义 ───
 
 export const CONTAINER_DEFS: ContainerDef[] = [
-  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#79c0ff', isContainer: true, description: '网页操作：导航、点击、输入、提取', outputHint: 'actionId: value, ...', params: [
+  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#79c0ff', isContainer: true, category: 'browser', description: '网页操作：导航、点击、输入、提取', outputHint: 'actionId: value, ...', params: [
     { key: 'browser', label: '浏览器', type: 'select', options: [
       { label: 'Chromium', value: 'chromium' }, { label: 'Firefox', value: 'firefox' }, { label: 'WebKit', value: 'webkit' },
     ], default: 'chromium' },
