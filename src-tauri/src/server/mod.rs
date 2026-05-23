@@ -1,6 +1,7 @@
 // server/mod.rs — 独立 HTTP 服务器模块（axum）
-pub mod routes;
+pub mod events;
 pub mod handlers;
+pub mod routes;
 pub mod sse;
 
 use axum::Router;
