@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 use tracing::info;
+use tracing_subscriber::prelude::*;
 use workflow_engine::App;
 
 #[tokio::main]
