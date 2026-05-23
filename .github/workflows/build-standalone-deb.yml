@@ -1,0 +1,75 @@
+name: Build Standalone ARM64 deb
+
+# 独立 server 模式（无 Tauri）的 ARM64 deb 构建
+on:
+  push:
+    branches: [feat/standalone-server]
+  workflow_dispatch:
+
+jobs:
+  build-deb:
+    name: ARM64 standalone deb
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache Rust & Node
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+            node_modules
+          key: standalone-arm64-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
+          restore-keys: standalone-arm64-${{ runner.os }}-
+
+      - name: Build frontend
+        run: npm ci && npm run build
+
+      - name: Build binaries (no Tauri, no gui)
+        working-directory: src-tauri
+        run: |
+          cargo build --bin workflow-engine --release
+          cargo build --bin wf-cli --release
+
+      - name: Package deb
+        run: |
+          # 目录布局
+          mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
+
+          # 二进制 + 前端
+          cp src-tauri/target/release/workflow-engine pkg/opt/workflow-engine/
+          cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
+          cp -r dist pkg/opt/workflow-engine/
+
+          # systemd service
+          cp debian/wf-engine.service pkg/usr/lib/systemd/user/
+          cp debian/wf-engine.service pkg/opt/workflow-engine/
+
+          # control + postinst (可执行)
+          cp debian/control pkg/DEBIAN/
+          cp debian/postinst pkg/DEBIAN/
+          chmod 755 pkg/DEBIAN/postinst
+
+          # 运行时数据目录
+          mkdir -p pkg/opt/workflow-engine/data/logs
+
+          # 构建
+          dpkg-deb --build pkg workflow-engine-standalone_7.1.0_arm64.deb
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-standalone-arm64-deb
+          path: workflow-engine-standalone_7.1.0_arm64.deb
