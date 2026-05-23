@@ -1,0 +1,31 @@
+name: Build ARM64
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build wf-cli
+        working-directory: src-tauri
+        run: cargo build --bin wf-cli --release --features gui
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wf-cli-arm64
+          path: src-tauri/target/release/wf-cli
