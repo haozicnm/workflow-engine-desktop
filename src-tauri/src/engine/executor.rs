@@ -52,11 +52,6 @@ impl StepExecutor {
         register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
 
         // ── 文件节点（v3: 独立 executor） ──
-        
-        // ── 剪贴板节点（v3: 独立 executor） ──
-        register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
-        register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
-        register!(executors, "clipboard", crate::nodes::clipboard_container::ClipboardContainerNode);
 
         // ── 正则节点（v3: 独立 executor） ──
         register!(executors, "regex_extract", crate::nodes::regex::RegexExtractNode);
@@ -102,12 +97,16 @@ impl StepExecutor {
         register!(executors, "parallel", crate::nodes::parallel::ParallelNode);
         register!(executors, "map", crate::nodes::map::MapNode);
         register!(executors, "web_scrape", crate::nodes::web_scrape::WebScrapeNode);
+        #[cfg(feature = "gui")]
         register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
+        #[cfg(feature = "gui")]
         register!(executors, "window", crate::nodes::window::WindowNode);
         register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);
         register!(executors, "delay", crate::nodes::delay::DelayNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
+        #[cfg(feature = "gui")]
         register!(executors, "recording", crate::nodes::recording::RecordingNode);
+        #[cfg(feature = "gui")]
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
 

@@ -1,13 +1,16 @@
 // lib.rs — 库导出
 #![recursion_limit = "512"]
 pub mod cli;
-pub mod commands;
+pub mod server;
 pub mod data;
 pub mod engine;
+#[cfg(feature = "gui")]
 pub mod ipc;
 pub mod ipc_client;
 pub mod nodes;
+#[cfg(feature = "gui")]
 pub mod system;
+#[cfg(feature = "gui")]
 pub mod platform;
 
 use std::sync::Arc;

@@ -6,7 +6,7 @@ use std::time::Instant;
 use anyhow::{Result, Context};
 use tracing::{info, debug};
 use crate::data::models::{WorkflowMeta, RunInfo, StepRunInfo, RunHistoryItem, RunDetail, ScheduleInfo, StepLogEntry};
-use crate::commands::workflow::WorkflowListItem;
+use crate::data::models::WorkflowListItem;
 
 pub struct Database {
     pool: Pool<SqliteConnectionManager>,

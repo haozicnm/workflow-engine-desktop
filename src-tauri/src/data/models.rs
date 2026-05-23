@@ -68,6 +68,17 @@ pub struct StepLogEntry {
     pub timestamp: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct WorkflowListItem {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub enabled: bool,
+    pub locked: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// 定时计划
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduleInfo {

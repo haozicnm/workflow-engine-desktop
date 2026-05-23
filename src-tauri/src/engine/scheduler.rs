@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use anyhow::Result;
+#[cfg(feature = "gui")]
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
@@ -31,10 +32,16 @@ pub struct RunControl {
 /// - AtomicBool 用于循环中的高效非阻塞检查
 /// - CancellationToken 用于结构化取消，可在 tokio::select! 中实现即时响应
 /// - 所有状态标志均通过 tokio::sync::RwLock 保护的 HashMap 共享
+
+#[cfg(feature = "gui")]
+type AppHandleRef<'a> = Option<&'a tauri::AppHandle>;
+#[cfg(not(feature = "gui"))]
+type AppHandleRef<'a> = Option<&'a ()>;
+
 pub async fn run_workflow(
     workflow: &Workflow,
     run_id: &str,
-    app_handle: Option<&tauri::AppHandle>,
+    app_handle: AppHandleRef<'_>,
     db: &Arc<Database>,
     approval_store: Arc<ApprovalStore>,
     browser_channel: &str,
@@ -130,6 +137,7 @@ pub async fn run_workflow(
             update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
 
             // 通知前端：断点命中
+            #[cfg(feature = "gui")]
             if let Some(h) = app_handle {
                 if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
                 "run_id": run_id,
@@ -242,6 +250,7 @@ pub async fn run_workflow(
                 // 单步模式：执行完暂停
                 if ctrl.step_mode_flag.load(Ordering::Relaxed) {
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
+                    #[cfg(feature = "gui")]
                     if let Some(h) = app_handle {
                         if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
                         "run_id": run_id,
@@ -410,7 +419,9 @@ pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionCont
 }
 
 // ─── 事件推送 ───
+// GUI 模式: Tauri emit; CLI 模式: noop（后续改 SSE）
 
+#[cfg(feature = "gui")]
 fn emit_step_update(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, status: &str, output: Option<&serde_json::Value>) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
@@ -424,8 +435,11 @@ fn emit_step_update(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str,
     });
     if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
+#[cfg(not(feature = "gui"))]
+fn emit_step_update(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _total_steps: usize, _status: &str, _output: Option<&serde_json::Value>) {}
 
 /// 执行后推送变量快照，供前端实时监视
+#[cfg(feature = "gui")]
 fn emit_variable_snapshot(app: Option<&tauri::AppHandle>, run_id: &str, ctx: &ExecutionContext) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
@@ -435,7 +449,10 @@ fn emit_variable_snapshot(app: Option<&tauri::AppHandle>, run_id: &str, ctx: &Ex
     });
     if let Err(e) = app.emit("variable-update", event) { warn!("emit failed: {}", e); }
 }
+#[cfg(not(feature = "gui"))]
+fn emit_variable_snapshot(_app: Option<&()>, _run_id: &str, _ctx: &ExecutionContext) {}
 
+#[cfg(feature = "gui")]
 fn emit_step_update_with_error(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, error: &str) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
@@ -448,8 +465,11 @@ fn emit_step_update_with_error(app: Option<&tauri::AppHandle>, run_id: &str, ste
     });
     if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
+#[cfg(not(feature = "gui"))]
+fn emit_step_update_with_error(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _error: &str) {}
 
 /// 错误被忽略时的事件（status = ignored, 区别于 failed）
+#[cfg(feature = "gui")]
 fn emit_step_update_ignored(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, error: &str) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
@@ -463,7 +483,10 @@ fn emit_step_update_ignored(app: Option<&tauri::AppHandle>, run_id: &str, step_i
     });
     if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
 }
+#[cfg(not(feature = "gui"))]
+fn emit_step_update_ignored(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _total_steps: usize, _error: &str) {}
 
+#[cfg(feature = "gui")]
 fn emit_run_update(app: Option<&tauri::AppHandle>, run_id: &str, workflow_name: &str, status: &str) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
@@ -473,6 +496,8 @@ fn emit_run_update(app: Option<&tauri::AppHandle>, run_id: &str, workflow_name: 
     });
     if let Err(e) = app.emit("run-update", event) { warn!("emit failed: {}", e); }
 }
+#[cfg(not(feature = "gui"))]
+fn emit_run_update(_app: Option<&()>, _run_id: &str, _workflow_name: &str, _status: &str) {}
 
 
 /// 更新调试快照：将当前执行上下文存入共享状态
