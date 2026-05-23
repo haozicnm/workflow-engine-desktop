@@ -1,166 +1,31 @@
-// main.rs — Tauri 入口 (支持 --cli 模式)
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// main.rs — 独立 HTTP 服务器入口
+// 启动 axum HTTP 服务器，提供 API + Vue 前端静态文件服务
 
-use workflow_engine::App;
-use tauri::Manager;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing::{info, debug};
-use std::env;
 use std::sync::Arc;
-use clap::Parser;
+use tracing::info;
+use workflow_engine::App;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     setup_logging();
 
-    let app = App::new().expect("failed to initialize application");
+    let app = Arc::new(App::new().expect("failed to initialize application"));
 
-    // ── CLI 模式: workflow-engine.exe --cli <command> ──
-    if env::args().any(|a| a == "--cli") {
-        let mut args: Vec<String> = vec!["workflow-engine".to_string()];
-        args.extend(env::args().skip_while(|a| a != "--cli").skip(1));
-        let app = std::sync::Arc::new(app);
+    let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
 
-        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
-        rt.block_on(async {
-            let cli = match workflow_engine::cli::Cli::try_parse_from(args) {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("参数错误: {}\n使用 --help 查看帮助", e);
-                    std::process::exit(1);
-                }
-            };
-            if let Err(e) = workflow_engine::cli::run_cli(cli, app).await {
-                eprintln!("错误: {}", e);
-                std::process::exit(1);
-            }
-        });
-        return;
-    }
+    let router = workflow_engine::server::build_router(app)
+        .fallback_service(tower_http::services::ServeDir::new(&static_dir));
 
-    tauri::Builder::default()
-        .manage(app)
-        .setup(|tauri_app| {
-            // 系统托盘
-            workflow_engine::system::tray::setup(tauri_app)?;
+    info!("服务器启动: http://{}  (静态文件: {})", bind_addr, static_dir);
 
-            // 启动后台定时调度器
-            let handle = tauri_app.handle().clone();
-            let db = tauri_app.state::<App>().db.clone();
-            workflow_engine::system::scheduler::start(handle, db);
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .expect("failed to bind address");
 
-            // 启动 IPC WebSocket Server
-            let app_state = tauri_app.state::<App>();
-            let app = Arc::new(App {
-                db: app_state.db.clone(),
-                config: app_state.config.clone(),
-                cancel_flags: app_state.cancel_flags.clone(),
-                cancel_tokens: app_state.cancel_tokens.clone(),
-                pause_flags: app_state.pause_flags.clone(),
-                breakpoint_flags: app_state.breakpoint_flags.clone(),
-                step_mode_flags: app_state.step_mode_flags.clone(),
-                debug_snapshots: app_state.debug_snapshots.clone(),
-                run_semaphore: app_state.run_semaphore.clone(),
-                approval_store: app_state.approval_store.clone(),
-            });
-            let ipc_server = Arc::new(workflow_engine::ipc::IpcServer::new(
-                app,
-                tauri_app.handle().clone(),
-            ));
-            // block_on 确保 IPC 端口在 Tauri setup 返回前已绑定，
-            // 消除前端 onMounted → check_ipc 与 bind 之间的竞态。
-            let ipc = ipc_server.clone();
-            tauri::async_runtime::block_on(async move {
-                ipc.start().await;
-            });
-
-            Ok(())
-        })
-        .on_window_event(|window, event| {
-            // 关闭窗口时最小化到托盘（而不是退出）
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
-            }
-        })
-        .invoke_handler(tauri::generate_handler![
-            // Workflow CRUD
-            workflow_engine::commands::workflow::workflow_list,
-            workflow_engine::commands::workflow::workflow_create,
-            workflow_engine::commands::workflow::workflow_get,
-            workflow_engine::commands::workflow::workflow_update,
-            workflow_engine::commands::workflow::workflow_delete,
-            workflow_engine::commands::workflow::workflow_validate,
-            workflow_engine::commands::workflow::workflow_save_yaml,
-            workflow_engine::commands::workflow::workflow_auto_order,
-            workflow_engine::commands::workflow::workflow_create_from_recording,
-            workflow_engine::commands::workflow::recording_status,
-            workflow_engine::commands::workflow::step_test,
-            // Web scrape preview
-            workflow_engine::commands::run::web_scrape_preview,
-            // Run control
-            workflow_engine::commands::run::run_start,
-            workflow_engine::commands::run::run_pause,
-            workflow_engine::commands::run::run_resume,
-            workflow_engine::commands::run::run_cancel,
-            workflow_engine::commands::run::run_status,
-            workflow_engine::commands::run::run_logs,
-            workflow_engine::commands::run::run_list,
-            workflow_engine::commands::run::run_detail,
-            workflow_engine::commands::run::run_step_logs,
-            workflow_engine::commands::run::approval_response,
-            workflow_engine::commands::run::approval_list_pending,
-            // Debug
-            workflow_engine::commands::run::debug_step,
-            workflow_engine::commands::run::debug_continue,
-            workflow_engine::commands::run::debug_set_breakpoint,
-            workflow_engine::commands::run::debug_remove_breakpoint,
-            workflow_engine::commands::run::debug_get_breakpoints,
-            workflow_engine::commands::run::debug_vars,
-            // System
-            workflow_engine::commands::system::system_check_browser,
-            workflow_engine::commands::system::settings_get,
-            workflow_engine::commands::system::settings_update,
-            workflow_engine::commands::system::get_log_path,
-            workflow_engine::commands::system::open_log_dir,
-            workflow_engine::commands::system::clear_logs,
-            // Pipeline
-            workflow_engine::commands::pipeline::run_pipeline,
-            // Schedules
-            workflow_engine::commands::schedule::schedule_list,
-            workflow_engine::commands::schedule::schedule_create,
-            workflow_engine::commands::schedule::schedule_update,
-            workflow_engine::commands::schedule::schedule_delete,
-            // Workflow import/export (P4)
-            workflow_engine::commands::workflow::export_workflow,
-            workflow_engine::commands::workflow::import_workflow,
-            // Browser recording
-            workflow_engine::commands::browser_recording::browser_recording_start,
-            workflow_engine::commands::browser_recording::browser_recording_stop,
-            workflow_engine::commands::browser_recording::browser_pick_element,
-            workflow_engine::commands::browser_recording::browser_pick_session_start,
-            workflow_engine::commands::browser_recording::browser_pick_next,
-            workflow_engine::commands::browser_recording::browser_pick_session_stop,
-            // Preview
-            workflow_engine::commands::preview::preview_excel,
-            workflow_engine::commands::preview::preview_word,
-            workflow_engine::commands::preview::get_trajectory,
-            workflow_engine::commands::preview::get_bundle_files,
-            workflow_engine::commands::preview::read_bundle_file,
-            // Workflow lock/unlock
-            workflow_engine::commands::workflow::workflow_lock,
-            // Plugin system
-            workflow_engine::commands::plugin::plugin_pick_file,
-            workflow_engine::commands::plugin::plugin_install,
-            workflow_engine::commands::plugin::plugin_uninstall,
-            workflow_engine::commands::plugin::plugin_list,
-            // IPC health
-            workflow_engine::commands::system::check_ipc,
-            // Node type registry
-            workflow_engine::commands::system::node_list_types,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>())
+        .await
+        .expect("server error");
 }
 
 /// 日志持久化：同时输出到 stdout 和每日轮转的文件（保留 7 天）
@@ -220,7 +85,7 @@ fn cleanup_old_logs(
                     if let Ok(modified) = metadata.modified() {
                         if modified < cutoff {
                             let _ = std::fs::remove_file(&path);
-                            debug!("清理过期日志: {:?}", path.file_name());
+                            tracing::debug!("清理过期日志: {:?}", path.file_name());
                         }
                     }
                 }

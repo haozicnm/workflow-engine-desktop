@@ -1,21 +1,20 @@
+use std::sync::Arc;
 // server/handlers.rs — HTTP API 请求处理器
 //
 // 每个 handler 对应原 commands/ 中的一个 Tauri 命令。
 // 签名模式: async fn handler(State(app): State<Arc<App>>, ...) -> impl IntoResponse
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     response::{IntoResponse, Response, Json, sse::{Event, Sse}},
     http::StatusCode,
 };
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::convert::Infallible;
 use tokio_stream::StreamExt;
 use tracing::{info, warn, error};
 
-use crate::App;
 use crate::server::events;
 
 // ═══════════════════════════════════════════════════════════
@@ -209,15 +208,15 @@ pub struct WebScrapePreviewBody {
 // ═══════════════════════════════════════════════════════════
 
 pub async fn workflow_list(
-    State(app): State<Arc<App>>,
 ) -> Response {
+    let app = crate::server::state::get();
     map_err_resp(app.db.list_workflows().map_err(|e| format!("Failed to list workflows: {e}")))
 }
 
 pub async fn workflow_create(
-    State(app): State<Arc<App>>,
     Json(body): Json<WorkflowCreateBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -241,17 +240,17 @@ pub async fn workflow_create(
 }
 
 pub async fn workflow_get(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     map_not_found_resp(app.db.get_workflow(&id).map_err(|e| format!("Failed to get workflow (id={id}): {e}")))
 }
 
 pub async fn workflow_update(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
     Json(body): Json<WorkflowUpdateBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let now = chrono::Utc::now().to_rfc3339();
     match app.db.update_workflow(&id, body.name.as_deref(), body.description.as_deref(), body.enabled, &now) {
         Ok(()) => {
@@ -266,9 +265,9 @@ pub async fn workflow_update(
 }
 
 pub async fn workflow_delete(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let wf = match app.db.get_workflow(&id) {
         Ok(Some(wf)) => wf,
         Ok(None) => return err_response(StatusCode::NOT_FOUND, "Workflow not found"),
@@ -290,10 +289,10 @@ pub async fn workflow_delete(
 }
 
 pub async fn workflow_lock(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
     Json(body): Json<WorkflowLockBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     match app.db.set_workflow_locked(&id, body.locked) {
         Ok(()) => {
             events::emit("workflow-changed", serde_json::json!({
@@ -310,10 +309,10 @@ pub async fn workflow_lock(
 }
 
 pub async fn workflow_save_yaml(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
     Json(body): Json<WorkflowSaveYamlBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let wf = match crate::engine::parser::parse_workflow(&body.yaml) {
         Ok(wf) => wf,
         Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("Failed to parse workflow YAML: {e}")),
@@ -507,9 +506,9 @@ pub async fn workflow_import(
 }
 
 pub async fn workflow_create_from_recording(
-    State(app): State<Arc<App>>,
     Json(body): Json<WorkflowCreateFromRecordingBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
 
     let recorded_actions: Vec<RecordedAction> = body.actions
@@ -556,9 +555,9 @@ pub async fn workflow_create_from_recording(
 // ═══════════════════════════════════════════════════════════
 
 pub async fn run_start(
-    State(app): State<Arc<App>>,
     Json(body): Json<RunStartBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let workflow_id = body.workflow_id;
 
     // 1. 获取工作流 YAML
@@ -679,9 +678,9 @@ pub async fn run_start(
 }
 
 pub async fn run_cancel(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let flags = app.cancel_flags.read().await;
     let tokens = app.cancel_tokens.read().await;
 
@@ -699,9 +698,9 @@ pub async fn run_cancel(
 }
 
 pub async fn run_pause(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let flags = app.pause_flags.read().await;
     match flags.get(&run_id) {
         Some(flag) => {
@@ -718,9 +717,9 @@ pub async fn run_pause(
 }
 
 pub async fn run_resume(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let flags = app.pause_flags.read().await;
     match flags.get(&run_id) {
         Some(flag) => {
@@ -737,9 +736,9 @@ pub async fn run_resume(
 }
 
 pub async fn run_status(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let run = match app.db.get_run(&run_id) {
         Ok(Some(r)) => r,
         Ok(None) => return err_response(StatusCode::NOT_FOUND, "运行不存在"),
@@ -757,9 +756,9 @@ pub async fn run_status(
 }
 
 pub async fn run_list(
-    State(app): State<Arc<App>>,
     Query(query): Query<RunListQuery>,
 ) -> Response {
+    let app = crate::server::state::get();
     map_err_resp(app.db.list_runs(
         query.workflow_id.as_deref(),
         query.limit.unwrap_or(50),
@@ -767,9 +766,9 @@ pub async fn run_list(
 }
 
 pub async fn run_detail(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     match app.db.get_run_detail(&run_id) {
         Ok(Some(detail)) => ok_response(detail),
         Ok(None) => err_response(StatusCode::NOT_FOUND, "运行记录不存在"),
@@ -778,10 +777,10 @@ pub async fn run_detail(
 }
 
 pub async fn run_logs(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
     Query(query): Query<RunLogsQuery>,
 ) -> Response {
+    let app = crate::server::state::get();
     let mut steps = match app.db.get_step_runs(&run_id) {
         Ok(s) => s,
         Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -806,9 +805,9 @@ pub async fn run_logs(
 }
 
 pub async fn run_step_logs(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     map_err_resp(app.db.get_step_logs(&run_id).map_err(|e| e.to_string()))
 }
 
@@ -817,8 +816,8 @@ pub async fn run_step_logs(
 // ═══════════════════════════════════════════════════════════
 
 pub async fn approval_list_pending(
-    State(app): State<Arc<App>>,
 ) -> Response {
+    let app = crate::server::state::get();
     let mut live = app.approval_store.pending().await;
     let live_ids: std::collections::HashSet<String> = live.iter().map(|e| e.id.clone()).collect();
 
@@ -851,9 +850,9 @@ pub async fn approval_list_pending(
 }
 
 pub async fn approval_respond(
-    State(app): State<Arc<App>>,
     Json(body): Json<ApprovalRespondBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let option_str = body.option.unwrap_or_else(|| {
         if body.approved { "同意".into() } else { "拒绝".into() }
     });
@@ -919,8 +918,8 @@ pub async fn node_list_types() -> Response {
 }
 
 pub async fn settings_get(
-    State(app): State<Arc<App>>,
 ) -> Response {
+    let app = crate::server::state::get();
     let config = app.config.read().await;
     ok_response(serde_json::json!({
         "theme": config.theme,
@@ -935,9 +934,9 @@ pub async fn settings_get(
 }
 
 pub async fn settings_update(
-    State(app): State<Arc<App>>,
     Json(body): Json<SettingsUpdateBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let mut config = app.config.write().await;
     config.theme = body.theme;
     config.language = body.language;
@@ -1152,15 +1151,15 @@ pub async fn check_ipc() -> Response {
 // ═══════════════════════════════════════════════════════════
 
 pub async fn schedule_list(
-    State(app): State<Arc<App>>,
 ) -> Response {
+    let app = crate::server::state::get();
     map_err_resp(app.db.list_schedules().map_err(|e| e.to_string()))
 }
 
 pub async fn schedule_create(
-    State(app): State<Arc<App>>,
     Json(body): Json<ScheduleCreateBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let fields: Vec<&str> = body.cron_expr.split_whitespace().collect();
     let quartz = match fields.len() {
         5 => format!("0 {} *", body.cron_expr),
@@ -1187,10 +1186,10 @@ pub async fn schedule_create(
 }
 
 pub async fn schedule_update(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
     Json(body): Json<ScheduleUpdateBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     if let Some(ref expr) = body.cron_expr {
         let fields: Vec<&str> = expr.split_whitespace().collect();
         let quartz = match fields.len() {
@@ -1216,9 +1215,9 @@ pub async fn schedule_update(
 }
 
 pub async fn schedule_delete(
-    State(app): State<Arc<App>>,
     Path(id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     match app.db.delete_schedule(&id) {
         Ok(()) => {
             events::emit("schedule-changed", serde_json::json!({
@@ -1306,9 +1305,9 @@ pub async fn read_bundle_file(
 // ═══════════════════════════════════════════════════════════
 
 pub async fn step_test(
-    State(app): State<Arc<App>>,
     Json(body): Json<StepTestBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     use crate::engine::context::ExecutionContext;
     use crate::engine::executor::StepExecutor;
     use crate::engine::workflow::{Step, Workflow};
@@ -1373,9 +1372,9 @@ pub async fn recording_status() -> Response {
 // ═══════════════════════════════════════════════════════════
 
 pub async fn debug_step(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let flags = app.step_mode_flags.read().await;
     match flags.get(&run_id) {
         Some(flag) => {
@@ -1395,9 +1394,9 @@ pub async fn debug_step(
 }
 
 pub async fn debug_continue(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     use std::sync::atomic::Ordering;
     if let Some(bp) = app.breakpoint_flags.read().await.get(&run_id) {
         bp.store(false, Ordering::Relaxed);
@@ -1413,9 +1412,9 @@ pub async fn debug_continue(
 }
 
 pub async fn debug_set_breakpoint(
-    State(app): State<Arc<App>>,
     Json(body): Json<DebugSetBreakpointBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let key = format!("breakpoints:{}", body.workflow_id);
     let mut bps: Vec<String> = app.config.read().await
         .get_temp(&key)
@@ -1429,9 +1428,9 @@ pub async fn debug_set_breakpoint(
 }
 
 pub async fn debug_remove_breakpoint(
-    State(app): State<Arc<App>>,
     Json(body): Json<DebugSetBreakpointBody>,
 ) -> Response {
+    let app = crate::server::state::get();
     let key = format!("breakpoints:{}", body.workflow_id);
     let mut bps: Vec<String> = app.config.read().await
         .get_temp(&key)
@@ -1443,9 +1442,9 @@ pub async fn debug_remove_breakpoint(
 }
 
 pub async fn debug_get_breakpoints(
-    State(app): State<Arc<App>>,
     Path(workflow_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let key = format!("breakpoints:{}", workflow_id);
     let bps: Vec<String> = app.config.read().await
         .get_temp(&key)
@@ -1455,9 +1454,9 @@ pub async fn debug_get_breakpoints(
 }
 
 pub async fn debug_vars(
-    State(app): State<Arc<App>>,
     Path(run_id): Path<String>,
 ) -> Response {
+    let app = crate::server::state::get();
     let snapshots = app.debug_snapshots.read().await;
     ok_response(snapshots.get(&run_id).cloned().unwrap_or(serde_json::json!({
         "variables": {},

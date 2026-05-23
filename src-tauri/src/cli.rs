@@ -113,6 +113,15 @@ pub enum Commands {
         #[arg(short = 'o', long)]
         output: Option<String>,
     },
+    /// 启动 HTTP 服务器（提供 API + 前端静态文件）
+    Serve {
+        /// 监听地址 (默认: 0.0.0.0:3000)
+        #[arg(long, default_value = "0.0.0.0:3000")]
+        bind: String,
+        /// 静态文件目录 (默认: dist)
+        #[arg(long, default_value = "dist")]
+        static_dir: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -299,6 +308,7 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::RunFile { file, vars } => cmd_run_file(&app, &file, &vars).await,
         Commands::Preview { run_or_action, step_id, json } => cmd_preview(&run_or_action, step_id.as_deref(), json),
         Commands::Skill { file_or_id, output } => cmd_skill(&app, &file_or_id, output.as_deref()),
+        Commands::Serve { bind, static_dir } => cmd_serve(app, &bind, &static_dir).await,
     }
 }
 
@@ -1728,4 +1738,21 @@ fn cmd_skill(app: &App, file_or_id: &str, output: Option<&str>) -> Result<(), St
         None => println!("{}", skill_md),
     }
     Ok(())
+}
+
+async fn cmd_serve(app: Arc<App>, bind: &str, static_dir: &str) -> Result<(), String> {
+    use tower_http::services::ServeDir;
+
+    let router = crate::server::build_router(app)
+        .fallback_service(ServeDir::new(static_dir.to_string()));
+
+    tracing::info!("服务器启动: http://{}  (静态文件: {})", bind, static_dir);
+
+    let listener = tokio::net::TcpListener::bind(bind)
+        .await
+        .map_err(|e| format!("绑定地址失败: {}", e))?;
+
+    axum::serve(listener, router.into_make_service())
+        .await
+        .map_err(|e| format!("服务器错误: {}", e))
 }
