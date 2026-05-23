@@ -14,7 +14,7 @@ pub async fn plugin_pick_file() -> Result<Option<String>, String> {
 
 #[tauri::command]
 pub async fn plugin_install(
-    app: State<'_, App>,
+    _app: State<'_, App>,
     wfplug_path: String,
 ) -> Result<serde_json::Value, String> {
     let path = std::path::Path::new(&wfplug_path);
@@ -36,7 +36,7 @@ pub async fn plugin_install(
 
 #[tauri::command]
 pub async fn plugin_uninstall(
-    app: State<'_, App>,
+    _app: State<'_, App>,
     name: String,
 ) -> Result<serde_json::Value, String> {
     plugin_manager::uninstall_plugin(&name)
@@ -50,7 +50,7 @@ pub async fn plugin_uninstall(
 
 #[tauri::command]
 pub async fn plugin_list(
-    app: State<'_, App>,
+    _app: State<'_, App>,
 ) -> Result<serde_json::Value, String> {
     let plugins = plugin_manager::list_plugins()
         .map_err(|e| format!("获取插件列表失败: {e}"))?;
