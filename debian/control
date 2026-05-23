@@ -1,0 +1,12 @@
+Package: workflow-engine
+Version: 7.1.0
+Section: utils
+Priority: optional
+Architecture: arm64
+Depends: libc6 (>= 2.27)
+Maintainer: haozi <haozi@example.com>
+Homepage: https://github.com/haozicnm/workflow-engine-desktop
+Description: Workflow Engine standalone HTTP server
+  A workflow automation engine with 14+ step types
+  (HTTP, shell, file, Excel, browser, condition, loop, etc.).
+  Provides REST API + Vue 3 web frontend via embedded axum server.

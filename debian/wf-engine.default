@@ -1,0 +1,5 @@
+# Workflow Engine 环境变量
+# 复制到: /etc/default/workflow-engine 或通过 systemctl --user set-environment 设置
+
+BIND=127.0.0.1:19528
+STATIC_DIR=/opt/workflow-engine/dist

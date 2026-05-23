@@ -1,0 +1,29 @@
+#!/bin/bash
+# postinst — Workflow Engine deb 安装后脚本
+
+set -e
+
+# 安装 systemd user service
+if command -v systemctl &>/dev/null; then
+    # 复制 service 文件到系统 user 目录（所有用户可用）
+    install -D -m 644 /opt/workflow-engine/wf-engine.service \
+        /usr/lib/systemd/user/wf-engine.service
+
+    echo "✅ systemd user service 已安装: /usr/lib/systemd/user/wf-engine.service"
+    echo ""
+    echo "手动启动: systemctl --user enable --now wf-engine"
+    echo "查看状态: systemctl --user status wf-engine"
+    echo "查看日志: journalctl --user -u wf-engine -f"
+else
+    echo "⚠ systemd 不可用，跳过 service 安装"
+fi
+
+# 创建数据目录
+mkdir -p /opt/workflow-engine/data/logs
+chmod 755 /opt/workflow-engine/data
+
+echo ""
+echo "Workflow Engine v7.1.0 安装完成"
+echo "================================="
+echo "服务地址: http://127.0.0.1:19528"
+echo "API 健康: http://127.0.0.1:19528/api/health"
