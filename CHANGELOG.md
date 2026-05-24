@@ -1,5 +1,41 @@
 # Changelog
 
+## v7.1.0 (2026-05-24) — MCP Expansion + Namespace Isolation
+
+### Rhai Context Namespace Isolation
+- **`__vars__` object**: User variables now injected into `__vars__` Rhai map instead of flat scope. Field name collisions between step outputs and user variables eliminated at the architecture level
+- **resolve_var layers**: `step_X.field` → step_outputs; `vars.xxx` → variables; bare `xxx` → step_outputs → variables fallback (backward compatible)
+- **Iteration variables** (`__item`, `__index`, `__index1`, `loop`) kept at top-level scope (lifecycle limited to one iteration)
+
+### MCP Node Expansion
+- **6 Python sidecar servers**: `mcp_http_server`, `mcp_json_server`, `mcp_script_server`, `mcp_excel_server`, `mcp_word_server`, `mcp_web_scrape_server`, `mcp_shell_server`
+- **13 MCP node types** registered alongside existing nodes (dual-track architecture)
+- **`mcp_node.rs`** wrapper: creates MCP executor with fallback to native node on failure
+
+### Feature Flags
+- **`gui` feature**: Gates desktop-only nodes (mouse_keyboard, window, recording, print) and Tauri build
+- **`cli` feature**: Default feature, enables CLI binary (`wf-cli`)
+- **axum + tower-http**: HTTP server dependencies added for headless mode
+
+### Template Updates
+- **web-monitor-alert**: File-based init (no shell dependency), trend comparison with `json_parse`
+- **file-batch-approval**: Cross-platform `work_dir` paths, file-based file preparation
+- **daily-monitor**: Removed shell init step, direct HTTP start
+
+### CSP Fix
+- **Vue runtime-only build**: `vite.config.ts` aliases `vue` → `vue.runtime.esm-bundler.js` to avoid `unsafe-eval` CSP violation
+
+### Audit Fixes (2026-05-23)
+- **IPC token auth re-enabled**: was disabled during debugging, now enforced
+- **i18n**: `containerConfig.noParams` key added (EN/ZH), ContainerConfigPanel hardcoded Chinese replaced
+- **ParamField**: `hint` field now rendered below parameter labels
+
+### Testing
+- 46 lib tests + 26 integration tests passing
+- 8 template library validation tests
+
+---
+
 ## v7.0.0 (2026-05-19) — First Production Release
 
 ### Security
