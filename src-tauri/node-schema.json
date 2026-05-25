@@ -94,5 +94,5 @@
     "ai":      { "label": "AI",       "order": 10 },
     "mcp":     { "label": "MCP 扩展", "order": 11 }
   },
-  "container_types": ["browser", "excel", "word", "logic", "file", "clipboard", "cursor", "loop", "while"]
+  "container_types": ["browser", "excel", "word", "logic", "file", "cursor", "loop", "while"]
 }
