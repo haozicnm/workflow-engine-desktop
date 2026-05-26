@@ -26,6 +26,7 @@ export default defineConfig({
         theme_color: "#0d1117",
         background_color: "#0d1117",
         display: "standalone",
+        display_override: ["window-controls-overlay"],
         orientation: "any",
         start_url: "/",
         categories: ["productivity", "developer-tools", "utilities"],
@@ -43,8 +44,30 @@ export default defineConfig({
             purpose: "any maskable",
           },
         ],
+        shortcuts: [
+          {
+            name: "新建工作流",
+            short_name: "新建",
+            description: "创建新的工作流",
+            url: "/?action=new",
+            icons: [{ src: "/icon-192.png", sizes: "192x192" }],
+          },
+          {
+            name: "运行记录",
+            short_name: "记录",
+            description: "查看最近运行记录",
+            url: "/?view=history",
+          },
+          {
+            name: "模板库",
+            short_name: "模板",
+            description: "浏览工作流模板",
+            url: "/?view=templates",
+          },
+        ],
       },
       workbox: {
+        navigateFallback: "/offline.html",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {

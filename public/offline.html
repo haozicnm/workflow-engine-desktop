@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>离线 — Workflow Engine</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+    }
+    .card {
+      text-align: center;
+      padding: 3rem 2rem;
+      max-width: 400px;
+    }
+    .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; color: #f0f6fc; }
+    p { font-size: 0.875rem; color: #8b949e; line-height: 1.6; }
+    .btn {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: 0.5rem 1.25rem;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 0.375rem;
+      color: #c9d1d9;
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #30363d; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>网络不可用</h1>
+    <p>请检查网络连接后刷新页面</p>
+    <button class="btn" onclick="location.reload()">重新连接</button>
+  </div>
+</body>
+</html>
