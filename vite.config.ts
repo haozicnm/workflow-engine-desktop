@@ -22,11 +22,14 @@ export default defineConfig({
         name: "Workflow Engine",
         short_name: "Workflow",
         description: "可视化工作流引擎 — 编排、执行、监控",
-        theme_color: "#1e1e2e",
-        background_color: "#1e1e2e",
+        lang: "zh-CN",
+        theme_color: "#0d1117",
+        background_color: "#0d1117",
         display: "standalone",
         orientation: "any",
         start_url: "/",
+        categories: ["productivity", "developer-tools", "utilities"],
+        dir: "ltr",
         icons: [
           {
             src: "/icon-192.png",

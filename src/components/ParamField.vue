@@ -217,7 +217,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
                 class="w-full justify-start h-auto px-2 py-1 pl-5 text-[11px]"
                 @click="selectRef(group.stepRef)"
               >
-                ⚡ {{ t('actionRow.entireOutput') }}
+                {{ t('actionRow.entireOutput') }}
               </Button>
               <!-- Actions -->
               <Button
@@ -228,7 +228,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
                 class="w-full justify-start h-auto px-2 py-1 pl-5 text-[11px]"
                 @click="selectRef(act.ref)"
               >
-                ⚡ {{ act.label }}
+                {{ act.label }}
                 <span v-if="act.isSameContainer" class="text-[10px] text-primary/70 ml-0.5">{{ t('actionRow.sameContainerBadge') }}</span>
               </Button>
             </div>

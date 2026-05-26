@@ -82,7 +82,7 @@ onMounted(loadPlugins)
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
       <div>
-        <h2 class="text-lg font-semibold text-foreground">🔌 插件管理</h2>
+        <h2 class="text-lg font-semibold text-foreground">插件管理</h2>
         <p class="text-xs text-muted-foreground mt-0.5">安装和管理 workflow 功能插件</p>
       </div>
       <div class="flex items-center gap-2">
@@ -135,13 +135,13 @@ onMounted(loadPlugins)
               <p class="text-xs text-muted-foreground line-clamp-2 mb-2">{{ p.description }}</p>
               <div class="flex items-center gap-3 text-[10px] text-muted-foreground">
                 <span v-if="p.author" class="flex items-center gap-1">
-                  <span>👤</span> {{ p.author }}
+                  {{ p.author }}
                 </span>
                 <span class="flex items-center gap-1" title="MCP 节点数">
-                  <span>🔌</span> {{ p.mcp_count }} 个节点
+                  {{ p.mcp_count }} 个节点
                 </span>
                 <span class="flex items-center gap-1" title="模板数">
-                  <span>📄</span> {{ p.template_count }} 个模板
+                  {{ p.template_count }} 个模板
                 </span>
               </div>
             </div>
