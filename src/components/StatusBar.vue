@@ -22,6 +22,15 @@ onMounted(() => {
 })
 onUnmounted(() => { if (ipcTimer) clearInterval(ipcTimer) })
 
+// API health polling
+let apiTimer: ReturnType<typeof setInterval> | null = null
+const { refreshApiStatus } = useGlobalStatus()
+onMounted(() => {
+  refreshApiStatus()
+  apiTimer = setInterval(refreshApiStatus, 15_000)
+})
+onUnmounted(() => { if (apiTimer) clearInterval(apiTimer) })
+
 const runningList = computed(() => {
   void now.value
   return Array.from(state.runningWorkflows.values())
@@ -60,6 +69,14 @@ function formatNextRun(iso: string | null): string {
       <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
       <span v-if="state.ipcOnline" class="text-muted-foreground/70">{{ t('dashboard.daemonStatus') }}</span>
       <span v-else class="text-destructive/70">{{ t('dashboard.daemonOffline') }}</span>
+    </span>
+
+    <span class="text-border">│</span>
+
+    <!-- API server status -->
+    <span class="flex items-center gap-1.5" :title="state.apiOnline ? '后端服务在线' : '后端服务离线'">
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.apiOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
+      <span class="text-muted-foreground/70">{{ state.apiOnline ? '服务在线' : '服务离线' }}</span>
     </span>
 
     <span class="text-border">│</span>

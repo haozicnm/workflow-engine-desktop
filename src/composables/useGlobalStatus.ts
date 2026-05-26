@@ -24,6 +24,7 @@ interface GlobalStatusState {
   scheduledWorkflows: ScheduledWorkflow[]
   schedulesLoaded: boolean
   ipcOnline: boolean
+  apiOnline: boolean
 }
 
 const state = reactive<GlobalStatusState>({
@@ -31,6 +32,7 @@ const state = reactive<GlobalStatusState>({
   scheduledWorkflows: [],
   schedulesLoaded: false,
   ipcOnline: false,
+  apiOnline: false,
 })
 
 let scheduleRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -90,6 +92,15 @@ export function useGlobalStatus() {
     }
   }
 
+  async function refreshApiStatus() {
+    try {
+      const resp = await fetch('/api/health')
+      state.apiOnline = resp.status === 200
+    } catch (e) {
+      state.apiOnline = false
+    }
+  }
+
   function startSchedulePolling() {
     if (scheduleRefreshTimer) return
     refreshSchedules()
@@ -110,6 +121,7 @@ export function useGlobalStatus() {
     unregisterRun,
     refreshSchedules,
     refreshIpcStatus,
+    refreshApiStatus,
     startSchedulePolling,
     stopSchedulePolling,
   }
