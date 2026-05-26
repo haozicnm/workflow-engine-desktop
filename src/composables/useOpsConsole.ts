@@ -3,7 +3,7 @@ import { ref, readonly, shallowRef } from 'vue'
 export interface OpLogEntry {
   time: string
   source: 'gui' | 'agent'
-  category: 'invoke' | 'event'
+  category: 'invoke' | 'event' | 'http'
   name: string
   status: 'start' | 'ok' | 'fail'
   detail?: string

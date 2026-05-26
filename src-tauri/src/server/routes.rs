@@ -1,9 +1,27 @@
 // server/routes.rs — 路由定义（无状态版本，handlers 通过 state::get() 获取 App）
-use axum::{Router, routing::{get, post, put, delete}};
+use axum::{Router, routing::{get, post, put, delete}, extract::Path, response::IntoResponse};
 use crate::server::handlers;
+
+/// 静态测试路由：无参数
+async fn test_static() -> impl IntoResponse {
+    "STATIC_ROUTE_OK".to_string()
+}
+
+/// 测试路由：验证路由是否匹配 (无 extractor，但 route 有 {id})
+async fn test_param() -> impl IntoResponse {
+    "test_param_no_extractor".to_string()
+}
+
+/// 测试路由2：验证路径参数是否工作
+async fn test_param2(Path(id): Path<String>) -> impl IntoResponse {
+    format!("test_param2: id={id}")
+}
 
 pub fn build() -> Router {
     Router::new()
+        .route("/api/__static", get(test_static))
+        .route("/api/__test/{id}", get(test_param))
+        .route("/api/__test2/{id}", get(test_param2))
         .route("/api/events", get(handlers::events_sse))
         .route("/api/health", get(handlers::system_health))
         .route("/api/settings", get(handlers::settings_get))

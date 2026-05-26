@@ -1,6 +1,7 @@
 // server/mod.rs — 独立 HTTP 服务器模块（axum）
 pub mod events;
 pub mod handlers;
+pub mod managers;
 pub mod routes;
 pub mod sse;
 pub mod state;
