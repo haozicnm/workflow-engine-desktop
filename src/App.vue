@@ -155,7 +155,7 @@ function statusColor(status: string): string {
   >
     <ErrorBoundary>
       <SidebarProvider :default-open="true">
-        <div class="flex h-screen w-full overflow-hidden bg-background">
+        <div class="flex min-h-[100dvh] w-full overflow-hidden bg-background">
           <!-- Sidebar: workflow list -->
           <Sidebar>
             <Dashboard
@@ -325,7 +325,7 @@ function statusColor(status: string): string {
 
 <style scoped>
 .app-shell {
-  height: 100vh;
+  min-height: 100dvh;
   background: var(--color-background);
   color: var(--color-foreground);
   overflow-y: auto;

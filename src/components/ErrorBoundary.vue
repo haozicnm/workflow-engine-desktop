@@ -29,7 +29,7 @@ function dismiss() {
 
 <template>
   <slot v-if="!error" />
-  <div v-else class="h-screen flex items-center justify-center bg-background text-foreground font-sans">
+  <div v-else class="min-h-[100dvh] flex items-center justify-center bg-background text-foreground font-sans">
     <div class="text-center p-10 bg-card border border-border rounded-xl max-w-[480px]">
       <AlertTriangle class="w-12 h-12 text-warning mx-auto mb-4" />
       <h2 class="text-lg font-semibold mb-3">出现了一个错误</h2>

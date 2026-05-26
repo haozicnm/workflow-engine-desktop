@@ -41,9 +41,10 @@ const sizeClasses: Record<string, string> = {
 
 const classes = computed(() =>
   cn(
-    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors',
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'disabled:pointer-events-none disabled:opacity-50',
+    'active:scale-[0.98]',
     variantClasses[props.variant],
     sizeClasses[props.size],
     props.class,
