@@ -1,5 +1,27 @@
 # Changelog
 
+## v7.1.1 (2026-05-26) — PWA Brand + Windows Launcher
+
+### PWA 品牌升级
+- **新图标**: 四节点流转 + 蓝紫渐变设计（SVG + 192/512 PNG）
+- **Manifest 增强**: lang→zh-CN, categories, #0d1117 暗色主题
+- **Service Worker**: Workbox precache + API NetworkFirst 策略
+
+### Windows 一键启动
+- **start.bat**: 双击自动启动服务 → 打开浏览器 → 提示安装 PWA
+- **发布包**: `workflow-engine-v7.1.1-windows-x64.zip` (6 MB)
+
+### PWA 布局修复
+- `min-h-dvh` → `h-dvh`（修复 PWA standalone 模式滚动问题）
+- `.app-shell` `overflow-y:auto` → `overflow:hidden`
+
+### Taste 补漏
+- Dashboard/Plugins/ParamField 残留 emoji 清理
+- i18n 补充 `nav.plugins` key
+
+### 模板修复
+- `integration-smoke`: 移除已废弃的 clipboard 节点
+
 ## v7.1.0 (2026-05-24) — MCP Expansion + Namespace Isolation
 
 ### Rhai Context Namespace Isolation
