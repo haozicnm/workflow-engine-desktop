@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Hand } from 'lucide-vue-next'
+import { Hand, Lightbulb, Search, Star } from 'lucide-vue-next'
 import { useToast } from '../composables/useToast'
 import { safeListen, safeInvoke } from '../utils/tauri'
 import Button from '@/components/ui/button/Button.vue'
@@ -145,15 +145,15 @@ onUnmounted(() => {
 
 <template>
   <!-- 浮动按钮：显示待审批数量 -->
-  <button
+  <Button
     v-if="pendingCount > 0"
-    class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors cursor-pointer"
+    class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full px-4 py-3 shadow-lg"
     @click="visible = !visible"
   >
     <Hand class="w-5 h-5" />
     <span class="font-medium">{{ t('approval.pending') }}</span>
     <Badge variant="secondary" class="ml-1">{{ pendingCount }}</Badge>
-  </button>
+  </Button>
 
   <!-- 侧边面板 -->
   <Teleport to="body">
@@ -169,12 +169,14 @@ onUnmounted(() => {
             <h2 class="text-base font-semibold text-foreground">{{ t('approval.pending') }}</h2>
             <Badge variant="secondary">{{ pendingCount }}</Badge>
           </div>
-          <button
-            class="text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer"
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7"
             @click="visible = false"
           >
             ✕
-          </button>
+          </Button>
         </div>
 
         <!-- 审批列表 -->
@@ -220,12 +222,13 @@ onUnmounted(() => {
 
             <!-- 上游数据（可展开） -->
             <div v-if="item.item">
-              <button
-                class="text-xs text-primary hover:underline py-0.5 cursor-pointer"
+              <Button
+                variant="link"
+                class="text-xs px-0 py-0.5 h-auto"
                 @click="item.showItem = !item.showItem"
               >
                 {{ item.showItem ? '▼' : '▶' }} {{ t('approval.viewData') }}
-              </button>
+              </Button>
               <pre
                 v-if="item.showItem"
                 class="mt-1 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground font-mono max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all"
@@ -242,7 +245,7 @@ onUnmounted(() => {
                 size="sm"
                 @click="decide(item, opt)"
               >
-                <span v-if="opt === item.recommended" class="mr-1">⭐</span>
+                <Star v-if="opt === item.recommended" class="w-3 h-3 mr-1 text-warning fill-warning" />
                 {{ opt }}
               </Button>
             </div>
@@ -252,7 +255,7 @@ onUnmounted(() => {
               v-if="item.recommended"
               class="text-xs text-muted-foreground"
             >
-              💡 {{ t('approval.recommendedLabel') }}: {{ item.recommended }}
+              <Lightbulb class="w-3 h-3 inline-block mr-1 text-warning" />{{ t('approval.recommendedLabel') }}: {{ item.recommended }}
             </p>
 
             <!-- 条件推荐原因（新增） -->
@@ -260,7 +263,7 @@ onUnmounted(() => {
               v-if="item.recommendation_reason"
               class="text-xs text-primary whitespace-pre-wrap"
             >
-              🔍 {{ item.recommendation_reason }}
+              <Search class="w-3 h-3 inline-block mr-1 text-primary" />{{ item.recommendation_reason }}
             </p>
 
             <!-- 审批意见 -->

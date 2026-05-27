@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ActionIcon from './ActionIcon.vue'
+import Button from './ui/button/Button.vue'
 
 const { t } = useI18n()
 
@@ -77,10 +78,12 @@ const iconMap = {
   >
     <ActionIcon :name="iconMap[type || 'info']" cls="w-4 h-4 shrink-0" />
     <span class="flex-1">{{ message }}</span>
-    <button
-      class="shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 transition-colors"
+    <Button
+      variant="ghost"
+      size="icon"
+      class="shrink-0 w-5 h-5 text-primary-foreground hover:bg-white/20 hover:text-primary-foreground"
       @click="dismissNow"
       :aria-label="t('common.close')"
-    >✕</button>
+    >✕</Button>
   </div>
 </template>

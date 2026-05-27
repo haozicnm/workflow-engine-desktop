@@ -149,9 +149,9 @@ const conditionLabel = computed(() => {
   if (!rc) return ''
   const refStep = (props.steps || []).find(s => s.id === rc.ref)
   const name = refStep?.label || rc.ref
-  if (rc.when === 'both') return `📌 ${name}`
+  if (rc.when === 'both') return `${name}`
   if (rc.when === 'merge') return `↔ ${name}`
-  return `📌 ${name}=${rc.when === 'true' ? 'T' : 'F'}`
+  return `${name}=${rc.when === 'true' ? 'T' : 'F'}`
 })
 function setCondition(ref: string, when: 'true' | 'false' | 'both' | 'merge') {
   if (!ref) {
@@ -286,28 +286,31 @@ function closeAllMenus() {
         :style="menuPosStyle"
       >
           <!-- 容器设置 -->
-          <button
-            class="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
+          <Button
+            variant="ghost"
+            class="w-full justify-start px-3 py-2 text-sm"
             @click="emit('open-config', step.id); closeAllMenus()"
           >
             <Settings class="w-4 h-4 inline" /> {{ t('stepCard.containerSettings') }}
-          </button>
+          </Button>
 
           <!-- 录制 (Browser only) -->
-          <button
+          <Button
             v-if="step.type === 'browser' && !isRecording"
-            class="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent flex items-center gap-2 transition-colors"
+            variant="ghost"
+            class="w-full justify-start px-3 py-2 text-sm"
             @click="emit('start-recording', step.id); closeAllMenus()"
           >
             <Circle class="w-4 h-4 text-red-500 fill-red-500" /> {{ t('stepCard.recordActions') }}
-          </button>
-          <button
+          </Button>
+          <Button
             v-if="step.type === 'browser' && isRecording"
-            class="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 flex items-center gap-2 transition-colors"
+            variant="ghost"
+            class="w-full justify-start px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
             @click="emit('stop-recording', step.id); closeAllMenus()"
           >
             <Square class="w-4 h-4" /> {{ t('stepCard.stopRecording') }}
-          </button>
+          </Button>
 
           <!-- 条件执行 -->
           <div v-if="step.type !== 'logic' && logicSteps.length > 0" class="border-t border-border mt-1 pt-1">
@@ -320,7 +323,7 @@ function closeAllMenus() {
               <div class="px-3 py-1 text-[11px] text-muted-foreground bg-muted/30">
                 <ActionIcon :name="getContainerDef(ls.type, t).icon" cls="w-3.5 h-3.5 inline" /> {{ ls.label }}
               </div>
-              <button
+              <Button
                 v-for="opt in [
                   { value: 'true', icon: 'CheckCircle', label: 'True' },
                   { value: 'false', icon: 'XCircle', label: 'False' },
@@ -328,36 +331,39 @@ function closeAllMenus() {
                   { value: 'merge', icon: 'Merge', label: t('editor.errorBranch') },
                 ]"
                 :key="opt.value"
+                variant="ghost"
                 :class="cn(
-                  'w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2 transition-colors',
+                  'w-full justify-start px-3 py-1.5 text-sm',
                   step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value ? 'bg-accent' : '',
                 )"
                 @click="setCondition(ls.id, opt.value as 'true' | 'false' | 'both' | 'merge')"
               >
                 <ActionIcon :name="opt.icon" cls="w-3.5 h-3.5 inline" /> {{ opt.label }}
-              </button>
+              </Button>
             </div>
-            <button
+            <Button
               v-if="step.runCondition"
-              class="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              variant="ghost"
+              class="w-full justify-start px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
               @click="removeCondition"
             >
               {{ t('stepCard.removeCondition') }}
-            </button>
+            </Button>
           </div>
 
           <!-- 错误策略 -->
           <div class="border-t border-border mt-1 pt-1">
             <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.errorStrategy') }}</div>
-            <button
+            <Button
               v-for="(opt, key) in {
                 fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: t('stepCard.errDescFail') },
                 ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: t('stepCard.errDescIgnore') },
                 branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: t('stepCard.errDescBranch') },
               }"
               :key="key"
+              variant="ghost"
               :class="cn(
-                'w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2 transition-colors',
+                'w-full justify-start px-3 py-1.5 text-sm',
                 ((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError)) ? 'bg-accent' : '',
               )"
               @click="key === 'fail' ? setErrStrategy('fail') : key === 'ignore' ? setErrStrategy('ignore') : setErrStrategy({ branch: '' })"
@@ -367,7 +373,7 @@ function closeAllMenus() {
                 <span>{{ opt.label }}</span>
                 <span class="text-[10px] text-muted-foreground">{{ opt.desc }}</span>
               </div>
-            </button>
+            </Button>
           </div>
         </div>
       </Teleport>

@@ -13,10 +13,12 @@ import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
 import ErrorBoundary from "./components/ErrorBoundary.vue"
 import Toast from './components/Toast.vue'
+import Button from './components/ui/button/Button.vue'
 import ApprovalCenter from './components/ApprovalCenter.vue'
 import { useToast } from './composables/useToast'
 import { useGlobalStatus } from './composables/useGlobalStatus'
 import { useOpsConsole } from './composables/useOpsConsole'
+import { syncNodeSchema } from './composables/useNodeSchema'
 import SidebarProvider from './components/ui/sidebar/SidebarProvider.vue'
 import Sidebar from './components/ui/sidebar/Sidebar.vue'
 import SidebarInset from './components/ui/sidebar/SidebarInset.vue'
@@ -28,6 +30,7 @@ const ops = useOpsConsole()
 
 onMounted(() => {
   globalStatus.startSchedulePolling()
+  syncNodeSchema() // P3: 拉取后端节点目录，扩展前端可用节点类型
 })
 
 onUnmounted(() => {
@@ -257,18 +260,20 @@ function statusColor(status: string): string {
               >
                 <div class="flex items-center gap-2">
                   <span class="text-[11px] text-muted-foreground">{{ ops.visible.value ? '▼' : '▶' }}</span>
-                  <span class="text-xs text-foreground">📟 {{ t('nav.dashboard') }} {{ t('common.actions') }}</span>
+                  <span class="text-xs text-foreground">{{ t('nav.dashboard') }} {{ t('common.actions') }}</span>
                   <span v-if="ops.logs.value.length" class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5">
                     {{ ops.logs.value.length }}
                   </span>
                   <span class="text-[10px] text-success ml-0.5">✓{{ consoleStatusCounts.ok }}</span>
                   <span v-if="consoleStatusCounts.fail" class="text-[10px] text-destructive ml-0.5">✗{{ consoleStatusCounts.fail }}</span>
                 </div>
-                <button
+                <Button
                   v-if="ops.visible.value"
-                  class="h-5 text-[10px] text-muted-foreground hover:text-foreground"
+                  variant="ghost"
+                  size="sm"
+                  class="h-5 text-[10px] px-1.5"
                   @click.stop="ops.clearLogs()"
-                >{{ t('common.clear') }}</button>
+                >{{ t('common.clear') }}</Button>
               </button>
               <Transition name="collapse">
                 <div v-if="ops.visible.value" class="max-h-[200px] overflow-y-auto border-t border-border">

@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useToast } from '@/composables/useToast'
 import ActionIcon from '@/components/ActionIcon.vue'
+import Button from '@/components/ui/button/Button.vue'
 
 const { show: toast } = useToast()
 
@@ -86,13 +87,12 @@ onMounted(loadPlugins)
         <p class="text-xs text-muted-foreground mt-0.5">安装和管理 workflow 功能插件</p>
       </div>
       <div class="flex items-center gap-2">
-        <button
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+        <Button
           :disabled="installing"
           @click="installPlugin"
         >
           {{ installing ? '安装中...' : '+ 安装插件' }}
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -110,12 +110,11 @@ onMounted(loadPlugins)
         <p class="text-sm text-muted-foreground mb-4 max-w-sm">
           点击「安装插件」选择 .wfplug 文件，即可快速添加新功能包
         </p>
-        <button
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+        <Button
           @click="installPlugin"
         >
           + 安装插件
-        </button>
+        </Button>
       </div>
 
       <!-- Cards -->
@@ -145,12 +144,14 @@ onMounted(loadPlugins)
                 </span>
               </div>
             </div>
-            <button
-              class="shrink-0 px-2.5 py-1 rounded text-[11px] font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            <Button
+              variant="destructive"
+              size="sm"
+              class="shrink-0 text-[11px]"
               @click="uninstallPlugin(p)"
             >
               删除
-            </button>
+            </Button>
           </div>
         </div>
       </div>
