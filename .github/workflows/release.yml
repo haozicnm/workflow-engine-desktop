@@ -55,20 +55,26 @@ jobs:
       - name: Package deb
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+          DEB_ARCH=arm64
           mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
           cp src-tauri/target/release/workflow-engine pkg/opt/workflow-engine/
           cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
           cp node-schema.json pkg/opt/workflow-engine/
-          cp debian/wf-engine.service pkg/usr/lib/systemd/user/ 2>/dev/null || true
-          cp debian/control pkg/DEBIAN/ 2>/dev/null || true
+          if [ -f debian/wf-engine.service ]; then
+            cp debian/wf-engine.service pkg/usr/lib/systemd/user/
+          fi
           if [ -f debian/postinst ]; then
             cp debian/postinst pkg/DEBIAN/
             chmod 755 pkg/DEBIAN/postinst
           fi
+          # 动态生成 DEBIAN/control（修正版本和架构）
+          sed -e "s/^Version:.*/Version: ${VERSION}/" \
+              -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
+              debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_arm64.deb
+          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_${DEB_ARCH}.deb
 
       - name: Package tar.gz (standalone)
         run: |
@@ -145,20 +151,26 @@ jobs:
       - name: Package deb
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+          DEB_ARCH=amd64
           mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
           cp src-tauri/target/release/workflow-engine pkg/opt/workflow-engine/
           cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
           cp node-schema.json pkg/opt/workflow-engine/
-          cp debian/wf-engine.service pkg/usr/lib/systemd/user/ 2>/dev/null || true
-          cp debian/control pkg/DEBIAN/ 2>/dev/null || true
+          if [ -f debian/wf-engine.service ]; then
+            cp debian/wf-engine.service pkg/usr/lib/systemd/user/
+          fi
           if [ -f debian/postinst ]; then
             cp debian/postinst pkg/DEBIAN/
             chmod 755 pkg/DEBIAN/postinst
           fi
+          # 动态生成 DEBIAN/control（修正版本和架构）
+          sed -e "s/^Version:.*/Version: ${VERSION}/" \
+              -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
+              debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_amd64.deb
+          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_${DEB_ARCH}.deb
 
       - name: Package tar.gz (standalone)
         run: |
