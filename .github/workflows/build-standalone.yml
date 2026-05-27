@@ -76,7 +76,7 @@ jobs:
               -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
               debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.2.0_${DEB_ARCH}.deb
+          dpkg-deb --build pkg workflow-engine-standalone_7.2.0_${DEB_ARCH}.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v4
