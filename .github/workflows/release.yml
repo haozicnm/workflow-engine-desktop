@@ -42,27 +42,33 @@ jobs:
           key: arm64-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
           restore-keys: arm64-${{ runner.os }}-
 
-      - name: Install system deps (Tauri + WebKit2GTK)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libappindicator3-dev librsvg2-dev patchelf \
-            libssl-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libxdo-dev
-
       - name: Install npm deps
         run: npm ci
 
       - name: Build frontend
         run: npm run build
 
-      - name: Build & bundle (deb)
+      - name: Build backend
+        working-directory: src-tauri
+        run: cargo build --release --bin workflow-engine --bin wf-cli
+
+      - name: Package deb
         run: |
-          npx tauri build --bundles deb
-        env:
-          CI: true
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
+          cp src-tauri/target/release/workflow-engine pkg/opt/workflow-engine/
+          cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
+          cp -r dist pkg/opt/workflow-engine/
+          cp -r src-tauri/sidecars pkg/opt/workflow-engine/
+          cp node-schema.json pkg/opt/workflow-engine/
+          cp debian/wf-engine.service pkg/usr/lib/systemd/user/ 2>/dev/null || true
+          cp debian/control pkg/DEBIAN/ 2>/dev/null || true
+          if [ -f debian/postinst ]; then
+            cp debian/postinst pkg/DEBIAN/
+            chmod 755 pkg/DEBIAN/postinst
+          fi
+          mkdir -p pkg/opt/workflow-engine/data/logs
+          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_arm64.deb
 
       - name: Package tar.gz (standalone)
         run: |
@@ -80,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-arm64-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
+          path: workflow-engine_*_arm64.deb
 
       - name: Upload tar.gz
         uses: actions/upload-artifact@v4
@@ -93,7 +99,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/deb/*.deb
+            workflow-engine_*_arm64.deb
             workflow-engine-*-linux-arm64.tar.gz
 
   # ═══════════════════════════════════════════
@@ -126,27 +132,33 @@ jobs:
           key: x64-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
           restore-keys: x64-${{ runner.os }}-
 
-      - name: Install system deps (Tauri + WebKit2GTK)
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libappindicator3-dev librsvg2-dev patchelf \
-            libssl-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libxdo-dev
-
       - name: Install npm deps
         run: npm ci
 
       - name: Build frontend
         run: npm run build
 
-      - name: Build & bundle (deb)
+      - name: Build backend
+        working-directory: src-tauri
+        run: cargo build --release --bin workflow-engine --bin wf-cli
+
+      - name: Package deb
         run: |
-          npx tauri build --bundles deb
-        env:
-          CI: true
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
+          cp src-tauri/target/release/workflow-engine pkg/opt/workflow-engine/
+          cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
+          cp -r dist pkg/opt/workflow-engine/
+          cp -r src-tauri/sidecars pkg/opt/workflow-engine/
+          cp node-schema.json pkg/opt/workflow-engine/
+          cp debian/wf-engine.service pkg/usr/lib/systemd/user/ 2>/dev/null || true
+          cp debian/control pkg/DEBIAN/ 2>/dev/null || true
+          if [ -f debian/postinst ]; then
+            cp debian/postinst pkg/DEBIAN/
+            chmod 755 pkg/DEBIAN/postinst
+          fi
+          mkdir -p pkg/opt/workflow-engine/data/logs
+          dpkg-deb -Zgzip --build pkg workflow-engine_${VERSION}_amd64.deb
 
       - name: Package tar.gz (standalone)
         run: |
@@ -164,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-x64-deb
-          path: src-tauri/target/release/bundle/deb/*.deb
+          path: workflow-engine_*_amd64.deb
 
       - name: Upload tar.gz
         uses: actions/upload-artifact@v4
@@ -177,14 +189,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/deb/*.deb
+            workflow-engine_*_amd64.deb
             workflow-engine-*-linux-x64.tar.gz
 
   # ═══════════════════════════════════════════
-  # Windows NSIS + zip
+  # Windows zip (standalone)
   # ═══════════════════════════════════════════
   build-windows:
-    name: Windows (NSIS + zip)
+    name: Windows (zip)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -195,9 +207,9 @@ jobs:
           node-version: '22'
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
+          targets: x86_64-pc-windows-msvc
 
       - name: Cache Rust & Node
         uses: actions/cache@v4
@@ -216,13 +228,19 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build & bundle (NSIS)
-        run: |
-          npx tauri build --bundles nsis
-        env:
-          CI: true
+      - name: Build backend
+        working-directory: src-tauri
+        run: cargo build --release --bin workflow-engine --bin wf-cli
 
-      - name: Package zip (standalone)
+      - name: Create python-runtime placeholder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/wheels
+          Set-Content -Path src-tauri/python-runtime/wheels/.gitkeep -Value "placeholder"
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
+          Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
+
+      - name: Package zip
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}" -replace '^v',''
@@ -233,6 +251,7 @@ jobs:
           Copy-Item -Recurse dist $pkgDir/
           Copy-Item -Recurse src-tauri/sidecars $pkgDir/sidecars
           Copy-Item node-schema.json $pkgDir/
+          Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
           $lines = @(
             'echo off'
             'title Workflow Engine'
@@ -245,12 +264,6 @@ jobs:
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
           Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
 
-      - name: Upload NSIS installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-engine-windows-installer
-          path: src-tauri/target/release/bundle/nsis/*.exe
-
       - name: Upload zip
         uses: actions/upload-artifact@v4
         with:
@@ -261,6 +274,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            workflow-engine-*-windows-x64.zip
+          files: workflow-engine-*-windows-x64.zip
