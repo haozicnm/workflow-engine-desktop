@@ -41,7 +41,7 @@ pub struct PluginUninstallBody {
 pub async fn system_health() -> Response {
     ok_response(serde_json::json!({
         "status": "ok",
-        "version": "7.1.1",
+        "version": "7.2.0",
     }))
 }
 

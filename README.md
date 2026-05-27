@@ -2,7 +2,7 @@
 
 **可视化工作流自动化引擎** — 独立 HTTP 服务器 + PWA 前端，支持 Windows / Linux (ARM64/x86_64)。
 
-版本：**7.1.1**
+版本：**7.2.0**
 
 ## 架构
 
@@ -78,7 +78,7 @@
 从 [GitHub Actions](https://github.com/haozicnm/workflow-engine-desktop/actions) 下载最新构建产物：
 
 - **Windows**：下载 `workflow-engine` + `dist/`，双击 `start.bat` 启动
-- **Linux ARM64**：下载 `.deb` 包，`dpkg -i workflow-engine-standalone_7.1.1_arm64.deb`
+- **Linux ARM64**：下载 `.deb` 包，`dpkg -i workflow-engine-standalone_7.2.0_arm64.deb`
 - **PWA**：启动后在浏览器打开 `http://localhost:3000`，地址栏安装为 PWA
 
 ### 从源码构建

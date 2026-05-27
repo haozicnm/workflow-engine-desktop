@@ -5,7 +5,7 @@ set "PORT=19528"
 set "URL=http://127.0.0.1:%PORT%"
 
 echo.
-echo   Workflow Engine v7.1.1
+echo   Workflow Engine v7.2.0
 echo   Visual Workflow Automation
 echo.
 echo   Starting server...

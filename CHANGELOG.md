@@ -1,5 +1,28 @@
 # Changelog
 
+## v7.2.0 (2026-05-27) — Schema-First 节点系统
+
+### P0: deb 包含 sidecar 脚本
+- CI 打包增加 `mcp-servers/` 目录 + Python venv
+- 77 个节点全可用（原仅 19 个）
+
+### P1: 前端 Schema 驱动
+- 新增 `useNodeSchema` composable，优先从 `/api/nodes/schema` 动态加载
+- `node-registry.ts` 降级为 UI 覆写层，不再硬编码节点定义
+- 新增 `registry-state.ts` 共享状态层
+
+### P2: 后端注册表优化
+- `registry.rs` 改用 `LazyLock` 缓存 `node-schema.json`，消除重复 JSON 解析
+- 审查确认 executor HashMap + register 宏、parser 责任链已就位
+
+### P3: Plugin 前端兼容
+- `Plugins.vue` 从 Tauri `invoke()` 迁移到 HTTP API + multipart 文件上传
+- 新增 `POST /api/plugins/upload` 端点（axum multipart）
+- 独立服务器模式下插件管理完全可用
+
+### 架构原则
+- `node-schema.json` 管定义，Rust 管执行，`type` 字段串联
+
 ## v7.1.1 (2026-05-26) — PWA Brand + Windows Launcher
 
 ### PWA 品牌升级

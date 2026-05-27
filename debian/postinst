@@ -29,7 +29,7 @@ if [ -d /opt/workflow-engine/sidecars ]; then
 fi
 
 echo ""
-echo "Workflow Engine v7.1.1 安装完成"
+echo "Workflow Engine v7.2.0 安装完成"
 echo "================================="
 echo "服务地址: http://127.0.0.1:19528"
 echo "API 健康: http://127.0.0.1:19528/api/health"
