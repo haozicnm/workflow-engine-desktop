@@ -75,10 +75,10 @@ jobs:
           mkdir -p pkg/opt/workflow-engine/data/logs
 
           # 构建 (gzip 兼容 UOS 20 的 dpkg)
-          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.1.0_arm64.deb
+          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.1.1_arm64.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-standalone-arm64-deb
-          path: workflow-engine-standalone_7.1.0_arm64.deb
+          path: workflow-engine-standalone_7.1.1_arm64.deb

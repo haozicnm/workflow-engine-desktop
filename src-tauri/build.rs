@@ -1,4 +1,3 @@
 fn main() {
-    #[cfg(feature = "gui")]
-    tauri_build::build();
+    // Standalone server — no tauri_build needed
 }
