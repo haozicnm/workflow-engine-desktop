@@ -1,0 +1,152 @@
+name: Build Standalone
+
+on:
+  push:
+    branches: [feat/standalone-server]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux-arm64:
+    name: Linux ARM64 deb
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache Rust & Node
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+            node_modules
+          key: standalone-arm64-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
+          restore-keys: standalone-arm64-${{ runner.os }}-
+
+      - name: Build frontend
+        run: npm ci && npm run build
+
+      - name: Install zig (for cargo-zigbuild)
+        run: |
+          curl -L -o zig.tar.xz https://ziglang.org/download/0.13.0/zig-linux-aarch64-0.13.0.tar.xz
+          tar xf zig.tar.xz
+          echo "$PWD/zig-linux-aarch64-0.13.0" >> $GITHUB_PATH
+
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild
+
+      - name: Build binaries (target glibc 2.27 for UOS 20)
+        working-directory: src-tauri
+        run: |
+          cargo zigbuild --target aarch64-unknown-linux-gnu.2.27 --bin workflow-engine --release
+          cargo zigbuild --target aarch64-unknown-linux-gnu.2.27 --bin wf-cli --release
+
+      - name: Package deb
+        run: |
+          mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
+          cp src-tauri/target/aarch64-unknown-linux-gnu/release/workflow-engine pkg/opt/workflow-engine/
+          cp src-tauri/target/aarch64-unknown-linux-gnu/release/wf-cli pkg/opt/workflow-engine/
+          cp -r dist pkg/opt/workflow-engine/
+          cp debian/wf-engine.service pkg/usr/lib/systemd/user/
+          cp debian/wf-engine.service pkg/opt/workflow-engine/
+          cp debian/control pkg/DEBIAN/
+          cp debian/postinst pkg/DEBIAN/
+          chmod 755 pkg/DEBIAN/postinst
+          mkdir -p pkg/opt/workflow-engine/data/logs
+          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.1.1_arm64.deb
+
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-standalone-arm64-deb
+          path: workflow-engine-standalone_7.1.1_arm64.deb
+
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: windows-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
+          restore-keys: windows-cargo-
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build backend
+        working-directory: src-tauri
+        run: cargo build --release --bin workflow-engine --bin wf-cli
+
+      - name: Create python-runtime placeholder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/wheels
+          Set-Content -Path src-tauri/python-runtime/wheels/.gitkeep -Value "placeholder"
+          New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
+          Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $version = "7.1.1"
+          $pkgDir = "workflow-engine-$version-windows-x64"
+          New-Item -ItemType Directory -Force -Path $pkgDir
+
+          Copy-Item src-tauri/target/release/workflow-engine.exe $pkgDir/
+          Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
+          Copy-Item -Recurse dist $pkgDir/
+          Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
+
+          $lines = @(
+            'echo off'
+            'title Workflow Engine'
+            'cd /d "%~dp0"'
+            'start /MIN "" "workflow-engine.exe"'
+            'echo Workflow Engine started on http://localhost:3000'
+            'ping 127.0.0.1 -n 4 > nul'
+            'start http://localhost:3000'
+          )
+          $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
+
+          Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-windows-x64
+          path: workflow-engine-7.1.1-windows-x64.zip
