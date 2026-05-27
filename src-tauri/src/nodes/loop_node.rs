@@ -1,13 +1,13 @@
 // nodes/loop_node.rs — 循环节点（for-each 全遍历）
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
-use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
-use crate::engine::executor::StepExecutor;
 use crate::engine::collect;
+use crate::engine::context::ExecutionContext;
+use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use serde_json::{json, Value};
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use serde_json::{Value, json};
 
 #[derive(Default)]
 pub struct LoopNode;
@@ -19,9 +19,9 @@ fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
             return Ok(body.clone());
         }
     }
-    let steps: Vec<Step> = serde_json::from_value(
-        step.config.get("body").cloned().unwrap_or(json!([]))
-    ).map_err(|e| anyhow!("循环 body 解析失败: {}", e))?;
+    let steps: Vec<Step> =
+        serde_json::from_value(step.config.get("body").cloned().unwrap_or(json!([])))
+            .map_err(|e| anyhow!("循环 body 解析失败: {}", e))?;
     if steps.is_empty() {
         return Err(anyhow!("循环 body 不能为空"));
     }
@@ -36,13 +36,17 @@ impl NodeExecutor for LoopNode {
         ctx: &mut ExecutionContext,
         executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let items_value = step.config.get("items")
+        let items_value = step
+            .config
+            .get("items")
             .ok_or_else(|| anyhow!("循环节点缺少 items 参数"))?;
         let items = crate::engine::common::resolve_iteration_items(items_value, ctx, "循环")?;
         let body_steps = parse_body_steps(step)?;
 
         // 安全上限：最大迭代次数
-        let max_iter = step.config.get("max_iterations")
+        let max_iter = step
+            .config
+            .get("max_iterations")
             .and_then(|v| v.as_u64())
             .unwrap_or(1000) as usize;
         let total = items.len().min(max_iter);
@@ -54,11 +58,14 @@ impl NodeExecutor for LoopNode {
             ctx.set_var("__index".to_string(), json!(i));
             ctx.set_var("__index1".to_string(), json!(i + 1));
             // 友好别名：{{loop.current}} / {{loop.index}}
-            ctx.set_var("loop".to_string(), json!({
-                "current": item,
-                "index": i,
-                "index1": i + 1,
-            }));
+            ctx.set_var(
+                "loop".to_string(),
+                json!({
+                    "current": item,
+                    "index": i,
+                    "index1": i + 1,
+                }),
+            );
 
             let mut item_outputs = serde_json::Map::new();
             // 迭代变量已设入 ctx，容器/节点各自解析模板

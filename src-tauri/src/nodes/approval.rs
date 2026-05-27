@@ -15,16 +15,16 @@
 // 输出：
 //   { decision: "选项名", comment: "...", item: {...}, auto?: true, recommendation_reason?: str }
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
+use crate::engine::approval_store::{ApprovalDecision, ApprovalEntry};
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use crate::engine::approval_store::{ApprovalEntry, ApprovalDecision};
+use crate::engine::workflow::Step;
 use crate::nodes::condition::eval_condition;
-use std::sync::Arc;
+use crate::nodes::traits::NodeExecutor;
 use anyhow::Result;
-use serde_json::{Value, json};
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use std::sync::Arc;
 use tracing::info;
 
 #[derive(Default)]
@@ -42,12 +42,14 @@ impl NodeExecutor for ApprovalNode {
         let approval_id = format!("approval:{}:{}", ctx.run_id, step.id);
 
         // ── 读取配置 ──
-        let title = config.get("title")
+        let title = config
+            .get("title")
             .and_then(|v| v.as_str())
             .unwrap_or("人工审批")
             .to_string();
 
-        let message_template = config.get("message")
+        let message_template = config
+            .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or("请审批此操作")
             .to_string();
@@ -56,40 +58,59 @@ impl NodeExecutor for ApprovalNode {
             let tmp_val = json!(message_template);
             let config_val = json!({ "_msg": tmp_val });
             let resolved = ctx.resolve_config(&config_val);
-            resolved.get("_msg")
+            resolved
+                .get("_msg")
                 .and_then(|v| v.as_str())
                 .unwrap_or(&message_template)
                 .to_string()
         };
 
-        let options_str = config.get("options")
+        let options_str = config
+            .get("options")
             .and_then(|v| v.as_str())
             .unwrap_or("同意,拒绝");
         let options: Vec<String> = options_str
-            .split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
 
-        let mut recommended = config.get("recommended")
+        let mut recommended = config
+            .get("recommended")
             .and_then(|v| v.as_str())
-            .unwrap_or("同意").to_string();
+            .unwrap_or("同意")
+            .to_string();
 
-        let require_review = config.get("require_review")
+        let require_review = config
+            .get("require_review")
             .and_then(|v| {
-                if let Some(b) = v.as_bool() { Some(b) }
-                else if let Some(s) = v.as_str() { Some(s == "true") }
-                else { None }
-            }).unwrap_or(true);
+                if let Some(b) = v.as_bool() {
+                    Some(b)
+                } else if let Some(s) = v.as_str() {
+                    Some(s == "true")
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(true);
 
-        let timeout_secs = config.get("timeout")
-            .and_then(|v| v.as_u64()).unwrap_or(300);
+        let timeout_secs = config
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(300);
 
-        let timeout_action = config.get("timeout_action")
+        let timeout_action = config
+            .get("timeout_action")
             .and_then(|v| v.as_str())
-            .unwrap_or("recommended").to_string();
+            .unwrap_or("recommended")
+            .to_string();
 
         // ── 新增：超时行为（auto/manual） ──
-        let timeout_behavior = config.get("timeout_behavior")
+        let timeout_behavior = config
+            .get("timeout_behavior")
             .and_then(|v| v.as_str())
-            .unwrap_or("auto").to_string();
+            .unwrap_or("auto")
+            .to_string();
         let is_manual_timeout = timeout_behavior == "manual";
 
         let item = collect_upstream_item(ctx, config);
@@ -112,7 +133,10 @@ impl NodeExecutor for ApprovalNode {
                     let pass = eval_condition(&left, op, &right);
                     results.push(format!(
                         "{} {} {} → {}",
-                        left, op, right, if pass { "✓" } else { "✗" }
+                        left,
+                        op,
+                        right,
+                        if pass { "✓" } else { "✗" }
                     ));
 
                     if !pass {
@@ -122,23 +146,39 @@ impl NodeExecutor for ApprovalNode {
 
                 // 全部通过 → 推荐同意（第一个选项）；任一不通过 → 推荐拒绝（最后一个选项）
                 if all_pass {
-                    recommended = options.first().cloned().unwrap_or_else(|| "同意".to_string());
-                    recommendation_reason = format!("全部{}个条件通过 → 推荐「{}」", conditions.len(), recommended);
+                    recommended = options
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "同意".to_string());
+                    recommendation_reason = format!(
+                        "全部{}个条件通过 → 推荐「{}」",
+                        conditions.len(),
+                        recommended
+                    );
                 } else {
-                    recommended = options.last().cloned().unwrap_or_else(|| "拒绝".to_string());
+                    recommended = options
+                        .last()
+                        .cloned()
+                        .unwrap_or_else(|| "拒绝".to_string());
                     recommendation_reason = format!(
                         "条件未全部通过 → 推荐「{}」\n详情: {}",
                         recommended,
                         results.join("; ")
                     );
                 }
-                info!("审批节点 '{}' 条件评估: {}", step.name, recommendation_reason);
+                info!(
+                    "审批节点 '{}' 条件评估: {}",
+                    step.name, recommendation_reason
+                );
             }
         }
 
         // ── 不需要人工审核 → 直接用推荐选项 ──
         if !require_review {
-            info!("审批节点 '{}' 自动决策（无需审核）→ {}", step.name, recommended);
+            info!(
+                "审批节点 '{}' 自动决策（无需审核）→ {}",
+                step.name, recommended
+            );
             return Ok(json!({
                 "decision": recommended,
                 "comment": if recommendation_reason.is_empty() {
@@ -156,7 +196,11 @@ impl NodeExecutor for ApprovalNode {
         if let Some(existing) = executor.db.get_approval(&approval_id) {
             match existing.status.as_str() {
                 "decided" => {
-                    info!("审批节点 '{}' SQLite 已有决策: {} → 直接返回", step.name, existing.decision.as_deref().unwrap_or("?"));
+                    info!(
+                        "审批节点 '{}' SQLite 已有决策: {} → 直接返回",
+                        step.name,
+                        existing.decision.as_deref().unwrap_or("?")
+                    );
                     let _ = executor.db.delete_approval(&approval_id);
                     return Ok(json!({
                         "decision": existing.decision.as_deref().unwrap_or("拒绝"),
@@ -168,12 +212,27 @@ impl NodeExecutor for ApprovalNode {
                 }
                 "pending" => {
                     // 检查是否已超时
-                    if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&existing.created_at) {
-                        let elapsed = chrono::Utc::now().signed_duration_since(created.with_timezone(&chrono::Utc));
+                    if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&existing.created_at)
+                    {
+                        let elapsed = chrono::Utc::now()
+                            .signed_duration_since(created.with_timezone(&chrono::Utc));
                         if elapsed.num_seconds() as u64 >= existing.timeout_secs as u64 {
-                            let auto_option = resolve_timeout_action(&existing.timeout_action, &existing.recommended);
-                            info!("审批节点 '{}' 重启后发现已超时 → 自动 {}", step.name, auto_option);
-                            executor.db.update_approval_decision(&approval_id, &auto_option, Some("超时自动执行（重启恢复）")).ok();
+                            let auto_option = resolve_timeout_action(
+                                &existing.timeout_action,
+                                &existing.recommended,
+                            );
+                            info!(
+                                "审批节点 '{}' 重启后发现已超时 → 自动 {}",
+                                step.name, auto_option
+                            );
+                            executor
+                                .db
+                                .update_approval_decision(
+                                    &approval_id,
+                                    &auto_option,
+                                    Some("超时自动执行（重启恢复）"),
+                                )
+                                .ok();
                             let _ = executor.db.delete_approval(&approval_id);
                             return Ok(json!({
                                 "decision": auto_option,
@@ -194,9 +253,17 @@ impl NodeExecutor for ApprovalNode {
         let item_str = item.as_ref().map(|v| v.to_string());
         let options_str = options.join(",");
         let _ = executor.db.insert_approval(
-            &approval_id, &ctx.run_id, &step.id, &title, &message,
-            item_str.as_deref(), Some(&options_str), &recommended,
-            timeout_secs as i64, &timeout_action, &chrono::Utc::now().to_rfc3339(),
+            &approval_id,
+            &ctx.run_id,
+            &step.id,
+            &title,
+            &message,
+            item_str.as_deref(),
+            Some(&options_str),
+            &recommended,
+            timeout_secs as i64,
+            &timeout_action,
+            &chrono::Utc::now().to_rfc3339(),
         );
 
         // ── 注册到 ApprovalStore 并等待 ──
@@ -209,7 +276,11 @@ impl NodeExecutor for ApprovalNode {
             item: item.clone(),
             options: options.clone(),
             recommended: recommended.clone(),
-            timeout_secs: if is_manual_timeout { u64::MAX } else { timeout_secs },
+            timeout_secs: if is_manual_timeout {
+                u64::MAX
+            } else {
+                timeout_secs
+            },
             timeout_action: timeout_action.clone(),
             created_at: chrono::Utc::now().to_rfc3339(),
             recommendation_reason: if recommendation_reason.is_empty() {
@@ -220,8 +291,10 @@ impl NodeExecutor for ApprovalNode {
         };
 
         let mut rx = executor.approval_store.register(entry).await;
-        info!("审批节点 '{}' 已注册，等待用户决策 (id: {}, timeout_behavior: {})",
-            step.name, approval_id, timeout_behavior);
+        info!(
+            "审批节点 '{}' 已注册，等待用户决策 (id: {}, timeout_behavior: {})",
+            step.name, approval_id, timeout_behavior
+        );
 
         // ── 等待决策或超时 ──
         let decision = if is_manual_timeout {
@@ -229,7 +302,10 @@ impl NodeExecutor for ApprovalNode {
             match rx.recv().await {
                 Some(d) => {
                     info!("审批节点 '{}' 收到用户决策: {}", step.name, d.option);
-                    executor.db.update_approval_decision(&approval_id, &d.option, d.comment.as_deref()).ok();
+                    executor
+                        .db
+                        .update_approval_decision(&approval_id, &d.option, d.comment.as_deref())
+                        .ok();
                     let _ = executor.db.delete_approval(&approval_id);
                     d
                 }

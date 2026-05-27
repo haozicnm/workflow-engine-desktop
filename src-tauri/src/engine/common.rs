@@ -1,7 +1,7 @@
 // engine/common.rs — 引擎公共函数（loop / cursor 共用）
 
 use crate::engine::context::ExecutionContext;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::Value;
 
 /// 解析迭代 items（loop / cursor 共用）
@@ -24,7 +24,7 @@ pub fn resolve_iteration_items(
         // 先解析变量引用
         let resolved = ctx.resolve_config(items_value);
         let resolved_s = resolved.as_str().unwrap_or(s);
-        
+
         // 尝试将 JSON 字符串解析为数组
         if let Ok(parsed) = serde_json::from_str::<Value>(resolved_s) {
             if let Some(arr) = parsed.as_array() {
@@ -47,7 +47,12 @@ pub fn resolve_iteration_items(
             .get_output(resolved_s)
             .and_then(|v| v.as_array())
             .cloned()
-            .or_else(|| ctx.variables.get(resolved_s).and_then(|v| v.as_array()).cloned())
+            .or_else(|| {
+                ctx.variables
+                    .get(resolved_s)
+                    .and_then(|v| v.as_array())
+                    .cloned()
+            })
             .ok_or_else(|| anyhow!("{}: items '{}' 不是数组", node_label, s));
     }
     Err(anyhow!("{}: items 必须是数组或引用", node_label))

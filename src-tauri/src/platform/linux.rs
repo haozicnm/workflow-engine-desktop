@@ -4,9 +4,9 @@
 // 支持 X11 和 Wayland（通过 libei 协议）。
 
 use crate::platform::traits::InputBackend;
-use anyhow::{Result, anyhow};
-use tracing::info;
+use anyhow::{anyhow, Result};
 use enigo::{Keyboard, Mouse};
+use tracing::info;
 
 pub struct LinuxBackend {
     enigo: std::sync::Mutex<enigo::Enigo>,
@@ -31,7 +31,8 @@ impl LinuxBackend {
     }
 
     fn enigo_lock(&self) -> Result<std::sync::MutexGuard<'_, enigo::Enigo>> {
-        self.enigo.lock()
+        self.enigo
+            .lock()
             .map_err(|e| anyhow!("enigo 锁获取失败: {}", e))
     }
 
@@ -72,8 +73,7 @@ impl InputBackend for LinuxBackend {
         // 逐字符输入以保证可靠性
         for ch in text.chars() {
             let s = ch.to_string();
-            e.text(&s)
-                .map_err(|err| anyhow!("输入文本失败: {}", err))?;
+            e.text(&s).map_err(|err| anyhow!("输入文本失败: {}", err))?;
             if delay_ms > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             }
@@ -120,8 +120,7 @@ impl InputBackend for LinuxBackend {
                 "PAGEDOWN" => main_key = Some(enigo::Key::PageDown),
                 single if single.len() == 1 => {
                     // 单字母 → 先按修饰键再模拟字符
-                    let ch = single.chars().next()
-                        .expect("单字符字符串应有至少一个字符");
+                    let ch = single.chars().next().expect("单字符字符串应有至少一个字符");
                     let key = match ch {
                         'A'..='Z' => enigo::Key::Unicode(ch),
                         '0'..='9' => enigo::Key::Unicode(ch),
@@ -133,12 +132,18 @@ impl InputBackend for LinuxBackend {
                 fkey if fkey.starts_with('F') => {
                     if let Ok(n) = fkey[1..].parse::<u8>() {
                         main_key = Some(match n {
-                            1 => enigo::Key::F1, 2 => enigo::Key::F2,
-                            3 => enigo::Key::F3, 4 => enigo::Key::F4,
-                            5 => enigo::Key::F5, 6 => enigo::Key::F6,
-                            7 => enigo::Key::F7, 8 => enigo::Key::F8,
-                            9 => enigo::Key::F9, 10 => enigo::Key::F10,
-                            11 => enigo::Key::F11, 12 => enigo::Key::F12,
+                            1 => enigo::Key::F1,
+                            2 => enigo::Key::F2,
+                            3 => enigo::Key::F3,
+                            4 => enigo::Key::F4,
+                            5 => enigo::Key::F5,
+                            6 => enigo::Key::F6,
+                            7 => enigo::Key::F7,
+                            8 => enigo::Key::F8,
+                            9 => enigo::Key::F9,
+                            10 => enigo::Key::F10,
+                            11 => enigo::Key::F11,
+                            12 => enigo::Key::F12,
                             _ => continue,
                         });
                     }
@@ -176,5 +181,7 @@ impl InputBackend for LinuxBackend {
         Ok(())
     }
 
-    fn platform_name(&self) -> &str { "linux" }
+    fn platform_name(&self) -> &str {
+        "linux"
+    }
 }

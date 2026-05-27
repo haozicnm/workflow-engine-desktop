@@ -3,7 +3,7 @@
 // .wfplug 包安装/卸载/列表管理
 // 所有数据统一在 ~/.config/workflow-engine/ 下
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
@@ -111,16 +111,20 @@ pub fn install_plugin(wfplug_path: &Path) -> Result<PluginMeta> {
     // 1. 解压 .wfplug (zip)
     let file = fs::File::open(wfplug_path)
         .with_context(|| format!("无法打开插件包: {}", wfplug_path.display()))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .with_context(|| "无法解析 .wfplug 包（不是有效的 zip 文件）")?;
+    let mut archive =
+        zip::ZipArchive::new(file).with_context(|| "无法解析 .wfplug 包（不是有效的 zip 文件）")?;
 
     // 2. 读取 plugin.json
     let mut plugin_json_bytes = Vec::new();
-    let plugin_json_entry = archive.by_name("plugin.json")
+    let plugin_json_entry = archive
+        .by_name("plugin.json")
         .with_context(|| "插件包缺少 plugin.json")?;
-    std::io::copy(&mut plugin_json_entry.take(10_000_000), &mut plugin_json_bytes)?;
-    let meta: PluginMeta = serde_json::from_slice(&plugin_json_bytes)
-        .with_context(|| "plugin.json 格式错误")?;
+    std::io::copy(
+        &mut plugin_json_entry.take(10_000_000),
+        &mut plugin_json_bytes,
+    )?;
+    let meta: PluginMeta =
+        serde_json::from_slice(&plugin_json_bytes).with_context(|| "plugin.json 格式错误")?;
 
     // 3. 校验必填字段
     if meta.name.is_empty() || meta.version.is_empty() {
@@ -135,7 +139,9 @@ pub fn install_plugin(wfplug_path: &Path) -> Result<PluginMeta> {
             if !version_ge(current, we_req) {
                 bail!(
                     "插件 {} 需要 workflow-engine >= {}，当前版本: {}",
-                    meta.name, we_req, current
+                    meta.name,
+                    we_req,
+                    current
                 );
             }
         }
@@ -276,11 +282,15 @@ fn merge_mcp_mappings(meta: &PluginMeta) -> Result<()> {
     let mut config: McpExternalConfig = if path.exists() {
         serde_json::from_str(&fs::read_to_string(&path)?)?
     } else {
-        McpExternalConfig { mappings: Vec::new() }
+        McpExternalConfig {
+            mappings: Vec::new(),
+        }
     };
 
     // 移除该插件旧的映射（覆盖安装）
-    config.mappings.retain(|m| m._plugin.as_deref() != Some(&meta.name));
+    config
+        .mappings
+        .retain(|m| m._plugin.as_deref() != Some(&meta.name));
 
     // 添加新映射
     for mapping in &meta.mcp_mappings {
@@ -308,7 +318,9 @@ fn remove_mcp_mappings(plugin_name: &str) -> Result<()> {
     }
 
     let mut config: McpExternalConfig = serde_json::from_str(&fs::read_to_string(&path)?)?;
-    config.mappings.retain(|m| m._plugin.as_deref() != Some(plugin_name));
+    config
+        .mappings
+        .retain(|m| m._plugin.as_deref() != Some(plugin_name));
     fs::write(&path, serde_json::to_string_pretty(&config)?)?;
     Ok(())
 }
@@ -335,8 +347,7 @@ fn import_templates(meta: &PluginMeta, plugin_dir: &Path) -> Result<()> {
             continue;
         }
         let dst = library_dir.join(template);
-        fs::copy(&src, &dst)
-            .with_context(|| format!("导入模板失败: {}", template))?;
+        fs::copy(&src, &dst).with_context(|| format!("导入模板失败: {}", template))?;
     }
 
     Ok(())
@@ -377,7 +388,13 @@ fn install_offline_debs(offline_dir: &Path, packages: &[String]) -> Result<()> {
         .collect();
 
     // lib → common → server → tools 顺序
-    let order = ["libwbclient", "samba-libs", "samba-common", "samba_", "samba-common-bin"];
+    let order = [
+        "libwbclient",
+        "samba-libs",
+        "samba-common",
+        "samba_",
+        "samba-common-bin",
+    ];
     let mut sorted = Vec::new();
     for prefix in &order {
         for deb in &debs {
@@ -418,8 +435,12 @@ fn version_ge(current: &str, required: &str) -> bool {
     for i in 0..req_parts.len().max(cur_parts.len()) {
         let c = cur_parts.get(i).copied().unwrap_or(0);
         let r = req_parts.get(i).copied().unwrap_or(0);
-        if c > r { return true; }
-        if c < r { return false; }
+        if c > r {
+            return true;
+        }
+        if c < r {
+            return false;
+        }
     }
     true // equal
 }
@@ -456,7 +477,11 @@ pub fn migrate_from_legacy() -> Result<()> {
     let legacy_library = legacy_hermes_dir().join("workflows").join("library");
     let new_library = templates_library_dir();
     if legacy_library.exists() && !new_library.exists() {
-        tracing::info!("迁移模板库: {} → {}", legacy_library.display(), new_library.display());
+        tracing::info!(
+            "迁移模板库: {} → {}",
+            legacy_library.display(),
+            new_library.display()
+        );
         fs::create_dir_all(new_library.parent().unwrap())?;
         copy_dir_recursive(&legacy_library, &new_library)?;
     }

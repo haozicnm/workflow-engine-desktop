@@ -1,10 +1,10 @@
 // nodes/traits.rs — 节点执行器 trait
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use std::sync::Arc;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
 use anyhow::Result;
+use async_trait::async_trait;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait NodeExecutor: Send + Sync {

@@ -271,16 +271,14 @@ fn action_to_node(action: &RecordedAction) -> (&'static str, String, Value) {
                 }),
             )
         }
-        "wait" => {
-            (
-                "browser_wait",
-                "等待".to_string(),
-                serde_json::json!({
-                    "selector": action.selector.clone().unwrap_or_default(),
-                    "timeout": 10000,
-                }),
-            )
-        }
+        "wait" => (
+            "browser_wait",
+            "等待".to_string(),
+            serde_json::json!({
+                "selector": action.selector.clone().unwrap_or_default(),
+                "timeout": 10000,
+            }),
+        ),
         "hotkey" => {
             let keys = action.keys.clone().unwrap_or_default();
             (
@@ -477,50 +475,44 @@ fn action_to_template(action: &RecordedAction, index: usize) -> StepTemplate {
                 action_indices: vec![index],
             }
         }
-        "select" => {
-            StepTemplate {
-                id: id.clone(),
-                name: format!("下拉选择 {}", action.selector.as_deref().unwrap_or("")),
-                step_type: "browser".to_string(),
-                config: serde_json::json!({
-                    "action": "select",
-                    "params": {
-                        "selector": action.selector.clone().unwrap_or_default(),
-                        "value": action.value.clone().unwrap_or_default(),
-                    }
-                }),
-                action_indices: vec![index],
-            }
-        }
-        "wait" => {
-            StepTemplate {
-                id: id.clone(),
-                name: "等待".to_string(),
-                step_type: "browser".to_string(),
-                config: serde_json::json!({
-                    "action": "wait",
-                    "params": {
-                        "selector": action.selector.clone().unwrap_or_default(),
-                        "timeout_ms": 10000,
-                    }
-                }),
-                action_indices: vec![index],
-            }
-        }
-        "screenshot" => {
-            StepTemplate {
-                id: id.clone(),
-                name: "截图".to_string(),
-                step_type: "browser".to_string(),
-                config: serde_json::json!({
-                    "action": "screenshot",
-                    "params": {
-                        "full_page": true,
-                    }
-                }),
-                action_indices: vec![index],
-            }
-        }
+        "select" => StepTemplate {
+            id: id.clone(),
+            name: format!("下拉选择 {}", action.selector.as_deref().unwrap_or("")),
+            step_type: "browser".to_string(),
+            config: serde_json::json!({
+                "action": "select",
+                "params": {
+                    "selector": action.selector.clone().unwrap_or_default(),
+                    "value": action.value.clone().unwrap_or_default(),
+                }
+            }),
+            action_indices: vec![index],
+        },
+        "wait" => StepTemplate {
+            id: id.clone(),
+            name: "等待".to_string(),
+            step_type: "browser".to_string(),
+            config: serde_json::json!({
+                "action": "wait",
+                "params": {
+                    "selector": action.selector.clone().unwrap_or_default(),
+                    "timeout_ms": 10000,
+                }
+            }),
+            action_indices: vec![index],
+        },
+        "screenshot" => StepTemplate {
+            id: id.clone(),
+            name: "截图".to_string(),
+            step_type: "browser".to_string(),
+            config: serde_json::json!({
+                "action": "screenshot",
+                "params": {
+                    "full_page": true,
+                }
+            }),
+            action_indices: vec![index],
+        },
         // 未知类型 → 脚本节点（保留原始数据供用户调整）
         _ => StepTemplate {
             id: id.clone(),
@@ -603,8 +595,10 @@ fn merge_templates(templates: &[StepTemplate], source: &RecordingSource) -> Vec<
             if !desc_parts.is_empty() && source != &RecordingSource::Desktop {
                 let mut new_config = current.config.clone();
                 if let Some(obj) = new_config.as_object_mut() {
-                    obj.insert("page_actions".to_string(), 
-                        serde_json::json!(desc_parts.join(" → ")));
+                    obj.insert(
+                        "page_actions".to_string(),
+                        serde_json::json!(desc_parts.join(" → ")),
+                    );
                 }
             }
 
@@ -683,7 +677,9 @@ fn generate_yaml(templates: &[StepTemplate], workflow_name: &str) -> String {
 
     // 变量区（预留）
     yaml.push_str("variables:\n");
-    yaml.push_str("  workflow_name: \""); yaml.push_str(workflow_name); yaml.push_str("\"\n");
+    yaml.push_str("  workflow_name: \"");
+    yaml.push_str(workflow_name);
+    yaml.push_str("\"\n");
 
     yaml
 }
@@ -697,7 +693,8 @@ fn json_to_yaml_string(value: &Value, indent: &str) -> String {
                 match v {
                     Value::String(s) => {
                         // 包含特殊字符的字符串加引号
-                        if s.contains(':') || s.contains('#') || s.contains('{') || s.contains('}') {
+                        if s.contains(':') || s.contains('#') || s.contains('{') || s.contains('}')
+                        {
                             result.push_str(&format!("{}{}: \"{}\"\n", indent, k, s));
                         } else if s.is_empty() {
                             result.push_str(&format!("{}{}: \"\"\n", indent, k));
@@ -709,7 +706,12 @@ fn json_to_yaml_string(value: &Value, indent: &str) -> String {
                         result.push_str(&format!("{}{}: {}\n", indent, k, n));
                     }
                     Value::Bool(b) => {
-                        result.push_str(&format!("{}{}: {}\n", indent, k, if *b { "true" } else { "false" }));
+                        result.push_str(&format!(
+                            "{}{}: {}\n",
+                            indent,
+                            k,
+                            if *b { "true" } else { "false" }
+                        ));
                     }
                     Value::Object(_) => {
                         result.push_str(&format!("{}{}:\n", indent, k));
@@ -748,16 +750,32 @@ fn step_description(step_type: &str, config: &Value) -> String {
             let action = config.get("action").and_then(|v| v.as_str()).unwrap_or("");
             match action {
                 "navigate" => {
-                    let url = config.get("params").and_then(|p| p.get("url")).and_then(|v| v.as_str()).unwrap_or("");
+                    let url = config
+                        .get("params")
+                        .and_then(|p| p.get("url"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     format!("打开页面: {}", truncate(url, 50))
                 }
                 "click" => {
-                    let sel = config.get("params").and_then(|p| p.get("selector")).and_then(|v| v.as_str()).unwrap_or("");
+                    let sel = config
+                        .get("params")
+                        .and_then(|p| p.get("selector"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     format!("点击: {}", truncate(sel, 40))
                 }
                 "fill" => {
-                    let sel = config.get("params").and_then(|p| p.get("selector")).and_then(|v| v.as_str()).unwrap_or("");
-                    let val = config.get("params").and_then(|p| p.get("value")).and_then(|v| v.as_str()).unwrap_or("");
+                    let sel = config
+                        .get("params")
+                        .and_then(|p| p.get("selector"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let val = config
+                        .get("params")
+                        .and_then(|p| p.get("value"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
                     format!("填写 {} ← {}", truncate(sel, 20), truncate(val, 20))
                 }
                 _ => format!("浏览器: {}", action),
@@ -845,16 +863,28 @@ mod tests {
                 selector: Some("#username".to_string()),
                 value: Some("admin".to_string()),
                 source: Some("browser".to_string()),
-                url: None, x: None, y: None, keys: None, amount: None, button: None,
-                timestamp: Some(1000), page_title: None,
+                url: None,
+                x: None,
+                y: None,
+                keys: None,
+                amount: None,
+                button: None,
+                timestamp: Some(1000),
+                page_title: None,
             },
             RecordedAction {
                 action_type: "fill".to_string(),
                 selector: Some("#password".to_string()),
                 value: Some("123456".to_string()),
                 source: Some("browser".to_string()),
-                url: None, x: None, y: None, keys: None, amount: None, button: None,
-                timestamp: Some(2000), page_title: None,
+                url: None,
+                x: None,
+                y: None,
+                keys: None,
+                amount: None,
+                button: None,
+                timestamp: Some(2000),
+                page_title: None,
             },
         ];
         let result = convert_actions_to_workflow(&actions, "填表", RecordingSource::Browser);
@@ -871,8 +901,13 @@ mod tests {
             y: Some(300.0),
             button: Some("left".to_string()),
             source: Some("desktop".to_string()),
-            selector: None, value: None, url: None, keys: None, amount: None,
-            timestamp: Some(1000), page_title: None,
+            selector: None,
+            value: None,
+            url: None,
+            keys: None,
+            amount: None,
+            timestamp: Some(1000),
+            page_title: None,
         }];
         let result = convert_actions_to_workflow(&actions, "桌面点击", RecordingSource::Desktop);
         assert_eq!(result.step_count, 1);

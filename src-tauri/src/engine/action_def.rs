@@ -64,37 +64,84 @@ pub struct ActionDef {
 // 各容器 Action 声明
 // ═══════════════════════════════════════
 
-macro_rules! text_param { ($key:expr, $label:expr, $required:expr) => {
-    ParamDef { key: $key, label: $label, param_type: ParamType::Text, required: $required, default_value: None, placeholder: None, options: None, hint: None }
-}}
-macro_rules! number_param { ($key:expr, $label:expr) => {
-    ParamDef { key: $key, label: $label, param_type: ParamType::Number, required: false, default_value: None, placeholder: None, options: None, hint: None }
-}}
-macro_rules! select_param { ($key:expr, $label:expr, $opts:expr) => {
-    ParamDef { key: $key, label: $label, param_type: ParamType::Select, required: false, default_value: None, placeholder: None, options: Some($opts), hint: None }
-}}
-macro_rules! textarea_param { ($key:expr, $label:expr) => {
-    ParamDef { key: $key, label: $label, param_type: ParamType::Textarea, required: false, default_value: None, placeholder: None, options: None, hint: None }
-}}
+macro_rules! text_param {
+    ($key:expr, $label:expr, $required:expr) => {
+        ParamDef {
+            key: $key,
+            label: $label,
+            param_type: ParamType::Text,
+            required: $required,
+            default_value: None,
+            placeholder: None,
+            options: None,
+            hint: None,
+        }
+    };
+}
+macro_rules! number_param {
+    ($key:expr, $label:expr) => {
+        ParamDef {
+            key: $key,
+            label: $label,
+            param_type: ParamType::Number,
+            required: false,
+            default_value: None,
+            placeholder: None,
+            options: None,
+            hint: None,
+        }
+    };
+}
+macro_rules! select_param {
+    ($key:expr, $label:expr, $opts:expr) => {
+        ParamDef {
+            key: $key,
+            label: $label,
+            param_type: ParamType::Select,
+            required: false,
+            default_value: None,
+            placeholder: None,
+            options: Some($opts),
+            hint: None,
+        }
+    };
+}
+macro_rules! textarea_param {
+    ($key:expr, $label:expr) => {
+        ParamDef {
+            key: $key,
+            label: $label,
+            param_type: ParamType::Textarea,
+            required: false,
+            default_value: None,
+            placeholder: None,
+            options: None,
+            hint: None,
+        }
+    };
+}
 
 pub fn browser_actions() -> &'static [ActionDef] {
     &[
         ActionDef {
-            action_type: "navigate", label: "Navigate",
+            action_type: "navigate",
+            label: "Navigate",
             category: ActionCategory::Navigation,
             description: "Navigate to a URL",
             params: &[text_param!("url", "URL", true)],
             output_hint: Some("{ url, title }"),
         },
         ActionDef {
-            action_type: "click", label: "Click",
+            action_type: "click",
+            label: "Click",
             category: ActionCategory::Interaction,
             description: "Click an element by CSS selector",
             params: &[text_param!("selector", "CSS Selector", true)],
             output_hint: None,
         },
         ActionDef {
-            action_type: "input", label: "Type Text",
+            action_type: "input",
+            label: "Type Text",
             category: ActionCategory::Interaction,
             description: "Type text into an input field",
             params: &[
@@ -104,35 +151,55 @@ pub fn browser_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "scroll", label: "Scroll",
+            action_type: "scroll",
+            label: "Scroll",
             category: ActionCategory::Interaction,
             description: "Scroll the page by pixels",
             params: &[number_param!("amount", "Scroll Amount (px)")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "extract", label: "Extract Content",
+            action_type: "extract",
+            label: "Extract Content",
             category: ActionCategory::DataRead,
             description: "Extract text or HTML from elements",
             params: &[
                 text_param!("selector", "CSS Selector", false),
-                select_param!("mode", "Extract Mode", &[("text", "Text"), ("html", "HTML"), ("attribute", "Attribute")]),
+                select_param!(
+                    "mode",
+                    "Extract Mode",
+                    &[
+                        ("text", "Text"),
+                        ("html", "HTML"),
+                        ("attribute", "Attribute")
+                    ]
+                ),
                 text_param!("attribute", "Attribute Name", false),
             ],
             output_hint: Some("{ text, html, count }"),
         },
         ActionDef {
-            action_type: "screenshot", label: "Screenshot",
+            action_type: "screenshot",
+            label: "Screenshot",
             category: ActionCategory::DataRead,
             description: "Take a screenshot of the page",
             params: &[
-                select_param!("mode", "Mode", &[("full", "Full Page"), ("viewport", "Viewport"), ("element", "Element")]),
+                select_param!(
+                    "mode",
+                    "Mode",
+                    &[
+                        ("full", "Full Page"),
+                        ("viewport", "Viewport"),
+                        ("element", "Element")
+                    ]
+                ),
                 text_param!("selector", "Element Selector", false),
             ],
             output_hint: Some("{ path, base64 }"),
         },
         ActionDef {
-            action_type: "wait", label: "Wait",
+            action_type: "wait",
+            label: "Wait",
             category: ActionCategory::System,
             description: "Wait for an element or timeout",
             params: &[
@@ -142,14 +209,16 @@ pub fn browser_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "hover", label: "Hover",
+            action_type: "hover",
+            label: "Hover",
             category: ActionCategory::Interaction,
             description: "Hover over an element",
             params: &[text_param!("selector", "CSS Selector", true)],
             output_hint: None,
         },
         ActionDef {
-            action_type: "press_key", label: "Press Key",
+            action_type: "press_key",
+            label: "Press Key",
             category: ActionCategory::Interaction,
             description: "Press a keyboard key or combination",
             params: &[text_param!("key", "Key (e.g. Enter, Ctrl+C)", true)],
@@ -161,67 +230,92 @@ pub fn browser_actions() -> &'static [ActionDef] {
 pub fn excel_actions() -> &'static [ActionDef] {
     &[
         ActionDef {
-            action_type: "read", label: "Read Data",
+            action_type: "read",
+            label: "Read Data",
             category: ActionCategory::DataRead,
             description: "Read cells from a sheet",
             params: &[],
             output_hint: Some("{ sheet, data, rows, cols }"),
         },
         ActionDef {
-            action_type: "write", label: "Write Data",
+            action_type: "write",
+            label: "Write Data",
             category: ActionCategory::DataWrite,
             description: "Write structured data to the sheet",
             params: &[textarea_param!("value", "Data (array of arrays)")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "create", label: "Create Workbook",
+            action_type: "create",
+            label: "Create Workbook",
             category: ActionCategory::DataWrite,
             description: "Create a new Excel file with headers",
-            params: &[text_param!("headers", "Column Headers (comma-separated)", false)],
+            params: &[text_param!(
+                "headers",
+                "Column Headers (comma-separated)",
+                false
+            )],
             output_hint: None,
         },
         ActionDef {
-            action_type: "append", label: "Append Row",
+            action_type: "append",
+            label: "Append Row",
             category: ActionCategory::DataWrite,
             description: "Append a row to the existing sheet",
             params: &[textarea_param!("value", "Row data (array)")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "sort", label: "Sort",
+            action_type: "sort",
+            label: "Sort",
             category: ActionCategory::DataWrite,
             description: "Sort data by a column",
             params: &[
                 text_param!("column", "Column (name or letter)", true),
-                select_param!("order", "Order", &[("asc", "Ascending"), ("desc", "Descending")]),
+                select_param!(
+                    "order",
+                    "Order",
+                    &[("asc", "Ascending"), ("desc", "Descending")]
+                ),
             ],
             output_hint: Some("{ sheet, rows, data }"),
         },
         ActionDef {
-            action_type: "filter", label: "Filter",
+            action_type: "filter",
+            label: "Filter",
             category: ActionCategory::DataRead,
             description: "Filter rows by condition",
             params: &[
                 text_param!("column", "Column", true),
-                select_param!("op", "Operator", &[
-                    ("contains", "Contains"), ("equals", "Equals"), ("gt", ">"),
-                    ("gte", ">="), ("lt", "<"), ("lte", "<="),
-                    ("is_empty", "Is Empty"), ("not_empty", "Not Empty"),
-                ]),
+                select_param!(
+                    "op",
+                    "Operator",
+                    &[
+                        ("contains", "Contains"),
+                        ("equals", "Equals"),
+                        ("gt", ">"),
+                        ("gte", ">="),
+                        ("lt", "<"),
+                        ("lte", "<="),
+                        ("is_empty", "Is Empty"),
+                        ("not_empty", "Not Empty"),
+                    ]
+                ),
                 text_param!("value", "Filter Value", false),
             ],
             output_hint: Some("{ sheet, rows, data }"),
         },
         ActionDef {
-            action_type: "update", label: "Update Cells",
+            action_type: "update",
+            label: "Update Cells",
             category: ActionCategory::DataWrite,
             description: "Update specific cells",
             params: &[textarea_param!("updates", "Cell updates")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "sheets", label: "List Sheets",
+            action_type: "sheets",
+            label: "List Sheets",
             category: ActionCategory::DataRead,
             description: "List all sheets in the workbook",
             params: &[],
@@ -233,28 +327,32 @@ pub fn excel_actions() -> &'static [ActionDef] {
 pub fn word_actions() -> &'static [ActionDef] {
     &[
         ActionDef {
-            action_type: "read", label: "Read Document",
+            action_type: "read",
+            label: "Read Document",
             category: ActionCategory::DataRead,
             description: "Read the full document content",
             params: &[],
             output_hint: Some("{ paragraphs, full_text }"),
         },
         ActionDef {
-            action_type: "write", label: "Write Content",
+            action_type: "write",
+            label: "Write Content",
             category: ActionCategory::DataWrite,
             description: "Write paragraphs to the document",
             params: &[textarea_param!("value", "Content (text or paragraphs)")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "create", label: "Create Document",
+            action_type: "create",
+            label: "Create Document",
             category: ActionCategory::DataWrite,
             description: "Create a new document with optional title",
             params: &[text_param!("title", "Document Title", false)],
             output_hint: None,
         },
         ActionDef {
-            action_type: "replace", label: "Replace Text",
+            action_type: "replace",
+            label: "Replace Text",
             category: ActionCategory::DataWrite,
             description: "Find and replace text in the document",
             params: &[
@@ -264,14 +362,16 @@ pub fn word_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "merge", label: "Merge Documents",
+            action_type: "merge",
+            label: "Merge Documents",
             category: ActionCategory::DataWrite,
             description: "Merge multiple docx files into one",
             params: &[textarea_param!("files", "File paths (array)")],
             output_hint: None,
         },
         ActionDef {
-            action_type: "insert_table", label: "Insert Table",
+            action_type: "insert_table",
+            label: "Insert Table",
             category: ActionCategory::DataWrite,
             description: "Insert a table into the document",
             params: &[textarea_param!("data", "Table data (array of rows)")],
@@ -283,14 +383,16 @@ pub fn word_actions() -> &'static [ActionDef] {
 pub fn file_actions() -> &'static [ActionDef] {
     &[
         ActionDef {
-            action_type: "read", label: "Read File",
+            action_type: "read",
+            label: "Read File",
             category: ActionCategory::DataRead,
             description: "Read file content as text",
             params: &[text_param!("path", "File Path", true)],
             output_hint: Some("{ path, content, size, lines }"),
         },
         ActionDef {
-            action_type: "write", label: "Write File",
+            action_type: "write",
+            label: "Write File",
             category: ActionCategory::DataWrite,
             description: "Write content to a file",
             params: &[
@@ -300,7 +402,8 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: Some("{ path, size }"),
         },
         ActionDef {
-            action_type: "append", label: "Append to File",
+            action_type: "append",
+            label: "Append to File",
             category: ActionCategory::DataWrite,
             description: "Append content to a file",
             params: &[
@@ -310,7 +413,8 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "copy", label: "Copy File",
+            action_type: "copy",
+            label: "Copy File",
             category: ActionCategory::FileOperation,
             description: "Copy a file to a new location",
             params: &[
@@ -320,7 +424,8 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "move", label: "Move / Rename",
+            action_type: "move",
+            label: "Move / Rename",
             category: ActionCategory::FileOperation,
             description: "Move or rename a file",
             params: &[
@@ -330,14 +435,16 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: None,
         },
         ActionDef {
-            action_type: "delete", label: "Delete",
+            action_type: "delete",
+            label: "Delete",
             category: ActionCategory::FileOperation,
             description: "Delete a file or directory",
             params: &[text_param!("path", "Path", true)],
             output_hint: None,
         },
         ActionDef {
-            action_type: "list", label: "List Directory",
+            action_type: "list",
+            label: "List Directory",
             category: ActionCategory::DataRead,
             description: "List files in a directory",
             params: &[
@@ -347,14 +454,16 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: Some("[{ name, path, size, is_dir }]"),
         },
         ActionDef {
-            action_type: "exists", label: "Check Exists",
+            action_type: "exists",
+            label: "Check Exists",
             category: ActionCategory::DataRead,
             description: "Check if a file or directory exists",
             params: &[text_param!("path", "Path", true)],
             output_hint: Some("{ exists: bool }"),
         },
         ActionDef {
-            action_type: "glob", label: "Glob Search",
+            action_type: "glob",
+            label: "Glob Search",
             category: ActionCategory::DataRead,
             description: "Find files matching a pattern",
             params: &[
@@ -364,7 +473,8 @@ pub fn file_actions() -> &'static [ActionDef] {
             output_hint: Some("[{ name, path }]"),
         },
         ActionDef {
-            action_type: "grep", label: "Grep Search",
+            action_type: "grep",
+            label: "Grep Search",
             category: ActionCategory::DataRead,
             description: "Search file contents for text",
             params: &[
@@ -379,14 +489,16 @@ pub fn file_actions() -> &'static [ActionDef] {
 pub fn clipboard_actions() -> &'static [ActionDef] {
     &[
         ActionDef {
-            action_type: "read", label: "Read Clipboard",
+            action_type: "read",
+            label: "Read Clipboard",
             category: ActionCategory::DataRead,
             description: "Read text from the clipboard",
             params: &[],
             output_hint: Some("{ text }"),
         },
         ActionDef {
-            action_type: "write", label: "Write Clipboard",
+            action_type: "write",
+            label: "Write Clipboard",
             category: ActionCategory::Clipboard,
             description: "Write text to the clipboard",
             params: &[text_param!("text", "Text", true)],
@@ -404,7 +516,9 @@ fn to_snake_case(s: &str) -> String {
     let mut result = String::new();
     for (i, c) in s.chars().enumerate() {
         if c.is_uppercase() {
-            if i > 0 { result.push('_'); }
+            if i > 0 {
+                result.push('_');
+            }
             result.push(c.to_lowercase().next().unwrap());
         } else {
             result.push(c);
@@ -442,7 +556,13 @@ pub fn generate_ts_metadata() -> String {
                 action.description));
             for param in action.params {
                 let opts_str = if let Some(opts) = param.options {
-                    format!("[{}]", opts.iter().map(|(k, v)| format!("{{ label: '{}', value: '{}' }}", v, k)).collect::<Vec<_>>().join(", "))
+                    format!(
+                        "[{}]",
+                        opts.iter()
+                            .map(|(k, v)| format!("{{ label: '{}', value: '{}' }}", v, k))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 } else {
                     "undefined".to_string()
                 };
@@ -458,7 +578,10 @@ pub fn generate_ts_metadata() -> String {
                 ));
             }
             ts.push_str("      ],\n");
-            let output = action.output_hint.map(|s| format!("'{}'", s)).unwrap_or_else(|| "undefined".to_string());
+            let output = action
+                .output_hint
+                .map(|s| format!("'{}'", s))
+                .unwrap_or_else(|| "undefined".to_string());
             ts.push_str(&format!("      output_hint: {},\n", output));
             ts.push_str("    },\n");
         }
@@ -510,10 +633,19 @@ mod tests {
 
     #[test]
     fn all_params_have_keys() {
-        for actions in [browser_actions(), excel_actions(), word_actions(), file_actions()] {
+        for actions in [
+            browser_actions(),
+            excel_actions(),
+            word_actions(),
+            file_actions(),
+        ] {
             for action in actions {
                 for param in action.params {
-                    assert!(!param.key.is_empty(), "Action {} has param with empty key", action.action_type);
+                    assert!(
+                        !param.key.is_empty(),
+                        "Action {} has param with empty key",
+                        action.action_type
+                    );
                 }
             }
         }

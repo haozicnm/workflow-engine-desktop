@@ -10,45 +10,58 @@
 // 所有 action 全部通过 → branch: "true"，否则 → branch: "false"
 // 输出同时包含原始 value 以便下游使用
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use log::info;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ConditionNode;
 
 #[async_trait]
 impl NodeExecutor for ConditionNode {
-    async fn execute(&self, step: &Step, ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
 
         // 上游注入的原始值（将透传到输出）
-        let original_value = config.get("value").cloned().unwrap_or(serde_json::Value::Null);
+        let original_value = config
+            .get("value")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         // ── 新格式：conditionGroup（可视化条件构建器） ──
         // 优先从 step.condition_group 读，回退到 config.condition_group
         let condition_group_owned: Option<crate::engine::workflow::LogicConditionGroup> =
             step.condition_group.clone().or_else(|| {
-                config.get("condition_group")
+                config
+                    .get("condition_group")
                     .and_then(|cg| serde_json::from_value(cg.clone()).ok())
             });
         if let Some(ref group) = condition_group_owned {
             if !group.conditions.is_empty() {
-                let results: Vec<bool> = group.conditions.iter().map(|cond| {
-                    let left = ctx.resolve_config(&serde_json::json!(cond.left));
-                    let right = ctx.resolve_config(&serde_json::json!(cond.right));
-                    let result = eval_condition(&left, &cond.op, &right);
-                    info!(
+                let results: Vec<bool> = group
+                    .conditions
+                    .iter()
+                    .map(|cond| {
+                        let left = ctx.resolve_config(&serde_json::json!(cond.left));
+                        let right = ctx.resolve_config(&serde_json::json!(cond.right));
+                        let result = eval_condition(&left, &cond.op, &right);
+                        info!(
                         "[逻辑判断] left_template={} left={} op={} right_template={} right={} → {}",
                         cond.left, left, cond.op, cond.right, right, if result { "✓" } else { "✗" }
                     );
-                    result
-                }).collect();
+                        result
+                    })
+                    .collect();
 
                 let pass = if group.combinator == "or" {
                     results.iter().any(|&r| r)
@@ -58,11 +71,14 @@ impl NodeExecutor for ConditionNode {
 
                 info!(
                     "[逻辑判断] conditionGroup combinator={} conditions={} → {}",
-                    group.combinator, results.len(), if pass { "✓ true" } else { "✗ false" }
+                    group.combinator,
+                    results.len(),
+                    if pass { "✓ true" } else { "✗ false" }
                 );
 
                 let branch_str = if pass { "true" } else { "false" };
-                let output_value = resolve_output_template(&step.config, &original_value, branch_str, pass, ctx);
+                let output_value =
+                    resolve_output_template(&step.config, &original_value, branch_str, pass, ctx);
                 return Ok(serde_json::json!({
                     "branch": branch_str,
                     "value": output_value,
@@ -77,7 +93,8 @@ impl NodeExecutor for ConditionNode {
             let resolved_left = ctx.resolve_config(&original_value);
             let mut all_pass = true;
             for (i, action) in step_actions.iter().enumerate() {
-                let op = action.get("type")
+                let op = action
+                    .get("type")
                     .or_else(|| action.get("op"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
@@ -89,7 +106,11 @@ impl NodeExecutor for ConditionNode {
                 let pass = eval_condition(&resolved_left, op, right);
                 info!(
                     "[逻辑判断] action[{}] op={} left={} right={} → {}",
-                    i, op, resolved_left, right, if pass { "✓" } else { "✗" }
+                    i,
+                    op,
+                    resolved_left,
+                    right,
+                    if pass { "✓" } else { "✗" }
                 );
 
                 if !pass {
@@ -102,7 +123,8 @@ impl NodeExecutor for ConditionNode {
             if !all_pass {
                 info!("[逻辑判断] 条件不通过，走 false 出口");
             }
-            let output_value = resolve_output_template(&step.config, &original_value, branch_str, all_pass, ctx);
+            let output_value =
+                resolve_output_template(&step.config, &original_value, branch_str, all_pass, ctx);
             return Ok(serde_json::json!({
                 "branch": branch_str,
                 "value": output_value,
@@ -112,12 +134,8 @@ impl NodeExecutor for ConditionNode {
 
         // ── 旧格式兼容：left/op/right（声明式） ──
         if let Some(op) = config.get("op").and_then(|v| v.as_str()) {
-            let left = ctx.resolve_config(
-                config.get("left").unwrap_or(&serde_json::Value::Null)
-            );
-            let right = ctx.resolve_config(
-                config.get("right").unwrap_or(&serde_json::Value::Null)
-            );
+            let left = ctx.resolve_config(config.get("left").unwrap_or(&serde_json::Value::Null));
+            let right = ctx.resolve_config(config.get("right").unwrap_or(&serde_json::Value::Null));
             let result = eval_condition(&left, op, &right);
             if result {
                 return Ok(left);
@@ -127,7 +145,9 @@ impl NodeExecutor for ConditionNode {
         }
 
         // ── 旧格式兼容：表达式 ──
-        let condition = config.get("condition").and_then(|v| v.as_str())
+        let condition = config
+            .get("condition")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("逻辑判断节点需要 actions 数组、left/op 或 condition"))?;
         let result = ctx.eval_expr(condition).map_err(|e| anyhow!(e))?;
         let is_true = result.as_bool().unwrap_or(false);
@@ -171,7 +191,11 @@ fn resolve_output_template(
 
 // ─── 条件求值（pub(crate) 让 approval 等节点可复用） ───
 
-pub(crate) fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_json::Value) -> bool {
+pub(crate) fn eval_condition(
+    left: &serde_json::Value,
+    op: &str,
+    right: &serde_json::Value,
+) -> bool {
     match op {
         "==" | "equals" => left == right,
         "!=" | "not_equals" => left != right,
@@ -190,7 +214,9 @@ pub(crate) fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_j
             _ => false,
         },
         "starts_with" | "start_with" => match (left, right) {
-            (serde_json::Value::String(l), serde_json::Value::String(r)) => l.starts_with(r.as_str()),
+            (serde_json::Value::String(l), serde_json::Value::String(r)) => {
+                l.starts_with(r.as_str())
+            }
             _ => false,
         },
         "ends_with" | "end_with" => match (left, right) {
@@ -208,9 +234,9 @@ pub(crate) fn eval_condition(left: &serde_json::Value, op: &str, right: &serde_j
             _ => true,
         },
         "regex" => match (left, right) {
-            (serde_json::Value::String(l), serde_json::Value::String(r)) => {
-                regex::Regex::new(r).map(|re| re.is_match(l)).unwrap_or(false)
-            }
+            (serde_json::Value::String(l), serde_json::Value::String(r)) => regex::Regex::new(r)
+                .map(|re| re.is_match(l))
+                .unwrap_or(false),
             _ => false,
         },
         _ => false,

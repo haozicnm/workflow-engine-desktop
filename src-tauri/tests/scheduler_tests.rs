@@ -202,10 +202,7 @@ fn approval_awaiting_returns_none() {
 #[test]
 fn approval_approved_continues() {
     let step = make_step_with_next("app1", "approval", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let mut ctx = new_ctx();
     ctx.set_output("app1", json!({"status": "approved"}));
@@ -217,10 +214,7 @@ fn approval_approved_continues() {
 #[test]
 fn approval_rejected_continues() {
     let step = make_step_with_next("app1", "approval", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let mut ctx = new_ctx();
     ctx.set_output("app1", json!({"status": "rejected"}));
@@ -232,10 +226,7 @@ fn approval_rejected_continues() {
 #[test]
 fn approval_no_output_continues() {
     let step = make_step_with_next("app1", "approval", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     // 没有 output → 不满足 awaiting_approval 条件 → 继续
@@ -250,10 +241,7 @@ fn approval_no_output_continues() {
 #[test]
 fn loop_node_returns_none() {
     let step = make_step_with_next("loop1", "loop", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -263,10 +251,7 @@ fn loop_node_returns_none() {
 #[test]
 fn parallel_node_returns_none() {
     let step = make_step_with_next("par1", "parallel", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -276,10 +261,7 @@ fn parallel_node_returns_none() {
 #[test]
 fn while_node_returns_none() {
     let step = make_step_with_next("while1", "while", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -315,7 +297,11 @@ fn default_falls_back_to_list_order() {
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, Some("s2".to_string()), "should fall back to next in list");
+    assert_eq!(
+        next,
+        Some("s2".to_string()),
+        "should fall back to next in list"
+    );
 }
 
 #[test]
@@ -352,10 +338,7 @@ fn default_step_not_in_list_returns_none() {
 #[test]
 fn http_step_uses_next_field() {
     let step = make_step_with_next("h1", "http", "h2");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("h2", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("h2", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -365,10 +348,7 @@ fn http_step_uses_next_field() {
 #[test]
 fn script_step_falls_back_to_list() {
     let step = make_step("sc1", "script", json!({"script": "1+1"}));
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("sc2", "notify", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("sc2", "notify", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -445,10 +425,7 @@ fn cursor_done_missing_defaults_false() {
 #[test]
 fn approval_status_other_than_awaiting_continues() {
     let step = make_step_with_next("app1", "approval", "next1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("next1", "http", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let mut ctx = new_ctx();
     ctx.set_output("app1", json!({"status": "timeout"}));

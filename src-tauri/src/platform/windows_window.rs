@@ -5,7 +5,7 @@
 // 从 async 改为同步（std::process::Command），与平台层其他实现保持一致。
 
 use crate::platform::traits::{WindowBackend, WindowInfo};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::process::Command;
 
 pub struct WindowsWindowBackend;

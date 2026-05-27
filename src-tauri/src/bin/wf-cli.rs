@@ -1,17 +1,16 @@
 // bin/wf-cli.rs — 独立 CLI 入口（无 GUI 依赖）
 // 其他 agent 安装后可直接调用: wf-cli list --json
 use clap::Parser;
-use workflow_engine::App;
-use workflow_engine::cli::{Cli, run_cli};
 use std::sync::Arc;
+use workflow_engine::cli::{run_cli, Cli};
+use workflow_engine::App;
 
 fn main() {
     // 初始化日志（只输出到 stderr，不污染 stdout JSON）
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "warn".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
         )
         .init();
 

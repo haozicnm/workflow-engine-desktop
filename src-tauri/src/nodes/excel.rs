@@ -1,12 +1,12 @@
 // nodes/excel.rs — Excel 读写节点（拆分为细粒度操作 + 内存筛选排序 + CSV 互转）
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use calamine::Reader;
+use std::sync::Arc;
 
 // ═══════════════════════════════════════════
 // Excel 通用节点（兼容旧版，保留所有 action）
@@ -16,11 +16,20 @@ pub struct ExcelNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let action = config.get("action").and_then(|v| v.as_str())
+        let action = config
+            .get("action")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Excel 节点缺少 action 参数"))?;
-        let file_path = config.get("path").and_then(|v| v.as_str())
+        let file_path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Excel 节点缺少 path 参数"))?;
 
         match action {
@@ -45,9 +54,16 @@ pub struct ExcelReadNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelReadNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("读取表格需要 path 参数"))?;
         let sheet = config.get("sheet").and_then(|v| v.as_str());
         let cfg = if let Some(s) = sheet {
@@ -65,12 +81,25 @@ pub struct ExcelWriteNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelWriteNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("写入表格需要 path 参数"))?;
-        let sheet = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1");
-        let write_mode = config.get("write_mode").and_then(|v| v.as_str()).unwrap_or("overwrite");
+        let sheet = config
+            .get("sheet")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Sheet1");
+        let write_mode = config
+            .get("write_mode")
+            .and_then(|v| v.as_str())
+            .unwrap_or("overwrite");
         let data = config.get("data");
         match write_mode {
             "append" => {
@@ -91,11 +120,21 @@ pub struct ExcelCreateNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelCreateNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("创建表格需要 path 参数"))?;
-        let sheet = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1");
+        let sheet = config
+            .get("sheet")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Sheet1");
         let headers = config.get("headers").and_then(|v| v.as_str());
         let data = config.get("data");
 
@@ -110,13 +149,21 @@ pub struct ExcelFilterNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelFilterNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let column = config.get("column").and_then(|v| v.as_str())
+        let column = config
+            .get("column")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("筛选数据需要 column 参数"))?;
         let op = config.get("op").and_then(|v| v.as_str()).unwrap_or("==");
         let value = config.get("value").and_then(|v| v.as_str()).unwrap_or("");
-        let data = config.get("data")
+        let data = config
+            .get("data")
             .ok_or_else(|| anyhow!("筛选数据需要 data 参数"))?;
 
         excel_filter_in_memory(data, column, op, value)
@@ -129,12 +176,23 @@ pub struct ExcelSortNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelSortNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let column = config.get("column").and_then(|v| v.as_str())
+        let column = config
+            .get("column")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("排序数据需要 column 参数"))?;
-        let order = config.get("order").and_then(|v| v.as_str()).unwrap_or("asc");
-        let data = config.get("data")
+        let order = config
+            .get("order")
+            .and_then(|v| v.as_str())
+            .unwrap_or("asc");
+        let data = config
+            .get("data")
             .ok_or_else(|| anyhow!("排序数据需要 data 参数"))?;
 
         excel_sort_in_memory(data, column, order)
@@ -147,11 +205,21 @@ pub struct ExcelAppendNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelAppendNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("追加行需要 path 参数"))?;
-        let sheet = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1");
+        let sheet = config
+            .get("sheet")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Sheet1");
         let data = config.get("data");
 
         let cfg = serde_json::json!({ "sheet": sheet, "data": data });
@@ -165,13 +233,26 @@ pub struct ExcelCsvNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelCsvNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("CSV 转换需要 path 参数"))?;
-        let direction = config.get("direction").and_then(|v| v.as_str()).unwrap_or("csv_to_xlsx");
+        let direction = config
+            .get("direction")
+            .and_then(|v| v.as_str())
+            .unwrap_or("csv_to_xlsx");
         let output = config.get("output").and_then(|v| v.as_str());
-        let delimiter = config.get("delimiter").and_then(|v| v.as_str()).unwrap_or(",");
+        let delimiter = config
+            .get("delimiter")
+            .and_then(|v| v.as_str())
+            .unwrap_or(",");
 
         excel_csv_convert(path, output, direction, delimiter).await
     }
@@ -184,7 +265,10 @@ impl NodeExecutor for ExcelCsvNode {
 /// 读取 Excel 工作表数据
 pub async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).map(String::from);
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let mut workbook = calamine::open_workbook::<calamine::Xlsx<_>, _>(&path)
@@ -193,12 +277,15 @@ pub async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_
         let sheet = if let Some(s) = &sheet_name {
             s.clone()
         } else {
-            workbook.sheet_names().first()
+            workbook
+                .sheet_names()
+                .first()
                 .ok_or_else(|| anyhow!("Excel 文件没有工作表"))?
                 .clone()
         };
 
-        let range = workbook.worksheet_range(&sheet)
+        let range = workbook
+            .worksheet_range(&sheet)
             .map_err(|e| anyhow!("读取工作表 '{}' 失败: {}", sheet, e))?;
 
         let mut rows = Vec::new();
@@ -213,44 +300,68 @@ pub async fn excel_read(path: &str, config: &serde_json::Value) -> Result<serde_
             "cols": range.width(),
             "data": rows,
         }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 读取工作表名称列表
 pub async fn excel_sheets(path: &str) -> Result<serde_json::Value> {
     let path = path.to_string();
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
-        let workbook: calamine::Xlsx<_> = calamine::open_workbook(&path)
-            .map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
+        let workbook: calamine::Xlsx<_> =
+            calamine::open_workbook(&path).map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
         Ok(serde_json::json!({ "sheets": workbook.sheet_names() }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 提取指定列为扁平数组
 async fn excel_extract_column(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
-    let column = config.get("column").and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("extract_column 需要 column 参数"))?.to_string();
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sheet1")
+        .to_string();
+    let column = config
+        .get("column")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("extract_column 需要 column 参数"))?
+        .to_string();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
-        let mut workbook: calamine::Xlsx<_> = calamine::open_workbook(&path)
-            .map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
-        let range = workbook.worksheet_range(&sheet_name)
+        let mut workbook: calamine::Xlsx<_> =
+            calamine::open_workbook(&path).map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
+        let range = workbook
+            .worksheet_range(&sheet_name)
             .map_err(|e| anyhow!("读取工作表 '{}' 失败: {}", sheet_name, e))?;
         let col_idx = parse_column_index(&column)?;
-        let values: Vec<serde_json::Value> = range.rows()
-            .filter_map(|row| row.get(col_idx)).map(cell_to_json).collect();
+        let values: Vec<serde_json::Value> = range
+            .rows()
+            .filter_map(|row| row.get(col_idx))
+            .map(cell_to_json)
+            .collect();
         Ok(serde_json::json!(values))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 写入 Excel（创建新文件或覆盖）
 pub async fn excel_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
-    let data = config.get("data").and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("write 需要 data 参数（二维数组）"))?.clone();
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sheet1")
+        .to_string();
+    let data = config
+        .get("data")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("write 需要 data 参数（二维数组）"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let mut workbook = rust_xlsxwriter::Workbook::new();
@@ -267,14 +378,23 @@ pub async fn excel_write(path: &str, config: &serde_json::Value) -> Result<serde
         }
         workbook.save(&path)?;
         Ok(serde_json::json!({ "path": path, "sheet": sheet_name, "rows_written": total_rows }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 创建新 Excel（写空文件或带表头）
 pub async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
-    let headers = config.get("headers").and_then(|v| v.as_str()).map(String::from);
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sheet1")
+        .to_string();
+    let headers = config
+        .get("headers")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     let data = config.get("data").and_then(|v| v.as_array()).cloned();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
@@ -304,15 +424,24 @@ pub async fn excel_create(path: &str, config: &serde_json::Value) -> Result<serd
 
         workbook.save(&path)?;
         Ok(serde_json::json!({ "path": path, "sheet": sheet_name, "created": true }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 追加行到 Excel（保留原文件格式）
 pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
-    let data = config.get("data").and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("append 需要 data 参数"))?.clone();
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sheet1")
+        .to_string();
+    let data = config
+        .get("data")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("append 需要 data 参数"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let mut book = if std::path::Path::new(&path).exists() {
@@ -327,7 +456,8 @@ pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serd
             b
         };
 
-        let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        let sheet = book
+            .get_sheet_by_name_mut(&sheet_name)
             .ok_or_else(|| anyhow!("工作表 '{}' 不存在", sheet_name))?;
 
         // 找到最后一行（1-indexed）
@@ -343,13 +473,24 @@ pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serd
                     let target = sheet.get_cell_mut((col, row_num));
                     match cell {
                         serde_json::Value::Number(n) => {
-                            if let Some(i) = n.as_i64() { target.set_value(i.to_string()); }
-                            else if let Some(f) = n.as_f64() { target.set_value(f.to_string()); }
+                            if let Some(i) = n.as_i64() {
+                                target.set_value(i.to_string());
+                            } else if let Some(f) = n.as_f64() {
+                                target.set_value(f.to_string());
+                            }
                         }
-                        serde_json::Value::String(s) => { target.set_value(s.as_str()); }
-                        serde_json::Value::Bool(b) => { target.set_value(b.to_string()); }
-                        serde_json::Value::Null => { target.set_value(""); }
-                        _ => { target.set_value(cell.to_string()); }
+                        serde_json::Value::String(s) => {
+                            target.set_value(s.as_str());
+                        }
+                        serde_json::Value::Bool(b) => {
+                            target.set_value(b.to_string());
+                        }
+                        serde_json::Value::Null => {
+                            target.set_value("");
+                        }
+                        _ => {
+                            target.set_value(cell.to_string());
+                        }
                     }
                 }
             }
@@ -364,28 +505,42 @@ pub async fn excel_append(path: &str, config: &serde_json::Value) -> Result<serd
             "appended_rows": data.len(),
             "start_row": next_row,
         }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 更新 Excel 单元格（保留原文件格式）
 pub async fn excel_update(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let sheet_name = config.get("sheet").and_then(|v| v.as_str()).unwrap_or("Sheet1").to_string();
-    let updates = config.get("updates").and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("update 需要 updates 参数"))?.clone();
+    let sheet_name = config
+        .get("sheet")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Sheet1")
+        .to_string();
+    let updates = config
+        .get("updates")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("update 需要 updates 参数"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let mut book = umya_spreadsheet::reader::xlsx::read(&path)
             .map_err(|e| anyhow!("打开 Excel 文件失败: {}", e))?;
 
-        let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        let sheet = book
+            .get_sheet_by_name_mut(&sheet_name)
             .ok_or_else(|| anyhow!("工作表 '{}' 不存在", sheet_name))?;
 
         let mut updated_count = 0;
         for update in &updates {
-            let cell_ref = update.get("cell").and_then(|v| v.as_str())
+            let cell_ref = update
+                .get("cell")
+                .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("update 项缺少 cell 参数"))?;
-            let value = update.get("value").and_then(|v| v.as_str())
+            let value = update
+                .get("value")
+                .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("update 项缺少 value 参数（必须为字符串）"))?;
             let (col, row) = parse_cell_ref_umya(cell_ref)?;
             sheet.get_cell_mut((col, row)).set_value(value);
@@ -396,54 +551,84 @@ pub async fn excel_update(path: &str, config: &serde_json::Value) -> Result<serd
             .map_err(|e| anyhow!("保存 Excel 失败: {}", e))?;
 
         Ok(serde_json::json!({ "path": path, "sheet": sheet_name, "updated_cells": updated_count }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 // ─── 内存操作（不读文件，直接对传入的 JSON 数据操作） ───
 
 /// 内存筛选：对 JSON 二维数组按列条件过滤
-fn excel_filter_in_memory(data: &serde_json::Value, column: &str, op: &str, value: &str) -> Result<serde_json::Value> {
-    let rows = data.as_array().ok_or_else(|| anyhow!("筛选需要 data 参数（二维数组）"))?;
+fn excel_filter_in_memory(
+    data: &serde_json::Value,
+    column: &str,
+    op: &str,
+    value: &str,
+) -> Result<serde_json::Value> {
+    let rows = data
+        .as_array()
+        .ok_or_else(|| anyhow!("筛选需要 data 参数（二维数组）"))?;
     if rows.is_empty() {
         return Ok(serde_json::json!({ "data": [], "filtered_count": 0, "total": 0 }));
     }
 
-    let col_idx = parse_column_index(column)
-        .or_else(|_| {
-            // 如果 column 不是字母，尝试按 header 名称查找
-            let first_row = rows[0].as_array();
-            match first_row {
-                Some(cells) => cells.iter().position(|c| c.as_str() == Some(column))
-                    .ok_or_else(|| anyhow!("未找到列 '{}'", column)),
-                None => Err(anyhow!("无法解析列 '{}'", column)),
-            }
-        })?;
+    let col_idx = parse_column_index(column).or_else(|_| {
+        // 如果 column 不是字母，尝试按 header 名称查找
+        let first_row = rows[0].as_array();
+        match first_row {
+            Some(cells) => cells
+                .iter()
+                .position(|c| c.as_str() == Some(column))
+                .ok_or_else(|| anyhow!("未找到列 '{}'", column)),
+            None => Err(anyhow!("无法解析列 '{}'", column)),
+        }
+    })?;
 
-    let filtered: Vec<serde_json::Value> = rows.iter().filter(|row| {
-        let cells = row.as_array();
-        match cells.and_then(|c| c.get(col_idx)) {
-            None => false,
-            Some(cell) => {
-                let cell_str = match cell {
-                    serde_json::Value::String(s) => s.clone(),
-                    serde_json::Value::Number(n) => n.to_string(),
-                    serde_json::Value::Bool(b) => b.to_string(),
-                    _ => String::new(),
-                };
-                match op {
-                    "==" => cell_str == value,
-                    "!=" => cell_str != value,
-                    ">" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a > b),
-                    "<" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a < b),
-                    ">=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a >= b),
-                    "<=" => cell_str.parse::<f64>().ok().zip(value.parse::<f64>().ok()).is_some_and(|(a, b)| a <= b),
-                    "contains" => cell_str.contains(value),
-                    "starts_with" => cell_str.starts_with(value),
-                    _ => false,
+    let filtered: Vec<serde_json::Value> = rows
+        .iter()
+        .filter(|row| {
+            let cells = row.as_array();
+            match cells.and_then(|c| c.get(col_idx)) {
+                None => false,
+                Some(cell) => {
+                    let cell_str = match cell {
+                        serde_json::Value::String(s) => s.clone(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::Bool(b) => b.to_string(),
+                        _ => String::new(),
+                    };
+                    match op {
+                        "==" => cell_str == value,
+                        "!=" => cell_str != value,
+                        ">" => cell_str
+                            .parse::<f64>()
+                            .ok()
+                            .zip(value.parse::<f64>().ok())
+                            .is_some_and(|(a, b)| a > b),
+                        "<" => cell_str
+                            .parse::<f64>()
+                            .ok()
+                            .zip(value.parse::<f64>().ok())
+                            .is_some_and(|(a, b)| a < b),
+                        ">=" => cell_str
+                            .parse::<f64>()
+                            .ok()
+                            .zip(value.parse::<f64>().ok())
+                            .is_some_and(|(a, b)| a >= b),
+                        "<=" => cell_str
+                            .parse::<f64>()
+                            .ok()
+                            .zip(value.parse::<f64>().ok())
+                            .is_some_and(|(a, b)| a <= b),
+                        "contains" => cell_str.contains(value),
+                        "starts_with" => cell_str.starts_with(value),
+                        _ => false,
+                    }
                 }
             }
-        }
-    }).cloned().collect();
+        })
+        .cloned()
+        .collect();
 
     let total = rows.len();
     let count = filtered.len();
@@ -451,21 +636,29 @@ fn excel_filter_in_memory(data: &serde_json::Value, column: &str, op: &str, valu
 }
 
 /// 内存排序：对 JSON 二维数组按列排序
-fn excel_sort_in_memory(data: &serde_json::Value, column: &str, order: &str) -> Result<serde_json::Value> {
-    let rows = data.as_array().ok_or_else(|| anyhow!("排序需要 data 参数（二维数组）"))?.clone();
+fn excel_sort_in_memory(
+    data: &serde_json::Value,
+    column: &str,
+    order: &str,
+) -> Result<serde_json::Value> {
+    let rows = data
+        .as_array()
+        .ok_or_else(|| anyhow!("排序需要 data 参数（二维数组）"))?
+        .clone();
     if rows.len() <= 1 {
         return Ok(serde_json::json!({ "data": rows, "sorted_count": rows.len() }));
     }
 
-    let col_idx = parse_column_index(column)
-        .or_else(|_| {
-            let first_row = rows[0].as_array();
-            match first_row {
-                Some(cells) => cells.iter().position(|c| c.as_str() == Some(column))
-                    .ok_or_else(|| anyhow!("未找到列 '{}'", column)),
-                None => Err(anyhow!("无法解析列 '{}'", column)),
-            }
-        })?;
+    let col_idx = parse_column_index(column).or_else(|_| {
+        let first_row = rows[0].as_array();
+        match first_row {
+            Some(cells) => cells
+                .iter()
+                .position(|c| c.as_str() == Some(column))
+                .ok_or_else(|| anyhow!("未找到列 '{}'", column)),
+            None => Err(anyhow!("无法解析列 '{}'", column)),
+        }
+    })?;
 
     let mut sorted = rows.clone();
     let desc = order == "desc";
@@ -473,20 +666,33 @@ fn excel_sort_in_memory(data: &serde_json::Value, column: &str, order: &str) -> 
         let ca = a.as_array().and_then(|c| c.get(col_idx));
         let cb = b.as_array().and_then(|c| c.get(col_idx));
         let cmp = compare_cells(ca, cb);
-        if desc { cmp.reverse() } else { cmp }
+        if desc {
+            cmp.reverse()
+        } else {
+            cmp
+        }
     });
 
     Ok(serde_json::json!({ "data": sorted, "sorted_count": sorted.len() }))
 }
 
-fn compare_cells(a: Option<&serde_json::Value>, b: Option<&serde_json::Value>) -> std::cmp::Ordering {
+fn compare_cells(
+    a: Option<&serde_json::Value>,
+    b: Option<&serde_json::Value>,
+) -> std::cmp::Ordering {
     match (a, b) {
         (None, None) => std::cmp::Ordering::Equal,
         (None, Some(_)) => std::cmp::Ordering::Less,
         (Some(_), None) => std::cmp::Ordering::Greater,
         (Some(a), Some(b)) => {
-            let sa = match a { serde_json::Value::String(s) => s.clone(), other => other.to_string() };
-            let sb = match b { serde_json::Value::String(s) => s.clone(), other => other.to_string() };
+            let sa = match a {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            let sb = match b {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
             if let (Ok(na), Ok(nb)) = (sa.parse::<f64>(), sb.parse::<f64>()) {
                 na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal)
             } else {
@@ -497,7 +703,12 @@ fn compare_cells(a: Option<&serde_json::Value>, b: Option<&serde_json::Value>) -
 }
 
 /// CSV ↔ Excel 互转
-async fn excel_csv_convert(path: &str, output: Option<&str>, direction: &str, delimiter: &str) -> Result<serde_json::Value> {
+async fn excel_csv_convert(
+    path: &str,
+    output: Option<&str>,
+    direction: &str,
+    delimiter: &str,
+) -> Result<serde_json::Value> {
     let path = path.to_string();
     let output = output.map(String::from);
     let direction = direction.to_string();
@@ -565,7 +776,9 @@ async fn excel_csv_convert(path: &str, output: Option<&str>, direction: &str, de
 // ─── 辅助函数 ───
 
 fn parse_column_index(column: &str) -> Result<usize> {
-    if let Ok(idx) = column.parse::<usize>() { return Ok(idx); }
+    if let Ok(idx) = column.parse::<usize>() {
+        return Ok(idx);
+    }
     let mut idx: usize = 0;
     for ch in column.chars() {
         if !ch.is_ascii_uppercase() {
@@ -573,10 +786,11 @@ fn parse_column_index(column: &str) -> Result<usize> {
         }
         idx = idx * 26 + (ch as usize - 'A' as usize + 1);
     }
-    if idx == 0 { return Err(anyhow!("无效的列标识符: '{}'", column)); }
+    if idx == 0 {
+        return Err(anyhow!("无效的列标识符: '{}'", column));
+    }
     Ok(idx - 1)
 }
-
 
 /// 解析单元格引用为 umya 坐标 (col, row)，均为 1-indexed
 /// 例: "A1" → (1, 1), "B3" → (2, 3), "AA10" → (27, 10)
@@ -586,14 +800,24 @@ fn parse_cell_ref_umya(cell_ref: &str) -> Result<(u32, u32)> {
     let mut row_str = String::new();
     let mut in_col = true;
     for ch in cell_ref.chars() {
-        if ch.is_ascii_alphabetic() && in_col { col_str.push(ch.to_ascii_uppercase()); }
-        else if ch.is_ascii_digit() { in_col = false; row_str.push(ch); }
-        else { return Err(anyhow!("无效的单元格引用: {}", cell_ref)); }
+        if ch.is_ascii_alphabetic() && in_col {
+            col_str.push(ch.to_ascii_uppercase());
+        } else if ch.is_ascii_digit() {
+            in_col = false;
+            row_str.push(ch);
+        } else {
+            return Err(anyhow!("无效的单元格引用: {}", cell_ref));
+        }
     }
-    if col_str.is_empty() || row_str.is_empty() { return Err(anyhow!("无效的单元格引用: {}", cell_ref)); }
+    if col_str.is_empty() || row_str.is_empty() {
+        return Err(anyhow!("无效的单元格引用: {}", cell_ref));
+    }
     let mut col: u32 = 0;
-    for ch in col_str.chars() { col = col * 26 + (ch as u32 - 'A' as u32 + 1); }
-    let row: u32 = row_str.parse::<u32>()
+    for ch in col_str.chars() {
+        col = col * 26 + (ch as u32 - 'A' as u32 + 1);
+    }
+    let row: u32 = row_str
+        .parse::<u32>()
         .map_err(|_| anyhow!("无效的行号: {}", row_str))?;
     Ok((col, row))
 }
@@ -612,14 +836,26 @@ fn cell_to_json(cell: &calamine::Data) -> serde_json::Value {
     }
 }
 
-fn write_json_cell(ws: &mut rust_xlsxwriter::Worksheet, row: u32, col: u16, val: &serde_json::Value) -> Result<()> {
+fn write_json_cell(
+    ws: &mut rust_xlsxwriter::Worksheet,
+    row: u32,
+    col: u16,
+    val: &serde_json::Value,
+) -> Result<()> {
     match val {
         serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() { ws.write_number(row, col, i as f64)?; }
-            else if let Some(f) = n.as_f64() { ws.write_number(row, col, f)?; }
+            if let Some(i) = n.as_i64() {
+                ws.write_number(row, col, i as f64)?;
+            } else if let Some(f) = n.as_f64() {
+                ws.write_number(row, col, f)?;
+            }
         }
-        serde_json::Value::String(s) => { ws.write_string(row, col, s)?; }
-        serde_json::Value::Bool(b) => { ws.write_boolean(row, col, *b)?; }
+        serde_json::Value::String(s) => {
+            ws.write_string(row, col, s)?;
+        }
+        serde_json::Value::Bool(b) => {
+            ws.write_boolean(row, col, *b)?;
+        }
         _ => {}
     }
     Ok(())

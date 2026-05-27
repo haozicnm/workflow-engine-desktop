@@ -1,12 +1,12 @@
 // cli.rs — 命令行接口
 // 用法: workflow-engine.exe --cli <command> [args]
 
-use clap::{Parser, Subcommand};
-use crate::App;
 use crate::engine::{parser, scheduler};
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use crate::App;
+use clap::{Parser, Subcommand};
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "workflow-engine", about = "Workflow Engine CLI")]
@@ -224,9 +224,7 @@ pub enum LibraryCommand {
         json: bool,
     },
     /// 查看模板详情
-    Show {
-        name: String,
-    },
+    Show { name: String },
     /// 从已导入的工作流创建模板
     Create {
         /// 模板名称
@@ -249,9 +247,7 @@ pub enum LibraryCommand {
         params: String,
     },
     /// 校验模板
-    Validate {
-        name: String,
-    },
+    Validate { name: String },
     /// 为模板创建定时调度
     Schedule {
         name: String,
@@ -278,14 +274,13 @@ pub enum ScheduleCommand {
         cron_expr: String,
     },
     /// 删除调度
-    Delete {
-        id: String,
-    },
+    Delete { id: String },
 }
 
 /// 解析 --var key=value 参数
 fn parse_var(s: &str) -> Result<(String, String), String> {
-    let (k, v) = s.split_once('=')
+    let (k, v) = s
+        .split_once('=')
         .ok_or_else(|| format!("无效格式 '{}'，应为 key=value", s))?;
     Ok((k.to_string(), v.to_string()))
 }
@@ -301,31 +296,49 @@ pub async fn run_cli(cli: Cli, app: Arc<App>) -> Result<(), String> {
         Commands::Schedule(sub) => cmd_schedule(&app, sub),
         Commands::Library(sub) => cmd_library(&app, sub).await,
         Commands::Steps { json: _ } => cmd_steps(),
-        Commands::New { name, output, description } => cmd_new(&name, output.as_deref(), &description),
+        Commands::New {
+            name,
+            output,
+            description,
+        } => cmd_new(&name, output.as_deref(), &description),
         Commands::Step(sub) => cmd_step(sub),
         Commands::Action(sub) => cmd_action(sub),
         Commands::Show { file } => cmd_show(&file),
         Commands::RunFile { file, vars } => cmd_run_file(&app, &file, &vars).await,
-        Commands::Preview { run_or_action, step_id, json } => cmd_preview(&run_or_action, step_id.as_deref(), json),
+        Commands::Preview {
+            run_or_action,
+            step_id,
+            json,
+        } => cmd_preview(&run_or_action, step_id.as_deref(), json),
         Commands::Skill { file_or_id, output } => cmd_skill(&app, &file_or_id, output.as_deref()),
         Commands::Serve { bind, static_dir } => cmd_serve(app, &bind, &static_dir).await,
     }
 }
 
 fn cmd_list(app: &App, json: bool) -> Result<(), String> {
-    let workflows = app.db.list_workflows().map_err(|e| format!("查询失败: {e}"))?;
+    let workflows = app
+        .db
+        .list_workflows()
+        .map_err(|e| format!("查询失败: {e}"))?;
     if json {
-        let items: Vec<serde_json::Value> = workflows.iter().map(|w| {
-            serde_json::json!({
-                "id": w.id,
-                "name": w.name,
-                "updated_at": w.updated_at,
+        let items: Vec<serde_json::Value> = workflows
+            .iter()
+            .map(|w| {
+                serde_json::json!({
+                    "id": w.id,
+                    "name": w.name,
+                    "updated_at": w.updated_at,
+                })
             })
-        }).collect();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "workflows": items,
-            "count": items.len(),
-        })).expect("CLI JSON 序列化失败"));
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "workflows": items,
+                "count": items.len(),
+            }))
+            .expect("CLI JSON 序列化失败")
+        );
         return Ok(());
     }
     if workflows.is_empty() {
@@ -347,33 +360,44 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         let vars_map: Option<std::collections::HashMap<String, String>> = if vars.is_empty() {
             None
         } else {
-            Some(vars.iter().map(|(k,v)| (k.clone(), v.clone())).collect())
+            Some(vars.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
         };
         return crate::ipc_client::IpcClient::run_remote(workflow_id, vars_map).await;
     }
 
     // 回退：本地直接执行
-    let yaml = app.db.get_workflow_yaml(workflow_id)
+    let yaml = app
+        .db
+        .get_workflow_yaml(workflow_id)
         .map_err(|e| format!("获取工作流失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
 
-    let workflow = parser::parse_workflow(&yaml)
-        .map_err(|e| format!("解析失败: {e}"))?;
+    let workflow = parser::parse_workflow(&yaml).map_err(|e| format!("解析失败: {e}"))?;
 
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let workflow_name = workflow.name.clone();
-    app.db.create_run(&run_id, workflow_id, &workflow_name, &now)
+    app.db
+        .create_run(&run_id, workflow_id, &workflow_name, &now)
         .map_err(|e| format!("创建运行记录失败: {e}"))?;
 
     // 注入 --var 变量到 context（scheduler 内部会创建 ExecutionContext）
     // 由于 scheduler 内部管理 ctx，变量注入需在调用前通过 workflow.variables 传递
     if !vars.is_empty() {
-        println!("注入变量: {}", vars.iter().map(|(k,v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(", "));
+        println!(
+            "注入变量: {}",
+            vars.iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
 
     // 并发控制
-    let _permit = app.run_semaphore.clone().try_acquire_owned()
+    let _permit = app
+        .run_semaphore
+        .clone()
+        .try_acquire_owned()
         .map_err(|_| "已达到最大并发工作流数限制，请等待其他工作流完成后再试".to_string())?;
 
     // 构建 RunControl（CLI 模式：无取消/暂停/断点/单步）
@@ -387,7 +411,8 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
     };
 
     if workflow.steps.is_empty() {
-        app.db.update_run_status(&run_id, "completed", None)
+        app.db
+            .update_run_status(&run_id, "completed", None)
             .map_err(|e| e.to_string())?;
         println!("✓ 工作流无步骤，直接完成");
         return Ok(());
@@ -407,7 +432,8 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         "auto", // browser_channel: CLI 默认 auto
         vars,
         &ctrl,
-    ).await;
+    )
+    .await;
 
     let elapsed = start.elapsed().as_secs_f64();
 
@@ -427,27 +453,37 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
 }
 
 fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
-    let detail = app.db.get_run_detail(run_id)
+    let detail = app
+        .db
+        .get_run_detail(run_id)
         .map_err(|e| format!("查询失败: {e}"))?
         .ok_or_else(|| "运行记录不存在".to_string())?;
 
     if json {
-        let steps: Vec<serde_json::Value> = detail.steps.iter().map(|s| {
-            serde_json::json!({
-                "step_id": s.step_id,
-                "status": s.status,
-                "output": s.output,
+        let steps: Vec<serde_json::Value> = detail
+            .steps
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "step_id": s.step_id,
+                    "status": s.status,
+                    "output": s.output,
+                })
             })
-        }).collect();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "run_id": detail.run.id,
-            "workflow_name": detail.workflow_name,
-            "status": detail.run.status,
-            "started_at": detail.run.started_at,
-            "finished_at": detail.run.finished_at,
-            "error": detail.run.error,
-            "steps": steps,
-        })).expect("CLI JSON 序列化失败"));
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "run_id": detail.run.id,
+                "workflow_name": detail.workflow_name,
+                "status": detail.run.status,
+                "started_at": detail.run.started_at,
+                "finished_at": detail.run.finished_at,
+                "error": detail.run.error,
+                "steps": steps,
+            }))
+            .expect("CLI JSON 序列化失败")
+        );
         return Ok(());
     }
 
@@ -455,7 +491,10 @@ fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
     println!("工作流:    {}", detail.workflow_name);
     println!("状态:      {}", detail.run.status);
     println!("开始:      {}", detail.run.started_at);
-    println!("结束:      {}", detail.run.finished_at.as_deref().unwrap_or("-"));
+    println!(
+        "结束:      {}",
+        detail.run.finished_at.as_deref().unwrap_or("-")
+    );
     if let Some(ref err) = detail.run.error {
         println!("错误:      {}", err);
     }
@@ -463,7 +502,9 @@ fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
         println!("\n步骤日志:");
         for s in &detail.steps {
             let icon = match s.status.as_str() {
-                "success" => "✓", "error" => "✗", _ => " ",
+                "success" => "✓",
+                "error" => "✗",
+                _ => " ",
             };
             println!("  {} {} - {}", icon, s.step_id, s.status);
         }
@@ -472,14 +513,15 @@ fn cmd_status(app: &App, run_id: &str, json: bool) -> Result<(), String> {
 }
 
 fn cmd_export(app: &App, workflow_id: &str, output: Option<&str>) -> Result<(), String> {
-    let yaml = app.db.get_workflow_yaml(workflow_id)
+    let yaml = app
+        .db
+        .get_workflow_yaml(workflow_id)
         .map_err(|e| format!("获取失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
 
-    let value: serde_json::Value = serde_json::from_str(&yaml)
-        .map_err(|e| format!("JSON 解析失败: {e}"))?;
-    let pretty = serde_json::to_string_pretty(&value)
-        .map_err(|e| format!("序列化失败: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&yaml).map_err(|e| format!("JSON 解析失败: {e}"))?;
+    let pretty = serde_json::to_string_pretty(&value).map_err(|e| format!("序列化失败: {e}"))?;
 
     match output {
         Some(path) => {
@@ -492,49 +534,57 @@ fn cmd_export(app: &App, workflow_id: &str, output: Option<&str>) -> Result<(), 
 }
 
 fn cmd_import(app: &App, file: &str) -> Result<(), String> {
-    let content = std::fs::read_to_string(file)
-        .map_err(|e| format!("读取失败: {e}"))?;
-    let value: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 格式错误: {e}"))?;
+    let content = std::fs::read_to_string(file).map_err(|e| format!("读取失败: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 格式错误: {e}"))?;
 
     // 从 JSON 中读取工作流名称
-    let name = value.get("name")
+    let name = value
+        .get("name")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .unwrap_or("未命名工作流");
 
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_workflow(&id, name, "", &now, &now)
+    app.db
+        .create_workflow(&id, name, "", &now, &now)
         .map_err(|e| format!("创建失败: {e}"))?;
-    app.db.save_workflow_yaml(&id, &content)
+    app.db
+        .save_workflow_yaml(&id, &content)
         .map_err(|e| format!("保存失败: {e}"))?;
     println!("✓ 已导入: {} (ID: {})", name, id);
     Ok(())
 }
 
 fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
-    let content = std::fs::read_to_string(file)
-        .map_err(|e| format!("读取失败: {e}"))?;
-    let _: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 格式错误: {e}"))?;
-    let workflow = parser::parse_workflow(&content)
-        .map_err(|e| format!("工作流结构错误: {e}"))?;
+    let content = std::fs::read_to_string(file).map_err(|e| format!("读取失败: {e}"))?;
+    let _: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 格式错误: {e}"))?;
+    let workflow = parser::parse_workflow(&content).map_err(|e| format!("工作流结构错误: {e}"))?;
 
     if json {
-        let steps: Vec<serde_json::Value> = workflow.steps.iter().map(|s| {
-            serde_json::json!({
-                "name": s.name,
-                "type": s.step_type,
-                "next": s.next,
+        let steps: Vec<serde_json::Value> = workflow
+            .steps
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "name": s.name,
+                    "type": s.step_type,
+                    "next": s.next,
+                })
             })
-        }).collect();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "valid": true,
-            "name": workflow.name,
-            "step_count": workflow.steps.len(),
-            "steps": steps,
-        })).expect("CLI JSON 序列化失败"));
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "valid": true,
+                "name": workflow.name,
+                "step_count": workflow.steps.len(),
+                "steps": steps,
+            }))
+            .expect("CLI JSON 序列化失败")
+        );
         return Ok(());
     }
 
@@ -552,7 +602,10 @@ fn cmd_validate(file: &str, json: bool) -> Result<(), String> {
 /// 输出所有可用步骤类型和动作（JSON），与前端 CONTAINER_DEFS 保持同步
 fn cmd_steps() -> Result<(), String> {
     let manifest = build_step_manifest();
-    println!("{}", serde_json::to_string_pretty(&manifest).expect("CLI manifest 序列化失败"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&manifest).expect("CLI manifest 序列化失败")
+    );
     Ok(())
 }
 
@@ -819,40 +872,59 @@ fn build_step_manifest() -> serde_json::Value {
 fn cmd_schedule(app: &App, sub: ScheduleCommand) -> Result<(), String> {
     match sub {
         ScheduleCommand::List { json } => cmd_schedule_list(app, json),
-        ScheduleCommand::Create { workflow_id, cron_expr } => cmd_schedule_create(app, &workflow_id, &cron_expr),
+        ScheduleCommand::Create {
+            workflow_id,
+            cron_expr,
+        } => cmd_schedule_create(app, &workflow_id, &cron_expr),
         ScheduleCommand::Delete { id } => cmd_schedule_delete(app, &id),
     }
 }
 
 fn cmd_schedule_list(app: &App, json: bool) -> Result<(), String> {
-    let schedules = app.db.list_schedules().map_err(|e| format!("查询失败: {e}"))?;
+    let schedules = app
+        .db
+        .list_schedules()
+        .map_err(|e| format!("查询失败: {e}"))?;
     if json {
-        let items: Vec<serde_json::Value> = schedules.iter().map(|s| {
-            serde_json::json!({
-                "id": s.id,
-                "workflow_id": s.workflow_id,
-                "workflow_name": s.workflow_name,
-                "cron_expr": s.cron_expr,
-                "enabled": s.enabled,
-                "last_run_at": s.last_run_at,
+        let items: Vec<serde_json::Value> = schedules
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "id": s.id,
+                    "workflow_id": s.workflow_id,
+                    "workflow_name": s.workflow_name,
+                    "cron_expr": s.cron_expr,
+                    "enabled": s.enabled,
+                    "last_run_at": s.last_run_at,
+                })
             })
-        }).collect();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-"results": items,
-            "count": items.len(),
-        })).expect("CLI JSON 序列化失败"));
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+            "results": items,
+                "count": items.len(),
+            }))
+            .expect("CLI JSON 序列化失败")
+        );
         return Ok(());
     }
     if schedules.is_empty() {
         println!("(无调度)");
         return Ok(());
     }
-    println!("{:<38} {:<38} {:<20} {:<8} {:<20}", "ID", "工作流ID", "Cron", "启用", "上次运行");
+    println!(
+        "{:<38} {:<38} {:<20} {:<8} {:<20}",
+        "ID", "工作流ID", "Cron", "启用", "上次运行"
+    );
     println!("{}", "-".repeat(130));
     for s in &schedules {
         let enabled = if s.enabled { "✓" } else { "✗" };
         let last = s.last_run_at.as_deref().unwrap_or("-");
-        println!("{:<38} {:<38} {:<20} {:<8} {:<20}", s.id, s.workflow_id, s.cron_expr, enabled, last);
+        println!(
+            "{:<38} {:<38} {:<20} {:<8} {:<20}",
+            s.id, s.workflow_id, s.cron_expr, enabled, last
+        );
     }
     println!("\n共 {} 个调度", schedules.len());
     Ok(())
@@ -861,23 +933,25 @@ fn cmd_schedule_list(app: &App, json: bool) -> Result<(), String> {
 fn cmd_schedule_create(app: &App, workflow_id: &str, cron_expr: &str) -> Result<(), String> {
     use std::str::FromStr;
     // 验证 cron 表达式
-    cron::Schedule::from_str(cron_expr)
-        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+    cron::Schedule::from_str(cron_expr).map_err(|e| format!("无效的 cron 表达式: {e}"))?;
     // 验证工作流存在
-    app.db.get_workflow_yaml(workflow_id)
+    app.db
+        .get_workflow_yaml(workflow_id)
         .map_err(|e| format!("查询失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
 
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_schedule(&id, workflow_id, cron_expr, &now)
+    app.db
+        .create_schedule(&id, workflow_id, cron_expr, &now)
         .map_err(|e| format!("创建调度失败: {e}"))?;
     println!("✓ 调度已创建 (ID: {})", id);
     Ok(())
 }
 
 fn cmd_schedule_delete(app: &App, id: &str) -> Result<(), String> {
-    app.db.delete_schedule(id)
+    app.db
+        .delete_schedule(id)
         .map_err(|e| format!("删除调度失败: {e}"))?;
     println!("✓ 调度已删除");
     Ok(())
@@ -891,10 +965,19 @@ async fn cmd_library(app: &App, sub: LibraryCommand) -> Result<(), String> {
     match sub {
         LibraryCommand::List { json } => cmd_library_list(json),
         LibraryCommand::Show { name } => cmd_library_show(&name),
-        LibraryCommand::Create { name, from, category, params } => cmd_library_create(app, &name, &from, &category, &params),
+        LibraryCommand::Create {
+            name,
+            from,
+            category,
+            params,
+        } => cmd_library_create(app, &name, &from, &category, &params),
         LibraryCommand::Run { name, params } => cmd_library_run(app, &name, &params).await,
         LibraryCommand::Validate { name } => cmd_library_validate(&name),
-        LibraryCommand::Schedule { name, cron_expr, params } => cmd_library_schedule(app, &name, &cron_expr, &params).await,
+        LibraryCommand::Schedule {
+            name,
+            cron_expr,
+            params,
+        } => cmd_library_schedule(app, &name, &cron_expr, &params).await,
     }
 }
 
@@ -907,8 +990,8 @@ fn load_catalog() -> Result<Vec<TemplateEntry>, String> {
     let path = library_dir().join("catalog.toml");
     let content = std::fs::read_to_string(&path)
         .map_err(|e| format!("读取 catalog.toml 失败: {}\n路径: {}", e, path.display()))?;
-    let catalog: Catalog = toml::from_str(&content)
-        .map_err(|e| format!("解析 catalog.toml 失败: {}", e))?;
+    let catalog: Catalog =
+        toml::from_str(&content).map_err(|e| format!("解析 catalog.toml 失败: {}", e))?;
     Ok(catalog.templates)
 }
 
@@ -931,20 +1014,27 @@ struct TemplateEntry {
 fn cmd_library_list(json: bool) -> Result<(), String> {
     let templates = load_catalog()?;
     if json {
-        let items: Vec<serde_json::Value> = templates.iter().map(|t| {
-            serde_json::json!({
-                "name": t.name,
-                "version": t.version,
-                "description": t.description,
-                "params": t.params,
-                "schedule": t.schedule,
-                "category": t.category,
+        let items: Vec<serde_json::Value> = templates
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "name": t.name,
+                    "version": t.version,
+                    "description": t.description,
+                    "params": t.params,
+                    "schedule": t.schedule,
+                    "category": t.category,
+                })
             })
-        }).collect();
-        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-            "templates": items,
-            "count": items.len(),
-        })).expect("CLI JSON 序列化失败"));
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "templates": items,
+                "count": items.len(),
+            }))
+            .expect("CLI JSON 序列化失败")
+        );
         return Ok(());
     }
     if templates.is_empty() {
@@ -955,7 +1045,10 @@ fn cmd_library_list(json: bool) -> Result<(), String> {
     println!("{}", "-".repeat(80));
     for t in &templates {
         let schedule = t.schedule.as_deref().unwrap_or("手动");
-        println!("{:<25} {:<8} {:<12} {:<30}", t.name, t.version, t.category, t.description);
+        println!(
+            "{:<25} {:<8} {:<12} {:<30}",
+            t.name, t.version, t.category, t.description
+        );
         println!("  参数: {}  默认调度: {}", t.params.join(", "), schedule);
     }
     println!("\n共 {} 个模板", templates.len());
@@ -964,33 +1057,44 @@ fn cmd_library_list(json: bool) -> Result<(), String> {
 
 fn cmd_library_show(name: &str) -> Result<(), String> {
     let templates = load_catalog()?;
-    let entry = templates.iter().find(|t| t.name == name)
+    let entry = templates
+        .iter()
+        .find(|t| t.name == name)
         .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
 
     let file_path = library_dir().join(&entry.file);
-    let content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("读取模板文件失败: {}", e))?;
-    let wf: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
+    let content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("读取模板文件失败: {}", e))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
 
     let params = wf.get("params").and_then(|v| v.as_object());
-    let default_params: Vec<String> = params.map(|p| {
-        p.iter().map(|(k, v)| format!("  {} = {}", k, v)).collect()
-    }).unwrap_or_default();
+    let default_params: Vec<String> = params
+        .map(|p| p.iter().map(|(k, v)| format!("  {} = {}", k, v)).collect())
+        .unwrap_or_default();
 
     println!("名称:     {}", entry.name);
     println!("版本:     {}", entry.version);
     println!("分类:     {}", entry.category);
     println!("描述:     {}", entry.description);
     println!("声明参数: {}", entry.params.join(", "));
-    println!("默认调度: {}", entry.schedule.as_deref().unwrap_or("手动触发"));
+    println!(
+        "默认调度: {}",
+        entry.schedule.as_deref().unwrap_or("手动触发")
+    );
     if !default_params.is_empty() {
         println!("\n默认参数值:");
         for p in &default_params {
             println!("{}", p);
         }
     }
-    println!("\n步骤数:   {}", wf.get("steps").and_then(|s| s.as_array()).map(|a| a.len()).unwrap_or(0));
+    println!(
+        "\n步骤数:   {}",
+        wf.get("steps")
+            .and_then(|s| s.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0)
+    );
     Ok(())
 }
 
@@ -1000,12 +1104,24 @@ async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(),
         let params_map: Option<std::collections::HashMap<String, String>> = if params_json != "{}" {
             let overrides: serde_json::Value = serde_json::from_str(params_json)
                 .map_err(|e| format!("--params JSON 解析失败: {}", e))?;
-            Some(overrides.as_object().map(|obj| {
-                obj.iter().map(|(k,v)| (k.clone(), match v {
-                    serde_json::Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                })).collect()
-            }).unwrap_or_default())
+            Some(
+                overrides
+                    .as_object()
+                    .map(|obj| {
+                        obj.iter()
+                            .map(|(k, v)| {
+                                (
+                                    k.clone(),
+                                    match v {
+                                        serde_json::Value::String(s) => s.clone(),
+                                        other => other.to_string(),
+                                    },
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            )
         } else {
             None
         };
@@ -1014,25 +1130,30 @@ async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(),
 
     // 回退：本地执行
     let templates = load_catalog()?;
-    let entry = templates.iter().find(|t| t.name == name)
+    let entry = templates
+        .iter()
+        .find(|t| t.name == name)
         .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
 
     let file_path = library_dir().join(&entry.file);
-    let mut content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("读取模板文件失败: {}", e))?;
+    let mut content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("读取模板文件失败: {}", e))?;
 
     // 解析模板 JSON
-    let wf: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("模板 JSON 格式错误: {}", e))?;
 
     // 收集默认参数
     let mut resolved: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
         for (k, v) in params {
-            resolved.insert(k.clone(), match v {
-                serde_json::Value::String(s) => s.clone(),
-                other => other.to_string(),
-            });
+            resolved.insert(
+                k.clone(),
+                match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                },
+            );
         }
     }
 
@@ -1042,10 +1163,13 @@ async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(),
             .map_err(|e| format!("--params JSON 解析失败: {}", e))?;
         if let Some(obj) = overrides.as_object() {
             for (k, v) in obj {
-                resolved.insert(k.clone(), match v {
-                    serde_json::Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                });
+                resolved.insert(
+                    k.clone(),
+                    match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    },
+                );
             }
         }
     }
@@ -1057,16 +1181,18 @@ async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(),
     }
 
     // 校验解析后的 JSON
-    let _: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("参数替换后 JSON 格式错误: {}", e))?;
+    let _: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("参数替换后 JSON 格式错误: {}", e))?;
 
     // 导入到临时工作流并运行
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let label = format!("[库] {}", entry.name);
-    app.db.create_workflow(&id, &label, "", &now, &now)
+    app.db
+        .create_workflow(&id, &label, "", &now, &now)
         .map_err(|e| format!("创建失败: {e}"))?;
-    app.db.save_workflow_yaml(&id, &content)
+    app.db
+        .save_workflow_yaml(&id, &content)
         .map_err(|e| format!("保存失败: {e}"))?;
 
     // 调用 cmd_run 逻辑（复用已有实现，通过 db 中的工作流执行）
@@ -1076,19 +1202,25 @@ async fn cmd_library_run(app: &App, name: &str, params_json: &str) -> Result<(),
 
 fn cmd_library_validate(name: &str) -> Result<(), String> {
     let templates = load_catalog()?;
-    let entry = templates.iter().find(|t| t.name == name)
+    let entry = templates
+        .iter()
+        .find(|t| t.name == name)
         .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
 
     let file_path = library_dir().join(&entry.file);
-    let content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("读取模板文件失败: {}", e))?;
+    let content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("读取模板文件失败: {}", e))?;
 
     // 验证 JSON 结构
-    let wf: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 格式错误: {}", e))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 格式错误: {}", e))?;
 
     // 检查 params 声明
-    let declared_params = entry.params.iter().cloned().collect::<std::collections::HashSet<_>>();
+    let declared_params = entry
+        .params
+        .iter()
+        .cloned()
+        .collect::<std::collections::HashSet<_>>();
     if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
         let actual_params: std::collections::HashSet<String> = params.keys().cloned().collect();
         let missing: Vec<_> = declared_params.difference(&actual_params).collect();
@@ -1103,7 +1235,9 @@ fn cmd_library_validate(name: &str) -> Result<(), String> {
 
     // 验证含占位符的工作流结构（占位符不影响结构校验，但类型可能变化）
     // 这里仅验证 JSON 合法性和参数完整性，完整校验用 wf-cli validate
-    let steps = wf.get("steps").and_then(|v| v.as_array())
+    let steps = wf
+        .get("steps")
+        .and_then(|v| v.as_array())
         .ok_or_else(|| "模板缺少 steps 数组".to_string())?;
     println!("✓ 模板校验通过");
     println!("  名称:     {}", entry.name);
@@ -1113,43 +1247,65 @@ fn cmd_library_validate(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_library_create(app: &App, name: &str, workflow_id: &str, category: &str, params_decl: &str) -> Result<(), String> {
+fn cmd_library_create(
+    app: &App,
+    name: &str,
+    workflow_id: &str,
+    category: &str,
+    params_decl: &str,
+) -> Result<(), String> {
     // 从 DB 导出工作流 JSON
-    let yaml = app.db.get_workflow_yaml(workflow_id)
+    let yaml = app
+        .db
+        .get_workflow_yaml(workflow_id)
         .map_err(|e| format!("获取工作流失败: {e}"))?
         .ok_or_else(|| "工作流不存在".to_string())?;
 
-    let mut wf: serde_json::Value = serde_json::from_str(&yaml)
-        .map_err(|e| format!("工作流 JSON 解析失败: {e}"))?;
+    let mut wf: serde_json::Value =
+        serde_json::from_str(&yaml).map_err(|e| format!("工作流 JSON 解析失败: {e}"))?;
 
-    let original_name = wf.get("name").and_then(|v| v.as_str()).unwrap_or("未命名").to_string();
+    let original_name = wf
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("未命名")
+        .to_string();
 
     let declared: Vec<String> = if params_decl.is_empty() {
         Vec::new()
     } else {
-        params_decl.split(',').map(|s| s.trim().to_string()).collect()
+        params_decl
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
     };
 
     // 构建默认 params 值
-    let default_params: serde_json::Map<String, serde_json::Value> = declared.iter()
-        .map(|p| (p.clone(), serde_json::Value::String(format!("TODO: replace with {{{{params.{}}}}}", p))))
+    let default_params: serde_json::Map<String, serde_json::Value> = declared
+        .iter()
+        .map(|p| {
+            (
+                p.clone(),
+                serde_json::Value::String(format!("TODO: replace with {{{{params.{}}}}}", p)),
+            )
+        })
         .collect();
 
     if let Some(obj) = wf.as_object_mut() {
-        obj.insert("params".to_string(), serde_json::Value::Object(default_params));
+        obj.insert(
+            "params".to_string(),
+            serde_json::Value::Object(default_params),
+        );
     }
 
-    let template_json = serde_json::to_string_pretty(&wf)
-        .map_err(|e| format!("序列化失败: {e}"))?;
+    let template_json =
+        serde_json::to_string_pretty(&wf).map_err(|e| format!("序列化失败: {e}"))?;
 
     let category_dir = library_dir().join(category);
-    std::fs::create_dir_all(&category_dir)
-        .map_err(|e| format!("创建目录失败: {e}"))?;
+    std::fs::create_dir_all(&category_dir).map_err(|e| format!("创建目录失败: {e}"))?;
 
     let file_name = format!("{}.wf.json", name);
     let file_path = category_dir.join(&file_name);
-    std::fs::write(&file_path, &template_json)
-        .map_err(|e| format!("写入模板文件失败: {e}"))?;
+    std::fs::write(&file_path, &template_json).map_err(|e| format!("写入模板文件失败: {e}"))?;
 
     // 更新 catalog.toml
     let catalog_path = library_dir().join("catalog.toml");
@@ -1182,30 +1338,39 @@ fn cmd_library_create(app: &App, name: &str, workflow_id: &str, category: &str, 
     Ok(())
 }
 
-async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_json: &str) -> Result<(), String> {
+async fn cmd_library_schedule(
+    app: &App,
+    name: &str,
+    cron_expr: &str,
+    params_json: &str,
+) -> Result<(), String> {
     use std::str::FromStr;
 
-    cron::Schedule::from_str(cron_expr)
-        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+    cron::Schedule::from_str(cron_expr).map_err(|e| format!("无效的 cron 表达式: {e}"))?;
 
     let templates = load_catalog()?;
-    let entry = templates.iter().find(|t| t.name == name)
+    let entry = templates
+        .iter()
+        .find(|t| t.name == name)
         .ok_or_else(|| format!("模板 '{}' 不存在", name))?;
 
     let file_path = library_dir().join(&entry.file);
-    let mut content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("读取模板文件失败: {e}"))?;
+    let mut content =
+        std::fs::read_to_string(&file_path).map_err(|e| format!("读取模板文件失败: {e}"))?;
 
-    let wf: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("模板 JSON 格式错误: {e}"))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("模板 JSON 格式错误: {e}"))?;
 
     let mut resolved: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     if let Some(params) = wf.get("params").and_then(|v| v.as_object()) {
         for (k, v) in params {
-            resolved.insert(k.clone(), match v {
-                serde_json::Value::String(s) => s.clone(),
-                other => other.to_string(),
-            });
+            resolved.insert(
+                k.clone(),
+                match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                },
+            );
         }
     }
     if params_json != "{}" {
@@ -1213,10 +1378,13 @@ async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_jso
             .map_err(|e| format!("--params JSON 解析失败: {e}"))?;
         if let Some(obj) = overrides.as_object() {
             for (k, v) in obj {
-                resolved.insert(k.clone(), match v {
-                    serde_json::Value::String(s) => s.clone(),
-                    other => other.to_string(),
-                });
+                resolved.insert(
+                    k.clone(),
+                    match v {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    },
+                );
             }
         }
     }
@@ -1228,13 +1396,16 @@ async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_jso
     let workflow_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let label = format!("[库调度] {}", entry.name);
-    app.db.create_workflow(&workflow_id, &label, "", &now, &now)
+    app.db
+        .create_workflow(&workflow_id, &label, "", &now, &now)
         .map_err(|e| format!("创建失败: {e}"))?;
-    app.db.save_workflow_yaml(&workflow_id, &content)
+    app.db
+        .save_workflow_yaml(&workflow_id, &content)
         .map_err(|e| format!("保存失败: {e}"))?;
 
     let schedule_id = uuid::Uuid::new_v4().to_string();
-    app.db.create_schedule(&schedule_id, &workflow_id, cron_expr, &now)
+    app.db
+        .create_schedule(&schedule_id, &workflow_id, cron_expr, &now)
         .map_err(|e| format!("创建调度失败: {e}"))?;
 
     println!("✓ 调度已创建");
@@ -1250,19 +1421,17 @@ async fn cmd_library_schedule(app: &App, name: &str, cron_expr: &str, params_jso
 
 /// 读取工作流 JSON 文件
 fn read_workflow_file(file: &str) -> Result<(String, serde_json::Value), String> {
-    let content = std::fs::read_to_string(file)
-        .map_err(|e| format!("无法读取文件 '{}': {}", file, e))?;
-    let wf: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("JSON 格式错误: {}", e))?;
+    let content =
+        std::fs::read_to_string(file).map_err(|e| format!("无法读取文件 '{}': {}", file, e))?;
+    let wf: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("JSON 格式错误: {}", e))?;
     Ok((content, wf))
 }
 
 /// 写入工作流 JSON 文件
 fn write_workflow_file(file: &str, wf: &serde_json::Value) -> Result<(), String> {
-    let content = serde_json::to_string_pretty(wf)
-        .map_err(|e| format!("序列化失败: {}", e))?;
-    std::fs::write(file, &content)
-        .map_err(|e| format!("无法写入文件 '{}': {}", file, e))?;
+    let content = serde_json::to_string_pretty(wf).map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(file, &content).map_err(|e| format!("无法写入文件 '{}': {}", file, e))?;
     Ok(())
 }
 
@@ -1276,7 +1445,8 @@ fn get_steps_mut(wf: &mut serde_json::Value) -> &mut Vec<serde_json::Value> {
 
 /// 生成下一个步骤 ID (step_N, N = 当前最大 + 1)
 fn next_step_id(steps: &[serde_json::Value]) -> String {
-    let max_n = steps.iter()
+    let max_n = steps
+        .iter()
         .filter_map(|s| s["id"].as_str())
         .filter_map(|id| id.strip_prefix("step_"))
         .filter_map(|n| n.parse::<usize>().ok())
@@ -1297,10 +1467,8 @@ fn cmd_new(name: &str, output: Option<&str>, description: &str) -> Result<(), St
         "params": {},
         "steps": []
     });
-    let content = serde_json::to_string_pretty(&wf)
-        .map_err(|e| format!("序列化失败: {}", e))?;
-    std::fs::write(file, &content)
-        .map_err(|e| format!("写入失败: {}", e))?;
+    let content = serde_json::to_string_pretty(&wf).map_err(|e| format!("序列化失败: {}", e))?;
+    std::fs::write(file, &content).map_err(|e| format!("写入失败: {}", e))?;
     println!("✓ 已创建: {}", file);
     println!("  名称: {}", name);
     if !description.is_empty() {
@@ -1311,7 +1479,14 @@ fn cmd_new(name: &str, output: Option<&str>, description: &str) -> Result<(), St
 
 fn cmd_step(sub: StepCommand) -> Result<(), String> {
     match sub {
-        StepCommand::Add { file, step_type, name, config, id, position } => {
+        StepCommand::Add {
+            file,
+            step_type,
+            name,
+            config,
+            id,
+            position,
+        } => {
             let (_, mut wf) = read_workflow_file(&file)?;
             let steps = get_steps_mut(&mut wf);
             let config_val: serde_json::Value = serde_json::from_str(&config)
@@ -1323,7 +1498,13 @@ fn cmd_step(sub: StepCommand) -> Result<(), String> {
                 "label": name,
                 "config": config_val,
             });
-            let container_types = ["browser_container", "excel_container", "word_container", "file_container", "logic_container"];
+            let container_types = [
+                "browser_container",
+                "excel_container",
+                "word_container",
+                "file_container",
+                "logic_container",
+            ];
             if container_types.contains(&step_type.as_str()) {
                 step["actions"] = serde_json::json!([]);
             }
@@ -1345,7 +1526,11 @@ fn cmd_step(sub: StepCommand) -> Result<(), String> {
                     let id = step["id"].as_str().unwrap_or("?");
                     let t = step["type"].as_str().unwrap_or("?");
                     let label = step["label"].as_str().unwrap_or("");
-                    let has_actions = step.get("actions").and_then(|a| a.as_array()).map(|a| a.len()).unwrap_or(0);
+                    let has_actions = step
+                        .get("actions")
+                        .and_then(|a| a.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
                     if has_actions > 0 {
                         println!("  {}  [{:30}]  {}  (+{} )", id, t, label, has_actions);
                     } else {
@@ -1357,23 +1542,37 @@ fn cmd_step(sub: StepCommand) -> Result<(), String> {
         StepCommand::Remove { file, id } => {
             let (_, mut wf) = read_workflow_file(&file)?;
             let steps = get_steps_mut(&mut wf);
-            let idx = steps.iter().position(|s| s["id"].as_str() == Some(&id))
+            let idx = steps
+                .iter()
+                .position(|s| s["id"].as_str() == Some(&id))
                 .ok_or_else(|| format!("找不到步骤: {}", id))?;
             let removed = steps.remove(idx);
             write_workflow_file(&file, &wf)?;
-            println!(" 已删除步骤: {} ({})", id, removed["label"].as_str().unwrap_or(""));
+            println!(
+                " 已删除步骤: {} ({})",
+                id,
+                removed["label"].as_str().unwrap_or("")
+            );
         }
         StepCommand::Show { file, id } => {
             let (_, wf) = read_workflow_file(&file)?;
-            let step = wf["steps"].as_array()
+            let step = wf["steps"]
+                .as_array()
                 .and_then(|a| a.iter().find(|s| s["id"].as_str() == Some(&id)))
                 .ok_or_else(|| format!("找不到步骤: {}", id))?;
             println!("{}", serde_json::to_string_pretty(step).unwrap_or_default());
         }
-        StepCommand::Edit { file, id, name, config } => {
+        StepCommand::Edit {
+            file,
+            id,
+            name,
+            config,
+        } => {
             let (_, mut wf) = read_workflow_file(&file)?;
             let steps = get_steps_mut(&mut wf);
-            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&id))
+            let step = steps
+                .iter_mut()
+                .find(|s| s["id"].as_str() == Some(&id))
                 .ok_or_else(|| format!("找不到步骤: {}", id))?;
             if let Some(n) = name {
                 step["label"] = serde_json::Value::String(n);
@@ -1381,7 +1580,9 @@ fn cmd_step(sub: StepCommand) -> Result<(), String> {
             if let Some(c) = config {
                 let update: serde_json::Value = serde_json::from_str(&c)
                     .map_err(|e| format!("--config JSON 解析失败: {}", e))?;
-                if let (Some(obj), Some(update_obj)) = (step["config"].as_object_mut(), update.as_object()) {
+                if let (Some(obj), Some(update_obj)) =
+                    (step["config"].as_object_mut(), update.as_object())
+                {
                     for (k, v) in update_obj {
                         obj.insert(k.clone(), v.clone());
                     }
@@ -1396,10 +1597,18 @@ fn cmd_step(sub: StepCommand) -> Result<(), String> {
 
 fn cmd_action(sub: ActionCommand) -> Result<(), String> {
     match sub {
-        ActionCommand::Add { file, step_id, action_type, config, id } => {
+        ActionCommand::Add {
+            file,
+            step_id,
+            action_type,
+            config,
+            id,
+        } => {
             let (_, mut wf) = read_workflow_file(&file)?;
             let steps = get_steps_mut(&mut wf);
-            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&step_id))
+            let step = steps
+                .iter_mut()
+                .find(|s| s["id"].as_str() == Some(&step_id))
                 .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
             let config_val: serde_json::Value = serde_json::from_str(&config)
                 .map_err(|e| format!("--config JSON 解析失败: {}", e))?;
@@ -1422,17 +1631,25 @@ fn cmd_action(sub: ActionCommand) -> Result<(), String> {
             });
             actions.push(action);
             write_workflow_file(&file, &wf)?;
-            println!(" 已添加动作: {} -> {} ({})", step_id, action_id, action_type);
+            println!(
+                " 已添加动作: {} -> {} ({})",
+                step_id, action_id, action_type
+            );
         }
         ActionCommand::List { file, step_id } => {
             let (_, wf) = read_workflow_file(&file)?;
-            let step = wf["steps"].as_array()
+            let step = wf["steps"]
+                .as_array()
                 .and_then(|a| a.iter().find(|s| s["id"].as_str() == Some(&step_id)))
                 .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
             let actions = step.get("actions").and_then(|a| a.as_array());
             match actions {
                 Some(a) if !a.is_empty() => {
-                    println!("步骤 {} ({}) :", step_id, step["label"].as_str().unwrap_or(""));
+                    println!(
+                        "步骤 {} ({}) :",
+                        step_id,
+                        step["label"].as_str().unwrap_or("")
+                    );
                     for action in a {
                         let id = action["id"].as_str().unwrap_or("?");
                         let t = action["type"].as_str().unwrap_or("?");
@@ -1445,11 +1662,17 @@ fn cmd_action(sub: ActionCommand) -> Result<(), String> {
         ActionCommand::Remove { file, step_id, id } => {
             let (_, mut wf) = read_workflow_file(&file)?;
             let steps = get_steps_mut(&mut wf);
-            let step = steps.iter_mut().find(|s| s["id"].as_str() == Some(&step_id))
+            let step = steps
+                .iter_mut()
+                .find(|s| s["id"].as_str() == Some(&step_id))
                 .ok_or_else(|| format!("找不到步骤: {}", step_id))?;
-            let actions = step.get_mut("actions").and_then(|a| a.as_array_mut())
+            let actions = step
+                .get_mut("actions")
+                .and_then(|a| a.as_array_mut())
                 .ok_or_else(|| format!("步骤 {} 没有 actions", step_id))?;
-            let idx = actions.iter().position(|a| a["id"].as_str() == Some(&id))
+            let idx = actions
+                .iter()
+                .position(|a| a["id"].as_str() == Some(&id))
                 .ok_or_else(|| format!("找不到动作: {}", id))?;
             actions.remove(idx);
             write_workflow_file(&file, &wf)?;
@@ -1475,16 +1698,20 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
             resolved_content = resolved_content.replace(&placeholder, val);
         }
     }
-    let workflow = parser::parse_workflow(&resolved_content)
-        .map_err(|e| format!("解析失败: {e}"))?;
+    let workflow =
+        parser::parse_workflow(&resolved_content).map_err(|e| format!("解析失败: {e}"))?;
 
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let workflow_name = workflow.name.clone();
-    app.db.create_run(&run_id, "runfile", &workflow_name, &now)
+    app.db
+        .create_run(&run_id, "runfile", &workflow_name, &now)
         .map_err(|e| format!("创建运行记录失败: {e}"))?;
 
-    let _permit = app.run_semaphore.clone().try_acquire_owned()
+    let _permit = app
+        .run_semaphore
+        .clone()
+        .try_acquire_owned()
         .map_err(|_| "已达到最大并发工作流数限制".to_string())?;
 
     let ctrl = scheduler::RunControl {
@@ -1509,16 +1736,19 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
         "auto",
         vars,
         &ctrl,
-    ).await;
+    )
+    .await;
 
     match result {
         Ok(_) => {
-            app.db.update_run_status(&run_id, "completed", None)
+            app.db
+                .update_run_status(&run_id, "completed", None)
                 .map_err(|e| e.to_string())?;
             println!("  完成 ({:.1}s)", start.elapsed().as_secs_f64());
         }
         Err(e) => {
-            app.db.update_run_status(&run_id, "failed", Some(&e.to_string()))
+            app.db
+                .update_run_status(&run_id, "failed", Some(&e.to_string()))
                 .map_err(|e2| e2.to_string())?;
             println!("  失败: {}", e);
         }
@@ -1541,10 +1771,14 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
                 return Ok(());
             }
             if json {
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                    "runs": runs,
-                    "count": runs.len(),
-                })).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "runs": runs,
+                        "count": runs.len(),
+                    }))
+                    .unwrap()
+                );
             } else {
                 println!("{:<40} {}", "Run ID", "步骤数");
                 println!("{}", "-".repeat(60));
@@ -1565,49 +1799,49 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
             let run_id = runs.last().unwrap();
             print_preview(run_id, step_id, json)?;
         }
-        "live" => {
-            match step_id.as_deref() {
-                Some("list") | None => {
-                    let sessions = preview::list_live_sessions();
-                    if sessions.is_empty() {
-                        if json {
-                            println!("{{\"sessions\": []}}");
-                        } else {
-                            println!("(无活跃会话)");
-                        }
-                        return Ok(());
-                    }
+        "live" => match step_id.as_deref() {
+            Some("list") | None => {
+                let sessions = preview::list_live_sessions();
+                if sessions.is_empty() {
                     if json {
-                        println!("{}", serde_json::to_string_pretty(&sessions).unwrap());
+                        println!("{{\"sessions\": []}}");
                     } else {
-                        println!("{:<40} {:<20} {:<10} {}/{}", "Run ID", "工作流", "状态", "进度", "总步数");
-                        println!("{}", "-".repeat(90));
-                        for s in &sessions {
-                            println!("{:<40} {:<20} {:<10} {}/{}",
-                                s.run_id,
-                                truncate(&s.workflow_name, 20),
-                                s.status,
-                                s.step_index,
-                                s.total_steps,
-                            );
-                        }
-                        println!("\n共 {} 个活跃会话", sessions.len());
+                        println!("(无活跃会话)");
                     }
+                    return Ok(());
                 }
-                Some(run_id) => {
-                    match preview::get_live_status(run_id) {
-                        Some(session) => {
-                            if json {
-                                println!("{}", serde_json::to_string_pretty(&session).unwrap());
-                            } else {
-                                print_live_status(&session);
-                            }
-                        }
-                        None => eprintln!("会话 {} 不存在或已结束", run_id),
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&sessions).unwrap());
+                } else {
+                    println!(
+                        "{:<40} {:<20} {:<10} {}/{}",
+                        "Run ID", "工作流", "状态", "进度", "总步数"
+                    );
+                    println!("{}", "-".repeat(90));
+                    for s in &sessions {
+                        println!(
+                            "{:<40} {:<20} {:<10} {}/{}",
+                            s.run_id,
+                            truncate(&s.workflow_name, 20),
+                            s.status,
+                            s.step_index,
+                            s.total_steps,
+                        );
                     }
+                    println!("\n共 {} 个活跃会话", sessions.len());
                 }
             }
-        }
+            Some(run_id) => match preview::get_live_status(run_id) {
+                Some(session) => {
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&session).unwrap());
+                    } else {
+                        print_live_status(&session);
+                    }
+                }
+                None => eprintln!("会话 {} 不存在或已结束", run_id),
+            },
+        },
         run_id => {
             print_preview(run_id, step_id, json)?;
         }
@@ -1627,13 +1861,19 @@ fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), 
     if let Some(sid) = step_id {
         if let Some(preview) = trajectory.iter().find(|p| p.step_id == sid) {
             if json {
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!(preview)).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!(preview)).unwrap()
+                );
             } else {
                 println!("步骤: {} ({})", preview.step_name, preview.step_id);
                 println!("类型: {}", preview.step_type);
                 println!("状态: {} ({}ms)", preview.status, preview.duration_ms);
                 println!("摘要: {}", preview.summary);
-                println!("详情: {}", serde_json::to_string_pretty(&preview.detail).unwrap());
+                println!(
+                    "详情: {}",
+                    serde_json::to_string_pretty(&preview.detail).unwrap()
+                );
                 if let Some(ref bundle_path) = preview.bundle_path {
                     println!("\nBundle: {}", bundle_path);
                     if let Ok(entries) = std::fs::read_dir(bundle_path) {
@@ -1654,7 +1894,10 @@ fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), 
             println!("{}", serde_json::to_string_pretty(&trajectory).unwrap());
         } else {
             println!("运行: {}", run_id);
-            println!("{:<4} {:<18} {:<12} {:<8} {}", "#", "步骤名称", "类型", "状态", "摘要");
+            println!(
+                "{:<4} {:<18} {:<12} {:<8} {}",
+                "#", "步骤名称", "类型", "状态", "摘要"
+            );
             println!("{}", "-".repeat(90));
             for (i, p) in trajectory.iter().enumerate() {
                 let status_icon = match p.status.as_str() {
@@ -1690,9 +1933,13 @@ fn print_live_status(session: &crate::engine::preview::LiveSession) {
     println!("Run ID:      {}", session.run_id);
     println!("工作流:      {}", session.workflow_name);
     println!("状态:        {}", session.status);
-    println!("进度:        {}/{}", session.step_index, session.total_steps);
+    println!(
+        "进度:        {}/{}",
+        session.step_index, session.total_steps
+    );
     if let Some(ref id) = session.current_step_id {
-        println!("当前步骤:    {} ({})",
+        println!(
+            "当前步骤:    {} ({})",
             session.current_step_name.as_deref().unwrap_or("?"),
             id
         );
@@ -1709,8 +1956,7 @@ fn print_live_status(session: &crate::engine::preview::LiveSession) {
                 "skipped" => "⏭",
                 _ => "?",
             };
-            println!("  {} {} {} — {}",
-                i + 1, icon, entry.step_id, entry.summary);
+            println!("  {} {} {} — {}", i + 1, icon, entry.step_id, entry.summary);
         }
     }
 }
@@ -1722,7 +1968,9 @@ fn cmd_skill(app: &App, file_or_id: &str, output: Option<&str>) -> Result<(), St
     let workflow = if let Ok(content) = std::fs::read_to_string(file_or_id) {
         parser::parse_workflow(&content).map_err(|e| format!("解析失败: {}", e))?
     } else {
-        let yaml = app.db.get_workflow_yaml(file_or_id)
+        let yaml = app
+            .db
+            .get_workflow_yaml(file_or_id)
             .map_err(|e| format!("获取工作流失败: {}", e))?
             .ok_or_else(|| format!("工作流不存在: {}", file_or_id))?;
         parser::parse_workflow(&yaml).map_err(|e| format!("解析失败: {}", e))?
@@ -1743,8 +1991,8 @@ fn cmd_skill(app: &App, file_or_id: &str, output: Option<&str>) -> Result<(), St
 async fn cmd_serve(app: Arc<App>, bind: &str, static_dir: &str) -> Result<(), String> {
     use tower_http::services::ServeDir;
 
-    let router = crate::server::build_router(app)
-        .fallback_service(ServeDir::new(static_dir.to_string()));
+    let router =
+        crate::server::build_router(app).fallback_service(ServeDir::new(static_dir.to_string()));
 
     tracing::info!("服务器启动: http://{}  (静态文件: {})", bind, static_dir);
 

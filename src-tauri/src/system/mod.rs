@@ -1,3 +1,3 @@
 // system/mod.rs
-pub mod tray;
 pub mod scheduler;
+pub mod tray;

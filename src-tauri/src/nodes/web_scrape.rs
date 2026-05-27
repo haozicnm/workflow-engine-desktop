@@ -30,13 +30,13 @@
 //     "items": [ { "name": "...", "price": "...", ... }, ... ]
 //   }
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use tracing::info;
 
 #[derive(Default)]
@@ -44,10 +44,16 @@ pub struct WebScrapeNode;
 
 #[async_trait]
 impl NodeExecutor for WebScrapeNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
 
-        let url = config.get("url")
+        let url = config
+            .get("url")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("web_scrape 节点缺少 url 参数"))?;
 
@@ -56,43 +62,49 @@ impl NodeExecutor for WebScrapeNode {
             return scrape_local_file(url, config);
         }
 
-        let wait_for = config.get("wait_for")
+        let wait_for = config
+            .get("wait_for")
             .and_then(|v| v.as_str())
             .unwrap_or("body");
 
-        let scroll = config.get("scroll")
+        let scroll = config
+            .get("scroll")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let scroll_times = config.get("scroll_times")
+        let scroll_times = config
+            .get("scroll_times")
             .and_then(|v| v.as_u64())
             .unwrap_or(3);
 
-        let delay_ms = config.get("delay_ms")
+        let delay_ms = config
+            .get("delay_ms")
             .and_then(|v| v.as_u64())
             .unwrap_or(1000);
 
-        let headless = config.get("headless")
+        let headless = config
+            .get("headless")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let user_agent = config.get("user_agent")
-            .and_then(|v| v.as_str());
+        let user_agent = config.get("user_agent").and_then(|v| v.as_str());
 
-        let proxy = config.get("proxy")
-            .and_then(|v| v.as_str());
+        let proxy = config.get("proxy").and_then(|v| v.as_str());
 
-        let max_pages = config.get("pagination")
+        let max_pages = config
+            .get("pagination")
             .and_then(|p| p.get("max_pages"))
             .and_then(|v| v.as_u64())
             .unwrap_or(1) as usize;
 
-        let next_selector = config.get("pagination")
+        let next_selector = config
+            .get("pagination")
             .and_then(|p| p.get("next"))
             .and_then(|v| v.as_str());
 
         // 提取规则
-        let extract_rules = config.get("extract")
+        let extract_rules = config
+            .get("extract")
             .and_then(|v| v.as_array())
             .ok_or_else(|| anyhow!("web_scrape 节点缺少 extract 参数"))?;
 
@@ -110,7 +122,8 @@ impl NodeExecutor for WebScrapeNode {
         }
 
         // 启动浏览器
-        let _launch_result = crate::nodes::browser::send_sidecar_action("launch", &launch_params).await?;
+        let _launch_result =
+            crate::nodes::browser::send_sidecar_action("launch", &launch_params).await?;
 
         // ── 翻页抓取循环 ──
         let mut all_items: Vec<serde_json::Value> = Vec::new();
@@ -123,9 +136,17 @@ impl NodeExecutor for WebScrapeNode {
                 "url": current_url,
                 "wait_until": "domcontentloaded",
             });
-            let nav_result = crate::nodes::browser::send_sidecar_action("navigate", &nav_params).await?;
-            if !nav_result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
-                let err = nav_result.get("error").and_then(|v| v.as_str()).unwrap_or("导航失败");
+            let nav_result =
+                crate::nodes::browser::send_sidecar_action("navigate", &nav_params).await?;
+            if !nav_result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
+                let err = nav_result
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("导航失败");
                 return Err(anyhow!("第 {} 页导航失败: {}", page_num + 1, err));
             }
 
@@ -143,17 +164,18 @@ impl NodeExecutor for WebScrapeNode {
                     "times": scroll_times,
                     "delay_ms": delay_ms,
                 });
-                let _ = crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
+                let _ =
+                    crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
             }
 
             // ── 按 extract 规则提取数据 ──
             for rule in extract_rules {
-                let item_selector = rule.get("selector")
+                let item_selector = rule
+                    .get("selector")
                     .and_then(|v| v.as_str())
                     .unwrap_or("body");
 
-                let fields = rule.get("fields")
-                    .and_then(|v| v.as_object());
+                let fields = rule.get("fields").and_then(|v| v.as_object());
 
                 if let Some(fields) = fields {
                     // 字段模式：每个 item_selector 匹配的元素，按 fields 提取子字段
@@ -162,10 +184,15 @@ impl NodeExecutor for WebScrapeNode {
                         "document.querySelectorAll({}).length",
                         serde_json::json!(item_selector)
                     );
-                    let count_result = crate::nodes::browser::send_sidecar_action("evaluate", &serde_json::json!({
-                        "script": count_script,
-                    })).await?;
-                    let count = count_result.get("data")
+                    let count_result = crate::nodes::browser::send_sidecar_action(
+                        "evaluate",
+                        &serde_json::json!({
+                            "script": count_script,
+                        }),
+                    )
+                    .await?;
+                    let count = count_result
+                        .get("data")
                         .and_then(|d| d.get("result"))
                         .and_then(|v| v.as_u64())
                         .unwrap_or(0) as usize;
@@ -185,10 +212,15 @@ impl NodeExecutor for WebScrapeNode {
                                     serde_json::json!(base_sel),
                                     serde_json::json!(attr_name),
                                 );
-                                let result = crate::nodes::browser::send_sidecar_action("evaluate", &serde_json::json!({
-                                    "script": script,
-                                })).await?;
-                                let value = result.get("data")
+                                let result = crate::nodes::browser::send_sidecar_action(
+                                    "evaluate",
+                                    &serde_json::json!({
+                                        "script": script,
+                                    }),
+                                )
+                                .await?;
+                                let value = result
+                                    .get("data")
                                     .and_then(|d| d.get("result"))
                                     .cloned()
                                     .unwrap_or(serde_json::Value::Null);
@@ -202,10 +234,15 @@ impl NodeExecutor for WebScrapeNode {
                                     i,
                                     serde_json::json!(sel),
                                 );
-                                let result = crate::nodes::browser::send_sidecar_action("evaluate", &serde_json::json!({
-                                    "script": script,
-                                })).await?;
-                                let value = result.get("data")
+                                let result = crate::nodes::browser::send_sidecar_action(
+                                    "evaluate",
+                                    &serde_json::json!({
+                                        "script": script,
+                                    }),
+                                )
+                                .await?;
+                                let value = result
+                                    .get("data")
                                     .and_then(|d| d.get("result"))
                                     .cloned()
                                     .unwrap_or(serde_json::Value::Null);
@@ -216,10 +253,18 @@ impl NodeExecutor for WebScrapeNode {
                     }
                 } else {
                     // 简单模式：只提取文本
-                    let result = crate::nodes::browser::send_sidecar_action("extract_text", &serde_json::json!({
-                        "selector": item_selector,
-                    })).await?;
-                    if let Some(texts) = result.get("data").and_then(|d| d.get("texts")).and_then(|v| v.as_array()) {
+                    let result = crate::nodes::browser::send_sidecar_action(
+                        "extract_text",
+                        &serde_json::json!({
+                            "selector": item_selector,
+                        }),
+                    )
+                    .await?;
+                    if let Some(texts) = result
+                        .get("data")
+                        .and_then(|d| d.get("texts"))
+                        .and_then(|v| v.as_array())
+                    {
                         for text in texts {
                             all_items.push(serde_json::json!({
                                 "text": text,
@@ -239,14 +284,27 @@ impl NodeExecutor for WebScrapeNode {
                         "selector": next_sel,
                         "wait_ms": delay_ms,
                     });
-                    let click_result = crate::nodes::browser::send_sidecar_action("click", &click_params).await?;
-                    if !click_result.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    let click_result =
+                        crate::nodes::browser::send_sidecar_action("click", &click_params).await?;
+                    if !click_result
+                        .get("success")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+                    {
                         info!("翻页失败（可能已到最后一页），停止抓取");
                         break;
                     }
                     // 更新当前 URL
-                    let url_result = crate::nodes::browser::send_sidecar_action("current_url", &serde_json::json!({})).await?;
-                    if let Some(new_url) = url_result.get("data").and_then(|d| d.get("url")).and_then(|v| v.as_str()) {
+                    let url_result = crate::nodes::browser::send_sidecar_action(
+                        "current_url",
+                        &serde_json::json!({}),
+                    )
+                    .await?;
+                    if let Some(new_url) = url_result
+                        .get("data")
+                        .and_then(|d| d.get("url"))
+                        .and_then(|v| v.as_str())
+                    {
                         current_url = new_url.to_string();
                     }
                 }
@@ -281,10 +339,11 @@ fn extract_attr_from_selector(sel: &str) -> Option<&str> {
 /// 离线模式：读取本地 HTML 文件并用 scrapper crate 提取内容
 fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = url.strip_prefix("file://").unwrap_or(url);
-    let html = std::fs::read_to_string(path)
-        .map_err(|e| anyhow!("无法读取本地文件 {}: {}", path, e))?;
+    let html =
+        std::fs::read_to_string(path).map_err(|e| anyhow!("无法读取本地文件 {}: {}", path, e))?;
 
-    let extract_rules = config.get("extract")
+    let extract_rules = config
+        .get("extract")
         .and_then(|v| v.as_array())
         .ok_or_else(|| anyhow!("web_scrape 节点缺少 extract 参数"))?;
 
@@ -292,11 +351,11 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
     let mut items: Vec<serde_json::Value> = Vec::new();
 
     for rule in extract_rules {
-        let selector_str = rule.get("selector")
+        let selector_str = rule
+            .get("selector")
             .and_then(|v| v.as_str())
             .unwrap_or("body");
-        let fields = rule.get("fields")
-            .and_then(|v| v.as_object());
+        let fields = rule.get("fields").and_then(|v| v.as_object());
 
         let selector = match scraper::Selector::parse(selector_str) {
             Ok(s) => s,
@@ -312,9 +371,15 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
                 for (name, field_sel) in fields {
                     let field_str = field_sel.as_str().unwrap_or("");
                     let value = if field_str.is_empty() {
-                        element.text().collect::<Vec<_>>().join(" ").trim().to_string()
+                        element
+                            .text()
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                            .trim()
+                            .to_string()
                     } else if let Ok(sub_sel) = scraper::Selector::parse(field_str) {
-                        element.select(&sub_sel)
+                        element
+                            .select(&sub_sel)
                             .flat_map(|e| e.text())
                             .collect::<Vec<_>>()
                             .join(" ")
@@ -327,7 +392,12 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
                 }
                 items.push(serde_json::Value::Object(item));
             } else {
-                let text = element.text().collect::<Vec<_>>().join(" ").trim().to_string();
+                let text = element
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .trim()
+                    .to_string();
                 items.push(serde_json::Value::String(text));
             }
         }

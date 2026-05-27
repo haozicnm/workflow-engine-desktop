@@ -4,13 +4,15 @@
 // 代码逻辑与原 mouse_keyboard.rs 完全一致，零功能变更。
 
 use crate::platform::traits::InputBackend;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use tracing::warn;
 
 pub struct WindowsBackend;
 
 impl WindowsBackend {
-    pub fn new() -> Self { WindowsBackend }
+    pub fn new() -> Self {
+        WindowsBackend
+    }
 }
 
 fn run_ps(script: &str) -> Result<()> {
@@ -31,9 +33,22 @@ fn validate_hotkey(keys: &str) -> Result<()> {
     let upper = keys.to_uppercase();
     let trimmed = upper.trim();
     let blocked = [
-        "{LWIN}", "{RWIN}", "^%{DELETE}", "^{ESC}", "%{TAB}",
-        "#R", "{LWIN}R", "{RWIN}R", "^+{ESC}", "#D",
-        "{LWIN}D", "{RWIN}D", "#L", "{LWIN}L", "{RWIN}L", "^%{TAB}",
+        "{LWIN}",
+        "{RWIN}",
+        "^%{DELETE}",
+        "^{ESC}",
+        "%{TAB}",
+        "#R",
+        "{LWIN}R",
+        "{RWIN}R",
+        "^+{ESC}",
+        "#D",
+        "{LWIN}D",
+        "{RWIN}D",
+        "#L",
+        "{LWIN}L",
+        "{RWIN}L",
+        "^%{TAB}",
     ];
     for dangerous in &blocked {
         if trimmed.contains(dangerous) {
@@ -113,5 +128,7 @@ impl InputBackend for WindowsBackend {
         run_ps(&ps)
     }
 
-    fn platform_name(&self) -> &str { "windows" }
+    fn platform_name(&self) -> &str {
+        "windows"
+    }
 }

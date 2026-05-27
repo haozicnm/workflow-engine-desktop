@@ -7,8 +7,8 @@
 //   - 启动时根据 cfg 自动选择实现
 //   - 所有节点代码只依赖 trait，不直接调平台 API
 
-pub mod traits;
 pub mod recording;
+pub mod traits;
 
 #[cfg(target_os = "windows")]
 pub mod windows;
@@ -20,10 +20,10 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub use linux as current;
 
-#[cfg(target_os = "windows")]
-pub mod windows_window;
 #[cfg(target_os = "linux")]
 pub mod linux_window;
+#[cfg(target_os = "windows")]
+pub mod windows_window;
 
 use std::sync::OnceLock;
 use traits::InputBackend;
@@ -74,7 +74,9 @@ impl InputBackend for UnsupportedBackend {
     fn move_mouse(&self, _x: i32, _y: i32) -> anyhow::Result<()> {
         Err(anyhow::anyhow!("当前操作系统暂不支持键鼠操作"))
     }
-    fn platform_name(&self) -> &str { "unsupported" }
+    fn platform_name(&self) -> &str {
+        "unsupported"
+    }
 }
 
 // ─── 窗口管理平台抽象 ───
@@ -84,14 +86,22 @@ static WINDOW_BACKEND: OnceLock<Box<dyn WindowBackend + Send + Sync>> = OnceLock
 
 /// 获取全局窗口管理后端
 pub fn window() -> &'static (dyn WindowBackend + Send + Sync) {
-    WINDOW_BACKEND.get_or_init(|| {
-        #[cfg(target_os = "windows")]
-        { Box::new(windows_window::WindowsWindowBackend::new()) }
-        #[cfg(target_os = "linux")]
-        { Box::new(linux_window::LinuxWindowBackend::new()) }
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-        { Box::new(UnsupportedWindowBackend) }
-    }).as_ref()
+    WINDOW_BACKEND
+        .get_or_init(|| {
+            #[cfg(target_os = "windows")]
+            {
+                Box::new(windows_window::WindowsWindowBackend::new())
+            }
+            #[cfg(target_os = "linux")]
+            {
+                Box::new(linux_window::LinuxWindowBackend::new())
+            }
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            {
+                Box::new(UnsupportedWindowBackend)
+            }
+        })
+        .as_ref()
 }
 
 #[allow(dead_code)]

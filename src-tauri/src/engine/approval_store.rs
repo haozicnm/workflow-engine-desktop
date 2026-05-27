@@ -6,9 +6,9 @@
 //   3. 用户通过 approval_response → 调用 decide() → 通过 sender 发送决策
 //   4. ApprovalNode 收到决策 → 返回结果 → scheduler 继续
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::{mpsc, RwLock};
-use serde::{Serialize, Deserialize};
 use tracing::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,10 +51,7 @@ impl ApprovalStore {
     }
 
     /// 注册新的审批请求，返回 receiver（调用方 await 等待决策）
-    pub async fn register(
-        &self,
-        entry: ApprovalEntry,
-    ) -> mpsc::Receiver<ApprovalDecision> {
+    pub async fn register(&self, entry: ApprovalEntry) -> mpsc::Receiver<ApprovalDecision> {
         let (tx, rx) = mpsc::channel::<ApprovalDecision>(1);
         let id = entry.id.clone();
         info!("[ApprovalStore] 注册审批请求: {}", id);
@@ -64,16 +61,17 @@ impl ApprovalStore {
     }
 
     /// 提交决策（由 approval_response 命令调用）
-    pub async fn decide(
-        &self,
-        id: &str,
-        decision: ApprovalDecision,
-    ) -> Result<(), String> {
-        let tx = self.senders.write().await.remove(id)
+    pub async fn decide(&self, id: &str, decision: ApprovalDecision) -> Result<(), String> {
+        let tx = self
+            .senders
+            .write()
+            .await
+            .remove(id)
             .ok_or_else(|| format!("审批请求不存在或已处理: {}", id))?;
         self.entries.write().await.remove(id);
         info!("[ApprovalStore] 审批决策: {} → {}", id, decision.option);
-        tx.send(decision).await
+        tx.send(decision)
+            .await
             .map_err(|_| "发送决策失败（接收端已关闭）".to_string())
     }
 

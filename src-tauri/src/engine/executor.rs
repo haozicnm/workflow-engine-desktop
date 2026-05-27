@@ -3,16 +3,16 @@
 // v3: 所有节点独立 executor，不再使用 action 参数分发。
 //   每个操作一个 struct，一个注册条目。
 
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
+use crate::engine::workflow::Step;
 use crate::nodes::traits::NodeExecutor;
+use anyhow::Result;
+use serde_json::Value;
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::collections::HashMap;
-use serde_json::Value;
-use anyhow::Result;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 pub struct StepExecutor {
     executors: HashMap<String, Box<dyn NodeExecutor>>,
@@ -36,48 +36,119 @@ macro_rules! register_containers {
 }
 
 impl StepExecutor {
-    pub fn new(approval_store: Arc<crate::engine::approval_store::ApprovalStore>, db: Arc<crate::data::db::Database>) -> Arc<Self> {
+    pub fn new(
+        approval_store: Arc<crate::engine::approval_store::ApprovalStore>,
+        db: Arc<crate::data::db::Database>,
+    ) -> Arc<Self> {
         let mut executors: HashMap<String, Box<dyn NodeExecutor>> = HashMap::new();
 
         // ── P0 核心节点 ──
         register!(executors, "http", crate::nodes::http::HttpNode);
         register!(executors, "script", crate::nodes::script::ScriptNode);
-        register!(executors, "condition", crate::nodes::condition::ConditionNode);
+        register!(
+            executors,
+            "condition",
+            crate::nodes::condition::ConditionNode
+        );
 
         // ── 数据处理节点（v3: 独立 executor） ──
         register!(executors, "data_set", crate::nodes::data::DataSetNode);
         register!(executors, "data_get", crate::nodes::data::DataGetNode);
         register!(executors, "data_length", crate::nodes::data::DataLengthNode);
-        register!(executors, "data_default", crate::nodes::data::DataDefaultNode);
+        register!(
+            executors,
+            "data_default",
+            crate::nodes::data::DataDefaultNode
+        );
         register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
 
         // ── 文件节点（v3: 独立 executor） ──
 
         // ── 正则节点（v3: 独立 executor） ──
-        register!(executors, "regex_extract", crate::nodes::regex::RegexExtractNode);
-        register!(executors, "regex_replace", crate::nodes::regex::RegexReplaceNode);
-        register!(executors, "regex_match", crate::nodes::regex::RegexMatchNode);
+        register!(
+            executors,
+            "regex_extract",
+            crate::nodes::regex::RegexExtractNode
+        );
+        register!(
+            executors,
+            "regex_replace",
+            crate::nodes::regex::RegexReplaceNode
+        );
+        register!(
+            executors,
+            "regex_match",
+            crate::nodes::regex::RegexMatchNode
+        );
 
         // ── 数组节点（v3: 独立 executor） ──
-        register!(executors, "array_filter", crate::nodes::array::ArrayFilterNode);
+        register!(
+            executors,
+            "array_filter",
+            crate::nodes::array::ArrayFilterNode
+        );
         register!(executors, "array_sort", crate::nodes::array::ArraySortNode);
-        register!(executors, "array_dedup", crate::nodes::array::ArrayDedupNode);
-        register!(executors, "array_paginate", crate::nodes::array::ArrayPaginateNode);
+        register!(
+            executors,
+            "array_dedup",
+            crate::nodes::array::ArrayDedupNode
+        );
+        register!(
+            executors,
+            "array_paginate",
+            crate::nodes::array::ArrayPaginateNode
+        );
         register!(executors, "array_map", crate::nodes::array::ArrayMapNode);
         register!(executors, "array_join", crate::nodes::array::ArrayJoinNode);
-        register!(executors, "array_reduce", crate::nodes::array::ArrayReduceNode);
+        register!(
+            executors,
+            "array_reduce",
+            crate::nodes::array::ArrayReduceNode
+        );
 
         // ── 转换节点（v3: 独立 executor） ──
-        register!(executors, "convert_to_text", crate::nodes::convert::ConvertToTextNode);
-        register!(executors, "convert_to_number", crate::nodes::convert::ConvertToNumberNode);
-        register!(executors, "convert_to_json", crate::nodes::convert::ConvertToJsonNode);
-        register!(executors, "convert_to_csv", crate::nodes::convert::ConvertToCsvNode);
-        register!(executors, "convert_to_html", crate::nodes::convert::ConvertToHtmlNode);
-        register!(executors, "convert_to_base64", crate::nodes::convert::ConvertToBase64Node);
+        register!(
+            executors,
+            "convert_to_text",
+            crate::nodes::convert::ConvertToTextNode
+        );
+        register!(
+            executors,
+            "convert_to_number",
+            crate::nodes::convert::ConvertToNumberNode
+        );
+        register!(
+            executors,
+            "convert_to_json",
+            crate::nodes::convert::ConvertToJsonNode
+        );
+        register!(
+            executors,
+            "convert_to_csv",
+            crate::nodes::convert::ConvertToCsvNode
+        );
+        register!(
+            executors,
+            "convert_to_html",
+            crate::nodes::convert::ConvertToHtmlNode
+        );
+        register!(
+            executors,
+            "convert_to_base64",
+            crate::nodes::convert::ConvertToBase64Node
+        );
 
         // ── 新增数据节点 ──
-        register!(executors, "json_parse", crate::nodes::json_parse::JsonParseNode);
-        register!(executors, "text_template", crate::nodes::text_template::TextTemplateNode);
+        register!(
+            executors,
+            "json_parse",
+            crate::nodes::json_parse::JsonParseNode
+        );
+        register!(
+            executors,
+            "text_template",
+            crate::nodes::text_template::TextTemplateNode
+        );
 
         // ── 容器节点（由 register_containers! 统一注册，与 registry (node-schema.json) 对应）──
         register_containers!(executors,
@@ -96,16 +167,32 @@ impl StepExecutor {
         register!(executors, "cursor", crate::nodes::cursor::CursorNode);
         register!(executors, "parallel", crate::nodes::parallel::ParallelNode);
         register!(executors, "map", crate::nodes::map::MapNode);
-        register!(executors, "web_scrape", crate::nodes::web_scrape::WebScrapeNode);
+        register!(
+            executors,
+            "web_scrape",
+            crate::nodes::web_scrape::WebScrapeNode
+        );
         #[cfg(feature = "gui")]
-        register!(executors, "mouse_keyboard", crate::nodes::mouse_keyboard::MouseKeyboardNode);
+        register!(
+            executors,
+            "mouse_keyboard",
+            crate::nodes::mouse_keyboard::MouseKeyboardNode
+        );
         #[cfg(feature = "gui")]
         register!(executors, "window", crate::nodes::window::WindowNode);
-        register!(executors, "sub_workflow", crate::nodes::sub_workflow::SubWorkflowNode);
+        register!(
+            executors,
+            "sub_workflow",
+            crate::nodes::sub_workflow::SubWorkflowNode
+        );
         register!(executors, "delay", crate::nodes::delay::DelayNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
         #[cfg(feature = "gui")]
-        register!(executors, "recording", crate::nodes::recording::RecordingNode);
+        register!(
+            executors,
+            "recording",
+            crate::nodes::recording::RecordingNode
+        );
         #[cfg(feature = "gui")]
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
@@ -130,7 +217,11 @@ impl StepExecutor {
             debug!("节点注册: {}", type_name);
         }
 
-        Arc::new(StepExecutor { executors, approval_store, db })
+        Arc::new(StepExecutor {
+            executors,
+            approval_store,
+            db,
+        })
     }
 
     /// 返回所有已注册的节点类型名称（用于编译期契约校验）
@@ -202,18 +293,16 @@ impl StepExecutor {
             run_condition: None,
         };
 
-        Box::pin(async move {
-            executor.execute(&resolved_step, ctx, self).await
-        })
+        Box::pin(async move { executor.execute(&resolved_step, ctx, self).await })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::parser;
     use crate::engine::context::ExecutionContext;
-    use crate::engine::workflow::{Workflow, Step};
+    use crate::engine::parser;
+    use crate::engine::workflow::{Step, Workflow};
     use std::sync::Arc;
 
     fn test_db() -> Arc<crate::data::db::Database> {
@@ -299,7 +388,10 @@ mod tests {
         // data_set should set a variable
         let result = block_on(exec.execute(&step, &mut ctx));
         assert!(result.is_ok());
-        assert_eq!(ctx.variables.get("greeting").and_then(|v| v.as_str()), Some("hello"));
+        assert_eq!(
+            ctx.variables.get("greeting").and_then(|v| v.as_str()),
+            Some("hello")
+        );
     }
 
     #[test]
@@ -321,7 +413,10 @@ mod tests {
         let mut ctx = ExecutionContext::new("run-1", &workflow);
         let result = block_on(exec.execute(&step, &mut ctx));
         assert!(result.is_ok());
-        assert_eq!(ctx.variables.get("msg").and_then(|v| v.as_str()), Some("world"));
+        assert_eq!(
+            ctx.variables.get("msg").and_then(|v| v.as_str()),
+            Some("world")
+        );
     }
 
     #[test]
@@ -342,7 +437,11 @@ mod tests {
         };
         let mut ctx = ExecutionContext::new("run-1", &Workflow::default());
         let result = block_on(exec.execute(&step, &mut ctx));
-        assert!(result.is_ok(), "condition execution failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "condition execution failed: {:?}",
+            result.err()
+        );
         let output = result.unwrap();
         assert_eq!(output.get("branch").and_then(|v| v.as_str()), Some("true"));
         assert_eq!(output.get("result").and_then(|v| v.as_bool()), Some(true));

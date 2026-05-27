@@ -6,7 +6,7 @@
 // 两个工具互为降级路径，任一可用即可工作。
 
 use crate::platform::traits::{WindowBackend, WindowInfo};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::process::Command;
 
 pub struct LinuxWindowBackend;
@@ -27,10 +27,12 @@ impl LinuxWindowBackend {
         Command::new("xdotool")
             .arg("--version")
             .output()
-            .map_err(|_| anyhow!(
-                "xdotool 未安装。请执行: sudo apt install xdotool\n\
+            .map_err(|_| {
+                anyhow!(
+                    "xdotool 未安装。请执行: sudo apt install xdotool\n\
                  窗口管理功能将在安装后可用。"
-            ))?;
+                )
+            })?;
         Ok(())
     }
 }
@@ -101,17 +103,21 @@ impl WindowBackend for LinuxWindowBackend {
             return Err(anyhow!("窗口标题不能为空"));
         }
         // xdotool search + windowactivate + windowfocus 一条龙
-        run("xdotool", &[
-            "search", "--name", title,
-            "windowactivate",
-            "windowfocus",
-        ])?;
+        run(
+            "xdotool",
+            &["search", "--name", title, "windowactivate", "windowfocus"],
+        )?;
         Ok(())
     }
 
     fn maximize(&self, title: &str) -> Result<()> {
         // 优先用 wmctrl（更可靠）
-        if run("wmctrl", &["-r", title, "-b", "add,maximized_vert,maximized_horz"]).is_ok() {
+        if run(
+            "wmctrl",
+            &["-r", title, "-b", "add,maximized_vert,maximized_horz"],
+        )
+        .is_ok()
+        {
             return Ok(());
         }
         // 降级：xdotool 激活窗口后发送 Alt+F10
@@ -143,24 +149,32 @@ impl WindowBackend for LinuxWindowBackend {
             return Err(anyhow!("窗口尺寸必须大于 0，收到: {}x{}", width, height));
         }
         // 优先用 wmctrl（可保持窗口位置不变）
-        if run("wmctrl", &[
-            "-r", title, "-e", "0,-1,-1",
-            &width.to_string(), &height.to_string(),
-        ]).is_ok() {
+        if run(
+            "wmctrl",
+            &[
+                "-r",
+                title,
+                "-e",
+                "0,-1,-1",
+                &width.to_string(),
+                &height.to_string(),
+            ],
+        )
+        .is_ok()
+        {
             return Ok(());
         }
         // 降级：xdotool windowsize
         let id = find_window_id(title)?;
-        run("xdotool", &[
-            "windowsize", &id,
-            &width.to_string(), &height.to_string(),
-        ])?;
+        run(
+            "xdotool",
+            &["windowsize", &id, &width.to_string(), &height.to_string()],
+        )?;
         Ok(())
     }
 
     fn wait(&self, title: &str, timeout_s: u64) -> Result<()> {
-        let deadline = std::time::Instant::now()
-            + std::time::Duration::from_secs(timeout_s);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_s);
         loop {
             if let Ok(ids) = run("xdotool", &["search", "--name", title]) {
                 if !ids.trim().is_empty() {
@@ -168,10 +182,7 @@ impl WindowBackend for LinuxWindowBackend {
                 }
             }
             if std::time::Instant::now() >= deadline {
-                return Err(anyhow!(
-                    "等待窗口 '{}' 出现超时 ({}s)",
-                    title, timeout_s
-                ));
+                return Err(anyhow!("等待窗口 '{}' 出现超时 ({}s)", title, timeout_s));
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
         }

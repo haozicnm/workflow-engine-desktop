@@ -14,15 +14,15 @@
 //   未完成: { done: false, item: ..., index: N, total: M, remaining: M-N-1 }
 //   已完成: { done: true, total: M }  — 游标自动重置
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use serde_json::{Value, json};
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use serde_json::{json, Value};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct CursorNode;
@@ -32,7 +32,7 @@ pub struct CursorNode;
 struct CursorState {
     index: usize,
     total: usize,
-    items_hash: u64,  // 简单校验数据是否变化
+    items_hash: u64, // 简单校验数据是否变化
 }
 
 /// 计算 items 的简单 hash
@@ -47,7 +47,9 @@ fn hash_items(items: &[Value]) -> u64 {
 
 /// 获取游标文件路径
 fn cursor_path(step_id: &str) -> PathBuf {
-    crate::data::paths::resolve_data_dir().join("cursors").join(format!("{}.json", step_id))
+    crate::data::paths::resolve_data_dir()
+        .join("cursors")
+        .join(format!("{}.json", step_id))
 }
 
 /// 读取游标状态
@@ -59,9 +61,9 @@ fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
         }
     }
     // 回退 config.body
-    let steps: Vec<Step> = serde_json::from_value(
-        step.config.get("body").cloned().unwrap_or(json!([]))
-    ).map_err(|e| anyhow!("cursor: body 解析失败: {}", e))?;
+    let steps: Vec<Step> =
+        serde_json::from_value(step.config.get("body").cloned().unwrap_or(json!([])))
+            .map_err(|e| anyhow!("cursor: body 解析失败: {}", e))?;
     if steps.is_empty() {
         return Err(anyhow!("cursor: body 不能为空"));
     }
@@ -78,7 +80,11 @@ fn read_cursor(step_id: &str) -> CursorState {
             }
         }
     }
-    CursorState { index: 0, total: 0, items_hash: 0 }
+    CursorState {
+        index: 0,
+        total: 0,
+        items_hash: 0,
+    }
 }
 
 /// 保存游标状态
@@ -100,7 +106,9 @@ impl NodeExecutor for CursorNode {
         ctx: &mut ExecutionContext,
         executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let items_value = step.config.get("items")
+        let items_value = step
+            .config
+            .get("items")
             .ok_or_else(|| anyhow!("cursor 节点缺少 items 参数"))?;
         let items = crate::engine::common::resolve_iteration_items(items_value, ctx, "cursor")?;
         let body_steps = parse_body_steps(step)?;
@@ -117,7 +125,11 @@ impl NodeExecutor for CursorNode {
         // 数据变化检测：hash 不匹配就重置
         if cursor.items_hash != 0 && cursor.items_hash != items_hash {
             tracing::info!("cursor: 数据已变化，重置游标 (step={})", step.id);
-            cursor = CursorState { index: 0, total, items_hash };
+            cursor = CursorState {
+                index: 0,
+                total,
+                items_hash,
+            };
         }
         cursor.total = total;
         cursor.items_hash = items_hash;
@@ -135,12 +147,15 @@ impl NodeExecutor for CursorNode {
         ctx.set_var("__index".to_string(), json!(cursor.index));
         ctx.set_var("__index1".to_string(), json!(cursor.index + 1));
         // 友好别名：{{cursor.current}} / {{cursor.index}}
-        ctx.set_var("cursor".to_string(), json!({
-            "current": current,
-            "index": cursor.index,
-            "index1": cursor.index + 1,
-            "total": total,
-        }));
+        ctx.set_var(
+            "cursor".to_string(),
+            json!({
+                "current": current,
+                "index": cursor.index,
+                "index1": cursor.index + 1,
+                "total": total,
+            }),
+        );
 
         // 执行 body — 迭代变量已设入 ctx，容器/节点各自解析模板
         for body_step in &body_steps {

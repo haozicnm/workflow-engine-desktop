@@ -3,12 +3,12 @@
 // 从 handlers.rs 提取的审批相关 handler 函数和类型。
 
 use axum::{
-    response::{Response, Json},
     http::StatusCode,
+    response::{Json, Response},
 };
 use serde::Deserialize;
 
-use crate::server::handlers::{ok_response, err_response};
+use crate::server::handlers::{err_response, ok_response};
 
 // ═══════════════════════════════════════════════════════════
 // Request body types
@@ -26,19 +26,26 @@ pub struct ApprovalRespondBody {
 // 审批 handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn approval_list_pending(
-) -> Response {
+pub async fn approval_list_pending() -> Response {
     let app = crate::server::state::get();
     let mut live = app.approval_store.pending().await;
     let live_ids: std::collections::HashSet<String> = live.iter().map(|e| e.id.clone()).collect();
 
     if let Ok(db_pending) = app.db.get_pending_approvals() {
         for rec in db_pending {
-            if live_ids.contains(&rec.id) { continue; }
-            let options: Vec<String> = rec.options.as_deref()
+            if live_ids.contains(&rec.id) {
+                continue;
+            }
+            let options: Vec<String> = rec
+                .options
+                .as_deref()
                 .unwrap_or("同意,拒绝")
-                .split(',').map(|s| s.trim().to_string()).collect();
-            let item: Option<serde_json::Value> = rec.item.as_deref()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+            let item: Option<serde_json::Value> = rec
+                .item
+                .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok());
             live.push(crate::engine::approval_store::ApprovalEntry {
                 id: rec.id,
@@ -60,15 +67,20 @@ pub async fn approval_list_pending(
     ok_response(live)
 }
 
-pub async fn approval_respond(
-    Json(body): Json<ApprovalRespondBody>,
-) -> Response {
+pub async fn approval_respond(Json(body): Json<ApprovalRespondBody>) -> Response {
     let app = crate::server::state::get();
     let option_str = body.option.unwrap_or_else(|| {
-        if body.approved { "同意".into() } else { "拒绝".into() }
+        if body.approved {
+            "同意".into()
+        } else {
+            "拒绝".into()
+        }
     });
 
-    if let Err(e) = app.db.update_approval_decision(&body.approval_id, &option_str, body.comment.as_deref()) {
+    if let Err(e) =
+        app.db
+            .update_approval_decision(&body.approval_id, &option_str, body.comment.as_deref())
+    {
         return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
     }
 

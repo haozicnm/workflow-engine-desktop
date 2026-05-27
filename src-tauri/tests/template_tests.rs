@@ -6,10 +6,8 @@ const TEMPLATE_DIR: &str = "../templates";
 
 fn load_template(filename: &str) -> Value {
     let path = format!("{}/{}", TEMPLATE_DIR, filename);
-    let content = std::fs::read_to_string(&path)
-        .expect(&format!("模板文件不存在: {}", path));
-    serde_json::from_str(&content)
-        .expect(&format!("模板 JSON 解析失败: {}", filename))
+    let content = std::fs::read_to_string(&path).expect(&format!("模板文件不存在: {}", path));
+    serde_json::from_str(&content).expect(&format!("模板 JSON 解析失败: {}", filename))
 }
 
 // ═══════════════════════════════════════════════════
@@ -48,7 +46,7 @@ fn test_template1_order_to_contracts() {
     let wf = wf.unwrap();
     assert_eq!(wf.steps.len(), 3);
     assert_eq!(wf.steps[0].step_type, "excel");
-    assert_eq!(wf.steps[1].step_type, "cursor");  // 不做容器转换
+    assert_eq!(wf.steps[1].step_type, "cursor"); // 不做容器转换
     assert_eq!(wf.steps[2].step_type, "notify");
 
     println!("✅ 模板1: excel_container → cursor → notify");
@@ -84,13 +82,25 @@ fn test_template2_monitor_to_report() {
     assert_eq!(conds[0]["op"].as_str().unwrap(), "contains");
 
     // 验证条件路由
-    assert_eq!(steps[1]["config"]["true_next"].as_str().unwrap(), "step_error");
-    assert_eq!(steps[1]["config"]["false_next"].as_str().unwrap(), "step_normal");
+    assert_eq!(
+        steps[1]["config"]["true_next"].as_str().unwrap(),
+        "step_error"
+    );
+    assert_eq!(
+        steps[1]["config"]["false_next"].as_str().unwrap(),
+        "step_normal"
+    );
 
     // 验证 runCondition
-    assert_eq!(steps[2]["runCondition"]["ref"].as_str().unwrap(), "step_logic");
+    assert_eq!(
+        steps[2]["runCondition"]["ref"].as_str().unwrap(),
+        "step_logic"
+    );
     assert_eq!(steps[2]["runCondition"]["when"].as_str().unwrap(), "true");
-    assert_eq!(steps[4]["runCondition"]["ref"].as_str().unwrap(), "step_logic");
+    assert_eq!(
+        steps[4]["runCondition"]["ref"].as_str().unwrap(),
+        "step_logic"
+    );
     assert_eq!(steps[4]["runCondition"]["when"].as_str().unwrap(), "false");
 
     // Parser 转换

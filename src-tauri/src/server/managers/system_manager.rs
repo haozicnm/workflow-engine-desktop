@@ -1,11 +1,11 @@
 use axum::{
-    response::{Response, Json},
     http::StatusCode,
+    response::{Json, Response},
 };
 use serde::Deserialize;
 use tracing::info;
 
-use crate::server::handlers::{ok_response, err_response};
+use crate::server::handlers::{err_response, ok_response};
 
 // ═══════════════════════════════════════════════════════════
 // Request body types
@@ -53,7 +53,9 @@ pub async fn sidecar_health() -> Response {
 
 pub async fn node_list_types() -> Response {
     let mut types: Vec<String> = crate::nodes::registry::all_nodes()
-        .into_iter().map(|n| n.node_type).collect();
+        .into_iter()
+        .map(|n| n.node_type)
+        .collect();
     for t in crate::nodes::mcp_node::get_all_mcp_types() {
         if !types.contains(&t) {
             types.push(t);
@@ -67,12 +69,14 @@ pub async fn node_schema() -> Response {
     let json_str = include_str!("../../../node-schema.json");
     match serde_json::from_str::<serde_json::Value>(json_str) {
         Ok(val) => ok_response(val),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("node-schema.json 解析失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("node-schema.json 解析失败: {e}"),
+        ),
     }
 }
 
-pub async fn settings_get(
-) -> Response {
+pub async fn settings_get() -> Response {
     let app = crate::server::state::get();
     let config = app.config.read().await;
     ok_response(serde_json::json!({
@@ -87,9 +91,7 @@ pub async fn settings_get(
     }))
 }
 
-pub async fn settings_update(
-    Json(body): Json<SettingsUpdateBody>,
-) -> Response {
+pub async fn settings_update(Json(body): Json<SettingsUpdateBody>) -> Response {
     let app = crate::server::state::get();
     let mut config = app.config.write().await;
     config.theme = body.theme;
@@ -117,25 +119,34 @@ pub async fn system_check_browser() -> Response {
     let scanned_python: Option<String> = {
         use std::path::PathBuf;
         let candidates: [PathBuf; 3] = [
-            PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Programs").join("Python"),
+            PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default())
+                .join("Programs")
+                .join("Python"),
             PathBuf::from(std::env::var("PROGRAMFILES").unwrap_or_default()).join("Python"),
             PathBuf::from("C:\\Python"),
         ];
         let mut found: Vec<PathBuf> = Vec::new();
         for base in &candidates {
-            if !base.exists() { continue }
+            if !base.exists() {
+                continue;
+            }
             if let Ok(entries) = std::fs::read_dir(base) {
                 for e in entries.flatten() {
                     let name = e.file_name().to_string_lossy().to_string();
                     if name.starts_with("Python3") {
                         let py = e.path().join("python.exe");
-                        if py.exists() { found.push(py); }
+                        if py.exists() {
+                            found.push(py);
+                        }
                     }
                 }
             }
         }
         found.sort_by(|a, b| b.cmp(a));
-        found.into_iter().next().map(|p| p.to_string_lossy().to_string())
+        found
+            .into_iter()
+            .next()
+            .map(|p| p.to_string_lossy().to_string())
     };
     #[cfg(not(target_os = "windows"))]
     let scanned_python: Option<String> = None;
@@ -148,12 +159,20 @@ pub async fn system_check_browser() -> Response {
             let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
             let pf = std::env::var("PROGRAMFILES").unwrap_or_default();
             let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            std::path::PathBuf::from(&pf_x86).join("Microsoft/Edge/Application/msedge.exe").exists()
-                || std::path::PathBuf::from(&pf).join("Microsoft/Edge/Application/msedge.exe").exists()
-                || std::path::PathBuf::from(&local).join("Microsoft/Edge/Application/msedge.exe").exists()
+            std::path::PathBuf::from(&pf_x86)
+                .join("Microsoft/Edge/Application/msedge.exe")
+                .exists()
+                || std::path::PathBuf::from(&pf)
+                    .join("Microsoft/Edge/Application/msedge.exe")
+                    .exists()
+                || std::path::PathBuf::from(&local)
+                    .join("Microsoft/Edge/Application/msedge.exe")
+                    .exists()
         }
         #[cfg(not(target_os = "windows"))]
-        { which::which("microsoft-edge").is_ok() }
+        {
+            which::which("microsoft-edge").is_ok()
+        }
     };
 
     let has_chrome = {
@@ -163,9 +182,15 @@ pub async fn system_check_browser() -> Response {
             let pf_x86 = std::env::var("PROGRAMFILES(X86)").unwrap_or_default();
             let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
             which::which("chrome").is_ok()
-                || std::path::PathBuf::from(&pf).join("Google/Chrome/Application/chrome.exe").exists()
-                || std::path::PathBuf::from(&pf_x86).join("Google/Chrome/Application/chrome.exe").exists()
-                || std::path::PathBuf::from(&local).join("Google/Chrome/Application/chrome.exe").exists()
+                || std::path::PathBuf::from(&pf)
+                    .join("Google/Chrome/Application/chrome.exe")
+                    .exists()
+                || std::path::PathBuf::from(&pf_x86)
+                    .join("Google/Chrome/Application/chrome.exe")
+                    .exists()
+                || std::path::PathBuf::from(&local)
+                    .join("Google/Chrome/Application/chrome.exe")
+                    .exists()
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -187,32 +212,47 @@ pub async fn system_check_browser() -> Response {
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x08000000);
         }
-        cmd.output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-    } else { false };
+        cmd.output().map(|o| o.status.success()).unwrap_or(false)
+    } else {
+        false
+    };
 
     let has_playwright_chromium = if let Ok(exe) = std::env::current_exe() {
         exe.parent()
             .map(|d| d.join("playwright-browsers"))
-            .map(|p| p.exists() && p.read_dir().ok()
-                .map(|mut entries| entries.any(|e| e.ok()
-                    .map(|f| f.file_name().to_string_lossy().starts_with("chromium-"))
-                    .unwrap_or(false)))
-                .unwrap_or(false))
+            .map(|p| {
+                p.exists()
+                    && p.read_dir()
+                        .ok()
+                        .map(|mut entries| {
+                            entries.any(|e| {
+                                e.ok()
+                                    .map(|f| {
+                                        f.file_name().to_string_lossy().starts_with("chromium-")
+                                    })
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+            })
             .unwrap_or(false)
-    } else { false };
+    } else {
+        false
+    };
 
     let has_playwright_cache = if let Some(ref py) = best_python {
         let mut cmd = std::process::Command::new(py);
-        cmd.args(["-c", r#"
+        cmd.args([
+            "-c",
+            r#"
 import os, sys
 home = os.environ.get('PLAYWRIGHT_BROWSERS_PATH',
     os.path.join(os.environ.get('LOCALAPPDATA', ''), 'ms-playwright') if sys.platform == 'win32'
     else os.path.join(os.path.expanduser('~'), '.cache', 'ms-playwright'))
 dirs = [d for d in os.listdir(home) if d.startswith('chromium-')] if os.path.exists(home) else []
 print('ok' if dirs else 'missing')
-"#]);
+"#,
+        ]);
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
@@ -221,7 +261,9 @@ print('ok' if dirs else 'missing')
         cmd.output()
             .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "ok")
             .unwrap_or(false)
-    } else { false };
+    } else {
+        false
+    };
 
     let has_browser = has_system_browser || has_playwright_chromium || has_playwright_cache;
     let ready = python_available && has_playwright_pkg && has_browser;
@@ -262,7 +304,10 @@ pub async fn open_log_dir() -> Response {
 
     match result {
         Ok(_) => ok_response(serde_json::json!({ "success": true })),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("打开日志目录失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("打开日志目录失败: {e}"),
+        ),
     }
 }
 
@@ -287,9 +332,9 @@ pub async fn clear_logs() -> Response {
 }
 
 pub async fn check_ipc() -> Response {
+    use std::net::SocketAddr;
     use tokio::net::TcpStream;
     use tokio::time::{timeout, Duration};
-    use std::net::SocketAddr;
     let addr: SocketAddr = match "127.0.0.1:19527".parse() {
         Ok(a) => a,
         Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -307,28 +352,34 @@ pub async fn check_ipc() -> Response {
 pub async fn plugin_list() -> Response {
     let plugins = match crate::engine::plugin_manager::list_plugins() {
         Ok(p) => p,
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("获取插件列表失败: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("获取插件列表失败: {e}"),
+            )
+        }
     };
 
-    let items: Vec<serde_json::Value> = plugins.iter().map(|p| {
-        serde_json::json!({
-            "name": p.name,
-            "version": p.version,
-            "title": p.title,
-            "description": p.description,
-            "author": p.author,
-            "icon": p.icon,
-            "mcp_count": p.mcp_mappings.len(),
-            "template_count": p.templates.len(),
+    let items: Vec<serde_json::Value> = plugins
+        .iter()
+        .map(|p| {
+            serde_json::json!({
+                "name": p.name,
+                "version": p.version,
+                "title": p.title,
+                "description": p.description,
+                "author": p.author,
+                "icon": p.icon,
+                "mcp_count": p.mcp_mappings.len(),
+                "template_count": p.templates.len(),
+            })
         })
-    }).collect();
+        .collect();
 
     ok_response(serde_json::json!({ "plugins": items }))
 }
 
-pub async fn plugin_install(
-    Json(body): Json<PluginInstallBody>,
-) -> Response {
+pub async fn plugin_install(Json(body): Json<PluginInstallBody>) -> Response {
     let path = std::path::Path::new(&body.wfplug_path);
     let meta = match crate::engine::plugin_manager::install_plugin(path) {
         Ok(m) => m,
@@ -348,9 +399,7 @@ pub async fn plugin_install(
     }))
 }
 
-pub async fn plugin_uninstall(
-    Json(body): Json<PluginUninstallBody>,
-) -> Response {
+pub async fn plugin_uninstall(Json(body): Json<PluginUninstallBody>) -> Response {
     match crate::engine::plugin_manager::uninstall_plugin(&body.name) {
         Ok(()) => ok_response(serde_json::json!({
             "success": true,
@@ -361,5 +410,8 @@ pub async fn plugin_uninstall(
 }
 
 pub async fn plugin_pick_file() -> Response {
-    err_response(StatusCode::NOT_IMPLEMENTED, "plugin_pick_file is not available in standalone server mode — use the REST API directly")
+    err_response(
+        StatusCode::NOT_IMPLEMENTED,
+        "plugin_pick_file is not available in standalone server mode — use the REST API directly",
+    )
 }

@@ -21,7 +21,10 @@ pub struct RunState {
 }
 
 impl RunState {
-    pub fn new(run_id: &str, variables: std::collections::HashMap<String, serde_json::Value>) -> Self {
+    pub fn new(
+        run_id: &str,
+        variables: std::collections::HashMap<String, serde_json::Value>,
+    ) -> Self {
         RunState {
             run_id: run_id.to_string(),
             status: "running".to_string(),
@@ -37,7 +40,8 @@ impl RunState {
     }
 
     pub fn mark_step_completed(&mut self, step_id: &str) {
-        self.steps.insert(step_id.to_string(), StepStatus::Completed);
+        self.steps
+            .insert(step_id.to_string(), StepStatus::Completed);
     }
 
     pub fn mark_step_failed(&mut self, step_id: &str) {

@@ -6,11 +6,11 @@
 #[cfg(target_os = "linux")]
 use crate::platform::traits::RecordingBackend;
 #[cfg(target_os = "linux")]
-use anyhow::{Result, anyhow};
-#[cfg(target_os = "linux")]
-use std::sync::Mutex;
+use anyhow::{anyhow, Result};
 #[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "linux")]
+use std::sync::Mutex;
 
 // ─── 共享录制状态（仅 Linux 编译） ───
 
@@ -40,12 +40,17 @@ fn now_ms() -> u128 {
 
 #[cfg(target_os = "linux")]
 fn push_action(action: serde_json::Value) {
-    RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").push(action);
+    RECORDED_ACTIONS
+        .lock()
+        .expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）")
+        .push(action);
 }
 
 #[cfg(target_os = "linux")]
 fn flush_text() {
-    let mut buf = TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）");
+    let mut buf = TEXT_BUFFER
+        .lock()
+        .expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）");
     if !buf.is_empty() {
         push_action(serde_json::json!({
             "type": "type", "source": "desktop",
@@ -72,7 +77,9 @@ impl Default for LinuxRecordingBackend {
 #[cfg(target_os = "linux")]
 impl LinuxRecordingBackend {
     pub fn new() -> Self {
-        LinuxRecordingBackend { handle: Mutex::new(None) }
+        LinuxRecordingBackend {
+            handle: Mutex::new(None),
+        }
     }
 }
 
@@ -82,55 +89,79 @@ impl RecordingBackend for LinuxRecordingBackend {
         if RECORDING_ACTIVE.load(Ordering::SeqCst) {
             return Err(anyhow!("已在录制中"));
         }
-        RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clear();
-        *TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）") = String::new();
-        *LAST_KEY_TIME.lock().expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）") = 0;
-        *LAST_MOUSE_TIME.lock().expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）") = 0;
+        RECORDED_ACTIONS
+            .lock()
+            .expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）")
+            .clear();
+        *TEXT_BUFFER
+            .lock()
+            .expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）") = String::new();
+        *LAST_KEY_TIME
+            .lock()
+            .expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）") = 0;
+        *LAST_MOUSE_TIME
+            .lock()
+            .expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）") = 0;
         RECORDING_ACTIVE.store(true, Ordering::SeqCst);
 
         let handle = std::thread::spawn(move || {
-            use rdev::{listen, Event, EventType, Key, Button};
+            use rdev::{listen, Button, Event, EventType, Key};
 
             let callback = |event: Event| {
-                if !RECORDING_ACTIVE.load(Ordering::SeqCst) { return; }
+                if !RECORDING_ACTIVE.load(Ordering::SeqCst) {
+                    return;
+                }
                 let now = now_ms();
 
                 match event.event_type {
-                    EventType::KeyPress(key) => {
-                        match key {
-                            Key::ShiftLeft | Key::ShiftRight |
-                            Key::ControlLeft | Key::ControlRight |
-                            Key::Alt | Key::AltGr | Key::MetaLeft | Key::MetaRight => (),
-                            Key::Return => {
-                                flush_text();
-                            }
-                            Key::Tab => {
-                                flush_text();
-                                push_action(serde_json::json!({
-                                    "type": "hotkey", "source": "desktop",
-                                    "keys": "Tab", "timestamp": now,
-                                }));
-                            }
-                            Key::Backspace => {
-                                TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）").pop();
-                            }
-                            _ => {
-                                if let Some(ch) = key_to_char(&key) {
-                                    let mut last = LAST_KEY_TIME.lock().expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）");
-                                    if now.saturating_sub(*last) > 1000 {
-                                        drop(last);
-                                        flush_text();
-                                    } else {
-                                        *last = now;
-                                        drop(last);
-                                    }
-                                    TEXT_BUFFER.lock().expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）").push_str(&ch);
+                    EventType::KeyPress(key) => match key {
+                        Key::ShiftLeft
+                        | Key::ShiftRight
+                        | Key::ControlLeft
+                        | Key::ControlRight
+                        | Key::Alt
+                        | Key::AltGr
+                        | Key::MetaLeft
+                        | Key::MetaRight => (),
+                        Key::Return => {
+                            flush_text();
+                        }
+                        Key::Tab => {
+                            flush_text();
+                            push_action(serde_json::json!({
+                                "type": "hotkey", "source": "desktop",
+                                "keys": "Tab", "timestamp": now,
+                            }));
+                        }
+                        Key::Backspace => {
+                            TEXT_BUFFER
+                                .lock()
+                                .expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）")
+                                .pop();
+                        }
+                        _ => {
+                            if let Some(ch) = key_to_char(&key) {
+                                let mut last = LAST_KEY_TIME
+                                    .lock()
+                                    .expect("获取 LAST_KEY_TIME 锁失败（Mutex 中毒）");
+                                if now.saturating_sub(*last) > 1000 {
+                                    drop(last);
+                                    flush_text();
+                                } else {
+                                    *last = now;
+                                    drop(last);
                                 }
+                                TEXT_BUFFER
+                                    .lock()
+                                    .expect("获取 TEXT_BUFFER 锁失败（Mutex 中毒）")
+                                    .push_str(&ch);
                             }
                         }
-                    }
+                    },
                     EventType::ButtonPress(button) => {
-                        let mut last_mouse = LAST_MOUSE_TIME.lock().expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）");
+                        let mut last_mouse = LAST_MOUSE_TIME
+                            .lock()
+                            .expect("获取 LAST_MOUSE_TIME 锁失败（Mutex 中毒）");
                         if now.saturating_sub(*last_mouse) > 100 {
                             *last_mouse = now;
                             drop(last_mouse);
@@ -157,23 +188,37 @@ impl RecordingBackend for LinuxRecordingBackend {
             };
 
             if let Err(e) = listen(callback) {
-tracing::error!("rdev listen 错误: {:?}", e);
+                tracing::error!("rdev listen 错误: {:?}", e);
             }
             flush_text();
         });
 
-        *self.handle.lock().expect("获取录制句柄锁失败（Mutex 中毒）") = Some(handle);
+        *self
+            .handle
+            .lock()
+            .expect("获取录制句柄锁失败（Mutex 中毒）") = Some(handle);
         Ok(())
     }
 
     fn stop(&self) -> Result<Vec<serde_json::Value>> {
         RECORDING_ACTIVE.store(false, Ordering::SeqCst);
         std::thread::sleep(std::time::Duration::from_millis(300));
-        if let Some(h) = self.handle.lock().expect("获取录制句柄锁失败（Mutex 中毒）").take() {
+        if let Some(h) = self
+            .handle
+            .lock()
+            .expect("获取录制句柄锁失败（Mutex 中毒）")
+            .take()
+        {
             let _ = h.join();
         }
-        let actions = RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clone();
-        RECORDED_ACTIONS.lock().expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）").clear();
+        let actions = RECORDED_ACTIONS
+            .lock()
+            .expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）")
+            .clone();
+        RECORDED_ACTIONS
+            .lock()
+            .expect("获取 RECORDED_ACTIONS 锁失败（Mutex 中毒）")
+            .clear();
         Ok(actions)
     }
 
@@ -186,21 +231,52 @@ tracing::error!("rdev listen 错误: {:?}", e);
 fn key_to_char(key: &rdev::Key) -> Option<String> {
     use rdev::Key;
     let c = match key {
-        Key::KeyA => "a", Key::KeyB => "b", Key::KeyC => "c", Key::KeyD => "d",
-        Key::KeyE => "e", Key::KeyF => "f", Key::KeyG => "g", Key::KeyH => "h",
-        Key::KeyI => "i", Key::KeyJ => "j", Key::KeyK => "k", Key::KeyL => "l",
-        Key::KeyM => "m", Key::KeyN => "n", Key::KeyO => "o", Key::KeyP => "p",
-        Key::KeyQ => "q", Key::KeyR => "r", Key::KeyS => "s", Key::KeyT => "t",
-        Key::KeyU => "u", Key::KeyV => "v", Key::KeyW => "w", Key::KeyX => "x",
-        Key::KeyY => "y", Key::KeyZ => "z",
-        Key::Num0 => "0", Key::Num1 => "1", Key::Num2 => "2", Key::Num3 => "3",
-        Key::Num4 => "4", Key::Num5 => "5", Key::Num6 => "6", Key::Num7 => "7",
-        Key::Num8 => "8", Key::Num9 => "9",
+        Key::KeyA => "a",
+        Key::KeyB => "b",
+        Key::KeyC => "c",
+        Key::KeyD => "d",
+        Key::KeyE => "e",
+        Key::KeyF => "f",
+        Key::KeyG => "g",
+        Key::KeyH => "h",
+        Key::KeyI => "i",
+        Key::KeyJ => "j",
+        Key::KeyK => "k",
+        Key::KeyL => "l",
+        Key::KeyM => "m",
+        Key::KeyN => "n",
+        Key::KeyO => "o",
+        Key::KeyP => "p",
+        Key::KeyQ => "q",
+        Key::KeyR => "r",
+        Key::KeyS => "s",
+        Key::KeyT => "t",
+        Key::KeyU => "u",
+        Key::KeyV => "v",
+        Key::KeyW => "w",
+        Key::KeyX => "x",
+        Key::KeyY => "y",
+        Key::KeyZ => "z",
+        Key::Num0 => "0",
+        Key::Num1 => "1",
+        Key::Num2 => "2",
+        Key::Num3 => "3",
+        Key::Num4 => "4",
+        Key::Num5 => "5",
+        Key::Num6 => "6",
+        Key::Num7 => "7",
+        Key::Num8 => "8",
+        Key::Num9 => "9",
         Key::Space => " ",
-        Key::Minus => "-", Key::Equal => "=",
-        Key::LeftBracket => "[", Key::RightBracket => "]",
-        Key::SemiColon => ";", Key::Quote => "'",
-        Key::Comma => ",", Key::Dot => ".", Key::Slash => "/",
+        Key::Minus => "-",
+        Key::Equal => "=",
+        Key::LeftBracket => "[",
+        Key::RightBracket => "]",
+        Key::SemiColon => ";",
+        Key::Quote => "'",
+        Key::Comma => ",",
+        Key::Dot => ".",
+        Key::Slash => "/",
         Key::BackSlash => "\\",
         _ => return None,
     };

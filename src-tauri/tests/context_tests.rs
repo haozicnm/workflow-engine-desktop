@@ -38,9 +38,10 @@ fn resolve_var_basic_lookup() {
 
 #[test]
 fn resolve_var_nested_field_access() {
-    let ctx = new_ctx_with_vars(vec![
-        ("user", json!({"name": "张三", "age": 30, "address": {"city": "北京"}})),
-    ]);
+    let ctx = new_ctx_with_vars(vec![(
+        "user",
+        json!({"name": "张三", "age": 30, "address": {"city": "北京"}}),
+    )]);
 
     // 一级嵌套
     assert_eq!(ctx.resolve_var("user.name"), Some(&json!("张三")));
@@ -90,36 +91,30 @@ fn resolve_var_priority_step_outputs_over_variables() {
 
 #[test]
 fn resolve_var_nested_field_missing_returns_none() {
-    let ctx = new_ctx_with_vars(vec![
-        ("user", json!({"name": "张三"})),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("user", json!({"name": "张三"}))]);
     // user.name 存在，但 user.name.nonexistent 不存在
     assert_eq!(ctx.resolve_var("user.name.nonexistent"), None);
 }
 
 #[test]
 fn resolve_var_array_not_indexable_by_dot() {
-    let ctx = new_ctx_with_vars(vec![
-        ("items", json!(["a", "b", "c"])),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("items", json!(["a", "b", "c"]))]);
     // serde_json Value::get(&str) does NOT support numeric array indexing
     // Arrays accessed via dot notation return None (only object fields work)
     assert_eq!(ctx.resolve_var("items.0"), None);
     assert_eq!(ctx.resolve_var("items.99"), None);
     // But object fields inside array items would work if accessed as object
-    let ctx2 = new_ctx_with_vars(vec![
-        ("data", json!({"items": ["a", "b", "c"]})),
-    ]);
+    let ctx2 = new_ctx_with_vars(vec![("data", json!({"items": ["a", "b", "c"]}))]);
     // data.items doesn't work for array indexing either
-    assert_eq!(ctx2.resolve_var("data.items"), Some(&json!(["a", "b", "c"])));
+    assert_eq!(
+        ctx2.resolve_var("data.items"),
+        Some(&json!(["a", "b", "c"]))
+    );
 }
 
 #[test]
 fn resolve_var_boolean_and_null() {
-    let ctx = new_ctx_with_vars(vec![
-        ("flag", json!(true)),
-        ("nothing", json!(null)),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("flag", json!(true)), ("nothing", json!(null))]);
     assert_eq!(ctx.resolve_var("flag"), Some(&json!(true)));
     assert_eq!(ctx.resolve_var("nothing"), Some(&json!(null)));
 }
@@ -130,10 +125,7 @@ fn resolve_var_boolean_and_null() {
 
 #[test]
 fn resolve_config_string_interpolation() {
-    let ctx = new_ctx_with_vars(vec![
-        ("name", json!("Alice")),
-        ("host", json!("localhost")),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("name", json!("Alice")), ("host", json!("localhost"))]);
 
     // 纯变量替换 — 整个字符串是 {{var}} 时保留类型
     assert_eq!(ctx.resolve_config(&json!("{{name}}")), json!("Alice"));
@@ -160,17 +152,20 @@ fn resolve_config_type_preservation() {
     // 整个字符串是 {{var}} 时保留原始类型
     assert_eq!(ctx.resolve_config(&json!("{{count}}")).as_i64(), Some(42));
     assert_eq!(ctx.resolve_config(&json!("{{price}}")).as_f64(), Some(3.14));
-    assert_eq!(ctx.resolve_config(&json!("{{active}}")).as_bool(), Some(true));
-    assert_eq!(ctx.resolve_config(&json!("{{data}}")), json!({"key": "value"}));
+    assert_eq!(
+        ctx.resolve_config(&json!("{{active}}")).as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        ctx.resolve_config(&json!("{{data}}")),
+        json!({"key": "value"})
+    );
     assert_eq!(ctx.resolve_config(&json!("{{list}}")), json!([1, 2, 3]));
 }
 
 #[test]
 fn resolve_config_nested_object() {
-    let ctx = new_ctx_with_vars(vec![
-        ("name", json!("小夏")),
-        ("port", json!(8080)),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("name", json!("小夏")), ("port", json!(8080))]);
 
     let config = json!({
         "url": "http://{{name}}:{{port}}/api",
@@ -190,10 +185,7 @@ fn resolve_config_nested_object() {
 
 #[test]
 fn resolve_config_array_resolution() {
-    let ctx = new_ctx_with_vars(vec![
-        ("a", json!("hello")),
-        ("b", json!("world")),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("a", json!("hello")), ("b", json!("world"))]);
 
     let config = json!(["{{a}}", "{{b}}", "literal", 42]);
     let result = ctx.resolve_config(&config);
@@ -232,9 +224,7 @@ fn resolve_config_unresolved_variable_preserved() {
 
 #[test]
 fn resolve_config_nested_array_in_object() {
-    let ctx = new_ctx_with_vars(vec![
-        ("item", json!("task")),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("item", json!("task"))]);
 
     let config = json!({
         "items": ["{{item}}_1", "{{item}}_2"],
@@ -263,10 +253,18 @@ fn eval_expr_arithmetic_complex() {
     let ctx = new_ctx_with_vars(vec![("a", json!(10)), ("b", json!(3)), ("c", json!(2))]);
 
     // 乘除优先
-    assert_eq!(ctx.eval_expr("__vars__.a + __vars__.b * __vars__.c").unwrap(), json!(16));
+    assert_eq!(
+        ctx.eval_expr("__vars__.a + __vars__.b * __vars__.c")
+            .unwrap(),
+        json!(16)
+    );
 
     // 括号
-    assert_eq!(ctx.eval_expr("(__vars__.a + __vars__.b) * __vars__.c").unwrap(), json!(26));
+    assert_eq!(
+        ctx.eval_expr("(__vars__.a + __vars__.b) * __vars__.c")
+            .unwrap(),
+        json!(26)
+    );
 
     // 减法
     assert_eq!(ctx.eval_expr("__vars__.a - __vars__.b").unwrap(), json!(7));
@@ -279,36 +277,51 @@ fn eval_expr_arithmetic_complex() {
 fn eval_expr_comparison() {
     let ctx = new_ctx_with_vars(vec![("x", json!(10)), ("y", json!(20))]);
 
-    assert_eq!(ctx.eval_expr("__vars__.x < __vars__.y").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("__vars__.x > __vars__.y").unwrap(), json!(false));
+    assert_eq!(
+        ctx.eval_expr("__vars__.x < __vars__.y").unwrap(),
+        json!(true)
+    );
+    assert_eq!(
+        ctx.eval_expr("__vars__.x > __vars__.y").unwrap(),
+        json!(false)
+    );
     assert_eq!(ctx.eval_expr("__vars__.x == 10").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("__vars__.x != __vars__.y").unwrap(), json!(true));
+    assert_eq!(
+        ctx.eval_expr("__vars__.x != __vars__.y").unwrap(),
+        json!(true)
+    );
     assert_eq!(ctx.eval_expr("__vars__.x >= 10").unwrap(), json!(true));
     assert_eq!(ctx.eval_expr("__vars__.x <= 5").unwrap(), json!(false));
 }
 
 #[test]
 fn eval_expr_boolean_logic() {
-    let ctx = new_ctx_with_vars(vec![
-        ("a", json!(true)),
-        ("b", json!(false)),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("a", json!(true)), ("b", json!(false))]);
 
-    assert_eq!(ctx.eval_expr("__vars__.a && __vars__.b").unwrap(), json!(false));
-    assert_eq!(ctx.eval_expr("__vars__.a || __vars__.b").unwrap(), json!(true));
+    assert_eq!(
+        ctx.eval_expr("__vars__.a && __vars__.b").unwrap(),
+        json!(false)
+    );
+    assert_eq!(
+        ctx.eval_expr("__vars__.a || __vars__.b").unwrap(),
+        json!(true)
+    );
     assert_eq!(ctx.eval_expr("!__vars__.b").unwrap(), json!(true));
-    assert_eq!(ctx.eval_expr("__vars__.a && !__vars__.b").unwrap(), json!(true));
+    assert_eq!(
+        ctx.eval_expr("__vars__.a && !__vars__.b").unwrap(),
+        json!(true)
+    );
 }
 
 #[test]
 fn eval_expr_variable_substitution() {
-    let ctx = new_ctx_with_vars(vec![
-        ("name", json!("test")),
-        ("count", json!(5)),
-    ]);
+    let ctx = new_ctx_with_vars(vec![("name", json!("test")), ("count", json!(5))]);
 
     // 字符串拼接
-    assert_eq!(ctx.eval_expr("`hello ${__vars__.name}`").unwrap(), json!("hello test"));
+    assert_eq!(
+        ctx.eval_expr("`hello ${__vars__.name}`").unwrap(),
+        json!("hello test")
+    );
 
     // 数值运算
     assert_eq!(ctx.eval_expr("__vars__.count * 2").unwrap(), json!(10));
@@ -321,13 +334,19 @@ fn eval_expr_step_output_access() {
     ctx.set_output("step2", json!(20));
 
     // 通过 step_ 前缀访问
-    assert_eq!(ctx.eval_expr("step_step1.count + step_step2").unwrap(), json!(30));
+    assert_eq!(
+        ctx.eval_expr("step_step1.count + step_step2").unwrap(),
+        json!(30)
+    );
 }
 
 #[test]
 fn eval_expr_string_literal() {
     let ctx = new_ctx();
-    assert_eq!(ctx.eval_expr("`hello world`").unwrap(), json!("hello world"));
+    assert_eq!(
+        ctx.eval_expr("`hello world`").unwrap(),
+        json!("hello world")
+    );
 }
 
 #[test]
@@ -372,7 +391,10 @@ fn open_session_idempotent() {
     // 第二次打开 — 应返回同一个 session
     let s2 = ctx.open_session("node_1", "browser").session_id.clone();
 
-    assert_eq!(s1, s2, "Calling open_session twice should return the same session");
+    assert_eq!(
+        s1, s2,
+        "Calling open_session twice should return the same session"
+    );
 }
 
 #[test]
@@ -382,7 +404,10 @@ fn open_session_different_nodes() {
     let s1_id = ctx.open_session("node_a", "browser").session_id.clone();
     let s2_id = ctx.open_session("node_b", "excel").session_id.clone();
 
-    assert_ne!(s1_id, s2_id, "Different nodes should get different sessions");
+    assert_ne!(
+        s1_id, s2_id,
+        "Different nodes should get different sessions"
+    );
     assert_eq!(ctx.sessions.len(), 2);
 }
 

@@ -1,8 +1,8 @@
 // system/tray.rs — 系统托盘
 // 关闭窗口时最小化到托盘，双击/右键菜单恢复窗口
 use tauri::{
-    tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState},
     menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
 use tracing::info;
@@ -13,7 +13,8 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
     // 获取图标（使用 clone 避免 unwrap，fallback 到空像素图）
-    let icon = app.default_window_icon()
+    let icon = app
+        .default_window_icon()
         .cloned()
         .unwrap_or_else(|| tauri::image::Image::new(&[0u8; 64], 4, 4));
 
@@ -37,7 +38,8 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
-            } = event {
+            } = event
+            {
                 info!("托盘图标双击: 显示主窗口");
                 show_window(tray.app_handle());
             }

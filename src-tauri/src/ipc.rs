@@ -5,8 +5,8 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -14,10 +14,10 @@ use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
 
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
-use crate::App;
 use crate::engine::{parser, scheduler};
+use crate::App;
 use tauri::Emitter;
 
 const IPC_PORT: u16 = 19527;
@@ -29,15 +29,27 @@ const TOKEN_FILE: &str = ".hermes/daemon-token";
 #[serde(tag = "type")]
 enum IpcRequest {
     #[serde(rename = "run")]
-    Run { id: String, workflow_id: String, vars: Option<HashMap<String, String>> },
+    Run {
+        id: String,
+        workflow_id: String,
+        vars: Option<HashMap<String, String>>,
+    },
     #[serde(rename = "library_run")]
-    LibraryRun { id: String, template: String, params: Option<HashMap<String, String>> },
+    LibraryRun {
+        id: String,
+        template: String,
+        params: Option<HashMap<String, String>>,
+    },
     #[serde(rename = "status")]
     Status { id: String, run_id: String },
     #[serde(rename = "list_runs")]
     ListRuns { id: String },
     #[serde(rename = "control")]
-    Control { id: String, run_id: String, action: String },
+    Control {
+        id: String,
+        run_id: String,
+        action: String,
+    },
     #[serde(rename = "ping")]
     Ping { id: String },
 }
@@ -46,15 +58,35 @@ enum IpcRequest {
 #[serde(tag = "type")]
 enum IpcResponse {
     #[serde(rename = "ack")]
-    Ack { id: String, run_id: Option<String>, message: Option<String> },
+    Ack {
+        id: String,
+        run_id: Option<String>,
+        message: Option<String>,
+    },
     #[serde(rename = "step_update")]
     #[allow(dead_code)]
-    StepUpdate { run_id: String, step_id: String, step_name: String, status: String, output: Option<Value>, error: Option<String> },
+    StepUpdate {
+        run_id: String,
+        step_id: String,
+        step_name: String,
+        status: String,
+        output: Option<Value>,
+        error: Option<String>,
+    },
     #[serde(rename = "var_snapshot")]
     #[allow(dead_code)]
-    VarSnapshot { run_id: String, variables: Value, step_outputs: Value },
+    VarSnapshot {
+        run_id: String,
+        variables: Value,
+        step_outputs: Value,
+    },
     #[serde(rename = "run_complete")]
-    RunComplete { run_id: String, status: String, elapsed_secs: f64, error: Option<String> },
+    RunComplete {
+        run_id: String,
+        status: String,
+        elapsed_secs: f64,
+        error: Option<String>,
+    },
     #[serde(rename = "pong")]
     Pong { id: String },
     #[serde(rename = "error")]
@@ -72,7 +104,11 @@ pub struct IpcServer {
 impl IpcServer {
     pub fn new(app: Arc<App>, handle: tauri::AppHandle) -> Self {
         let token = uuid::Uuid::new_v4().to_string();
-        IpcServer { token, app, app_handle: handle }
+        IpcServer {
+            token,
+            app,
+            app_handle: handle,
+        }
     }
 
     /// 启动 IPC 服务器（非阻塞，返回 JoinHandle）
@@ -93,8 +129,10 @@ impl IpcServer {
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    let _ = std::fs::set_permissions(&token_path,
-                        std::fs::Permissions::from_mode(0o600));
+                    let _ = std::fs::set_permissions(
+                        &token_path,
+                        std::fs::Permissions::from_mode(0o600),
+                    );
                 }
             }
         }
@@ -168,9 +206,11 @@ impl IpcServer {
                         id: "unknown".to_string(),
                         message: format!("Invalid JSON: {}", e),
                     };
-                    let _ = sender.send(Message::Text(
-                        serde_json::to_string(&err).unwrap_or_default(),
-                    )).await;
+                    let _ = sender
+                        .send(Message::Text(
+                            serde_json::to_string(&err).unwrap_or_default(),
+                        ))
+                        .await;
                     continue;
                 }
             };
@@ -181,7 +221,11 @@ impl IpcServer {
                 if !client_token.is_empty() && client_token != self.token {
                     warn!("IPC authentication failed: token mismatch");
                     let err = IpcResponse::Error {
-                        id: raw_msg.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                        id: raw_msg
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string(),
                         message: "Authentication failed: invalid token".to_string(),
                     };
                     let _ = sender.send(Message::Text(
@@ -200,12 +244,15 @@ impl IpcServer {
                         id: "unknown".to_string(),
                         message: format!("Message parse error: {}", e),
                     };
-                    let _ = sender.send(Message::Text(
-                        serde_json::to_string(&err).unwrap_or_else(|e| {
-                            tracing::warn!("序列化 IPC 错误响应失败: {}", e);
-                            r#"{"type":"error","id":"unknown","message":"Internal error"}"#.to_string()
-                        })
-                    )).await;
+                    let _ = sender
+                        .send(Message::Text(serde_json::to_string(&err).unwrap_or_else(
+                            |e| {
+                                tracing::warn!("序列化 IPC 错误响应失败: {}", e);
+                                r#"{"type":"error","id":"unknown","message":"Internal error"}"#
+                                    .to_string()
+                            },
+                        )))
+                        .await;
                     continue;
                 }
             };
@@ -223,73 +270,110 @@ impl IpcServer {
     async fn handle_request(
         &self,
         request: IpcRequest,
-        sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, Message>,
+        sender: &mut futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<TcpStream>,
+            Message,
+        >,
     ) -> Option<IpcResponse> {
         match request {
-            IpcRequest::Ping { id } => {
-                Some(IpcResponse::Pong { id })
-            }
+            IpcRequest::Ping { id } => Some(IpcResponse::Pong { id }),
 
-            IpcRequest::Run { id, workflow_id, vars } => {
-                self.handle_run(id, workflow_id, vars, sender).await
-            }
+            IpcRequest::Run {
+                id,
+                workflow_id,
+                vars,
+            } => self.handle_run(id, workflow_id, vars, sender).await,
 
-            IpcRequest::LibraryRun { id, template, params } => {
-                self.handle_library_run(id, template, params, sender).await
-            }
+            IpcRequest::LibraryRun {
+                id,
+                template,
+                params,
+            } => self.handle_library_run(id, template, params, sender).await,
 
-            IpcRequest::Status { id, run_id } => {
-                match self.app.db.get_run_detail(&run_id) {
-                    Ok(Some(detail)) => {
+            IpcRequest::Status { id, run_id } => match self.app.db.get_run_detail(&run_id) {
+                Ok(Some(detail)) => Some(IpcResponse::Ack {
+                    id,
+                    run_id: Some(run_id),
+                    message: Some(format!("status: {}", detail.run.status)),
+                }),
+                Ok(None) => Some(IpcResponse::Error {
+                    id,
+                    message: "运行记录不存在".into(),
+                }),
+                Err(e) => Some(IpcResponse::Error {
+                    id,
+                    message: e.to_string(),
+                }),
+            },
+
+            IpcRequest::ListRuns { id } => match self.app.db.list_runs(None, 10) {
+                Ok(runs) => {
+                    let list: Vec<String> = runs
+                        .iter()
+                        .map(|r| format!("{}: {}", r.id, r.status))
+                        .collect();
+                    Some(IpcResponse::Ack {
+                        id,
+                        run_id: None,
+                        message: Some(list.join("\n")),
+                    })
+                }
+                Err(e) => Some(IpcResponse::Error {
+                    id,
+                    message: e.to_string(),
+                }),
+            },
+
+            IpcRequest::Control { id, run_id, action } => match action.as_str() {
+                "cancel" => {
+                    if let Some(token) = self.app.cancel_tokens.read().await.get(&run_id) {
+                        token.cancel();
                         Some(IpcResponse::Ack {
                             id,
                             run_id: Some(run_id),
-                            message: Some(format!("status: {}", detail.run.status)),
+                            message: Some("已取消".into()),
+                        })
+                    } else {
+                        Some(IpcResponse::Error {
+                            id,
+                            message: "运行记录不存在或已完成".into(),
                         })
                     }
-                    Ok(None) => Some(IpcResponse::Error { id, message: "运行记录不存在".into() }),
-                    Err(e) => Some(IpcResponse::Error { id, message: e.to_string() }),
                 }
-            }
-
-            IpcRequest::ListRuns { id } => {
-                match self.app.db.list_runs(None, 10) {
-                    Ok(runs) => {
-                        let list: Vec<String> = runs.iter().map(|r| format!("{}: {}", r.id, r.status)).collect();
-                        Some(IpcResponse::Ack { id, run_id: None, message: Some(list.join("\n")) })
-                    }
-                    Err(e) => Some(IpcResponse::Error { id, message: e.to_string() }),
+                "pause" => {
+                    self.app
+                        .pause_flags
+                        .write()
+                        .await
+                        .entry(run_id.clone())
+                        .or_insert_with(|| Arc::new(AtomicBool::new(false)))
+                        .store(true, Ordering::SeqCst);
+                    Some(IpcResponse::Ack {
+                        id,
+                        run_id: Some(run_id),
+                        message: Some("已暂停".into()),
+                    })
                 }
-            }
-
-            IpcRequest::Control { id, run_id, action } => {
-                match action.as_str() {
-                    "cancel" => {
-                        if let Some(token) = self.app.cancel_tokens.read().await.get(&run_id) {
-                            token.cancel();
-                            Some(IpcResponse::Ack { id, run_id: Some(run_id), message: Some("已取消".into()) })
-                        } else {
-                            Some(IpcResponse::Error { id, message: "运行记录不存在或已完成".into() })
-                        }
+                "resume" => {
+                    if let Some(flag) = self.app.pause_flags.read().await.get(&run_id) {
+                        flag.store(false, Ordering::SeqCst);
+                        Some(IpcResponse::Ack {
+                            id,
+                            run_id: Some(run_id),
+                            message: Some("已恢复".into()),
+                        })
+                    } else {
+                        Some(IpcResponse::Error {
+                            id,
+                            message: "运行记录不存在".into(),
+                        })
                     }
-                    "pause" => {
-                        self.app.pause_flags.write().await
-                            .entry(run_id.clone())
-                            .or_insert_with(|| Arc::new(AtomicBool::new(false)))
-                            .store(true, Ordering::SeqCst);
-                        Some(IpcResponse::Ack { id, run_id: Some(run_id), message: Some("已暂停".into()) })
-                    }
-                    "resume" => {
-                        if let Some(flag) = self.app.pause_flags.read().await.get(&run_id) {
-                            flag.store(false, Ordering::SeqCst);
-                            Some(IpcResponse::Ack { id, run_id: Some(run_id), message: Some("已恢复".into()) })
-                        } else {
-                            Some(IpcResponse::Error { id, message: "运行记录不存在".into() })
-                        }
-                    }
-                    _ => Some(IpcResponse::Error { id, message: format!("未知操作: {}", action) }),
                 }
-            }
+                _ => Some(IpcResponse::Error {
+                    id,
+                    message: format!("未知操作: {}", action),
+                }),
+            },
         }
     }
 
@@ -298,31 +382,61 @@ impl IpcServer {
         id: String,
         workflow_id: String,
         vars: Option<HashMap<String, String>>,
-        sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, Message>,
+        sender: &mut futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<TcpStream>,
+            Message,
+        >,
     ) -> Option<IpcResponse> {
         let yaml = match self.app.db.get_workflow_yaml(&workflow_id) {
             Ok(Some(y)) => y,
-            Ok(None) => return Some(IpcResponse::Error { id, message: "Workflow not found".into() }),
-            Err(e) => return Some(IpcResponse::Error { id, message: e.to_string() }),
+            Ok(None) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: "Workflow not found".into(),
+                })
+            }
+            Err(e) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: e.to_string(),
+                })
+            }
         };
 
         let workflow = match parser::parse_workflow(&yaml) {
             Ok(w) => w,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("Parse error: {}", e) }),
+            Err(e) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: format!("Parse error: {}", e),
+                })
+            }
         };
 
         let run_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let workflow_name = workflow.name.clone();
 
-        if let Err(e) = self.app.db.create_run(&run_id, &workflow_id, &workflow_name, &now) {
-            return Some(IpcResponse::Error { id, message: format!("Failed to create run record: {}", e) });
+        if let Err(e) = self
+            .app
+            .db
+            .create_run(&run_id, &workflow_id, &workflow_name, &now)
+        {
+            return Some(IpcResponse::Error {
+                id,
+                message: format!("Failed to create run record: {}", e),
+            });
         }
 
         let _total = workflow.steps.len();
         let _permit = match self.app.run_semaphore.clone().try_acquire_owned() {
             Ok(p) => p,
-            Err(_) => return Some(IpcResponse::Error { id, message: "并发限制，请稍后重试".into() }),
+            Err(_) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: "并发限制，请稍后重试".into(),
+                })
+            }
         };
 
         let ctrl = scheduler::RunControl {
@@ -335,7 +449,11 @@ impl IpcServer {
         };
 
         // 发送 ack
-        let ack = IpcResponse::Ack { id: id.clone(), run_id: Some(run_id.clone()), message: None };
+        let ack = IpcResponse::Ack {
+            id: id.clone(),
+            run_id: Some(run_id.clone()),
+            message: None,
+        };
         let json = serde_json::to_string(&ack).unwrap_or_else(|e| {
             tracing::error!("序列化 ack 失败: {}", e);
             r#"{"type":"error","id":"internal","message":"Serialization failed"}"#.to_string()
@@ -356,9 +474,16 @@ impl IpcServer {
 
         let start = std::time::Instant::now();
         let result = scheduler::run_workflow(
-            &workflow, &run_id, Some(&app_handle), &db,
-            approval_store, "auto", &vars_vec, &ctrl,
-        ).await;
+            &workflow,
+            &run_id,
+            Some(&app_handle),
+            &db,
+            approval_store,
+            "auto",
+            &vars_vec,
+            &ctrl,
+        )
+        .await;
 
         let elapsed = start.elapsed().as_secs_f64();
 
@@ -366,11 +491,14 @@ impl IpcServer {
             Ok(_) => {
                 let _ = db.update_run_status(&run_id, "completed", None);
                 // 推送到 Tauri 前端
-                let _ = app_handle.emit("run-update", serde_json::json!({
-                    "run_id": &run_id_clone,
-                    "workflow_name": &workflow_name_clone,
-                    "status": "completed",
-                }));
+                let _ = app_handle.emit(
+                    "run-update",
+                    serde_json::json!({
+                        "run_id": &run_id_clone,
+                        "workflow_name": &workflow_name_clone,
+                        "status": "completed",
+                    }),
+                );
                 Some(IpcResponse::RunComplete {
                     run_id: run_id_clone,
                     status: "completed".into(),
@@ -381,11 +509,14 @@ impl IpcServer {
             Err(e) => {
                 let err_msg = e.to_string();
                 let _ = db.update_run_status(&run_id, "failed", Some(&err_msg));
-                let _ = app_handle.emit("run-update", serde_json::json!({
-                    "run_id": &run_id_clone,
-                    "workflow_name": &workflow_name_clone,
-                    "status": "failed",
-                }));
+                let _ = app_handle.emit(
+                    "run-update",
+                    serde_json::json!({
+                        "run_id": &run_id_clone,
+                        "workflow_name": &workflow_name_clone,
+                        "status": "failed",
+                    }),
+                );
                 Some(IpcResponse::RunComplete {
                     run_id: run_id_clone,
                     status: "failed".into(),
@@ -401,7 +532,10 @@ impl IpcServer {
         id: String,
         template_name: String,
         params: Option<HashMap<String, String>>,
-        sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, Message>,
+        sender: &mut futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<TcpStream>,
+            Message,
+        >,
     ) -> Option<IpcResponse> {
         // 加载 template（复用 cli 中 library 逻辑）
         let library_dir = {
@@ -413,28 +547,53 @@ impl IpcServer {
         let catalog_path = library_dir.join("catalog.toml");
         let catalog_content = match std::fs::read_to_string(&catalog_path) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to read catalog.toml: {}", e) }),
+            Err(e) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: format!("Failed to read catalog.toml: {}", e),
+                })
+            }
         };
 
         #[derive(Deserialize)]
-        struct Catalog { templates: Vec<TemplateEntry> }
+        struct Catalog {
+            templates: Vec<TemplateEntry>,
+        }
         #[derive(Deserialize)]
-        struct TemplateEntry { name: String, file: String }
+        struct TemplateEntry {
+            name: String,
+            file: String,
+        }
 
         let catalog: Catalog = match toml::from_str(&catalog_content) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to parse catalog.toml: {}", e) }),
+            Err(e) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: format!("Failed to parse catalog.toml: {}", e),
+                })
+            }
         };
 
         let entry = match catalog.templates.iter().find(|t| t.name == template_name) {
             Some(e) => e,
-            None => return Some(IpcResponse::Error { id, message: format!("Template '{}' not found", template_name) }),
+            None => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: format!("Template '{}' not found", template_name),
+                })
+            }
         };
 
         let file_path = library_dir.join(&entry.file);
         let mut content = match std::fs::read_to_string(&file_path) {
             Ok(c) => c,
-            Err(e) => return Some(IpcResponse::Error { id, message: format!("Failed to read template: {}", e) }),
+            Err(e) => {
+                return Some(IpcResponse::Error {
+                    id,
+                    message: format!("Failed to read template: {}", e),
+                })
+            }
         };
 
         // 参数替换
@@ -448,11 +607,21 @@ impl IpcServer {
         // 导入 + 运行
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
-        if let Err(e) = self.app.db.create_workflow(&workflow_id, &template_name, "", &now, &now) {
-            return Some(IpcResponse::Error { id, message: format!("Import failed: {}", e) });
+        if let Err(e) = self
+            .app
+            .db
+            .create_workflow(&workflow_id, &template_name, "", &now, &now)
+        {
+            return Some(IpcResponse::Error {
+                id,
+                message: format!("Import failed: {}", e),
+            });
         }
         if let Err(e) = self.app.db.save_workflow_yaml(&workflow_id, &content) {
-            return Some(IpcResponse::Error { id, message: format!("Save failed: {}", e) });
+            return Some(IpcResponse::Error {
+                id,
+                message: format!("Save failed: {}", e),
+            });
         }
 
         self.handle_run(id, workflow_id, None, sender).await

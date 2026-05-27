@@ -8,16 +8,16 @@
 //
 // 注意：前端事件发射依赖 main.rs 中调用 PrintNode::init_app_handle() 初始化。
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use anyhow::Result;
 use tauri::Emitter;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// 全局 AppHandle，用于发射 "console-output" 事件
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
@@ -42,11 +42,10 @@ impl NodeExecutor for PrintNode {
     ) -> Result<serde_json::Value> {
         let config = &step.config;
 
-        let message = config.get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let message = config.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
-        let level = config.get("level")
+        let level = config
+            .get("level")
             .and_then(|v| v.as_str())
             .unwrap_or("info");
 
@@ -62,13 +61,16 @@ impl NodeExecutor for PrintNode {
 
         // ── 前端控制台事件 ──
         if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit("console-output", serde_json::json!({
-                "step": step.id,
-                "step_name": step_name,
-                "level": level,
-                "message": message,
-                "timestamp": chrono::Utc::now().to_rfc3339(),
-            }));
+            let _ = handle.emit(
+                "console-output",
+                serde_json::json!({
+                    "step": step.id,
+                    "step_name": step_name,
+                    "level": level,
+                    "message": message,
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                }),
+            );
         }
 
         Ok(serde_json::json!({

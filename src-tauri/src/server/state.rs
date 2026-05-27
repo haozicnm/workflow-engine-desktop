@@ -1,6 +1,6 @@
 // server/state.rs — 全局 App 状态（避免 axum 0.7 Router 状态类型问题）
-use std::sync::Arc;
 use crate::App;
+use std::sync::Arc;
 
 static GLOBAL_APP: std::sync::OnceLock<Arc<App>> = std::sync::OnceLock::new();
 

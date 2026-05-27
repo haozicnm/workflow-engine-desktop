@@ -1,12 +1,12 @@
 // nodes/word.rs — Word 读写节点（拆分为细粒度操作，基于 zip/xml 解析 docx 格式）
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::io::{Read, Write};
-use anyhow::{Result, anyhow};
+use std::sync::Arc;
 
 // ═══════════════════════════════════════════
 // Word 通用节点（兼容旧版）
@@ -16,11 +16,20 @@ pub struct WordNode;
 
 #[async_trait]
 impl NodeExecutor for WordNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let action = config.get("action").and_then(|v| v.as_str())
+        let action = config
+            .get("action")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Word 节点缺少 action 参数"))?;
-        let file_path = config.get("path").and_then(|v| v.as_str())
+        let file_path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Word 节点缺少 path 参数"))?;
 
         match action {
@@ -43,8 +52,16 @@ pub struct WordReadNode;
 
 #[async_trait]
 impl NodeExecutor for WordReadNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
-        let path = step.config.get("path").and_then(|v| v.as_str())
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let path = step
+            .config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("读取文档需要 path 参数"))?;
         word_read(path).await
     }
@@ -56,11 +73,21 @@ pub struct WordWriteNode;
 
 #[async_trait]
 impl NodeExecutor for WordWriteNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("写入文档需要 path 参数"))?;
-        let mode = config.get("mode").and_then(|v| v.as_str()).unwrap_or("overwrite");
+        let mode = config
+            .get("mode")
+            .and_then(|v| v.as_str())
+            .unwrap_or("overwrite");
 
         let content = config.get("content");
         let paragraphs = match content {
@@ -88,9 +115,16 @@ pub struct WordCreateNode;
 
 #[async_trait]
 impl NodeExecutor for WordCreateNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("创建文档需要 path 参数"))?;
         let title = config.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let content = config.get("content");
@@ -107,9 +141,15 @@ impl NodeExecutor for WordCreateNode {
         // 如果有内容
         if let Some(c) = content {
             match c {
-                serde_json::Value::String(s) => { paras.push(serde_json::json!(s)); }
-                serde_json::Value::Array(arr) => { paras.extend(arr.clone()); }
-                _ => { paras.push(serde_json::json!(c.to_string())); }
+                serde_json::Value::String(s) => {
+                    paras.push(serde_json::json!(s));
+                }
+                serde_json::Value::Array(arr) => {
+                    paras.extend(arr.clone());
+                }
+                _ => {
+                    paras.push(serde_json::json!(c.to_string()));
+                }
             }
         }
 
@@ -124,11 +164,20 @@ pub struct WordReplaceNode;
 
 #[async_trait]
 impl NodeExecutor for WordReplaceNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let path = config.get("path").and_then(|v| v.as_str())
+        let path = config
+            .get("path")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("查找替换需要 path 参数"))?;
-        let find = config.get("find").and_then(|v| v.as_str())
+        let find = config
+            .get("find")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("查找替换需要 find 参数"))?;
         let replace = config.get("replace").and_then(|v| v.as_str()).unwrap_or("");
         let count = config.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -150,16 +199,26 @@ pub struct WordMergeNode;
 
 #[async_trait]
 impl NodeExecutor for WordMergeNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let output = config.get("output").and_then(|v| v.as_str()).unwrap_or("合并文档.docx");
+        let output = config
+            .get("output")
+            .and_then(|v| v.as_str())
+            .unwrap_or("合并文档.docx");
         let paths_str = config.get("paths").and_then(|v| v.as_str()).unwrap_or("");
         let files = config.get("files");
 
         let path_list: Vec<String> = if !paths_str.is_empty() {
             paths_str.split(',').map(|s| s.trim().to_string()).collect()
         } else if let Some(arr) = files.and_then(|v| v.as_array()) {
-            arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
         } else {
             return Err(anyhow!("合并文档需要 paths 或 files 参数"));
         };
@@ -184,22 +243,43 @@ struct Run {
 
 #[derive(Debug, Clone)]
 enum Block {
-    Paragraph { heading_level: Option<u32>, runs: Vec<Run> },
-    Table { rows: Vec<Vec<String>> },
+    Paragraph {
+        heading_level: Option<u32>,
+        runs: Vec<Run>,
+    },
+    Table {
+        rows: Vec<Vec<String>>,
+    },
     PageBreak,
 }
 
 impl Run {
     fn from_json(v: &serde_json::Value) -> Result<Self> {
         let obj = v.as_object().ok_or_else(|| anyhow!("run 必须是对象"))?;
-        let text = obj.get("text").and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("run 缺少 text 字段"))?.to_string();
+        let text = obj
+            .get("text")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("run 缺少 text 字段"))?
+            .to_string();
         let bold = obj.get("bold").and_then(|v| v.as_bool()).unwrap_or(false);
         let italic = obj.get("italic").and_then(|v| v.as_bool()).unwrap_or(false);
-        let underline = obj.get("underline").and_then(|v| v.as_bool()).unwrap_or(false);
+        let underline = obj
+            .get("underline")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let size = obj.get("size").and_then(|v| v.as_u64()).map(|v| v as u32);
-        let color = obj.get("color").and_then(|v| v.as_str()).map(|s| s.to_string());
-        Ok(Run { text, bold, italic, underline, size, color })
+        let color = obj
+            .get("color")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        Ok(Run {
+            text,
+            bold,
+            italic,
+            underline,
+            size,
+            color,
+        })
     }
 }
 
@@ -210,33 +290,71 @@ fn parse_paragraphs(paragraphs: &[serde_json::Value]) -> Result<Vec<Block>> {
             serde_json::Value::String(s) => {
                 blocks.push(Block::Paragraph {
                     heading_level: None,
-                    runs: vec![Run { text: s.clone(), bold: false, italic: false, underline: false, size: None, color: None }],
+                    runs: vec![Run {
+                        text: s.clone(),
+                        bold: false,
+                        italic: false,
+                        underline: false,
+                        size: None,
+                        color: None,
+                    }],
                 });
             }
             serde_json::Value::Object(obj) => {
-                let block_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("paragraph");
+                let block_type = obj
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("paragraph");
                 match block_type {
                     "paragraph" | "heading" => {
                         let heading_level = if block_type == "heading" {
                             obj.get("level").and_then(|v| v.as_u64()).map(|v| v as u32)
-                        } else { None };
-                        let runs_json = obj.get("runs").and_then(|v| v.as_array())
+                        } else {
+                            None
+                        };
+                        let runs_json = obj
+                            .get("runs")
+                            .and_then(|v| v.as_array())
                             .ok_or_else(|| anyhow!("段落/标题需要 runs 数组"))?;
-                        let runs: Vec<Run> = runs_json.iter().map(Run::from_json).collect::<Result<Vec<_>>>()?;
-                        if runs.is_empty() { return Err(anyhow!("段落/标题的 runs 不能为空")); }
-                        blocks.push(Block::Paragraph { heading_level, runs });
+                        let runs: Vec<Run> = runs_json
+                            .iter()
+                            .map(Run::from_json)
+                            .collect::<Result<Vec<_>>>()?;
+                        if runs.is_empty() {
+                            return Err(anyhow!("段落/标题的 runs 不能为空"));
+                        }
+                        blocks.push(Block::Paragraph {
+                            heading_level,
+                            runs,
+                        });
                     }
                     "table" => {
-                        let rows_json = obj.get("rows").and_then(|v| v.as_array())
+                        let rows_json = obj
+                            .get("rows")
+                            .and_then(|v| v.as_array())
                             .ok_or_else(|| anyhow!("表格需要 rows 数组"))?;
-                        let rows: Vec<Vec<String>> = rows_json.iter().map(|row| {
-                            row.as_array().ok_or_else(|| anyhow!("表格每行必须是数组"))
-                                .map(|arr| arr.iter().map(|c| c.as_str().unwrap_or(&c.to_string()).to_string()).collect())
-                        }).collect::<Result<Vec<_>>>()?;
-                        if rows.is_empty() { return Err(anyhow!("表格 rows 不能为空")); }
+                        let rows: Vec<Vec<String>> = rows_json
+                            .iter()
+                            .map(|row| {
+                                row.as_array()
+                                    .ok_or_else(|| anyhow!("表格每行必须是数组"))
+                                    .map(|arr| {
+                                        arr.iter()
+                                            .map(|c| {
+                                                c.as_str().unwrap_or(&c.to_string()).to_string()
+                                            })
+                                            .collect()
+                                    })
+                            })
+                            .collect::<Result<Vec<_>>>()?;
+                        if rows.is_empty() {
+                            return Err(anyhow!("表格 rows 不能为空"));
+                        }
                         blocks.push(Block::Table { rows });
                     }
-                    "pagebreak" => { blocks.push(Block::PageBreak); }
+                    "pagebreak" => {
+                        blocks.push(Block::PageBreak);
+                    }
                     _ => return Err(anyhow!("未知的段落类型: {}", block_type)),
                 }
             }
@@ -249,29 +367,60 @@ fn parse_paragraphs(paragraphs: &[serde_json::Value]) -> Result<Vec<Block>> {
 // ─── XML 生成 ───
 
 fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn run_to_xml(run: &Run) -> String {
     let mut rpr = String::new();
-    if run.bold { rpr.push_str("<w:b/><w:bCs/>"); }
-    if run.italic { rpr.push_str("<w:i/><w:iCs/>"); }
-    if run.underline { rpr.push_str(r#"<w:u w:val="single"/>"#); }
-    if let Some(size) = run.size { rpr.push_str(&format!(r#"<w:sz w:val="{}"/><w:szCs w:val="{}"/>"#, size, size)); }
-    if let Some(ref color) = run.color { rpr.push_str(&format!(r#"<w:color w:val="{}"/>"#, color)); }
-    let rpr_elem = if rpr.is_empty() { String::new() } else { format!("<w:rPr>{}</w:rPr>", rpr) };
-    format!(r#"<w:r>{}<w:t xml:space="preserve">{}</w:t></w:r>"#, rpr_elem, escape_xml(&run.text))
+    if run.bold {
+        rpr.push_str("<w:b/><w:bCs/>");
+    }
+    if run.italic {
+        rpr.push_str("<w:i/><w:iCs/>");
+    }
+    if run.underline {
+        rpr.push_str(r#"<w:u w:val="single"/>"#);
+    }
+    if let Some(size) = run.size {
+        rpr.push_str(&format!(
+            r#"<w:sz w:val="{}"/><w:szCs w:val="{}"/>"#,
+            size, size
+        ));
+    }
+    if let Some(ref color) = run.color {
+        rpr.push_str(&format!(r#"<w:color w:val="{}"/>"#, color));
+    }
+    let rpr_elem = if rpr.is_empty() {
+        String::new()
+    } else {
+        format!("<w:rPr>{}</w:rPr>", rpr)
+    };
+    format!(
+        r#"<w:r>{}<w:t xml:space="preserve">{}</w:t></w:r>"#,
+        rpr_elem,
+        escape_xml(&run.text)
+    )
 }
 
 fn paragraph_to_xml(block: &Block) -> String {
     match block {
-        Block::Paragraph { heading_level, runs } => {
+        Block::Paragraph {
+            heading_level,
+            runs,
+        } => {
             let mut ppr = String::new();
             if let Some(level) = heading_level {
                 let style = format!("Heading{}", (*level).min(6));
                 ppr.push_str(&format!(r#"<w:pStyle w:val="{}"/>"#, style));
             }
-            let ppr_elem = if ppr.is_empty() { String::new() } else { format!("<w:pPr>{}</w:pPr>", ppr) };
+            let ppr_elem = if ppr.is_empty() {
+                String::new()
+            } else {
+                format!("<w:pPr>{}</w:pPr>", ppr)
+            };
             let runs_xml: String = runs.iter().map(run_to_xml).collect();
             format!("<w:p>{}{}</w:p>", ppr_elem, runs_xml)
         }
@@ -281,8 +430,12 @@ fn paragraph_to_xml(block: &Block) -> String {
 }
 
 fn table_to_xml(rows: &[Vec<String>]) -> String {
-    let mut xml = String::from("<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"0\" w:type=\"auto\"/>");
-    xml.push_str("<w:tblBorders><w:top w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>");
+    let mut xml = String::from(
+        "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"0\" w:type=\"auto\"/>",
+    );
+    xml.push_str(
+        "<w:tblBorders><w:top w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>",
+    );
     xml.push_str("<w:left w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>");
     xml.push_str("<w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>");
     xml.push_str("<w:right w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>");
@@ -292,7 +445,10 @@ fn table_to_xml(rows: &[Vec<String>]) -> String {
     for row in rows {
         xml.push_str("<w:tr>");
         for cell in row {
-            xml.push_str(&format!(r#"<w:tc><w:p><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:tc>"#, escape_xml(cell)));
+            xml.push_str(&format!(
+                r#"<w:tc><w:p><w:r><w:t xml:space="preserve">{}</w:t></w:r></w:p></w:tc>"#,
+                escape_xml(cell)
+            ));
         }
         xml.push_str("</w:tr>");
     }
@@ -300,14 +456,19 @@ fn table_to_xml(rows: &[Vec<String>]) -> String {
     xml
 }
 
-fn blocks_to_body_xml(blocks: &[Block]) -> String { blocks.iter().map(paragraph_to_xml).collect() }
+fn blocks_to_body_xml(blocks: &[Block]) -> String {
+    blocks.iter().map(paragraph_to_xml).collect()
+}
 
 fn build_document_xml_from_blocks(blocks: &[Block]) -> String {
     let body = blocks_to_body_xml(blocks);
-    format!(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:body>{}</w:body>
-</w:document>"#, body)
+</w:document>"#,
+        body
+    )
 }
 
 // ─── 操作函数 ───
@@ -328,34 +489,46 @@ pub async fn word_read(path: &str) -> Result<serde_json::Value> {
 
 pub async fn word_write(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let paragraphs = config.get("paragraphs").and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("write 需要 paragraphs 参数"))?.clone();
+    let paragraphs = config
+        .get("paragraphs")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("write 需要 paragraphs 参数"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let blocks = parse_paragraphs(&paragraphs)?;
         let doc_xml = build_document_xml_from_blocks(&blocks);
         create_docx(&path, &doc_xml)?;
         Ok(serde_json::json!({ "path": path, "paragraphs_written": blocks.len() }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 async fn word_append(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let paragraphs = config.get("paragraphs").and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow!("append 需要 paragraphs 参数"))?.clone();
+    let paragraphs = config
+        .get("paragraphs")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("append 需要 paragraphs 参数"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let existing_xml = {
             let file = std::fs::File::open(&path)?;
-            let mut archive = zip::ZipArchive::new(file).map_err(|e| anyhow!("打开 docx 失败: {}", e))?;
+            let mut archive =
+                zip::ZipArchive::new(file).map_err(|e| anyhow!("打开 docx 失败: {}", e))?;
             let mut xml = String::new();
-            archive.by_name("word/document.xml")?.read_to_string(&mut xml)?;
+            archive
+                .by_name("word/document.xml")?
+                .read_to_string(&mut xml)?;
             xml
         };
         let blocks = parse_paragraphs(&paragraphs)?;
         let new_xml = blocks_to_body_xml(&blocks);
         let body_close = "</w:body>";
-        let insert_pos = existing_xml.rfind(body_close)
+        let insert_pos = existing_xml
+            .rfind(body_close)
             .ok_or_else(|| anyhow!("docx XML 格式异常：找不到 </w:body>"))?;
         let mut combined_xml = String::with_capacity(existing_xml.len() + new_xml.len());
         combined_xml.push_str(&existing_xml[..insert_pos]);
@@ -363,34 +536,52 @@ async fn word_append(path: &str, config: &serde_json::Value) -> Result<serde_jso
         combined_xml.push_str(&existing_xml[insert_pos..]);
         rewrite_docx_document_xml(&path, &combined_xml)?;
         Ok(serde_json::json!({ "path": path, "appended": blocks.len() }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 pub async fn word_replace(path: &str, config: &serde_json::Value) -> Result<serde_json::Value> {
     let path = path.to_string();
-    let output_path = config.get("output").and_then(|v| v.as_str()).map(String::from)
+    let output_path = config
+        .get("output")
+        .and_then(|v| v.as_str())
+        .map(String::from)
         .unwrap_or_else(|| {
             let p = std::path::Path::new(&path);
             let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
             let parent = p.parent().and_then(|p| p.to_str()).unwrap_or(".");
-            format!("{}_output.docx", std::path::Path::new(parent).join(stem).display())
+            format!(
+                "{}_output.docx",
+                std::path::Path::new(parent).join(stem).display()
+            )
         });
-    let replacements = config.get("replacements").and_then(|v| v.as_object())
-        .ok_or_else(|| anyhow!("replace 需要 replacements 参数"))?.clone();
+    let replacements = config
+        .get("replacements")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| anyhow!("replace 需要 replacements 参数"))?
+        .clone();
 
     tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
         let existing_xml = {
             let file = std::fs::File::open(&path)?;
-            let mut archive = zip::ZipArchive::new(file).map_err(|e| anyhow!("打开 docx 失败: {}", e))?;
+            let mut archive =
+                zip::ZipArchive::new(file).map_err(|e| anyhow!("打开 docx 失败: {}", e))?;
             let mut xml = String::new();
-            archive.by_name("word/document.xml")?.read_to_string(&mut xml)?;
+            archive
+                .by_name("word/document.xml")?
+                .read_to_string(&mut xml)?;
             xml
         };
         let mut replaced_xml = existing_xml.clone();
         let mut replaced_count = 0;
         for (placeholder, value) in &replacements {
             let val_str = value.as_str().unwrap_or("");
-            let val_owned = if val_str.is_empty() { value.to_string() } else { val_str.to_string() };
+            let val_owned = if val_str.is_empty() {
+                value.to_string()
+            } else {
+                val_str.to_string()
+            };
             let escaped_val = escape_xml(&val_owned);
             let escaped_placeholder = escape_xml(placeholder);
 
@@ -409,7 +600,9 @@ pub async fn word_replace(path: &str, config: &serde_json::Value) -> Result<serd
         }
         create_docx_from_existing(&path, &output_path, &replaced_xml)?;
         Ok(serde_json::json!({ "path": output_path, "replaced": replaced_count }))
-    }).await.map_err(|e| anyhow!("任务执行失败: {}", e))?
+    })
+    .await
+    .map_err(|e| anyhow!("任务执行失败: {}", e))?
 }
 
 /// 合并多个 docx 文件
@@ -452,12 +645,16 @@ pub async fn word_merge_files(paths: &[String], output: &str) -> Result<serde_js
 
 fn create_docx_from_existing(src_path: &str, dst_path: &str, new_document_xml: &str) -> Result<()> {
     let src_file = std::fs::File::open(src_path)?;
-    let mut src_archive = zip::ZipArchive::new(src_file).map_err(|e| anyhow!("打开源 docx 失败: {}", e))?;
+    let mut src_archive =
+        zip::ZipArchive::new(src_file).map_err(|e| anyhow!("打开源 docx 失败: {}", e))?;
     let dst_file = std::fs::File::create(dst_path)?;
     let mut dst_zip = zip::ZipWriter::new(dst_file);
-    let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     for i in 0..src_archive.len() {
-        let mut entry = src_archive.by_index(i).map_err(|e| anyhow!("读取 zip 条目失败: {}", e))?;
+        let mut entry = src_archive
+            .by_index(i)
+            .map_err(|e| anyhow!("读取 zip 条目失败: {}", e))?;
         let name = entry.name().to_string();
         if name == "word/document.xml" {
             dst_zip.start_file(&name, options)?;
@@ -489,10 +686,14 @@ fn extract_paragraphs_text(xml: &str) -> Vec<String> {
             let tag_end = xml[i..].find('>').map(|p| i + p).unwrap_or(xml.len());
             let tag = &xml[i..=tag_end];
             if tag.starts_with("<w:p>") || tag.starts_with("<w:p ") {
-                in_p = true; current_text.clear();
+                in_p = true;
+                current_text.clear();
             } else if tag == "</w:p>" {
-                if in_p { paragraphs.push(current_text.clone()); }
-                in_p = false; current_text.clear();
+                if in_p {
+                    paragraphs.push(current_text.clone());
+                }
+                in_p = false;
+                current_text.clear();
             }
         } else if in_p {
             let before = &xml[..i];
@@ -509,7 +710,8 @@ fn extract_paragraphs_text(xml: &str) -> Vec<String> {
 fn create_docx(path: &str, document_xml: &str) -> Result<()> {
     let file = std::fs::File::create(path)?;
     let mut zip = zip::ZipWriter::new(file);
-    let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let options =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     // [Content_Types].xml
     zip.start_file("[Content_Types].xml", options)?;

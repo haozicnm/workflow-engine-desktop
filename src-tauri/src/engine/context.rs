@@ -1,7 +1,7 @@
 // engine/context.rs — 执行上下文
 use crate::engine::workflow::Workflow;
-use std::collections::HashMap;
 use anyhow::Result;
+use std::collections::HashMap;
 use tracing::warn;
 use uuid::Uuid;
 
@@ -53,14 +53,15 @@ impl ExecutionContext {
 
     /// v4.1: 打开容器 session（幂等 — 已存在则返回已有 session）
     pub fn open_session(&mut self, node_id: &str, node_type: &str) -> &ContainerSession {
-        let session = self.sessions.entry(node_id.to_string()).or_insert_with(|| {
-            ContainerSession {
-                session_id: format!("{}-{}", node_id, Uuid::new_v4()),
-                node_id: node_id.to_string(),
-                node_type: node_type.to_string(),
-                status: SessionStatus::Created,
-            }
-        });
+        let session =
+            self.sessions
+                .entry(node_id.to_string())
+                .or_insert_with(|| ContainerSession {
+                    session_id: format!("{}-{}", node_id, Uuid::new_v4()),
+                    node_id: node_id.to_string(),
+                    node_type: node_type.to_string(),
+                    status: SessionStatus::Created,
+                });
         if session.status == SessionStatus::Created {
             session.status = SessionStatus::Running;
         }
@@ -111,7 +112,8 @@ impl ExecutionContext {
                 scope.push(format!("step_{}", stem), dynamic);
             }
 
-            let result = engine.eval_with_scope::<rhai::Dynamic>(&mut scope, expr)
+            let result = engine
+                .eval_with_scope::<rhai::Dynamic>(&mut scope, expr)
                 .map_err(|e| {
                     eprintln!("[eval_expr DEBUG] expr='{}'", expr);
                     for (k, _, _) in scope.iter() {
@@ -152,9 +154,8 @@ impl ExecutionContext {
                 serde_json::Value::Object(new_map)
             }
             serde_json::Value::Array(arr) => {
-                let new_arr: Vec<serde_json::Value> = arr.iter()
-                    .map(|v| self.resolve_config(v))
-                    .collect();
+                let new_arr: Vec<serde_json::Value> =
+                    arr.iter().map(|v| self.resolve_config(v)).collect();
                 serde_json::Value::Array(new_arr)
             }
             other => other.clone(),
@@ -164,7 +165,7 @@ impl ExecutionContext {
     fn resolve_string(&self, s: &str) -> serde_json::Value {
         let trimmed = s.trim();
         if trimmed.starts_with("{{") && trimmed.ends_with("}}") && trimmed.len() > 4 {
-            let inner = trimmed[2..trimmed.len()-2].trim();
+            let inner = trimmed[2..trimmed.len() - 2].trim();
             if !inner.contains("{{") {
                 if let Some(val) = self.resolve_var(inner) {
                     return val.clone();

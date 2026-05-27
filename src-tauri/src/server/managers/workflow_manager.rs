@@ -4,14 +4,14 @@
 
 use axum::{
     extract::Path,
-    response::{Response, Json},
     http::StatusCode,
+    response::{Json, Response},
 };
 use serde::Deserialize;
 use tracing::warn;
 
-use crate::server::handlers::{ok_response, err_response, map_err_resp, map_not_found_resp};
 use crate::server::events;
+use crate::server::handlers::{err_response, map_err_resp, map_not_found_resp, ok_response};
 use crate::server::state;
 
 // ═══════════════════════════════════════════════════════════
@@ -77,15 +77,16 @@ pub struct WorkflowCreateFromRecordingBody {
 // 工作流 CRUD handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn workflow_list(
-) -> Response {
+pub async fn workflow_list() -> Response {
     let app = state::get();
-    map_err_resp(app.db.list_workflows().map_err(|e| format!("Failed to list workflows: {e}")))
+    map_err_resp(
+        app.db
+            .list_workflows()
+            .map_err(|e| format!("Failed to list workflows: {e}")),
+    )
 }
 
-pub async fn workflow_create(
-    Json(body): Json<WorkflowCreateBody>,
-) -> Response {
+pub async fn workflow_create(Json(body): Json<WorkflowCreateBody>) -> Response {
     let app = state::get();
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
@@ -98,22 +99,30 @@ pub async fn workflow_create(
         &now,
     ) {
         Ok(()) => {
-            events::emit("workflow-changed", serde_json::json!({
-                "action": "create",
-                "workflow_id": &id,
-                "workflow_name": &body.name,
-            }));
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": "create",
+                    "workflow_id": &id,
+                    "workflow_name": &body.name,
+                }),
+            );
             ok_response(serde_json::json!({ "id": id }))
         }
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create workflow (name={}): {e}", body.name)),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create workflow (name={}): {e}", body.name),
+        ),
     }
 }
 
-pub async fn workflow_get(
-    Path(id): Path<String>,
-) -> Response {
+pub async fn workflow_get(Path(id): Path<String>) -> Response {
     let app = state::get();
-    map_not_found_resp(app.db.get_workflow(&id).map_err(|e| format!("Failed to get workflow (id={id}): {e}")))
+    map_not_found_resp(
+        app.db
+            .get_workflow(&id)
+            .map_err(|e| format!("Failed to get workflow (id={id}): {e}")),
+    )
 }
 
 pub async fn workflow_update(
@@ -122,21 +131,31 @@ pub async fn workflow_update(
 ) -> Response {
     let app = state::get();
     let now = chrono::Utc::now().to_rfc3339();
-    match app.db.update_workflow(&id, body.name.as_deref(), body.description.as_deref(), body.enabled, &now) {
+    match app.db.update_workflow(
+        &id,
+        body.name.as_deref(),
+        body.description.as_deref(),
+        body.enabled,
+        &now,
+    ) {
         Ok(()) => {
-            events::emit("workflow-changed", serde_json::json!({
-                "action": "update",
-                "workflow_id": &id,
-            }));
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": "update",
+                    "workflow_id": &id,
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to update workflow (id={id}): {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to update workflow (id={id}): {e}"),
+        ),
     }
 }
 
-pub async fn workflow_delete(
-    Path(id): Path<String>,
-) -> Response {
+pub async fn workflow_delete(Path(id): Path<String>) -> Response {
     let app = state::get();
     let wf = match app.db.get_workflow(&id) {
         Ok(Some(wf)) => wf,
@@ -148,32 +167,41 @@ pub async fn workflow_delete(
     }
     match app.db.delete_workflow(&id) {
         Ok(()) => {
-            events::emit("workflow-changed", serde_json::json!({
-                "action": "delete",
-                "workflow_id": &id,
-            }));
-            ok_response(serde_json::json!({ "success": true }))
-        }
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to delete workflow (id={id}): {e}")),
-    }
-}
-
-pub async fn workflow_lock(
-    Path(id): Path<String>,
-    Json(body): Json<WorkflowLockBody>,
-) -> Response {
-    let app = state::get();
-    match app.db.set_workflow_locked(&id, body.locked) {
-        Ok(()) => {
-            events::emit("workflow-changed", serde_json::json!({
-                "action": if body.locked { "lock" } else { "unlock" },
-                "workflow_id": &id,
-            }));
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": "delete",
+                    "workflow_id": &id,
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
         Err(e) => err_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to {} workflow: {e}", if body.locked { "lock" } else { "unlock" }),
+            format!("Failed to delete workflow (id={id}): {e}"),
+        ),
+    }
+}
+
+pub async fn workflow_lock(Path(id): Path<String>, Json(body): Json<WorkflowLockBody>) -> Response {
+    let app = state::get();
+    match app.db.set_workflow_locked(&id, body.locked) {
+        Ok(()) => {
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": if body.locked { "lock" } else { "unlock" },
+                    "workflow_id": &id,
+                }),
+            );
+            ok_response(serde_json::json!({ "success": true }))
+        }
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!(
+                "Failed to {} workflow: {e}",
+                if body.locked { "lock" } else { "unlock" }
+            ),
         ),
     }
 }
@@ -185,13 +213,21 @@ pub async fn workflow_save_yaml(
     let app = state::get();
     let wf = match crate::engine::parser::parse_workflow(&body.yaml) {
         Ok(wf) => wf,
-        Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("Failed to parse workflow YAML: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::BAD_REQUEST,
+                format!("Failed to parse workflow YAML: {e}"),
+            )
+        }
     };
     let validation = crate::engine::validate::validate_workflow(&wf);
     if !validation.valid {
         return err_response(
             StatusCode::BAD_REQUEST,
-            format!("Workflow validation failed:\n{}", validation.errors.join("\n")),
+            format!(
+                "Workflow validation failed:\n{}",
+                validation.errors.join("\n")
+            ),
         );
     }
     if !validation.warnings.is_empty() {
@@ -202,19 +238,23 @@ pub async fn workflow_save_yaml(
 
     match app.db.save_workflow_yaml(&id, &body.yaml) {
         Ok(()) => {
-            events::emit("workflow-changed", serde_json::json!({
-                "action": "save",
-                "workflow_id": &id,
-            }));
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": "save",
+                    "workflow_id": &id,
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save workflow YAML (id={id}): {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to save workflow YAML (id={id}): {e}"),
+        ),
     }
 }
 
-pub async fn workflow_validate(
-    Json(body): Json<WorkflowValidateBody>,
-) -> Response {
+pub async fn workflow_validate(Json(body): Json<WorkflowValidateBody>) -> Response {
     match crate::engine::parser::parse_workflow(&body.yaml) {
         Ok(wf) => ok_response(serde_json::json!({
             "valid": true,
@@ -230,9 +270,7 @@ pub async fn workflow_validate(
     }
 }
 
-pub async fn workflow_auto_order(
-    Json(body): Json<WorkflowAutoOrderBody>,
-) -> Response {
+pub async fn workflow_auto_order(Json(body): Json<WorkflowAutoOrderBody>) -> Response {
     let wf = match crate::engine::parser::parse_workflow(&body.yaml) {
         Ok(wf) => wf,
         Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("解析工作流失败: {e}")),
@@ -244,36 +282,38 @@ pub async fn workflow_auto_order(
     }))
 }
 
-pub async fn workflow_export(
-    Json(body): Json<WorkflowExportBody>,
-) -> Response {
+pub async fn workflow_export(Json(body): Json<WorkflowExportBody>) -> Response {
     use crate::engine::workflow::Step;
 
-    let steps: Vec<Step> = body.nodes.iter().map(|n| {
-        let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
-        let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-        let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
+    let steps: Vec<Step> = body
+        .nodes
+        .iter()
+        .map(|n| {
+            let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+            let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
 
-        Step {
-            id: id.to_string(),
-            name: label.to_string(),
-            step_type: node_type.to_string(),
-            config,
-            next: None,
-            retry: None,
-            timeout: None,
-            body_steps: None,
-            breakpoint: false,
-            delay: None,
-            on_error: None,
-            actions: None,
-            expanded: None,
-            condition: None,
-            condition_group: None,
-            run_condition: None,
-        }
-    }).collect();
+            Step {
+                id: id.to_string(),
+                name: label.to_string(),
+                step_type: node_type.to_string(),
+                config,
+                next: None,
+                retry: None,
+                timeout: None,
+                body_steps: None,
+                breakpoint: false,
+                delay: None,
+                on_error: None,
+                actions: None,
+                expanded: None,
+                condition: None,
+                condition_group: None,
+                run_condition: None,
+            }
+        })
+        .collect();
 
     let vars: Option<std::collections::HashMap<String, serde_json::Value>> =
         body.variables.and_then(|v| serde_json::from_value(v).ok());
@@ -287,31 +327,45 @@ pub async fn workflow_export(
 
     let mut yaml_value = match serde_yaml::to_value(&wf) {
         Ok(v) => v,
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("序列化 YAML 失败: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("序列化 YAML 失败: {e}"),
+            )
+        }
     };
 
     if !body.edges.is_empty() {
         if let Some(map) = yaml_value.as_mapping_mut() {
             if let Ok(edges_yaml) = serde_yaml::to_value(&body.edges) {
-                map.insert(
-                    serde_yaml::Value::String("edges".to_string()),
-                    edges_yaml,
-                );
+                map.insert(serde_yaml::Value::String("edges".to_string()), edges_yaml);
             }
         }
     }
 
     let yaml_str = match serde_yaml::to_string(&yaml_value) {
         Ok(s) => s,
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("生成 YAML 失败: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("生成 YAML 失败: {e}"),
+            )
+        }
     };
 
     let final_path = if let Some(path) = body.output_path {
         std::path::PathBuf::from(&path)
     } else {
-        let sanitized: String = body.name
+        let sanitized: String = body
+            .name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         std::env::current_dir()
             .unwrap_or_default()
@@ -320,12 +374,18 @@ pub async fn workflow_export(
 
     if let Some(parent) = final_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {e}"));
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to create directory: {e}"),
+            );
         }
     }
 
     if let Err(e) = std::fs::write(&final_path, &yaml_str) {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("写入文件失败: {e}"));
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("写入文件失败: {e}"),
+        );
     }
 
     ok_response(serde_json::json!({
@@ -337,9 +397,7 @@ pub async fn workflow_export(
     }))
 }
 
-pub async fn workflow_import(
-    Json(body): Json<WorkflowImportBody>,
-) -> Response {
+pub async fn workflow_import(Json(body): Json<WorkflowImportBody>) -> Response {
     use crate::engine::workflow::Workflow;
 
     let wf: Workflow = match serde_yaml::from_str(&body.yaml_content) {
@@ -353,16 +411,22 @@ pub async fn workflow_import(
             .and_then(|v| v.get("edges").cloned())
             .and_then(|e| serde_yaml::from_value(e).ok());
 
-    let nodes_json: Vec<serde_json::Value> = wf.steps.iter().map(|s| {
-        serde_json::json!({
-            "id": s.id,
-            "type": s.step_type,
-            "label": s.name,
-            "config": s.config,
+    let nodes_json: Vec<serde_json::Value> = wf
+        .steps
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "id": s.id,
+                "type": s.step_type,
+                "label": s.name,
+                "config": s.config,
+            })
         })
-    }).collect();
+        .collect();
 
-    let variables_json = wf.variables.map(|v| serde_json::to_value(v).unwrap_or_default());
+    let variables_json = wf
+        .variables
+        .map(|v| serde_json::to_value(v).unwrap_or_default());
 
     ok_response(serde_json::json!({
         "success": true,
@@ -381,7 +445,8 @@ pub async fn workflow_create_from_recording(
     let app = state::get();
     use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
 
-    let recorded_actions: Vec<RecordedAction> = body.actions
+    let recorded_actions: Vec<RecordedAction> = body
+        .actions
         .iter()
         .filter_map(|a| serde_json::from_value(a.clone()).ok())
         .collect();
@@ -393,20 +458,34 @@ pub async fn workflow_create_from_recording(
     };
 
     let conversion = recording_converter::convert_actions_to_workflow(
-        &recorded_actions, &body.workflow_name, src,
+        &recorded_actions,
+        &body.workflow_name,
+        src,
     );
 
     if conversion.yaml.is_empty() {
-        return err_response(StatusCode::BAD_REQUEST, "Recording is empty, cannot generate workflow");
+        return err_response(
+            StatusCode::BAD_REQUEST,
+            "Recording is empty, cannot generate workflow",
+        );
     }
 
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    if let Err(e) = app.db.create_workflow(&id, &body.workflow_name, "由录制操作生成", &now, &now) {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create workflow: {e}"));
+    if let Err(e) = app
+        .db
+        .create_workflow(&id, &body.workflow_name, "由录制操作生成", &now, &now)
+    {
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to create workflow: {e}"),
+        );
     }
     if let Err(e) = app.db.save_workflow_yaml(&id, &conversion.yaml) {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save workflow YAML: {e}"));
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to save workflow YAML: {e}"),
+        );
     }
 
     ok_response(serde_json::json!({

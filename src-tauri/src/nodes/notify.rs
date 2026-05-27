@@ -1,12 +1,12 @@
 // nodes/notify.rs — 通知节点
 // 支持：系统通知、Webhook
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use tracing::{info, warn};
 
 /// Windows: 禁止子进程弹出 cmd 窗口
@@ -25,26 +25,37 @@ pub struct NotifyNode;
 
 #[async_trait]
 impl NodeExecutor for NotifyNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let notify_type = config.get("notify_type")
+        let notify_type = config
+            .get("notify_type")
             .and_then(|v| v.as_str())
             .unwrap_or("system");
 
         match notify_type {
             "system" => send_system_notification(config).await,
             "webhook" => send_webhook(config).await,
-            _ => Err(anyhow!("不支持的通知类型: {}（支持 system / webhook）", notify_type)),
+            _ => Err(anyhow!(
+                "不支持的通知类型: {}（支持 system / webhook）",
+                notify_type
+            )),
         }
     }
 }
 
 /// 发送系统桌面通知
 async fn send_system_notification(config: &serde_json::Value) -> Result<serde_json::Value> {
-    let title = config.get("title")
+    let title = config
+        .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Workflow Engine");
-    let body = config.get("body")
+    let body = config
+        .get("body")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("系统通知缺少 body 参数"))?;
 
@@ -98,15 +109,18 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 
 /// 发送 Webhook 请求
 async fn send_webhook(config: &serde_json::Value) -> Result<serde_json::Value> {
-    let url = config.get("url")
+    let url = config
+        .get("url")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("Webhook 缺少 url 参数"))?;
 
-    let method = config.get("method")
+    let method = config
+        .get("method")
         .and_then(|v| v.as_str())
         .unwrap_or("POST");
 
-    let body = config.get("data")
+    let body = config
+        .get("data")
         .cloned()
         .unwrap_or_else(|| serde_json::json!({}));
 
@@ -132,12 +146,15 @@ async fn send_webhook(config: &serde_json::Value) -> Result<serde_json::Value> {
         req = req.json(&body);
     }
 
-    let resp = req.send().await.map_err(|e| anyhow!("Webhook 请求失败: {}", e))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| anyhow!("Webhook 请求失败: {}", e))?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
 
-    let resp_body = serde_json::from_str::<serde_json::Value>(&text)
-        .unwrap_or(serde_json::Value::String(text));
+    let resp_body =
+        serde_json::from_str::<serde_json::Value>(&text).unwrap_or(serde_json::Value::String(text));
 
     Ok(serde_json::json!({
         "type": "webhook",

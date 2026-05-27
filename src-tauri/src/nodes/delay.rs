@@ -1,12 +1,12 @@
 // nodes/delay.rs — 延时节点：暂停执行指定时长
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use serde_json::json;
+use std::sync::Arc;
 use tracing::info;
 
 #[derive(Default)]
@@ -20,11 +20,15 @@ impl NodeExecutor for DelayNode {
         _ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value> {
-        let duration_ms = step.config.get("duration_ms")
+        let duration_ms = step
+            .config
+            .get("duration_ms")
             .and_then(|v| v.as_u64())
             .unwrap_or(1000);
 
-        let max_duration = step.config.get("max_duration_ms")
+        let max_duration = step
+            .config
+            .get("max_duration_ms")
             .and_then(|v| v.as_u64())
             .unwrap_or(300_000); // 默认最大 5 分钟
 
@@ -37,8 +41,7 @@ impl NodeExecutor for DelayNode {
         }
 
         info!("延时 {}ms ({}秒)", duration_ms, duration_ms as f64 / 1000.0);
-        tokio::time::sleep(std::time::Duration::from_millis(duration_ms))
-            .await;
+        tokio::time::sleep(std::time::Duration::from_millis(duration_ms)).await;
 
         Ok(json!({
             "duration_ms": duration_ms,

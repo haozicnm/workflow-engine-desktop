@@ -1,14 +1,14 @@
-use std::sync::Arc;
 use axum::{
     extract::{Path, Query},
-    response::{Response, Json},
     http::StatusCode,
+    response::{Json, Response},
 };
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, error};
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
-use crate::server::handlers::{ok_response, err_response, map_err_resp};
 use crate::server::events;
+use crate::server::handlers::{err_response, map_err_resp, ok_response};
 
 // ═══════════════════════════════════════════════════════════
 // Request body types
@@ -40,9 +40,7 @@ pub struct RunListQuery {
 // 执行控制 handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn run_start(
-    Json(body): Json<RunStartBody>,
-) -> Response {
+pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
     let app = crate::server::state::get();
     let workflow_id = body.workflow_id;
 
@@ -63,7 +61,10 @@ pub async fn run_start(
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let workflow_name = workflow.name.clone();
-    if let Err(e) = app.db.create_run(&run_id, &workflow_id, &workflow_name, &now) {
+    if let Err(e) = app
+        .db
+        .create_run(&run_id, &workflow_id, &workflow_name, &now)
+    {
         return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
     }
 
@@ -90,19 +91,37 @@ pub async fn run_start(
         }
     };
 
-    app.cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
-    app.cancel_tokens.write().await.insert(run_id.clone(), cancel_token.clone());
-    app.pause_flags.write().await.insert(run_id.clone(), pause_flag.clone());
-    app.breakpoint_flags.write().await.insert(run_id.clone(), breakpoint_flag.clone());
-    app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
+    app.cancel_flags
+        .write()
+        .await
+        .insert(run_id.clone(), cancel_flag.clone());
+    app.cancel_tokens
+        .write()
+        .await
+        .insert(run_id.clone(), cancel_token.clone());
+    app.pause_flags
+        .write()
+        .await
+        .insert(run_id.clone(), pause_flag.clone());
+    app.breakpoint_flags
+        .write()
+        .await
+        .insert(run_id.clone(), breakpoint_flag.clone());
+    app.step_mode_flags
+        .write()
+        .await
+        .insert(run_id.clone(), step_mode_flag.clone());
 
     // 6. 发射 run 启动事件
-    events::emit("run-update", serde_json::json!({
-        "run_id": &run_id,
-        "workflow_id": &workflow_id,
-        "workflow_name": &workflow_name,
-        "status": "running",
-    }));
+    events::emit(
+        "run-update",
+        serde_json::json!({
+            "run_id": &run_id,
+            "workflow_id": &workflow_id,
+            "workflow_name": &workflow_name,
+            "status": "running",
+        }),
+    );
 
     // 7. 后台异步执行
     let db = app.db.clone();
@@ -130,14 +149,24 @@ pub async fn run_start(
         let result = tokio::time::timeout(
             global_timeout,
             crate::engine::scheduler::run_workflow(
-                &workflow, &run_id_clone, None, &db, approval_store, &browser_channel, &[], &ctrl,
+                &workflow,
+                &run_id_clone,
+                None,
+                &db,
+                approval_store,
+                &browser_channel,
+                &[],
+                &ctrl,
             ),
-        ).await;
+        )
+        .await;
         let result = match result {
             Ok(r) => r,
             Err(_elapsed) => {
                 warn!("Workflow global timeout (30min): {}", run_id_clone);
-                Err(anyhow::anyhow!("Workflow execution timeout (exceeded 30 minutes)"))
+                Err(anyhow::anyhow!(
+                    "Workflow execution timeout (exceeded 30 minutes)"
+                ))
             }
         };
 
@@ -154,8 +183,21 @@ pub async fn run_start(
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
-                error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
+                let status = if err_msg.contains("cancelled") {
+                    "cancelled"
+                } else {
+                    "failed"
+                };
+                error!(
+                    "工作流{}: {} - {}",
+                    if status == "cancelled" {
+                        "已取消"
+                    } else {
+                        "执行失败"
+                    },
+                    run_id_clone,
+                    err_msg
+                );
             }
         }
     });
@@ -163,9 +205,7 @@ pub async fn run_start(
     ok_response(serde_json::json!({ "run_id": run_id }))
 }
 
-pub async fn run_cancel(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_cancel(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let flags = app.cancel_flags.read().await;
     let tokens = app.cancel_tokens.read().await;
@@ -183,47 +223,47 @@ pub async fn run_cancel(
     }
 }
 
-pub async fn run_pause(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_pause(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let flags = app.pause_flags.read().await;
     match flags.get(&run_id) {
         Some(flag) => {
             use std::sync::atomic::Ordering;
             flag.store(true, Ordering::Relaxed);
-            events::emit("run-update", serde_json::json!({
-                "run_id": &run_id,
-                "status": "paused",
-            }));
+            events::emit(
+                "run-update",
+                serde_json::json!({
+                    "run_id": &run_id,
+                    "status": "paused",
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
         None => err_response(StatusCode::NOT_FOUND, "运行不存在或已结束"),
     }
 }
 
-pub async fn run_resume(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_resume(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let flags = app.pause_flags.read().await;
     match flags.get(&run_id) {
         Some(flag) => {
             use std::sync::atomic::Ordering;
             flag.store(false, Ordering::Relaxed);
-            events::emit("run-update", serde_json::json!({
-                "run_id": &run_id,
-                "status": "running",
-            }));
+            events::emit(
+                "run-update",
+                serde_json::json!({
+                    "run_id": &run_id,
+                    "status": "running",
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
         None => err_response(StatusCode::NOT_FOUND, "运行不存在或已结束"),
     }
 }
 
-pub async fn run_status(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_status(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let run = match app.db.get_run(&run_id) {
         Ok(Some(r)) => r,
@@ -241,19 +281,16 @@ pub async fn run_status(
     }))
 }
 
-pub async fn run_list(
-    Query(query): Query<RunListQuery>,
-) -> Response {
+pub async fn run_list(Query(query): Query<RunListQuery>) -> Response {
     let app = crate::server::state::get();
-    map_err_resp(app.db.list_runs(
-        query.workflow_id.as_deref(),
-        query.limit.unwrap_or(50),
-    ).map_err(|e| e.to_string()))
+    map_err_resp(
+        app.db
+            .list_runs(query.workflow_id.as_deref(), query.limit.unwrap_or(50))
+            .map_err(|e| e.to_string()),
+    )
 }
 
-pub async fn run_detail(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_detail(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     match app.db.get_run_detail(&run_id) {
         Ok(Some(detail)) => ok_response(detail),
@@ -262,10 +299,7 @@ pub async fn run_detail(
     }
 }
 
-pub async fn run_logs(
-    Path(run_id): Path<String>,
-    Query(query): Query<RunLogsQuery>,
-) -> Response {
+pub async fn run_logs(Path(run_id): Path<String>, Query(query): Query<RunLogsQuery>) -> Response {
     let app = crate::server::state::get();
     let mut steps = match app.db.get_step_runs(&run_id) {
         Ok(s) => s,
@@ -290,9 +324,7 @@ pub async fn run_logs(
     }))
 }
 
-pub async fn run_step_logs(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn run_step_logs(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     map_err_resp(app.db.get_step_logs(&run_id).map_err(|e| e.to_string()))
 }

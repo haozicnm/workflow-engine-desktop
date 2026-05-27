@@ -1,15 +1,15 @@
 // engine/scheduler.rs — 工作流调度器
-use crate::engine::workflow::{Workflow, Step};
+use crate::data::db::Database;
+use crate::engine::approval_store::ApprovalStore;
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
-use crate::engine::state::RunState;
-use crate::engine::approval_store::ApprovalStore;
 use crate::engine::preview;
-use crate::data::db::Database;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use crate::engine::state::RunState;
+use crate::engine::workflow::{Step, Workflow};
 use anyhow::Result;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 #[cfg(feature = "gui")]
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
@@ -22,7 +22,8 @@ pub struct RunControl {
     pub pause_flag: Arc<AtomicBool>,
     pub breakpoint_flag: Arc<AtomicBool>,
     pub step_mode_flag: Arc<AtomicBool>,
-    pub debug_snapshots: Arc<tokio::sync::RwLock<std::collections::HashMap<String, serde_json::Value>>>,
+    pub debug_snapshots:
+        Arc<tokio::sync::RwLock<std::collections::HashMap<String, serde_json::Value>>>,
 }
 
 /// 执行工作流（入口函数，由 commands/run.rs 调用）
@@ -62,7 +63,9 @@ pub async fn run_workflow(
 
     if workflow.steps.is_empty() {
         state.mark_completed();
-        if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
+        if let Err(e) = db.update_run_status(run_id, "completed", None) {
+            warn!("DB update failed: {}", e);
+        }
         emit_run_update(app_handle, run_id, &workflow_name, "completed");
         return Ok(state);
     }
@@ -75,7 +78,9 @@ pub async fn run_workflow(
     preview::start_live_session(run_id, &workflow_name, total_steps);
 
     // 预构建步骤 ID → 索引映射，避免循环中 O(n) 查找
-    let step_index: std::collections::HashMap<&str, usize> = workflow.steps.iter()
+    let step_index: std::collections::HashMap<&str, usize> = workflow
+        .steps
+        .iter()
         .enumerate()
         .map(|(i, s)| (s.id.as_str(), i))
         .collect();
@@ -86,7 +91,9 @@ pub async fn run_workflow(
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
             state.mark_failed();
-            if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
+            if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("DB update failed: {}", e);
+            }
             emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
             preview::stop_live_session(run_id, "cancelled");
             return Err(anyhow::anyhow!("cancelled"));
@@ -108,18 +115,29 @@ pub async fn run_workflow(
             // 暂停期间也检查取消
             if ctrl.cancel_flag.load(Ordering::Relaxed) {
                 state.mark_failed();
-                if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
+                if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                    warn!("DB update failed: {}", e);
+                }
                 emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                 return Err(anyhow::anyhow!("cancelled"));
             }
         }
 
         // 查找当前步骤（引用传递，避免循环中 clone 整个 Step）
-        let step = match step_index.get(current_id.as_str()).and_then(|&i| workflow.steps.get(i)) {
+        let step = match step_index
+            .get(current_id.as_str())
+            .and_then(|&i| workflow.steps.get(i))
+        {
             Some(s) => s,
             None => {
                 state.mark_failed();
-                if let Err(e) = db.update_run_status(run_id, "failed", Some(&format!("步骤 '{}' 不存在", current_id))) { warn!("DB update failed: {}", e); }
+                if let Err(e) = db.update_run_status(
+                    run_id,
+                    "failed",
+                    Some(&format!("步骤 '{}' 不存在", current_id)),
+                ) {
+                    warn!("DB update failed: {}", e);
+                }
                 emit_run_update(app_handle, run_id, &workflow_name, "failed");
                 return Err(anyhow::anyhow!("步骤 '{}' 不存在", current_id));
             }
@@ -128,8 +146,18 @@ pub async fn run_workflow(
         // 更新状态 & 持久化
         info!("步骤执行: {} (类型: {})", step.name, step.step_type);
         state.mark_step_running(&current_id);
-        if let Err(e) = db.create_step_run(run_id, &current_id) { warn!("DB create_step failed: {}", e); }
-        emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "running", None);
+        if let Err(e) = db.create_step_run(run_id, &current_id) {
+            warn!("DB create_step failed: {}", e);
+        }
+        emit_step_update(
+            app_handle,
+            run_id,
+            &current_id,
+            &step.name,
+            total_steps,
+            "running",
+            None,
+        );
 
         // ─── 断点 / 单步 检查 ───
         if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
@@ -139,13 +167,18 @@ pub async fn run_workflow(
             // 通知前端：断点命中
             #[cfg(feature = "gui")]
             if let Some(h) = app_handle {
-                if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
-                "run_id": run_id,
-                "step_id": current_id,
-                "step_name": step.name,
-                "variables": ctx.variables,
-                "step_outputs": ctx.step_outputs,
-                })) { warn!("emit breakpoint-hit failed: {}", e); }
+                if let Err(e) = h.emit(
+                    "breakpoint-hit",
+                    serde_json::json!({
+                    "run_id": run_id,
+                    "step_id": current_id,
+                    "step_name": step.name,
+                    "variables": ctx.variables,
+                    "step_outputs": ctx.step_outputs,
+                    }),
+                ) {
+                    warn!("emit breakpoint-hit failed: {}", e);
+                }
             }
 
             // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
@@ -165,7 +198,9 @@ pub async fn run_workflow(
                 // 暂停期间也检查取消（AtomicBool 快速路径）
                 if ctrl.cancel_flag.load(Ordering::Relaxed) {
                     state.mark_failed();
-                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                        warn!("DB update failed: {}", e);
+                    }
                     emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
                     return Err(anyhow::anyhow!("cancelled"));
                 }
@@ -178,7 +213,6 @@ pub async fn run_workflow(
                 tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
             }
         }
-
 
         // ─── 条件执行检查（runCondition） ───
         if let Some(ref rc) = step.run_condition {
@@ -193,8 +227,19 @@ pub async fn run_workflow(
                     step.name, rc.ref_step, branch
                 );
                 state.mark_step_skipped(&current_id);
-                ctx.set_output(&current_id, serde_json::json!({"skipped": true, "reason": "condition"}));
-                emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "skipped", None);
+                ctx.set_output(
+                    &current_id,
+                    serde_json::json!({"skipped": true, "reason": "condition"}),
+                );
+                emit_step_update(
+                    app_handle,
+                    run_id,
+                    &current_id,
+                    &step.name,
+                    total_steps,
+                    "skipped",
+                    None,
+                );
                 emit_variable_snapshot(app_handle, run_id, &ctx);
                 // Preview: 记录跳过步骤
                 let skipped = preview::generate_skipped_preview(step, "runCondition 不满足");
@@ -209,7 +254,9 @@ pub async fn run_workflow(
                     Some(next_id) => next_id,
                     None => {
                         state.mark_completed();
-                        if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
+                        if let Err(e) = db.update_run_status(run_id, "completed", None) {
+                            warn!("DB update failed: {}", e);
+                        }
                         emit_run_update(app_handle, run_id, &workflow_name, "completed");
                         return Ok(state);
                     }
@@ -227,8 +274,18 @@ pub async fn run_workflow(
             Ok(output) => {
                 ctx.set_output(&current_id, output.clone());
                 state.mark_step_completed(&current_id);
-                if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) { warn!("DB complete_step failed: {}", e); }
-                emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
+                if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) {
+                    warn!("DB complete_step failed: {}", e);
+                }
+                emit_step_update(
+                    app_handle,
+                    run_id,
+                    &current_id,
+                    &step.name,
+                    total_steps,
+                    "completed",
+                    Some(&output),
+                );
 
                 // Preview: 生成步骤预览 + bundle 快照
                 let mut preview = preview::generate_step_preview(step, &output, elapsed_ms);
@@ -252,14 +309,19 @@ pub async fn run_workflow(
                     ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
                     #[cfg(feature = "gui")]
                     if let Some(h) = app_handle {
-                        if let Err(e) = h.emit("breakpoint-hit", serde_json::json!({
-                        "run_id": run_id,
-                        "step_id": current_id,
-                        "step_name": step.name,
-                        "reason": "step_mode",
-                        "variables": ctx.variables,
-                        "step_outputs": ctx.step_outputs,
-                    })) { warn!("emit breakpoint-hit failed: {}", e); }
+                        if let Err(e) = h.emit(
+                            "breakpoint-hit",
+                            serde_json::json!({
+                                "run_id": run_id,
+                                "step_id": current_id,
+                                "step_name": step.name,
+                                "reason": "step_mode",
+                                "variables": ctx.variables,
+                                "step_outputs": ctx.step_outputs,
+                            }),
+                        ) {
+                            warn!("emit breakpoint-hit failed: {}", e);
+                        }
                     }
                 }
             }
@@ -267,7 +329,9 @@ pub async fn run_workflow(
                 let err_msg = e.to_string();
                 warn!("步骤失败: {} - {}", step.name, err_msg);
                 state.mark_step_failed(&current_id);
-                if let Err(e) = db.complete_step_run(run_id, &current_id, None, Some(&err_msg)) { warn!("DB complete_step failed: {}", e); }
+                if let Err(e) = db.complete_step_run(run_id, &current_id, None, Some(&err_msg)) {
+                    warn!("DB complete_step failed: {}", e);
+                }
                 emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
 
                 // Preview: 记录失败步骤
@@ -286,7 +350,9 @@ pub async fn run_workflow(
                 match strategy {
                     crate::engine::workflow::ErrorStrategy::Fail => {
                         state.mark_failed();
-                        if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) { warn!("DB update failed: {}", e); }
+                        if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) {
+                            warn!("DB update failed: {}", e);
+                        }
                         emit_run_update(app_handle, run_id, &workflow_name, "failed");
                         preview::stop_live_session(run_id, "failed");
                         return Err(e);
@@ -296,18 +362,33 @@ pub async fn run_workflow(
                         // 记录错误到上下文，输出 null
                         ctx.set_output(&current_id, serde_json::Value::Null);
                         state.mark_step_completed(&current_id);
-                        emit_step_update_ignored(app_handle, run_id, &current_id, &step.name, total_steps, &err_msg);
+                        emit_step_update_ignored(
+                            app_handle,
+                            run_id,
+                            &current_id,
+                            &step.name,
+                            total_steps,
+                            &err_msg,
+                        );
                         // 推送变量快照
                         emit_variable_snapshot(app_handle, run_id, &ctx);
                         // 继续到下一步
                     }
-                    crate::engine::workflow::ErrorStrategy::Branch { step_id: ref branch_id } => {
+                    crate::engine::workflow::ErrorStrategy::Branch {
+                        step_id: ref branch_id,
+                    } => {
                         info!("步骤 '{}' 失败，分支跳转到: {}", step.name, branch_id);
                         // 验证目标步骤存在
                         if !workflow.steps.iter().any(|s| s.id == *branch_id) {
                             warn!("分支目标步骤 '{}' 不存在，回退为 fail", branch_id);
                             state.mark_failed();
-                            if let Err(e) = db.update_run_status(run_id, "failed", Some(&format!("分支目标不存在: {}", branch_id))) { warn!("DB update failed: {}", e); }
+                            if let Err(e) = db.update_run_status(
+                                run_id,
+                                "failed",
+                                Some(&format!("分支目标不存在: {}", branch_id)),
+                            ) {
+                                warn!("DB update failed: {}", e);
+                            }
                             emit_run_update(app_handle, run_id, &workflow_name, "failed");
                             return Err(anyhow::anyhow!("分支目标步骤 '{}' 不存在", branch_id));
                         }
@@ -327,7 +408,9 @@ pub async fn run_workflow(
                 // 没有下一步，工作流完成
                 info!("工作流完成: {} (run_id: {})", workflow_name, run_id);
                 state.mark_completed();
-                if let Err(e) = db.update_run_status(run_id, "completed", None) { warn!("DB update failed: {}", e); }
+                if let Err(e) = db.update_run_status(run_id, "completed", None) {
+                    warn!("DB update failed: {}", e);
+                }
                 emit_run_update(app_handle, run_id, &workflow_name, "completed");
                 preview::stop_live_session(run_id, "completed");
                 return Ok(state);
@@ -374,12 +457,19 @@ async fn execute_with_retry(
 }
 
 /// 确定下一个步骤 ID
-pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionContext) -> Option<String> {
+pub fn determine_next_step(
+    step: &Step,
+    workflow: &Workflow,
+    ctx: &ExecutionContext,
+) -> Option<String> {
     // 条件节点：根据输出选择 true_next / false_next
     if step.step_type == "condition" {
         if let Some(output) = ctx.get_output(&step.id) {
             // 条件节点输出 {"result": bool, "branch": "true"/"false"}
-            let is_true = output.get("result").and_then(|v| v.as_bool()).unwrap_or(false);
+            let is_true = output
+                .get("result")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if is_true {
                 if let Some(next) = step.config.get("true_next").and_then(|v| v.as_str()) {
                     return Some(next.to_string());
@@ -396,9 +486,12 @@ pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionCont
     // cursor 节点：根据 done 标志决定是否继续
     if step.step_type == "cursor" {
         if let Some(output) = ctx.get_output(&step.id) {
-            let done = output.get("done").and_then(|v| v.as_bool()).unwrap_or(false);
+            let done = output
+                .get("done")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if !done {
-                return None;  // 还有数据待处理，本次运行到此为止
+                return None; // 还有数据待处理，本次运行到此为止
             }
             // done == true：继续执行后续步骤（如通知）
         }
@@ -422,7 +515,15 @@ pub fn determine_next_step(step: &Step, workflow: &Workflow, ctx: &ExecutionCont
 // GUI 模式: Tauri emit; CLI 模式: noop（后续改 SSE）
 
 #[cfg(feature = "gui")]
-fn emit_step_update(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, status: &str, output: Option<&serde_json::Value>) {
+fn emit_step_update(
+    app: Option<&tauri::AppHandle>,
+    run_id: &str,
+    step_id: &str,
+    step_name: &str,
+    total_steps: usize,
+    status: &str,
+    output: Option<&serde_json::Value>,
+) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
@@ -433,10 +534,21 @@ fn emit_step_update(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str,
         "output": output,
         "error": null,
     });
-    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
+    if let Err(e) = app.emit("step-update", event) {
+        warn!("emit failed: {}", e);
+    }
 }
 #[cfg(not(feature = "gui"))]
-fn emit_step_update(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _total_steps: usize, _status: &str, _output: Option<&serde_json::Value>) {}
+fn emit_step_update(
+    _app: Option<&()>,
+    _run_id: &str,
+    _step_id: &str,
+    _step_name: &str,
+    _total_steps: usize,
+    _status: &str,
+    _output: Option<&serde_json::Value>,
+) {
+}
 
 /// 执行后推送变量快照，供前端实时监视
 #[cfg(feature = "gui")]
@@ -447,13 +559,21 @@ fn emit_variable_snapshot(app: Option<&tauri::AppHandle>, run_id: &str, ctx: &Ex
         "variables": ctx.variables,
         "step_outputs": ctx.step_outputs,
     });
-    if let Err(e) = app.emit("variable-update", event) { warn!("emit failed: {}", e); }
+    if let Err(e) = app.emit("variable-update", event) {
+        warn!("emit failed: {}", e);
+    }
 }
 #[cfg(not(feature = "gui"))]
 fn emit_variable_snapshot(_app: Option<&()>, _run_id: &str, _ctx: &ExecutionContext) {}
 
 #[cfg(feature = "gui")]
-fn emit_step_update_with_error(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, error: &str) {
+fn emit_step_update_with_error(
+    app: Option<&tauri::AppHandle>,
+    run_id: &str,
+    step_id: &str,
+    step_name: &str,
+    error: &str,
+) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
@@ -463,14 +583,30 @@ fn emit_step_update_with_error(app: Option<&tauri::AppHandle>, run_id: &str, ste
         "output": null,
         "error": error,
     });
-    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
+    if let Err(e) = app.emit("step-update", event) {
+        warn!("emit failed: {}", e);
+    }
 }
 #[cfg(not(feature = "gui"))]
-fn emit_step_update_with_error(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _error: &str) {}
+fn emit_step_update_with_error(
+    _app: Option<&()>,
+    _run_id: &str,
+    _step_id: &str,
+    _step_name: &str,
+    _error: &str,
+) {
+}
 
 /// 错误被忽略时的事件（status = ignored, 区别于 failed）
 #[cfg(feature = "gui")]
-fn emit_step_update_ignored(app: Option<&tauri::AppHandle>, run_id: &str, step_id: &str, step_name: &str, total_steps: usize, error: &str) {
+fn emit_step_update_ignored(
+    app: Option<&tauri::AppHandle>,
+    run_id: &str,
+    step_id: &str,
+    step_name: &str,
+    total_steps: usize,
+    error: &str,
+) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
@@ -481,24 +617,40 @@ fn emit_step_update_ignored(app: Option<&tauri::AppHandle>, run_id: &str, step_i
         "output": null,
         "error": error,
     });
-    if let Err(e) = app.emit("step-update", event) { warn!("emit failed: {}", e); }
+    if let Err(e) = app.emit("step-update", event) {
+        warn!("emit failed: {}", e);
+    }
 }
 #[cfg(not(feature = "gui"))]
-fn emit_step_update_ignored(_app: Option<&()>, _run_id: &str, _step_id: &str, _step_name: &str, _total_steps: usize, _error: &str) {}
+fn emit_step_update_ignored(
+    _app: Option<&()>,
+    _run_id: &str,
+    _step_id: &str,
+    _step_name: &str,
+    _total_steps: usize,
+    _error: &str,
+) {
+}
 
 #[cfg(feature = "gui")]
-fn emit_run_update(app: Option<&tauri::AppHandle>, run_id: &str, workflow_name: &str, status: &str) {
+fn emit_run_update(
+    app: Option<&tauri::AppHandle>,
+    run_id: &str,
+    workflow_name: &str,
+    status: &str,
+) {
     let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "workflow_name": workflow_name,
         "status": status,
     });
-    if let Err(e) = app.emit("run-update", event) { warn!("emit failed: {}", e); }
+    if let Err(e) = app.emit("run-update", event) {
+        warn!("emit failed: {}", e);
+    }
 }
 #[cfg(not(feature = "gui"))]
 fn emit_run_update(_app: Option<&()>, _run_id: &str, _workflow_name: &str, _status: &str) {}
-
 
 /// 更新调试快照：将当前执行上下文存入共享状态
 async fn update_debug_snapshot(

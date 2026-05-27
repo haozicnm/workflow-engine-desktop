@@ -1,6 +1,11 @@
 // server/routes.rs — 路由定义（无状态版本，handlers 通过 state::get() 获取 App）
-use axum::{Router, routing::{get, post, put, delete}, extract::Path, response::IntoResponse};
 use crate::server::handlers;
+use axum::{
+    extract::Path,
+    response::IntoResponse,
+    routing::{delete, get, post, put},
+    Router,
+};
 
 /// 静态测试路由：无参数
 async fn test_static() -> impl IntoResponse {
@@ -27,7 +32,10 @@ pub fn build() -> Router {
         .route("/api/sidecar/health", get(handlers::sidecar_health))
         .route("/api/settings", get(handlers::settings_get))
         .route("/api/settings", put(handlers::settings_update))
-        .route("/api/system/check-browser", get(handlers::system_check_browser))
+        .route(
+            "/api/system/check-browser",
+            get(handlers::system_check_browser),
+        )
         .route("/api/system/log-path", get(handlers::get_log_path))
         .route("/api/system/open-log-dir", post(handlers::open_log_dir))
         .route("/api/system/clear-logs", post(handlers::clear_logs))
@@ -40,12 +48,21 @@ pub fn build() -> Router {
         .route("/api/workflows/{id}", put(handlers::workflow_update))
         .route("/api/workflows/{id}", delete(handlers::workflow_delete))
         .route("/api/workflows/{id}/lock", post(handlers::workflow_lock))
-        .route("/api/workflows/{id}/yaml", post(handlers::workflow_save_yaml))
+        .route(
+            "/api/workflows/{id}/yaml",
+            post(handlers::workflow_save_yaml),
+        )
         .route("/api/workflows/validate", post(handlers::workflow_validate))
-        .route("/api/workflows/auto-order", post(handlers::workflow_auto_order))
+        .route(
+            "/api/workflows/auto-order",
+            post(handlers::workflow_auto_order),
+        )
         .route("/api/workflows/export", post(handlers::workflow_export))
         .route("/api/workflows/import", post(handlers::workflow_import))
-        .route("/api/workflows/create-from-recording", post(handlers::workflow_create_from_recording))
+        .route(
+            "/api/workflows/create-from-recording",
+            post(handlers::workflow_create_from_recording),
+        )
         .route("/api/runs", post(handlers::run_start))
         .route("/api/runs", get(handlers::run_list))
         .route("/api/runs/{run_id}/cancel", post(handlers::run_cancel))
@@ -55,7 +72,10 @@ pub fn build() -> Router {
         .route("/api/runs/{run_id}/detail", get(handlers::run_detail))
         .route("/api/runs/{run_id}/logs", get(handlers::run_logs))
         .route("/api/runs/{run_id}/step-logs", get(handlers::run_step_logs))
-        .route("/api/approvals/pending", get(handlers::approval_list_pending))
+        .route(
+            "/api/approvals/pending",
+            get(handlers::approval_list_pending),
+        )
         .route("/api/approvals/respond", post(handlers::approval_respond))
         .route("/api/schedules", get(handlers::schedule_list))
         .route("/api/schedules", post(handlers::schedule_create))
@@ -63,15 +83,39 @@ pub fn build() -> Router {
         .route("/api/schedules/{id}", delete(handlers::schedule_delete))
         .route("/api/preview/excel", post(handlers::preview_excel))
         .route("/api/preview/word", post(handlers::preview_word))
-        .route("/api/preview/trajectory/{run_id}", get(handlers::get_trajectory))
-        .route("/api/preview/bundle-files/{run_id}/{step_id}", get(handlers::get_bundle_files))
-        .route("/api/preview/bundle-file/{run_id}/{step_id}/{filename}", get(handlers::read_bundle_file))
-        .route("/api/preview/web-scrape", post(handlers::web_scrape_preview))
+        .route(
+            "/api/preview/trajectory/{run_id}",
+            get(handlers::get_trajectory),
+        )
+        .route(
+            "/api/preview/bundle-files/{run_id}/{step_id}",
+            get(handlers::get_bundle_files),
+        )
+        .route(
+            "/api/preview/bundle-file/{run_id}/{step_id}/{filename}",
+            get(handlers::read_bundle_file),
+        )
+        .route(
+            "/api/preview/web-scrape",
+            post(handlers::web_scrape_preview),
+        )
         .route("/api/debug/step/{run_id}", post(handlers::debug_step))
-        .route("/api/debug/continue/{run_id}", post(handlers::debug_continue))
-        .route("/api/debug/breakpoints", post(handlers::debug_set_breakpoint))
-        .route("/api/debug/breakpoints/remove", post(handlers::debug_remove_breakpoint))
-        .route("/api/debug/breakpoints/{workflow_id}", get(handlers::debug_get_breakpoints))
+        .route(
+            "/api/debug/continue/{run_id}",
+            post(handlers::debug_continue),
+        )
+        .route(
+            "/api/debug/breakpoints",
+            post(handlers::debug_set_breakpoint),
+        )
+        .route(
+            "/api/debug/breakpoints/remove",
+            post(handlers::debug_remove_breakpoint),
+        )
+        .route(
+            "/api/debug/breakpoints/{workflow_id}",
+            get(handlers::debug_get_breakpoints),
+        )
         .route("/api/debug/vars/{run_id}", get(handlers::debug_vars))
         .route("/api/step-test", post(handlers::step_test))
         .route("/api/recording/status", get(handlers::recording_status))

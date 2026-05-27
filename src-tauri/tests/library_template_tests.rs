@@ -1,20 +1,21 @@
 // tests/library_template_tests.rs — 5个内置库模板的加载 + 解析 + 校验
-use std::collections::HashSet;
 use serde_json::Value;
+use std::collections::HashSet;
 use workflow_engine::engine::{parser, validate};
 
 const LIBRARY_DIR: &str = "../library";
 
 fn load_template(path: &str) -> Value {
     let full = format!("{}/{}", LIBRARY_DIR, path);
-    let content = std::fs::read_to_string(&full)
-        .expect(&format!("Template not found: {}", full));
-    serde_json::from_str(&content)
-        .expect(&format!("Invalid JSON: {}", path))
+    let content = std::fs::read_to_string(&full).expect(&format!("Template not found: {}", full));
+    serde_json::from_str(&content).expect(&format!("Invalid JSON: {}", path))
 }
 
 fn step_ids(json: &Value) -> HashSet<String> {
-    json["steps"].as_array().unwrap().iter()
+    json["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
         .map(|s| s["id"].as_str().unwrap().to_string())
         .collect()
 }
@@ -25,23 +26,30 @@ fn parse_and_validate(name: &str, path: &str) {
     let content = std::fs::read_to_string(&full).unwrap();
 
     // 1. Parse as JSON
-    let json: Value = serde_json::from_str(&content)
-        .expect(&format!("{}: invalid JSON", name));
+    let json: Value = serde_json::from_str(&content).expect(&format!("{}: invalid JSON", name));
 
     // 2. Parse as Workflow struct
-    let wf = parser::parse_workflow(&content)
-        .expect(&format!("{}: parser failed", name));
+    let wf = parser::parse_workflow(&content).expect(&format!("{}: parser failed", name));
 
     // 3. Run semantic validation
     let validation = validate::validate_workflow(&wf);
-    assert!(validation.valid,
-        "{}: validation failed: {:?}", name, validation.errors);
+    assert!(
+        validation.valid,
+        "{}: validation failed: {:?}",
+        name, validation.errors
+    );
 
     // 4. Check basic structure
-    assert!(!json["steps"].as_array().unwrap().is_empty(),
-        "{}: must have steps", name);
-    assert!(!json["name"].as_str().unwrap().is_empty(),
-        "{}: must have a name", name);
+    assert!(
+        !json["steps"].as_array().unwrap().is_empty(),
+        "{}: must have steps",
+        name
+    );
+    assert!(
+        !json["name"].as_str().unwrap().is_empty(),
+        "{}: must have a name",
+        name
+    );
 
     // 5. Check params consistency
     if let Some(params) = json["params"].as_object() {
@@ -70,7 +78,11 @@ fn test_template1_integration_smoke() {
     assert_eq!(json["name"].as_str().unwrap(), "integration-smoke");
     // 必须有 14 个步骤（涵盖所有核心节点类型）
     let steps = json["steps"].as_array().unwrap();
-    assert_eq!(steps.len(), 14, "integration-smoke must have 14 steps (one per node type)");
+    assert_eq!(
+        steps.len(),
+        14,
+        "integration-smoke must have 14 steps (one per node type)"
+    );
     // 验证关键步骤类型
     let types: Vec<&str> = steps.iter().map(|s| s["type"].as_str().unwrap()).collect();
     assert!(types.contains(&"json_parse"));
@@ -86,10 +98,17 @@ fn test_template1_integration_smoke() {
     assert!(types.contains(&"delay"));
     // Verify params exist and are used
     assert!(json["params"]["test_dir"].as_str().is_some());
-    let content = std::fs::read_to_string(
-        &format!("{}/stress/integration-smoke.wf.json", LIBRARY_DIR)).unwrap();
-    assert!(content.contains("{{params.test_dir}}"), "test_dir param must be referenced");
-    assert!(content.contains("{{params.delay_ms}}"), "delay_ms param must be referenced");
+    let content =
+        std::fs::read_to_string(&format!("{}/stress/integration-smoke.wf.json", LIBRARY_DIR))
+            .unwrap();
+    assert!(
+        content.contains("{{params.test_dir}}"),
+        "test_dir param must be referenced"
+    );
+    assert!(
+        content.contains("{{params.delay_ms}}"),
+        "delay_ms param must be referenced"
+    );
 
     parse_and_validate("integration-smoke", "stress/integration-smoke.wf.json");
     println!("✅ Template 1: integration-smoke — 14 steps, all types covered");
@@ -106,8 +125,9 @@ fn test_template2_daily_monitor() {
     assert!(types.contains(&"excel"));
     assert!(types.contains(&"word"));
     // Verify output_dir is used in file_path
-    let content = std::fs::read_to_string(
-        &format!("{}/monitoring/daily-monitor.wf.json", LIBRARY_DIR)).unwrap();
+    let content =
+        std::fs::read_to_string(&format!("{}/monitoring/daily-monitor.wf.json", LIBRARY_DIR))
+            .unwrap();
     assert!(content.contains("{{params.output_dir}}"));
 
     parse_and_validate("daily-monitor", "monitoring/daily-monitor.wf.json");
@@ -124,8 +144,11 @@ fn test_template3_file_batch_approval() {
     assert!(types.contains(&"cursor"));
     // approval is inside cursor body_steps, not at top level
     // Verify data_dir and file_pattern are used
-    let content = std::fs::read_to_string(
-        &format!("{}/batch/file-batch-approval.wf.json", LIBRARY_DIR)).unwrap();
+    let content = std::fs::read_to_string(&format!(
+        "{}/batch/file-batch-approval.wf.json",
+        LIBRARY_DIR
+    ))
+    .unwrap();
     assert!(content.contains("{{params.data_dir}}"));
     assert!(content.contains("{{params.file_pattern}}"));
 
@@ -143,12 +166,18 @@ fn test_template4_http_approval_pipeline() {
     assert!(types.contains(&"http"));
     assert!(types.contains(&"approval"));
     // Verify api_url and notify_title are used
-    let content = std::fs::read_to_string(
-        &format!("{}/batch/http-approval-pipeline.wf.json", LIBRARY_DIR)).unwrap();
+    let content = std::fs::read_to_string(&format!(
+        "{}/batch/http-approval-pipeline.wf.json",
+        LIBRARY_DIR
+    ))
+    .unwrap();
     assert!(content.contains("{{params.api_url}}"));
     assert!(content.contains("{{params.notify_title}}"));
 
-    parse_and_validate("http-approval-pipeline", "batch/http-approval-pipeline.wf.json");
+    parse_and_validate(
+        "http-approval-pipeline",
+        "batch/http-approval-pipeline.wf.json",
+    );
     println!("✅ Template 4: http-approval-pipeline — 10 steps, HTTP+approval+branch");
 }
 
@@ -163,11 +192,17 @@ fn test_template5_web_monitor_alert() {
     assert!(types.contains(&"excel"));
     assert!(types.contains(&"notify"));
     // Verify work_dir and alert_threshold are used
-    let content = std::fs::read_to_string(
-        &format!("{}/monitoring/web-monitor-alert.wf.json", LIBRARY_DIR)).unwrap();
+    let content = std::fs::read_to_string(&format!(
+        "{}/monitoring/web-monitor-alert.wf.json",
+        LIBRARY_DIR
+    ))
+    .unwrap();
     assert!(content.contains("{{params.work_dir}}"));
     // Verify trend comparison step exists (json_parse after file read)
-    assert!(types.contains(&"json_parse"), "Must have json_parse for trend comparison");
+    assert!(
+        types.contains(&"json_parse"),
+        "Must have json_parse for trend comparison"
+    );
 
     parse_and_validate("web-monitor-alert", "monitoring/web-monitor-alert.wf.json");
     println!("✅ Template 5: web-monitor-alert — 9 steps, loop+Excel+trend comparison");
@@ -183,7 +218,10 @@ fn test_all_templates_have_unique_step_ids() {
         ("integration-smoke", "stress/integration-smoke.wf.json"),
         ("daily-monitor", "monitoring/daily-monitor.wf.json"),
         ("file-batch-approval", "batch/file-batch-approval.wf.json"),
-        ("http-approval-pipeline", "batch/http-approval-pipeline.wf.json"),
+        (
+            "http-approval-pipeline",
+            "batch/http-approval-pipeline.wf.json",
+        ),
         ("web-monitor-alert", "monitoring/web-monitor-alert.wf.json"),
     ];
 
@@ -205,7 +243,10 @@ fn test_all_templates_parse_and_validate() {
         ("integration-smoke", "stress/integration-smoke.wf.json"),
         ("daily-monitor", "monitoring/daily-monitor.wf.json"),
         ("file-batch-approval", "batch/file-batch-approval.wf.json"),
-        ("http-approval-pipeline", "batch/http-approval-pipeline.wf.json"),
+        (
+            "http-approval-pipeline",
+            "batch/http-approval-pipeline.wf.json",
+        ),
         ("web-monitor-alert", "monitoring/web-monitor-alert.wf.json"),
     ];
 
@@ -227,7 +268,8 @@ fn test_all_runcondition_refs_valid() {
         }
     }
 
-    let templates = ["stress/integration-smoke.wf.json",
+    let templates = [
+        "stress/integration-smoke.wf.json",
         "monitoring/daily-monitor.wf.json",
         "batch/file-batch-approval.wf.json",
         "batch/http-approval-pipeline.wf.json",
@@ -245,8 +287,12 @@ fn test_all_runcondition_refs_valid() {
             for step in steps {
                 if let Some(rc) = step.get("runCondition") {
                     let ref_id = rc["ref"].as_str().unwrap();
-                    assert!(ids.contains(ref_id),
-                        "{}: runCondition.ref '{}' not found in any step", path, ref_id);
+                    assert!(
+                        ids.contains(ref_id),
+                        "{}: runCondition.ref '{}' not found in any step",
+                        path,
+                        ref_id
+                    );
                 }
                 if let Some(body) = step["body_steps"].as_array() {
                     check_rc(body, ids, path);

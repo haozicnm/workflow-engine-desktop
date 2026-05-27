@@ -1,12 +1,14 @@
 // data/db.rs — SQLite 数据库（r2d2 连接池 + schema 版本迁移）
-use rusqlite::params;
+use crate::data::models::WorkflowListItem;
+use crate::data::models::{
+    RunDetail, RunHistoryItem, RunInfo, ScheduleInfo, StepLogEntry, StepRunInfo, WorkflowMeta,
+};
+use anyhow::{Context, Result};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use std::time::Instant;
-use anyhow::{Result, Context};
-use tracing::{info, debug};
-use crate::data::models::{WorkflowMeta, RunInfo, StepRunInfo, RunHistoryItem, RunDetail, ScheduleInfo, StepLogEntry};
-use crate::data::models::WorkflowListItem;
+use tracing::{debug, info};
 
 pub struct Database {
     pool: Pool<SqliteConnectionManager>,
@@ -40,8 +42,7 @@ impl Database {
 
     /// 获取连接（用于调试日志）
     fn conn(&self) -> Result<r2d2::PooledConnection<SqliteConnectionManager>> {
-        let conn = self.pool.get()
-            .context("获取数据库连接失败")?;
+        let conn = self.pool.get().context("获取数据库连接失败")?;
         Ok(conn)
     }
 
@@ -64,12 +65,16 @@ impl Database {
         )?;
 
         // 迁移：为旧数据库添加 locked 列
-        let _ = conn.execute("ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0",
+            [],
+        );
 
         if version < 1 {
             info!("[db] 执行 v1 初始化…");
             let start = Instant::now();
-            conn.execute_batch(r#"
+            conn.execute_batch(
+                r#"
                 CREATE TABLE IF NOT EXISTS workflows (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -133,7 +138,8 @@ impl Database {
                     last_run_at TEXT,
                     created_at TEXT NOT NULL
                 );
-            "#)?;
+            "#,
+            )?;
             conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
             debug!("[db] v1 初始化完成，耗时 {:?}", start.elapsed());
         }
@@ -142,9 +148,8 @@ impl Database {
         if version < 2 {
             info!("[db] 执行 v2 迁移…");
             let start = Instant::now();
-            conn.execute_batch(
-                "ALTER TABLE workflows ADD COLUMN yaml_content TEXT DEFAULT ''"
-            ).ok(); // 忽略"列已存在"的错误
+            conn.execute_batch("ALTER TABLE workflows ADD COLUMN yaml_content TEXT DEFAULT ''")
+                .ok(); // 忽略"列已存在"的错误
             conn.execute("INSERT INTO schema_version (version) VALUES (2)", [])?;
             debug!("[db] v2 迁移完成，耗时 {:?}", start.elapsed());
         }
@@ -153,9 +158,8 @@ impl Database {
         if version < 3 {
             info!("[db] 执行 v3 迁移…");
             let start = Instant::now();
-            conn.execute_batch(
-                "ALTER TABLE runs ADD COLUMN workflow_name TEXT DEFAULT ''"
-            ).ok(); // 忽略"列已存在"的错误
+            conn.execute_batch("ALTER TABLE runs ADD COLUMN workflow_name TEXT DEFAULT ''")
+                .ok(); // 忽略"列已存在"的错误
             conn.execute("INSERT INTO schema_version (version) VALUES (3)", [])?;
             debug!("[db] v3 迁移完成，耗时 {:?}", start.elapsed());
         }
@@ -164,7 +168,8 @@ impl Database {
         if version < 4 {
             info!("[db] 执行 v4 迁移（审批系统重构）…");
             let start = Instant::now();
-            conn.execute_batch(r#"
+            conn.execute_batch(
+                r#"
                 DROP TABLE IF EXISTS approvals;
                 CREATE TABLE approvals (
                     id TEXT PRIMARY KEY,
@@ -183,7 +188,8 @@ impl Database {
                     decision TEXT,
                     comment TEXT
                 );
-            "#)?;
+            "#,
+            )?;
             conn.execute("INSERT INTO schema_version (version) VALUES (4)", [])?;
             debug!("[db] v4 迁移完成，耗时 {:?}", start.elapsed());
         }
@@ -209,10 +215,18 @@ impl Database {
                 updated_at: row.get::<_, String>(6)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
-    pub fn create_workflow(&self, id: &str, name: &str, desc: &str, created: &str, updated: &str) -> Result<()> {
+    pub fn create_workflow(
+        &self,
+        id: &str,
+        name: &str,
+        desc: &str,
+        created: &str,
+        updated: &str,
+    ) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
             "INSERT INTO workflows (id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -225,11 +239,14 @@ impl Database {
         let conn = self.conn()?;
         let conn_ref = &conn;
         // 检查 locked 列是否存在（兼容旧数据库）
-        let has_locked: bool = conn_ref.query_row(
-            "SELECT COUNT(*) FROM pragma_table_info('workflows') WHERE name='locked'",
-            [],
-            |r| r.get::<_, i64>(0),
-        ).unwrap_or(0) > 0;
+        let has_locked: bool = conn_ref
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('workflows') WHERE name='locked'",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0)
+            > 0;
         let query = if has_locked {
             "SELECT id, name, description, enabled, locked, created_at, updated_at, COALESCE(yaml_content, '') FROM workflows WHERE id = ?1"
         } else {
@@ -254,7 +271,14 @@ impl Database {
         }
     }
 
-    pub fn update_workflow(&self, id: &str, name: Option<&str>, desc: Option<&str>, enabled: Option<bool>, updated: &str) -> Result<()> {
+    pub fn update_workflow(
+        &self,
+        id: &str,
+        name: Option<&str>,
+        desc: Option<&str>,
+        enabled: Option<bool>,
+        updated: &str,
+    ) -> Result<()> {
         let mut query = String::from("UPDATE workflows SET updated_at = ?1");
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(updated.to_string())];
         let mut idx = 2;
@@ -287,7 +311,10 @@ impl Database {
     pub fn set_workflow_locked(&self, id: &str, locked: bool) -> Result<()> {
         let conn = self.conn()?;
         // 确保列存在
-        let _ = conn.execute("ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0",
+            [],
+        );
         conn.execute(
             "UPDATE workflows SET locked = ?1 WHERE id = ?2",
             params![if locked { 1i64 } else { 0i64 }, id],
@@ -311,9 +338,7 @@ impl Database {
     pub fn get_workflow_yaml(&self, id: &str) -> Result<Option<String>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare("SELECT yaml_content FROM workflows WHERE id = ?1")?;
-        let mut rows = stmt.query_map(params![id], |row| {
-            row.get::<_, String>(0)
-        })?;
+        let mut rows = stmt.query_map(params![id], |row| row.get::<_, String>(0))?;
         match rows.next() {
             Some(row) => Ok(Some(row?)),
             None => Ok(None),
@@ -332,7 +357,13 @@ impl Database {
 
     // ─── Run 持久化 ───
 
-    pub fn create_run(&self, run_id: &str, workflow_id: &str, workflow_name: &str, started_at: &str) -> Result<()> {
+    pub fn create_run(
+        &self,
+        run_id: &str,
+        workflow_id: &str,
+        workflow_name: &str,
+        started_at: &str,
+    ) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
             "INSERT INTO runs (id, workflow_id, workflow_name, status, started_at) VALUES (?1, ?2, ?3, 'running', ?4)",
@@ -402,10 +433,20 @@ impl Database {
         Ok(())
     }
 
-    pub fn complete_step_run(&self, run_id: &str, step_id: &str, output: Option<&serde_json::Value>, error: Option<&str>) -> Result<()> {
+    pub fn complete_step_run(
+        &self,
+        run_id: &str,
+        step_id: &str,
+        output: Option<&serde_json::Value>,
+        error: Option<&str>,
+    ) -> Result<()> {
         let id = format!("{}:{}", run_id, step_id);
         let now = chrono::Utc::now().to_rfc3339();
-        let status = if error.is_some() { "failed" } else { "completed" };
+        let status = if error.is_some() {
+            "failed"
+        } else {
+            "completed"
+        };
         let output_str = output.map(|v| v.to_string());
         let conn = self.conn()?;
         conn.execute(
@@ -434,12 +475,19 @@ impl Database {
                 error: row.get(7)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     // ─── v4.1: 步骤执行日志持久化 ───
 
-    pub fn insert_step_log(&self, step_run_id: &str, level: &str, message: &str, timestamp: &str) -> Result<()> {
+    pub fn insert_step_log(
+        &self,
+        step_run_id: &str,
+        level: &str,
+        message: &str,
+        timestamp: &str,
+    ) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
             "INSERT INTO step_logs (step_run_id, level, message, timestamp) VALUES (?1, ?2, ?3, ?4)",
@@ -468,13 +516,18 @@ impl Database {
                 timestamp: row.get(6)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     // ─── 运行历史查询 ───
 
     /// 查询运行列表（可选按工作流过滤），优先用 workflows 表的名称，回退到 runs.workflow_name
-    pub fn list_runs(&self, workflow_id: Option<&str>, limit: usize) -> Result<Vec<RunHistoryItem>> {
+    pub fn list_runs(
+        &self,
+        workflow_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<RunHistoryItem>> {
         let conn = self.conn()?;
         if let Some(wf_id) = workflow_id {
             let mut stmt = conn.prepare(
@@ -494,7 +547,8 @@ impl Database {
                     error: row.get(6)?,
                 })
             })?;
-            rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+            rows.collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(Into::into)
         } else {
             let mut stmt = conn.prepare(
                 "SELECT r.id, r.workflow_id, COALESCE(w.name, r.workflow_name), r.status, r.started_at, r.finished_at, r.error \
@@ -512,7 +566,8 @@ impl Database {
                     error: row.get(6)?,
                 })
             })?;
-            rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+            rows.collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(Into::into)
         }
     }
 
@@ -549,13 +604,22 @@ impl Database {
             "DELETE FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
             params![workflow_id],
         )?;
-        conn.execute("DELETE FROM runs WHERE workflow_id = ?1", params![workflow_id])?;
+        conn.execute(
+            "DELETE FROM runs WHERE workflow_id = ?1",
+            params![workflow_id],
+        )?;
         Ok(())
     }
 
     // ─── Schedule CRUD ───
 
-    pub fn create_schedule(&self, id: &str, workflow_id: &str, cron_expr: &str, created_at: &str) -> Result<()> {
+    pub fn create_schedule(
+        &self,
+        id: &str,
+        workflow_id: &str,
+        cron_expr: &str,
+        created_at: &str,
+    ) -> Result<()> {
         let conn = self.conn()?;
         conn.execute(
             "INSERT INTO schedules (id, workflow_id, cron_expr, enabled, created_at) VALUES (?1, ?2, ?3, 1, ?4)",
@@ -582,7 +646,8 @@ impl Database {
                 created_at: row.get(6)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     pub fn list_enabled_schedules(&self) -> Result<Vec<ScheduleInfo>> {
@@ -603,10 +668,16 @@ impl Database {
                 created_at: row.get(6)?,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+        rows.collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
-    pub fn update_schedule(&self, id: &str, cron_expr: Option<&str>, enabled: Option<bool>) -> Result<()> {
+    pub fn update_schedule(
+        &self,
+        id: &str,
+        cron_expr: Option<&str>,
+        enabled: Option<bool>,
+    ) -> Result<()> {
         let mut query = String::from("UPDATE schedules SET id = id");
         let mut param_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         let mut idx = 1;
@@ -742,7 +813,8 @@ impl Database {
                 decision: row.get(13)?,
                 comment: row.get(14)?,
             })
-        }).ok()
+        })
+        .ok()
     }
 
     /// 删除已审批记录（清理用）

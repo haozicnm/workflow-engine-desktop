@@ -39,7 +39,7 @@ pub struct StepPreview {
 pub struct LiveSession {
     pub run_id: String,
     pub workflow_name: String,
-    pub status: String,          // "running" | "paused" | "completed" | "failed" | "cancelled"
+    pub status: String, // "running" | "paused" | "completed" | "failed" | "cancelled"
     pub step_index: usize,
     pub total_steps: usize,
     pub current_step_id: Option<String>,
@@ -129,8 +129,16 @@ fn build_preview(step: &Step, output: &Value) -> (String, Value) {
 // ── Per-type preview builders ──
 
 fn http_preview(step: &Step, output: &Value) -> (String, Value) {
-    let method = step.config.get("method").and_then(|v| v.as_str()).unwrap_or("GET");
-    let url = step.config.get("url").and_then(|v| v.as_str()).unwrap_or("?");
+    let method = step
+        .config
+        .get("method")
+        .and_then(|v| v.as_str())
+        .unwrap_or("GET");
+    let url = step
+        .config
+        .get("url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
     let status = output.get("status").and_then(|v| v.as_u64()).unwrap_or(0);
     let body = output.get("body").and_then(|v| v.as_str()).unwrap_or("");
     let body_size = body.len();
@@ -148,7 +156,11 @@ fn http_preview(step: &Step, output: &Value) -> (String, Value) {
 }
 
 fn script_preview(step: &Step, output: &Value) -> (String, Value) {
-    let script = step.config.get("script").and_then(|v| v.as_str()).unwrap_or("");
+    let script = step
+        .config
+        .get("script")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let code_preview = truncate_str(script, 100);
     let result_type = describe_value(output);
 
@@ -161,14 +173,20 @@ fn script_preview(step: &Step, output: &Value) -> (String, Value) {
 }
 
 fn shell_preview(output: &Value) -> (String, Value) {
-    let exit_code = output.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let exit_code = output
+        .get("exit_code")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(-1);
     let stdout = output.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
     let stderr = output.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
     let stdout_size = stdout.len();
     let stderr_size = stderr.len();
     let stdout_preview = truncate_str(stdout, 200);
 
-    let summary = format!("Shell → 退出码 {} (stdout {}B, stderr {}B)", exit_code, stdout_size, stderr_size);
+    let summary = format!(
+        "Shell → 退出码 {} (stdout {}B, stderr {}B)",
+        exit_code, stdout_size, stderr_size
+    );
     let detail = serde_json::json!({
         "exit_code": exit_code,
         "stdout_size": stdout_size,
@@ -187,7 +205,11 @@ fn notify_preview(output: &Value) -> (String, Value) {
 }
 
 fn delay_preview(step: &Step) -> (String, Value) {
-    let ms = step.config.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+    let ms = step
+        .config
+        .get("duration_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     let summary = format!("延迟 {}ms", ms);
     let detail = serde_json::json!({"duration_ms": ms});
     (summary, detail)
@@ -203,8 +225,14 @@ fn clipboard_preview(output: &Value) -> (String, Value) {
 }
 
 fn approval_preview(output: &Value) -> (String, Value) {
-    let decision = output.get("decision").and_then(|v| v.as_str()).unwrap_or("?");
-    let reason = output.get("recommendation_reason").and_then(|v| v.as_str()).unwrap_or("");
+    let decision = output
+        .get("decision")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+    let reason = output
+        .get("recommendation_reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let summary = format!("审批 → {}", decision);
     let detail = serde_json::json!({
         "decision": decision,
@@ -225,8 +253,14 @@ fn json_parse_preview(output: &Value) -> (String, Value) {
 }
 
 fn array_op_preview(op: &str, output: &Value) -> (String, Value) {
-    let source = output.get("source_count").and_then(|v| v.as_u64()).unwrap_or(0);
-    let result = output.get("result_count").and_then(|v| v.as_u64()).unwrap_or(0);
+    let source = output
+        .get("source_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let result = output
+        .get("result_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     let summary = format!("数组{} {} → {}", op, source, result);
     let detail = serde_json::json!({"source_count": source, "result_count": result});
     (summary, detail)
@@ -251,57 +285,90 @@ fn file_container_preview(step: &Step, output: &Value) -> (String, Value) {
             let action_output = output.get(action_id);
             let info = match action_type {
                 "read" | "write" | "append" => {
-                    let path = action.get("params").and_then(|p| p.get("path"))
+                    let path = action
+                        .get("params")
+                        .and_then(|p| p.get("path"))
                         .or_else(|| action.get("config").and_then(|c| c.get("path")))
-                        .and_then(|v| v.as_str()).unwrap_or("?");
-                    let content_size = action_output.and_then(|o| o.get("content"))
-                        .and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let content_size = action_output
+                        .and_then(|o| o.get("content"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.len())
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "path": path, "content_size": content_size})
                 }
                 "list" | "glob" => {
-                    let count = action_output.and_then(|o| {
-                        o.as_array().map(|a| a.len())
-                            .or_else(|| o.get("count").and_then(|v| v.as_u64()).map(|c| c as usize))
-                    }).unwrap_or(0);
+                    let count = action_output
+                        .and_then(|o| {
+                            o.as_array().map(|a| a.len()).or_else(|| {
+                                o.get("count").and_then(|v| v.as_u64()).map(|c| c as usize)
+                            })
+                        })
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "count": count})
                 }
                 "copy" | "move" => {
-                    let from = action.get("params").and_then(|p| p.get("from"))
+                    let from = action
+                        .get("params")
+                        .and_then(|p| p.get("from"))
                         .or_else(|| action.get("config").and_then(|c| c.get("from")))
-                        .and_then(|v| v.as_str()).unwrap_or("?");
-                    let to = action.get("params").and_then(|p| p.get("to"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let to = action
+                        .get("params")
+                        .and_then(|p| p.get("to"))
                         .or_else(|| action.get("config").and_then(|c| c.get("to")))
-                        .and_then(|v| v.as_str()).unwrap_or("?");
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
                     serde_json::json!({"type": action_type, "from": from, "to": to})
                 }
                 "delete" | "exists" => {
-                    let path = action.get("params").and_then(|p| p.get("path"))
+                    let path = action
+                        .get("params")
+                        .and_then(|p| p.get("path"))
                         .or_else(|| action.get("config").and_then(|c| c.get("path")))
-                        .and_then(|v| v.as_str()).unwrap_or("?");
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
                     serde_json::json!({"type": action_type, "path": path})
                 }
                 "grep" => {
-                    let pattern = action.get("params").and_then(|p| p.get("pattern"))
+                    let pattern = action
+                        .get("params")
+                        .and_then(|p| p.get("pattern"))
                         .or_else(|| action.get("config").and_then(|c| c.get("pattern")))
-                        .and_then(|v| v.as_str()).unwrap_or("?");
-                    let matches = action_output.and_then(|o| o.get("count").and_then(|v| v.as_u64())).unwrap_or(0);
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let matches = action_output
+                        .and_then(|o| o.get("count").and_then(|v| v.as_u64()))
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "pattern": pattern, "matches": matches})
                 }
-                _ => serde_json::json!({"type": action_type})
+                _ => serde_json::json!({"type": action_type}),
             };
             action_details.push(info);
         }
     }
 
-    let summary = format!("文件操作 ({} 动作: {})", actions, action_details.iter()
-        .filter_map(|a| a.get("type").and_then(|v| v.as_str()))
-        .collect::<Vec<_>>().join(", "));
+    let summary = format!(
+        "文件操作 ({} 动作: {})",
+        actions,
+        action_details
+            .iter()
+            .filter_map(|a| a.get("type").and_then(|v| v.as_str()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     let detail = serde_json::json!({"actions": action_details});
     (summary, detail)
 }
 
 fn excel_container_preview(step: &Step, output: &Value) -> (String, Value) {
-    let file_path = step.config.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
+    let file_path = step
+        .config
+        .get("file_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
     let mut action_details = Vec::new();
 
     if let Some(acts) = &step.actions {
@@ -311,34 +378,53 @@ fn excel_container_preview(step: &Step, output: &Value) -> (String, Value) {
             let action_output = output.get(action_id);
             let info = match action_type {
                 "read" => {
-                    let rows = action_output.and_then(|o| o.as_array().map(|a| a.len())).unwrap_or(0);
-                    let cols = action_output.and_then(|o| o.as_array()
-                        .and_then(|a| a.first())
-                        .and_then(|r| r.as_array().map(|c| c.len()))).unwrap_or(0);
+                    let rows = action_output
+                        .and_then(|o| o.as_array().map(|a| a.len()))
+                        .unwrap_or(0);
+                    let cols = action_output
+                        .and_then(|o| {
+                            o.as_array()
+                                .and_then(|a| a.first())
+                                .and_then(|r| r.as_array().map(|c| c.len()))
+                        })
+                        .unwrap_or(0);
                     serde_json::json!({"type": "read", "rows": rows, "cols": cols})
                 }
                 "write" | "create" => {
-                    let rows = action.get("params").and_then(|p| p.get("value"))
-                        .and_then(|v| v.as_array().map(|a| a.len())).unwrap_or(0);
+                    let rows = action
+                        .get("params")
+                        .and_then(|p| p.get("value"))
+                        .and_then(|v| v.as_array().map(|a| a.len()))
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "rows_written": rows})
                 }
                 "filter" | "sort" => {
-                    let result_rows = action_output.and_then(|o| o.as_array().map(|a| a.len())).unwrap_or(0);
+                    let result_rows = action_output
+                        .and_then(|o| o.as_array().map(|a| a.len()))
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "result_rows": result_rows})
                 }
-                _ => serde_json::json!({"type": action_type})
+                _ => serde_json::json!({"type": action_type}),
             };
             action_details.push(info);
         }
     }
 
-    let summary = format!("Excel [{}] {} 动作", truncate_str(file_path, 40), action_details.len());
+    let summary = format!(
+        "Excel [{}] {} 动作",
+        truncate_str(file_path, 40),
+        action_details.len()
+    );
     let detail = serde_json::json!({"file_path": file_path, "actions": action_details});
     (summary, detail)
 }
 
 fn word_container_preview(step: &Step, output: &Value) -> (String, Value) {
-    let file_path = step.config.get("file_path").and_then(|v| v.as_str()).unwrap_or("?");
+    let file_path = step
+        .config
+        .get("file_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
     let mut action_details = Vec::new();
 
     if let Some(acts) = &step.actions {
@@ -348,22 +434,33 @@ fn word_container_preview(step: &Step, output: &Value) -> (String, Value) {
             let action_output = output.get(action_id);
             let info = match action_type {
                 "read" => {
-                    let content_size = action_output.and_then(|o| o.get("content"))
-                        .and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+                    let content_size = action_output
+                        .and_then(|o| o.get("content"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.len())
+                        .unwrap_or(0);
                     serde_json::json!({"type": "read", "content_size": content_size})
                 }
                 "write" | "create" => {
-                    let content_size = action.get("params").and_then(|p| p.get("value"))
-                        .and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+                    let content_size = action
+                        .get("params")
+                        .and_then(|p| p.get("value"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.len())
+                        .unwrap_or(0);
                     serde_json::json!({"type": action_type, "content_size": content_size})
                 }
-                _ => serde_json::json!({"type": action_type})
+                _ => serde_json::json!({"type": action_type}),
             };
             action_details.push(info);
         }
     }
 
-    let summary = format!("Word [{}] {} 动作", truncate_str(file_path, 40), action_details.len());
+    let summary = format!(
+        "Word [{}] {} 动作",
+        truncate_str(file_path, 40),
+        action_details.len()
+    );
     let detail = serde_json::json!({"file_path": file_path, "actions": action_details});
     (summary, detail)
 }
@@ -376,7 +473,11 @@ fn browser_container_preview(step: &Step, output: &Value) -> (String, Value) {
             let action_type = action.get("type").and_then(|v| v.as_str()).unwrap_or("?");
             let info = match action_type {
                 "navigate" | "current_url" => {
-                    let url = action.get("config").and_then(|c| c.get("url")).and_then(|v| v.as_str()).unwrap_or("?");
+                    let url = action
+                        .get("config")
+                        .and_then(|c| c.get("url"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
                     serde_json::json!({"type": action_type, "url": truncate_str(url, 60)})
                 }
                 "screenshot" => {
@@ -386,7 +487,7 @@ fn browser_container_preview(step: &Step, output: &Value) -> (String, Value) {
                     let count = output.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
                     serde_json::json!({"type": action_type, "count": count})
                 }
-                _ => serde_json::json!({"type": action_type})
+                _ => serde_json::json!({"type": action_type}),
             };
             action_details.push(info);
         }
@@ -399,7 +500,10 @@ fn browser_container_preview(step: &Step, output: &Value) -> (String, Value) {
 
 fn logic_container_preview(output: &Value) -> (String, Value) {
     let branch = output.get("branch").and_then(|v| v.as_str()).unwrap_or("?");
-    let result = output.get("result").and_then(|v| v.as_bool()).unwrap_or(false);
+    let result = output
+        .get("result")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let summary = format!("逻辑判断 → 分支 [{}] = {}", branch, result);
     let detail = output.clone();
     (summary, detail)
@@ -472,7 +576,11 @@ pub fn bundle_step_output(run_id: &str, step: &Step, output: &Value) -> Option<P
         _ => bundle_generic(&bundle_dir, output),
     };
 
-    if ok { Some(bundle_dir) } else { None }
+    if ok {
+        Some(bundle_dir)
+    } else {
+        None
+    }
 }
 
 fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
@@ -487,7 +595,10 @@ fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
     });
 
     let mut ok = true;
-    if let Err(e) = fs::write(dir.join("response.json"), serde_json::to_string_pretty(&response_json).unwrap_or_default()) {
+    if let Err(e) = fs::write(
+        dir.join("response.json"),
+        serde_json::to_string_pretty(&response_json).unwrap_or_default(),
+    ) {
         warn!("bundle http response.json: {}", e);
         ok = false;
     }
@@ -503,7 +614,10 @@ fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
 fn bundle_shell(dir: &PathBuf, output: &Value) -> bool {
     let stdout = output.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
     let stderr = output.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
-    let exit_code = output.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let exit_code = output
+        .get("exit_code")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(-1);
 
     let mut ok = true;
     if let Err(e) = fs::write(dir.join("stdout.txt"), stdout) {
@@ -581,7 +695,10 @@ fn bundle_browser(dir: &PathBuf, output: &Value) -> bool {
         "url": output.get("url").and_then(|v| v.as_str()).unwrap_or(""),
         "title": output.get("title").and_then(|v| v.as_str()).unwrap_or(""),
     });
-    if let Err(e) = fs::write(dir.join("meta.json"), serde_json::to_string_pretty(&meta).unwrap_or_default()) {
+    if let Err(e) = fs::write(
+        dir.join("meta.json"),
+        serde_json::to_string_pretty(&meta).unwrap_or_default(),
+    ) {
         warn!("bundle browser meta.json: {}", e);
         ok = false;
     }

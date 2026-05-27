@@ -15,9 +15,7 @@ pub enum ErrorStrategy {
     Branch { step_id: String },
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Workflow {
     pub name: String,
     pub description: Option<String>,
@@ -25,7 +23,6 @@ pub struct Workflow {
     #[serde(alias = "params")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
-
 
 /// 可视化条件（单个条件）
 #[derive(Debug, Clone, Serialize, Deserialize)]

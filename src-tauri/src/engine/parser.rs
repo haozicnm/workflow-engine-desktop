@@ -5,9 +5,8 @@
 //
 // parser 只做验证和 body step 递归处理，不再做类型名/字段名转换。
 
-
 use crate::engine::workflow::{Step, Workflow};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::Value;
 
 // v8: 容器类型从 registry（node-schema.json）读取，不再硬编码
@@ -21,8 +20,8 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
         .or_else(|_| serde_yaml::from_str(json_str))
         .map_err(|e| anyhow!("工作流解析失败: {}", e))?;
 
-    let mut wf: Workflow = serde_json::from_value(raw.clone())
-        .map_err(|e| anyhow!("工作流结构解析失败: {}", e))?;
+    let mut wf: Workflow =
+        serde_json::from_value(raw.clone()).map_err(|e| anyhow!("工作流结构解析失败: {}", e))?;
 
     // 基本校验
     if wf.name.trim().is_empty() {
@@ -71,7 +70,8 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
             if !step_ids.contains(rc.ref_step.as_str()) {
                 return Err(anyhow!(
                     "步骤 '{}' 的 runCondition 引用了不存在的步骤 '{}'",
-                    step.id, rc.ref_step
+                    step.id,
+                    rc.ref_step
                 ));
             }
             if rc.ref_step == step.id {
@@ -87,7 +87,8 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
             if !step_ids.contains(step_id.as_str()) {
                 return Err(anyhow!(
                     "步骤 '{}' 的 onError branch 引用了不存在的步骤 '{}'",
-                    step.id, step_id
+                    step.id,
+                    step_id
                 ));
             }
             if step_id == &step.id {
@@ -105,7 +106,9 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
             if !step_ids.contains(full_id.as_str()) {
                 return Err(anyhow!(
                     "步骤 '{}' 中引用了不存在的步骤 '{}'（{{{{step_{}}}}} 指向的步骤不存在）",
-                    step.id, full_id, ref_id
+                    step.id,
+                    full_id,
+                    ref_id
                 ));
             }
         }
@@ -150,23 +153,31 @@ impl StepParser for IterationParser {
         let raw_steps: Vec<Step> = if actions.is_empty() {
             step.body_steps.clone().unwrap_or_default()
         } else {
-            actions.iter()
+            actions
+                .iter()
                 .map(|a| convert_action_to_step(a))
                 .collect::<Result<Vec<_>>>()?
         };
 
-        let body_steps: Vec<Step> = raw_steps.into_iter()
+        let body_steps: Vec<Step> = raw_steps
+            .into_iter()
             .map(|s| convert_step(&s, true))
             .collect::<Result<Vec<_>>>()?;
 
-        Ok((step.step_type.clone(), step.config.clone(), Some(body_steps)))
+        Ok((
+            step.step_type.clone(),
+            step.config.clone(),
+            Some(body_steps),
+        ))
     }
 }
 
 /// 简单步骤 Parser: http, shell, script, delay, notify 等
 struct SimpleStepParser;
 impl StepParser for SimpleStepParser {
-    fn can_parse(_step_type: &str) -> bool { true }
+    fn can_parse(_step_type: &str) -> bool {
+        true
+    }
 
     fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
         Ok((step.step_type.clone(), step.config.clone(), None))
@@ -193,13 +204,18 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
 
     // 非迭代类型也可能有 body_steps（如 sub_workflow），同样递归转换
     let body_steps = parsed_body.or_else(|| {
-        step.body_steps.as_ref().map(|steps| {
-            steps.iter()
-                .map(|s| convert_step(s, true))
-                .collect::<Result<Vec<_>>>()
-        }).transpose().ok().flatten()
+        step.body_steps
+            .as_ref()
+            .map(|steps| {
+                steps
+                    .iter()
+                    .map(|s| convert_step(s, true))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()
+            .ok()
+            .flatten()
     });
-
 
     Ok(Step {
         id: step.id.clone(),
@@ -219,7 +235,8 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
         condition_group: step.condition_group.clone().or_else(|| {
             // 如果 JSON 的 condition_group 在 config 内而非 step 顶层，
             // 自动提升到 step 级别，避免 executor 的 resolve_config 改变类型后反序列化失败
-            step.config.get("condition_group")
+            step.config
+                .get("condition_group")
                 .or_else(|| step.config.get("conditionGroup"))
                 .and_then(|cg| serde_json::from_value(cg.clone()).ok())
         }),
@@ -231,33 +248,39 @@ fn convert_step(step: &Step, is_recursive: bool) -> Result<Step> {
 /// Action: { id, type, label, params }
 /// Step:   { id, name(=label), type, config(=params) }
 fn convert_action_to_step(action: &Value) -> Result<Step> {
-    let map = action.as_object()
+    let map = action
+        .as_object()
         .ok_or_else(|| anyhow!("action 不是对象"))?;
 
-    let id = map.get("id")
+    let id = map
+        .get("id")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string();
 
-    let step_type = map.get("type")
+    let step_type = map
+        .get("type")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string();
 
-    let name = map.get("label")
+    let name = map
+        .get("label")
         .and_then(|v| v.as_str())
         .unwrap_or(&step_type)
         .to_string();
 
     // params → config
-    let mut config = map.get("params")
+    let mut config = map
+        .get("params")
         .cloned()
         .or_else(|| map.get("config").cloned())
         .unwrap_or(serde_json::json!({}));
 
     // v8: 提取容器类型的 actions — 从 params.actions 中提取并放在 Step.actions
     let actions = if crate::nodes::registry::is_container(&step_type.as_str()) {
-        config.as_object()
+        config
+            .as_object()
             .and_then(|c| c.get("actions"))
             .and_then(|v| v.as_array())
             .map(|a| a.clone())
@@ -282,24 +305,27 @@ fn convert_action_to_step(action: &Value) -> Result<Step> {
 /// 归一化 action：params → config，补 label
 /// v8: 从 parser 私有 fn 提升为 pub，供 executor 在容器节点前调用
 pub fn normalize_actions(actions: &[Value]) -> Vec<Value> {
-    actions.iter().map(|action| {
-        let mut a = action.clone();
-        if let Value::Object(ref mut map) = a {
-            if let Some(params) = map.remove("params") {
-                map.insert("config".to_string(), params);
+    actions
+        .iter()
+        .map(|action| {
+            let mut a = action.clone();
+            if let Value::Object(ref mut map) = a {
+                if let Some(params) = map.remove("params") {
+                    map.insert("config".to_string(), params);
+                }
+                // 补 label
+                if !map.contains_key("label") {
+                    let action_type = map
+                        .get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    map.insert("label".to_string(), Value::String(action_type.to_string()));
+                }
             }
-            // 补 label
-            if !map.contains_key("label") {
-                let action_type = map.get("type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
-                map.insert("label".to_string(), Value::String(action_type.to_string()));
-            }
-        }
-        a
-    }).collect()
+            a
+        })
+        .collect()
 }
-
 
 /// 递归收集所有步骤（包括子步骤）
 fn flatten_all_steps(steps: &[Step]) -> Vec<&Step> {
@@ -319,8 +345,11 @@ pub fn auto_order_steps(steps: &[Step]) -> Vec<usize> {
         return Vec::new();
     }
 
-    let id_to_idx: HashMap<&str, usize> = steps.iter().enumerate()
-        .map(|(i, s)| (s.id.as_str(), i)).collect();
+    let id_to_idx: HashMap<&str, usize> = steps
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.as_str(), i))
+        .collect();
 
     let mut deps: Vec<Vec<usize>> = vec![Vec::new(); n];
     for (i, step) in steps.iter().enumerate() {
@@ -343,8 +372,7 @@ pub fn auto_order_steps(steps: &[Step]) -> Vec<usize> {
         }
     }
 
-    let mut queue: std::collections::VecDeque<usize> = (0..n)
-        .filter(|&i| in_deg[i] == 0).collect();
+    let mut queue: std::collections::VecDeque<usize> = (0..n).filter(|&i| in_deg[i] == 0).collect();
     let mut order = Vec::with_capacity(n);
 
     while let Some(j) = queue.pop_front() {
@@ -374,7 +402,8 @@ fn extract_step_refs(s: &str) -> Vec<String> {
     let prefix1 = "output.step_";
     for (pos, _) in s.match_indices(prefix1) {
         let rest = &s[pos + prefix1.len()..];
-        let id: String = rest.chars()
+        let id: String = rest
+            .chars()
             .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
             .collect();
         if !id.is_empty() {
@@ -385,7 +414,8 @@ fn extract_step_refs(s: &str) -> Vec<String> {
     let prefix2 = "{{step_";
     for (pos, _) in s.match_indices(prefix2) {
         let rest = &s[pos + prefix2.len()..];
-        let id: String = rest.chars()
+        let id: String = rest
+            .chars()
             .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
             .collect();
         if !id.is_empty() {
@@ -401,9 +431,9 @@ fn extract_step_refs(s: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::workflow::ErrorStrategy;
     use crate::engine::context::ExecutionContext;
-    use crate::engine::workflow::{Workflow, Step};
+    use crate::engine::workflow::ErrorStrategy;
+    use crate::engine::workflow::{Step, Workflow};
 
     fn make_step(id: &str, rc_ref: Option<&str>, on_error: Option<ErrorStrategy>) -> Step {
         Step {
@@ -440,7 +470,13 @@ mod tests {
     fn valid_branch_on_error_passes() {
         let steps = vec![
             make_step("step_1", None, None),
-            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
+            make_step(
+                "step_2",
+                None,
+                Some(ErrorStrategy::Branch {
+                    step_id: "step_1".into(),
+                }),
+            ),
         ];
         assert!(validate_step_references(&steps).is_ok());
     }
@@ -449,7 +485,13 @@ mod tests {
     fn missing_branch_target_fails() {
         let steps = vec![
             make_step("step_1", None, None),
-            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_missing".into() })),
+            make_step(
+                "step_2",
+                None,
+                Some(ErrorStrategy::Branch {
+                    step_id: "step_missing".into(),
+                }),
+            ),
         ];
         let err = validate_step_references(&steps).unwrap_err();
         assert!(err.to_string().contains("step_missing"));
@@ -457,9 +499,13 @@ mod tests {
 
     #[test]
     fn self_referencing_branch_fails() {
-        let steps = vec![
-            make_step("step_1", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
-        ];
+        let steps = vec![make_step(
+            "step_1",
+            None,
+            Some(ErrorStrategy::Branch {
+                step_id: "step_1".into(),
+            }),
+        )];
         let err = validate_step_references(&steps).unwrap_err();
         assert!(err.to_string().contains("死循环"));
     }
@@ -490,9 +536,16 @@ mod tests {
         assert_eq!(body[0].step_type, "browser");
         // v8: actions 从 params 提取到 step.actions
         // 该测试的 actions: [] 为空数组，但 container 类型会保留空 actions
-        let has_actions = body[0].actions.as_ref().map(|a| !a.is_empty()).unwrap_or(false);
+        let has_actions = body[0]
+            .actions
+            .as_ref()
+            .map(|a| !a.is_empty())
+            .unwrap_or(false);
         // body step 容器类型需要 actions（执行时由 executor 归一化补充）
-        assert!(body[0].actions.is_some(), "container body step should have actions field");
+        assert!(
+            body[0].actions.is_some(),
+            "container body step should have actions field"
+        );
     }
 
     #[test]
@@ -508,7 +561,11 @@ mod tests {
         }"#;
         let err = parse_workflow(json).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("step_99"), "expected error about step_99, got: {}", msg);
+        assert!(
+            msg.contains("step_99"),
+            "expected error about step_99, got: {}",
+            msg
+        );
     }
 
     // ─── D2: parser 边界测试 ───
@@ -604,7 +661,10 @@ steps:
         // v8: 类型名透传
         assert_eq!(wf.steps[0].step_type, "logic");
         // v8: condition_group 由 convert_step 提升到 step 级别
-        assert!(wf.steps[0].condition_group.is_some(), "condition_group should be on step");
+        assert!(
+            wf.steps[0].condition_group.is_some(),
+            "condition_group should be on step"
+        );
     }
 
     #[test]
@@ -641,8 +701,11 @@ steps:
         ctx.set_var("x".into(), serde_json::json!("var_val"));
         ctx.set_output("x", serde_json::json!("output_val"));
         let val = ctx.resolve_var("x");
-        assert_eq!(val.and_then(|v| v.as_str()), Some("output_val"),
-            "step_outputs should take priority over variables for same key");
+        assert_eq!(
+            val.and_then(|v| v.as_str()),
+            Some("output_val"),
+            "step_outputs should take priority over variables for same key"
+        );
     }
 
     #[test]
@@ -668,9 +731,7 @@ steps:
 
     #[test]
     fn run_condition_with_self_reference_warns() {
-        let steps = vec![
-            make_step("step_1", Some("step_1"), None),
-        ];
+        let steps = vec![make_step("step_1", Some("step_1"), None)];
         // self-referencing runCondition is a warning, not an error
         assert!(validate_step_references(&steps).is_ok());
     }
@@ -680,7 +741,7 @@ steps:
         use crate::engine::workflow::ErrorStrategy;
         let default = ErrorStrategy::default();
         match default {
-            ErrorStrategy::Fail => {}  // expected
+            ErrorStrategy::Fail => {} // expected
             _ => panic!("default ErrorStrategy should be Fail"),
         }
     }
@@ -689,7 +750,13 @@ steps:
     fn error_strategy_branch_with_valid_target() {
         let steps = vec![
             make_step("step_1", None, None),
-            make_step("step_2", None, Some(ErrorStrategy::Branch { step_id: "step_1".into() })),
+            make_step(
+                "step_2",
+                None,
+                Some(ErrorStrategy::Branch {
+                    step_id: "step_1".into(),
+                }),
+            ),
         ];
         assert!(validate_step_references(&steps).is_ok());
     }
@@ -714,6 +781,9 @@ steps:
         let order = auto_order_steps(&steps);
         let pos1 = order.iter().position(|&i| i == 0);
         let pos2 = order.iter().position(|&i| i == 1);
-        assert!(pos1 < pos2, "step_1 must come before step_2 in dependency order");
+        assert!(
+            pos1 < pos2,
+            "step_1 must come before step_2 in dependency order"
+        );
     }
 }

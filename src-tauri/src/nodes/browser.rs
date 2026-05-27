@@ -1,16 +1,16 @@
 // nodes/browser.rs — 浏览器节点（Python sidecar + Playwright）
 // v2: 增加健康检查、超时保护、自动重启
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Result, anyhow};
-use tokio::sync::{Mutex, RwLock};
-use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, ChildStdout};
+use tokio::sync::{Mutex, RwLock};
 use tracing::{info, warn};
 
 /// Windows: 禁止子进程弹出 cmd 窗口
@@ -64,9 +64,13 @@ impl BrowserSidecar {
             .spawn()
             .map_err(|e| anyhow!("启动 Python sidecar 失败: {}", e))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| anyhow!("无法获取 sidecar stdin"))?;
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| anyhow!("无法获取 sidecar stdout"))?;
 
         let sidecar = BrowserSidecar {
@@ -79,7 +83,9 @@ impl BrowserSidecar {
         // 等待 ready 信号
         let ready = sidecar.read_response().await?;
         if ready.get("type").and_then(|v| v.as_str()) != Some("ready") {
-            sidecar.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
+            sidecar
+                .healthy
+                .store(false, std::sync::atomic::Ordering::SeqCst);
             return Err(anyhow!("Sidecar 启动异常: {:?}", ready));
         }
 
@@ -87,27 +93,38 @@ impl BrowserSidecar {
     }
 
     /// 发送请求并等待响应（30 秒超时保护）
-    pub async fn send_action(&self, action: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn send_action(
+        &self,
+        action: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let result = tokio::time::timeout(
             Duration::from_secs(30),
             self.send_action_inner(action, params),
-        ).await;
+        )
+        .await;
 
         match result {
             Ok(Ok(val)) => Ok(val),
             Ok(Err(e)) => {
-                self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
+                self.healthy
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
                 Err(e)
             }
             Err(_elapsed) => {
-                self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
+                self.healthy
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
                 Err(anyhow!("浏览器操作超时（30 秒）"))
             }
         }
     }
 
     /// 内部：无超时的发送逻辑
-    async fn send_action_inner(&self, action: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+    async fn send_action_inner(
+        &self,
+        action: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let id = uuid::Uuid::new_v4().to_string();
         let request = serde_json::json!({
             "id": id,
@@ -127,18 +144,26 @@ impl BrowserSidecar {
         // 读取响应
         let response = self.read_response().await?;
 
-        let success = response.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+        let success = response
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         // 提取 CDP 事件（ActionGuard 用 — 当前通过 verify action 显式检查）
-        let _cdp_events = response.get("events")
+        let _cdp_events = response
+            .get("events")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
 
         if success {
-            Ok(response.get("data").cloned().unwrap_or(serde_json::Value::Null))
+            Ok(response
+                .get("data")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null))
         } else {
-            let error = response.get("error")
+            let error = response
+                .get("error")
                 .and_then(|v| v.as_str())
                 .unwrap_or("未知错误");
             Err(anyhow!("浏览器操作失败: {}", error))
@@ -152,7 +177,8 @@ impl BrowserSidecar {
             let mut line = String::new();
             let n = stdout.read_line(&mut line).await?;
             if n == 0 {
-                self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
+                self.healthy
+                    .store(false, std::sync::atomic::Ordering::SeqCst);
                 return Err(anyhow!("Sidecar 进程已退出"));
             }
             let line = line.trim();
@@ -163,7 +189,9 @@ impl BrowserSidecar {
                 .map_err(|e| anyhow!("Sidecar 响应解析失败: {} — {}", e, line))?;
 
             // CDP 事件行（无 "id" 字段，有 "type": "event"）— 跳过，等下一个响应行
-            if parsed.get("id").is_none() && parsed.get("type").and_then(|v| v.as_str()) == Some("event") {
+            if parsed.get("id").is_none()
+                && parsed.get("type").and_then(|v| v.as_str()) == Some("event")
+            {
                 // 事件行 — 未来会路由到事件通道，目前先跳过
                 continue;
             }
@@ -174,8 +202,11 @@ impl BrowserSidecar {
 
     /// 关闭 sidecar
     pub async fn shutdown(&self) -> Result<()> {
-        self.healthy.store(false, std::sync::atomic::Ordering::SeqCst);
-        let _ = self.send_action_inner("shutdown", serde_json::json!({})).await;
+        self.healthy
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let _ = self
+            .send_action_inner("shutdown", serde_json::json!({}))
+            .await;
         // 等待子进程退出（30s 超时，超时则强制 kill）
         let mut guard = self.child.lock().await;
         if let Some(ref mut child) = *guard {
@@ -214,21 +245,31 @@ fn find_sidecar_script() -> Result<std::path::PathBuf> {
     if let Ok(exe_dir) = std::env::current_exe() {
         if let Some(dir) = exe_dir.parent() {
             let p = dir.join("sidecars").join("playwright_driver.py");
-            if p.exists() { return Ok(p); }
+            if p.exists() {
+                return Ok(p);
+            }
         }
     }
 
     // 2. 相对于当前工作目录（开发模式）
     let cwd_script = std::path::Path::new("src-tauri/sidecars/playwright_driver.py");
-    if cwd_script.exists() { return Ok(cwd_script.to_path_buf()); }
+    if cwd_script.exists() {
+        return Ok(cwd_script.to_path_buf());
+    }
 
     // 3. 相对于 CARGO_MANIFEST_DIR
     if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        let p = std::path::PathBuf::from(manifest).join("sidecars").join("playwright_driver.py");
-        if p.exists() { return Ok(p); }
+        let p = std::path::PathBuf::from(manifest)
+            .join("sidecars")
+            .join("playwright_driver.py");
+        if p.exists() {
+            return Ok(p);
+        }
     }
 
-    Err(anyhow!("找不到 playwright_driver.py。请确保 sidecars/ 目录存在"))
+    Err(anyhow!(
+        "找不到 playwright_driver.py。请确保 sidecars/ 目录存在"
+    ))
 }
 
 /// 查找内置 Python（打包在 exe 旁的 embed/ 目录）
@@ -262,14 +303,15 @@ fn find_python() -> Result<std::path::PathBuf> {
             if !path.is_empty() {
                 tried.push(format!("用户配置: {}", path));
                 let p = std::path::PathBuf::from(path);
-                if p.exists() { return Ok(p); }
+                if p.exists() {
+                    return Ok(p);
+                }
             }
         }
     }
 
     // 3. 系统 PATH 中的 Python
-    let system_python = which::which("python3")
-        .or_else(|_| which::which("python"));
+    let system_python = which::which("python3").or_else(|_| which::which("python"));
     if let Ok(ref p) = system_python {
         tried.push(format!("系统 PATH: {:?}", p));
     } else {
@@ -328,7 +370,9 @@ fn find_windows_python() -> Result<std::path::PathBuf> {
     ];
 
     for base in &candidates {
-        if !base.exists() { continue }
+        if !base.exists() {
+            continue;
+        }
         if let Ok(entries) = std::fs::read_dir(base) {
             // Find the newest Python version
             let mut pythons: Vec<PathBuf> = entries
@@ -371,7 +415,9 @@ async fn is_sidecar_healthy(sidecar: &Arc<BrowserSidecar>) -> bool {
     match tokio::time::timeout(
         Duration::from_secs(3),
         sidecar.send_action_inner("ping", serde_json::json!({})),
-    ).await {
+    )
+    .await
+    {
         Ok(Ok(_)) => true,
         _ => {
             warn!("Sidecar ping 失败，标记为不可用");
@@ -419,7 +465,10 @@ async fn sidecar_heartbeat_loop() {
 
         // 心跳失败 → 自动重启
         if !info.healthy {
-            warn!("心跳检测 sidecar 不可用，尝试自动重启 (第 {} 次)...", restart_count + 1);
+            warn!(
+                "心跳检测 sidecar 不可用，尝试自动重启 (第 {} 次)...",
+                restart_count + 1
+            );
             let mut guard = SIDECAR.write().await;
             // 清理旧进程
             if let Some(ref old) = *guard {
@@ -467,7 +516,11 @@ pub fn start_heartbeat() {
 async fn check_playwright_installed(python: &std::path::Path) -> bool {
     let mut cmd = tokio::process::Command::new(python);
     hide_console(&mut cmd);
-    match cmd.args(["-c", "import playwright; print('ok')"]).output().await {
+    match cmd
+        .args(["-c", "import playwright; print('ok')"])
+        .output()
+        .await
+    {
         Ok(o) => o.status.success(),
         Err(_) => false,
     }
@@ -479,8 +532,9 @@ async fn install_playwright_online(python: &std::path::Path) -> Result<()> {
 
     // PyPI 直连
     let mut cmd = tokio::process::Command::new(python);
-        hide_console(&mut cmd);
-        let install = cmd.args(["-m", "pip", "install", "playwright", "-q"])
+    hide_console(&mut cmd);
+    let install = cmd
+        .args(["-m", "pip", "install", "playwright", "-q"])
         .output()
         .await
         .map_err(|e| anyhow!("执行 pip 失败: {}", e))?;
@@ -489,10 +543,19 @@ async fn install_playwright_online(python: &std::path::Path) -> Result<()> {
         // 清华镜像重试
         info!("PyPI 直连失败，尝试清华镜像...");
         let mut cmd = tokio::process::Command::new(python);
-            hide_console(&mut cmd);
-            let install_mirror = cmd.args(["-m", "pip", "install", "playwright", "-q",
-                   "-i", "https://pypi.tuna.tsinghua.edu.cn/simple",
-                   "--trusted-host", "pypi.tuna.tsinghua.edu.cn"])
+        hide_console(&mut cmd);
+        let install_mirror = cmd
+            .args([
+                "-m",
+                "pip",
+                "install",
+                "playwright",
+                "-q",
+                "-i",
+                "https://pypi.tuna.tsinghua.edu.cn/simple",
+                "--trusted-host",
+                "pypi.tuna.tsinghua.edu.cn",
+            ])
             .output()
             .await
             .map_err(|e| anyhow!("执行 pip (镜像) 失败: {}", e))?;
@@ -516,7 +579,8 @@ async fn install_playwright_chromium(python: &std::path::Path) -> Result<()> {
     info!("下载 Playwright Chromium（可能需要几分钟）...");
     let mut cmd = tokio::process::Command::new(python);
     hide_console(&mut cmd);
-    let install = cmd.args(["-m", "playwright", "install", "chromium"])
+    let install = cmd
+        .args(["-m", "playwright", "install", "chromium"])
         .output()
         .await
         .map_err(|e| anyhow!("执行 playwright install 失败: {}", e))?;
@@ -548,7 +612,9 @@ fn has_system_browser() -> Option<&'static str> {
             format!("{}/Microsoft/Edge/Application/msedge.exe", local),
         ];
         for p in &edge_paths {
-            if std::path::Path::new(p).exists() { return Some("Edge"); }
+            if std::path::Path::new(p).exists() {
+                return Some("Edge");
+            }
         }
 
         let chrome_paths = [
@@ -557,15 +623,23 @@ fn has_system_browser() -> Option<&'static str> {
             format!("{}/Google/Chrome/Application/chrome.exe", local),
         ];
         for p in &chrome_paths {
-            if std::path::Path::new(p).exists() { return Some("Chrome"); }
+            if std::path::Path::new(p).exists() {
+                return Some("Chrome");
+            }
         }
         None
     }
     #[cfg(not(target_os = "windows"))]
     {
-        if which::which("microsoft-edge").is_ok() { return Some("Edge"); }
-        if which::which("google-chrome-stable").is_ok() || which::which("google-chrome").is_ok() { return Some("Chrome"); }
-        if which::which("chromium-browser").is_ok() || which::which("chromium").is_ok() { return Some("Chromium"); }
+        if which::which("microsoft-edge").is_ok() {
+            return Some("Edge");
+        }
+        if which::which("google-chrome-stable").is_ok() || which::which("google-chrome").is_ok() {
+            return Some("Chrome");
+        }
+        if which::which("chromium-browser").is_ok() || which::which("chromium").is_ok() {
+            return Some("Chromium");
+        }
         None
     }
 }
@@ -589,7 +663,8 @@ print('ok' if chromium_dir else 'missing')
 
 /// 检测内置 playwright-browsers（安装包附带的 Chromium）
 fn has_bundled_chromium() -> bool {
-    std::env::current_exe().ok()
+    std::env::current_exe()
+        .ok()
         .and_then(|p| p.parent().map(|d| d.join("playwright-browsers")))
         .map(|p| p.exists())
         .unwrap_or(false)
@@ -601,8 +676,9 @@ async fn preflight_check() -> Result<()> {
 
     // 1. 检查 Python 版本
     let mut cmd = tokio::process::Command::new(&python);
-        hide_console(&mut cmd);
-        let output = cmd.arg("--version")
+    hide_console(&mut cmd);
+    let output = cmd
+        .arg("--version")
         .output()
         .await
         .map_err(|e| anyhow!("执行 Python 失败: {}", e))?;
@@ -612,7 +688,10 @@ async fn preflight_check() -> Result<()> {
     if let Some(ver) = version_str.strip_prefix("Python ") {
         let major: u32 = ver.split('.').next().unwrap_or("0").parse().unwrap_or(0);
         if major < 3 {
-            return Err(anyhow!("Python 版本过低: {}。需要 Python 3.8+", version_str));
+            return Err(anyhow!(
+                "Python 版本过低: {}。需要 Python 3.8+",
+                version_str
+            ));
         }
         info!("Python 版本: {}", version_str);
     }
@@ -680,12 +759,22 @@ async fn get_or_start_sidecar() -> Result<Arc<BrowserSidecar>> {
 // ─── 浏览器节点实现 ───
 
 /// 公共接口：发送 action 到 sidecar（供 web_scrape 等节点调用）
-pub async fn send_sidecar_action(action: &str, params: &serde_json::Value) -> Result<serde_json::Value> {
+pub async fn send_sidecar_action(
+    action: &str,
+    params: &serde_json::Value,
+) -> Result<serde_json::Value> {
     let sidecar = get_or_start_sidecar().await?;
 
     // 自动 launch（pick 操作由 Python 端自行管理浏览器，不自动 launch）
-    if action != "launch" && action != "close" && action != "shutdown" && action != "ping"
-       && action != "pick" && action != "pick_start" && action != "pick_next" && action != "pick_stop" {
+    if action != "launch"
+        && action != "close"
+        && action != "shutdown"
+        && action != "ping"
+        && action != "pick"
+        && action != "pick_start"
+        && action != "pick_next"
+        && action != "pick_stop"
+    {
         // 录制需要用户可见浏览器，非 headless
         let headless = action != "recording_start";
         let launch_params = serde_json::json!({"headless": headless});
@@ -700,13 +789,20 @@ pub struct BrowserNode;
 
 #[async_trait]
 impl NodeExecutor for BrowserNode {
-    async fn execute(&self, step: &Step, ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let action = config.get("action")
+        let action = config
+            .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("navigate");
 
-        let mut params = config.get("params")
+        let mut params = config
+            .get("params")
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
 
@@ -724,12 +820,16 @@ impl NodeExecutor for BrowserNode {
         // 对于需要 launch 的操作，自动先 launch
         if action != "launch" && action != "close" && action != "ping" {
             let headless = action != "recording_start" && action != "pick";
-            let mut launch_params = config.get("launch")
+            let mut launch_params = config
+                .get("launch")
                 .cloned()
                 .unwrap_or_else(|| serde_json::json!({"headless": headless}));
 
             // 从上下文读取浏览器通道设置（用户配置 > step config > 自动检测）
-            let channel = step.config.get("channel").and_then(|v| v.as_str())
+            let channel = step
+                .config
+                .get("channel")
+                .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
                 .or_else(|| {
@@ -747,7 +847,10 @@ impl NodeExecutor for BrowserNode {
             }
 
             // 可执行路径（WSL 指向 Windows 浏览器等场景）
-            let exe_path = step.config.get("executable_path").and_then(|v| v.as_str())
+            let exe_path = step
+                .config
+                .get("executable_path")
+                .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
                 .or_else(|| {
@@ -791,16 +894,33 @@ impl NodeExecutor for BrowserNode {
 // ═══════════════════════════════════════════════
 
 /// 辅助：获取 sidecar，自动 launch
-async fn ensure_sidecar(action: &str, config: &serde_json::Value, ctx: &ExecutionContext) -> Result<Arc<BrowserSidecar>> {
+async fn ensure_sidecar(
+    action: &str,
+    config: &serde_json::Value,
+    ctx: &ExecutionContext,
+) -> Result<Arc<BrowserSidecar>> {
     let sidecar = get_or_start_sidecar().await?;
     if action != "launch" && action != "close" && action != "ping" {
         let headless = action != "recording_start" && action != "pick";
-        let mut launch_params = config.get("launch").cloned()
+        let mut launch_params = config
+            .get("launch")
+            .cloned()
             .unwrap_or_else(|| serde_json::json!({"headless": headless}));
-        let channel = config.get("channel").and_then(|v| v.as_str()).filter(|s| !s.is_empty())
-            .or_else(|| if ctx.browser_channel != "auto" && !ctx.browser_channel.is_empty() { Some(ctx.browser_channel.as_str()) } else { None });
+        let channel = config
+            .get("channel")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                if ctx.browser_channel != "auto" && !ctx.browser_channel.is_empty() {
+                    Some(ctx.browser_channel.as_str())
+                } else {
+                    None
+                }
+            });
         if let Some(ch) = channel {
-            if let Some(obj) = launch_params.as_object_mut() { obj.insert("channel".to_string(), serde_json::json!(ch)); }
+            if let Some(obj) = launch_params.as_object_mut() {
+                obj.insert("channel".to_string(), serde_json::json!(ch));
+            }
         }
         let _ = sidecar.send_action("launch", launch_params).await;
     }
@@ -833,15 +953,15 @@ macro_rules! browser_sub_node {
     };
 }
 
-browser_sub_node!(BrowserNavigateNode,   "navigate",   "浏览器导航");
-browser_sub_node!(BrowserClickNode,      "click",      "浏览器点击");
-browser_sub_node!(BrowserFillNode,       "fill",       "浏览器填写");
-browser_sub_node!(BrowserExtractNode,    "extract",    "浏览器提取");
+browser_sub_node!(BrowserNavigateNode, "navigate", "浏览器导航");
+browser_sub_node!(BrowserClickNode, "click", "浏览器点击");
+browser_sub_node!(BrowserFillNode, "fill", "浏览器填写");
+browser_sub_node!(BrowserExtractNode, "extract", "浏览器提取");
 browser_sub_node!(BrowserScreenshotNode, "screenshot", "浏览器截图");
-browser_sub_node!(BrowserEvaluateNode,   "evaluate",   "浏览器执行JS");
-browser_sub_node!(BrowserScrollNode,     "scroll",     "浏览器滚动");
-browser_sub_node!(BrowserWaitNode,       "wait",       "浏览器等待");
-browser_sub_node!(BrowserPdfNode,        "pdf",        "浏览器PDF");
+browser_sub_node!(BrowserEvaluateNode, "evaluate", "浏览器执行JS");
+browser_sub_node!(BrowserScrollNode, "scroll", "浏览器滚动");
+browser_sub_node!(BrowserWaitNode, "wait", "浏览器等待");
+browser_sub_node!(BrowserPdfNode, "pdf", "浏览器PDF");
 
 /// 错误截图：保存浏览器当前画面到 screenshots/ 目录
 /// 直接从 sidecar 实例截图，避免 send_sidecar_action 的 auto-launch 逻辑

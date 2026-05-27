@@ -5,16 +5,16 @@
 //   - 桌面录制（通过 desktop_recorder.py sidecar）
 //   - 混合录制（浏览器 + 桌面同时录制）
 //   - 录制结果 → YAML 工作流自动转换
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
 use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
@@ -51,9 +51,13 @@ impl DesktopRecorder {
             .spawn()
             .map_err(|e| anyhow!("启动桌面录制器失败: {}", e))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| anyhow!("无法获取桌面录制器 stdin"))?;
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| anyhow!("无法获取桌面录制器 stdout"))?;
 
         let recorder = DesktopRecorder {
@@ -72,7 +76,11 @@ impl DesktopRecorder {
         Ok(recorder)
     }
 
-    pub async fn send_action(&self, action: &str, params: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn send_action(
+        &self,
+        action: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let id = uuid::Uuid::new_v4().to_string();
         let request = serde_json::json!({
             "id": id,
@@ -89,11 +97,20 @@ impl DesktopRecorder {
         }
 
         let response = self.read_response().await?;
-        let success = response.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+        let success = response
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if success {
-            Ok(response.get("data").cloned().unwrap_or(serde_json::Value::Null))
+            Ok(response
+                .get("data")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null))
         } else {
-            let error = response.get("error").and_then(|v| v.as_str()).unwrap_or("未知错误");
+            let error = response
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("未知错误");
             Err(anyhow!("桌面录制操作失败: {}", error))
         }
     }
@@ -155,23 +172,32 @@ fn find_desktop_recorder_script() -> Result<std::path::PathBuf> {
     if let Ok(exe_dir) = std::env::current_exe() {
         if let Some(dir) = exe_dir.parent() {
             let p = dir.join("sidecars").join("desktop_recorder.py");
-            if p.exists() { return Ok(p); }
+            if p.exists() {
+                return Ok(p);
+            }
         }
     }
     // 2. 开发模式
     let cwd_script = std::path::Path::new("src-tauri/sidecars/desktop_recorder.py");
-    if cwd_script.exists() { return Ok(cwd_script.to_path_buf()); }
+    if cwd_script.exists() {
+        return Ok(cwd_script.to_path_buf());
+    }
     // 3. CARGO_MANIFEST_DIR
     if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        let p = std::path::PathBuf::from(manifest).join("sidecars").join("desktop_recorder.py");
-        if p.exists() { return Ok(p); }
+        let p = std::path::PathBuf::from(manifest)
+            .join("sidecars")
+            .join("desktop_recorder.py");
+        if p.exists() {
+            return Ok(p);
+        }
     }
     Err(anyhow!("找不到 desktop_recorder.py"))
 }
 
 // ─── 全局录制状态（跨 step_test 调用共享） ───
 use std::sync::atomic::{AtomicBool, Ordering};
-static DESKTOP_RECORDER: tokio::sync::RwLock<Option<Arc<DesktopRecorder>>> = tokio::sync::RwLock::const_new(None);
+static DESKTOP_RECORDER: tokio::sync::RwLock<Option<Arc<DesktopRecorder>>> =
+    tokio::sync::RwLock::const_new(None);
 static DESKTOP_RECORDING: AtomicBool = AtomicBool::new(false);
 static RECORDING_MODE: tokio::sync::RwLock<String> = tokio::sync::RwLock::const_new(String::new());
 static RECORDING_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -182,7 +208,8 @@ static LINUX_RECORDER: std::sync::Mutex<Option<crate::platform::recording::Linux
     std::sync::Mutex::new(None);
 
 #[cfg(target_os = "linux")]
-fn get_linux_recorder() -> std::sync::MutexGuard<'static, Option<crate::platform::recording::LinuxRecordingBackend>> {
+fn get_linux_recorder(
+) -> std::sync::MutexGuard<'static, Option<crate::platform::recording::LinuxRecordingBackend>> {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
         // 初始化占位
@@ -216,7 +243,11 @@ async fn get_desktop_recorder() -> Result<Arc<DesktopRecorder>> {
 /// 获取录制状态（供 commands 层调用，跨 step_test 会话）
 pub async fn get_recording_status() -> serde_json::Value {
     let mode_guard = RECORDING_MODE.read().await;
-    let mode = if mode_guard.is_empty() { "none" } else { mode_guard.as_str() };
+    let mode = if mode_guard.is_empty() {
+        "none"
+    } else {
+        mode_guard.as_str()
+    };
     let is_active = RECORDING_ACTIVE.load(Ordering::SeqCst);
     serde_json::json!({
         "recording": is_active,
@@ -238,7 +269,8 @@ impl NodeExecutor for RecordingNode {
         _executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let action = config.get("action")
+        let action = config
+            .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("start");
 

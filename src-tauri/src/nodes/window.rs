@@ -4,13 +4,13 @@
 // Windows → platform/windows_window.rs（PowerShell + user32.dll）
 // Linux   → platform/linux_window.rs（xdotool + wmctrl CLI）
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 #[derive(Default)]
 pub struct WindowNode;
@@ -24,7 +24,8 @@ impl NodeExecutor for WindowNode {
         _executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let action = config.get("action")
+        let action = config
+            .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("find");
 

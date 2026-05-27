@@ -21,15 +21,21 @@ async fn main() {
     let router = workflow_engine::server::build_router(app)
         .fallback_service(tower_http::services::ServeDir::new(&static_dir));
 
-    info!("服务器启动: http://{}  (静态文件: {})", bind_addr, static_dir);
+    info!(
+        "服务器启动: http://{}  (静态文件: {})",
+        bind_addr, static_dir
+    );
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .expect("failed to bind address");
 
-    axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>())
-        .await
-        .expect("server error");
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .expect("server error");
 }
 
 /// 日志持久化：同时输出到 stdout 和每日轮转的文件（保留 7 天）

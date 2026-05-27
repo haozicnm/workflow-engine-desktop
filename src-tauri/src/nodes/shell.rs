@@ -12,17 +12,17 @@
 // 输出：
 //   { stdout: "...", stderr: "...", exit_code: 0 }
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
-use std::process::Command;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use serde_json::json;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use anyhow::{Result, anyhow};
-use serde_json::json;
+use std::process::Command;
+use std::sync::Arc;
 use tracing::{info, warn};
 
 #[derive(Default)]
@@ -37,23 +37,27 @@ impl NodeExecutor for ShellNode {
         _executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value> {
         // 1. 提取参数（config 已经过 resolve_config 做变量替换）
-        let command = step.config
+        let command = step
+            .config
             .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Shell 节点缺少 command 参数"))?
             .to_string();
 
-        let shell = step.config
+        let shell = step
+            .config
             .get("shell")
             .and_then(|v| v.as_str())
             .unwrap_or("auto");
 
-        let cwd = step.config
+        let cwd = step
+            .config
             .get("cwd")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let timeout_secs = step.config
+        let timeout_secs = step
+            .config
             .get("timeout_secs")
             .and_then(|v| v.as_u64())
             .unwrap_or(300);
@@ -66,8 +70,13 @@ impl NodeExecutor for ShellNode {
 
         info!(
             "Shell 执行: shell={} (resolved from '{}'), cmd=\"{}\", timeout={}s",
-            shell_cmd, shell,
-            if command.len() > 80 { format!("{}...", truncate_str(&command, 77)) } else { command.clone() },
+            shell_cmd,
+            shell,
+            if command.len() > 80 {
+                format!("{}...", truncate_str(&command, 77))
+            } else {
+                command.clone()
+            },
             timeout_secs
         );
 
@@ -87,17 +96,22 @@ impl NodeExecutor for ShellNode {
             }
         }
 
-        let output = tokio::task::spawn_blocking(move || {
-            cmd.output()
-        }).await
+        let output = tokio::task::spawn_blocking(move || cmd.output())
+            .await
             .map_err(|e| anyhow!("Shell 命令执行失败: {}", e))?
             .map_err(|e| anyhow!("Shell 命令启动失败: {}", e))?;
 
         let stdout_raw = String::from_utf8_lossy(&output.stdout);
         let stdout = stdout_raw.trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        info!("Shell stdout raw (first 100 chars): {}", truncate_str(&stdout_raw, 100));
-        info!("Shell stdout trimmed (first 100 chars): {}", truncate_str(&stdout, 100));
+        info!(
+            "Shell stdout raw (first 100 chars): {}",
+            truncate_str(&stdout_raw, 100)
+        );
+        info!(
+            "Shell stdout trimmed (first 100 chars): {}",
+            truncate_str(&stdout, 100)
+        );
         let exit_code = output.status.code().unwrap_or(-1);
 
         // 4. 记录并返回
@@ -105,7 +119,11 @@ impl NodeExecutor for ShellNode {
             warn!(
                 "Shell 命令非零退出: exit_code={}, stderr={}",
                 exit_code,
-                if stderr.len() > 200 { format!("{}...", truncate_str(&stderr, 197)) } else { stderr.clone() }
+                if stderr.len() > 200 {
+                    format!("{}...", truncate_str(&stderr, 197))
+                } else {
+                    stderr.clone()
+                }
             );
             // 非零退出码仍然返回结果，由上层 onError 策略决定是否继续
         }
@@ -118,7 +136,8 @@ impl NodeExecutor for ShellNode {
 
         info!(
             "Shell 完成: exit_code={}, stdout_len={}",
-            exit_code, stdout.len()
+            exit_code,
+            stdout.len()
         );
 
         if exit_code != 0 {
@@ -126,7 +145,11 @@ impl NodeExecutor for ShellNode {
             Err(anyhow!(
                 "Shell 命令退出码 {}: {}",
                 exit_code,
-                if stderr.is_empty() { "(无错误输出)" } else { &stderr }
+                if stderr.is_empty() {
+                    "(无错误输出)"
+                } else {
+                    &stderr
+                }
             ))
         } else {
             Ok(result)
@@ -147,9 +170,13 @@ fn resolve_shell(shell: &str) -> (String, String) {
         "cmd" => ("cmd".into(), "/C".into()),
         "auto" | _ => {
             #[cfg(target_os = "windows")]
-            { ("cmd".into(), "/C".into()) }
+            {
+                ("cmd".into(), "/C".into())
+            }
             #[cfg(not(target_os = "windows"))]
-            { ("bash".into(), "-c".into()) }
+            {
+                ("bash".into(), "-c".into())
+            }
         }
     }
 }
@@ -187,7 +214,7 @@ fn adapt_command(cmd: &str) -> String {
 
     // echo '...' → strip single quotes (cmd doesn't understand them)
     if adapted.starts_with("echo '") && adapted.ends_with('\'') {
-        adapted = format!("echo {}", &adapted[6..adapted.len()-1]);
+        adapted = format!("echo {}", &adapted[6..adapted.len() - 1]);
     }
 
     if adapted != cmd {

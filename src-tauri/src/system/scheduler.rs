@@ -3,7 +3,7 @@
 use crate::data::db::Database;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// 启动后台调度器（在 app.setup 中调用）
 pub fn start(app_handle: AppHandle, db: Arc<Database>) {
@@ -41,16 +41,25 @@ async fn check_and_run(app_handle: &AppHandle, db: &Arc<Database>) {
         };
 
         // 计算上次运行之后的下一次触发时间
-        let last_run = schedule.last_run_at.as_ref()
+        let last_run = schedule
+            .last_run_at
+            .as_ref()
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
             .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|| schedule.created_at.parse::<chrono::DateTime<chrono::Utc>>()
-                .unwrap_or_else(|_| now - chrono::Duration::hours(1)));
+            .unwrap_or_else(|| {
+                schedule
+                    .created_at
+                    .parse::<chrono::DateTime<chrono::Utc>>()
+                    .unwrap_or_else(|_| now - chrono::Duration::hours(1))
+            });
 
         // 如果下次触发时间 <= now，执行
         if let Some(next_fire) = cron_schedule.after(&last_run).next() {
             if next_fire <= now {
-                info!("定时计划 '{}' 到期，触发工作流 '{}'", schedule.id, schedule.workflow_id);
+                info!(
+                    "定时计划 '{}' 到期，触发工作流 '{}'",
+                    schedule.id, schedule.workflow_id
+                );
 
                 // 更新 last_run_at
                 let now_str = now.to_rfc3339();
@@ -84,7 +93,8 @@ async fn start_scheduled_run(
     app_handle: &AppHandle,
     workflow_id: &str,
 ) -> Result<String, String> {
-    let yaml = db.get_workflow_yaml(workflow_id)
+    let yaml = db
+        .get_workflow_yaml(workflow_id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "工作流不存在".to_string())?;
 
@@ -97,17 +107,28 @@ async fn start_scheduled_run(
     db.create_run(&run_id, workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
-    if let Err(e) = app_handle.emit("run-update", serde_json::json!({
-        "run_id": run_id,
-        "workflow_id": workflow_id,
-        "workflow_name": workflow_name,
-        "status": "running",
-        "trigger": "schedule",
-    })) { warn!("emit run-update failed: {}", e); }
+    if let Err(e) = app_handle.emit(
+        "run-update",
+        serde_json::json!({
+            "run_id": run_id,
+            "workflow_id": workflow_id,
+            "workflow_name": workflow_name,
+            "status": "running",
+            "trigger": "schedule",
+        }),
+    ) {
+        warn!("emit run-update failed: {}", e);
+    }
 
     // 读取浏览器通道设置
     use tauri::Manager;
-    let browser_channel = app_handle.state::<crate::App>().config.read().await.browser_channel.clone();
+    let browser_channel = app_handle
+        .state::<crate::App>()
+        .config
+        .read()
+        .await
+        .browser_channel
+        .clone();
 
     let run_id_clone = run_id.clone();
     let db_clone = db.clone();
@@ -119,7 +140,8 @@ async fn start_scheduled_run(
         let pause_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let breakpoint_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let step_mode_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let debug_snapshots = std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+        let debug_snapshots =
+            std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
         let ctrl = crate::engine::scheduler::RunControl {
             cancel_flag,
             cancel_token,
@@ -128,7 +150,18 @@ async fn start_scheduled_run(
             step_mode_flag,
             debug_snapshots,
         };
-        match crate::engine::scheduler::run_workflow(&workflow, &run_id_clone, Some(&handle_clone), &db_clone, approval_store, &browser_channel, &[], &ctrl).await {
+        match crate::engine::scheduler::run_workflow(
+            &workflow,
+            &run_id_clone,
+            Some(&handle_clone),
+            &db_clone,
+            approval_store,
+            &browser_channel,
+            &[],
+            &ctrl,
+        )
+        .await
+        {
             Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 error!("定时工作流执行失败: {} - {}", run_id_clone, e);
@@ -146,9 +179,9 @@ async fn start_scheduled_run(
 fn normalize_cron(expr: &str) -> String {
     let fields: Vec<&str> = expr.split_whitespace().collect();
     match fields.len() {
-        5 => format!("0 {} *", expr),   // 加秒=0, 年=*
-        6 => format!("0 {}", expr),      // 加秒=0
+        5 => format!("0 {} *", expr), // 加秒=0, 年=*
+        6 => format!("0 {}", expr),   // 加秒=0
         7 => expr.to_string(),
-        _ => expr.to_string(),           // 让解析器报错
+        _ => expr.to_string(), // 让解析器报错
     }
 }

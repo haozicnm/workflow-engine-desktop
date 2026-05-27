@@ -2,23 +2,33 @@
 //
 // 用点号路径提取 JSON 字段，支持 `$.data.name`, `$.items[0].id` 等语法
 
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 #[derive(Default)]
 pub struct JsonParseNode;
 
 #[async_trait]
 impl NodeExecutor for JsonParseNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
-        let data = config.get("data").ok_or_else(|| anyhow!("缺少 data 参数"))?;
-        let expression = config.get("expression").and_then(|v| v.as_str()).unwrap_or("$");
+        let data = config
+            .get("data")
+            .ok_or_else(|| anyhow!("缺少 data 参数"))?;
+        let expression = config
+            .get("expression")
+            .and_then(|v| v.as_str())
+            .unwrap_or("$");
 
         // 先将 input 解析为 JSON（如果已经是对象则直接使用）
         let root: serde_json::Value = if let Some(s) = data.as_str() {
@@ -41,7 +51,9 @@ impl NodeExecutor for JsonParseNode {
 /// 支持: $.key, $.key.sub, $.array[0], $.array[*].field, .key
 fn json_path_query(root: &serde_json::Value, expr: &str) -> serde_json::Value {
     let path = expr.trim_start_matches('$').trim_start_matches('.');
-    if path.is_empty() { return root.clone(); }
+    if path.is_empty() {
+        return root.clone();
+    }
 
     let mut current = root.clone();
     for segment in path.split('.') {
@@ -58,7 +70,10 @@ fn json_path_query(root: &serde_json::Value, expr: &str) -> serde_json::Value {
                 current = current.get(idx).cloned().unwrap_or(serde_json::Value::Null);
             }
         } else {
-            current = current.get(segment).cloned().unwrap_or(serde_json::Value::Null);
+            current = current
+                .get(segment)
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
         }
     }
     current

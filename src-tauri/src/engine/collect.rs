@@ -60,13 +60,10 @@ pub fn resolve_path(path: &str, context: &Value) -> Value {
 /// ```json
 /// { "collected": { "names": [...], "values": [...] } }
 /// ```
-pub fn apply_collect(
-    output: &mut Value,
-    collect_cfg: &Value,
-    items: &[Value],
-    results: &[Value],
-) {
-    let Some(map) = collect_cfg.as_object() else { return };
+pub fn apply_collect(output: &mut Value, collect_cfg: &Value, items: &[Value], results: &[Value]) {
+    let Some(map) = collect_cfg.as_object() else {
+        return;
+    };
     let mut collected = serde_json::Map::new();
 
     for (key, path_val) in map {
@@ -101,13 +98,10 @@ pub fn apply_collect(
 /// { "table": { "headers": [...], "rows": [[...], ...], "data": [[headers], [...], ...] } }
 /// ```
 /// `data = [headers, row0, row1, ...]` — 可直接喂给 Excel write 节点
-pub fn apply_table(
-    output: &mut Value,
-    table_cfg: &Value,
-    items: &[Value],
-    results: &[Value],
-) {
-    let Some(cols) = table_cfg.as_array() else { return };
+pub fn apply_table(output: &mut Value, table_cfg: &Value, items: &[Value], results: &[Value]) {
+    let Some(cols) = table_cfg.as_array() else {
+        return;
+    };
 
     let mut headers = Vec::new();
     let mut field_paths = Vec::new();
@@ -126,10 +120,7 @@ pub fn apply_table(
     let mut rows = Vec::new();
     for (i, item) in items.iter().enumerate() {
         let ictx = build_iter_context(item, i, &results[i]);
-        let row: Vec<Value> = field_paths
-            .iter()
-            .map(|p| resolve_path(p, &ictx))
-            .collect();
+        let row: Vec<Value> = field_paths.iter().map(|p| resolve_path(p, &ictx)).collect();
         rows.push(Value::Array(row));
     }
 

@@ -52,7 +52,8 @@ impl NodeExecutor for FileContainerNode {
         ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let mut actions: Vec<FileAction> = step.config
+        let mut actions: Vec<FileAction> = step
+            .config
             .get("actions")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .ok_or_else(|| anyhow!("file 容器缺少 actions 参数"))?;
@@ -74,10 +75,16 @@ impl NodeExecutor for FileContainerNode {
                     results.insert(action.id.clone(), val);
                 }
                 Err(e) => {
-                    warn!("文件操作失败: {} ({}) — {}", action.action_type, action.id, e);
-                    results.insert(action.id.clone(), json!({
-                        "error": e.to_string(),
-                    }));
+                    warn!(
+                        "文件操作失败: {} ({}) — {}",
+                        action.action_type, action.id, e
+                    );
+                    results.insert(
+                        action.id.clone(),
+                        json!({
+                            "error": e.to_string(),
+                        }),
+                    );
                 }
             }
         }
@@ -107,7 +114,8 @@ async fn execute_file_action(action: &FileAction) -> Result<Value> {
 }
 
 fn get_str<'a>(config: &'a HashMap<String, Value>, key: &str) -> Result<&'a str> {
-    config.get(key)
+    config
+        .get(key)
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("缺少 {} 参数", key))
 }
@@ -120,7 +128,8 @@ fn get_str_opt<'a>(config: &'a HashMap<String, Value>, key: &str) -> Option<&'a 
 
 async fn file_read(config: &HashMap<String, Value>) -> Result<Value> {
     let path = get_str(config, "path")?;
-    let content = tokio::fs::read_to_string(path).await
+    let content = tokio::fs::read_to_string(path)
+        .await
         .map_err(|e| anyhow!("读取失败 [{}]: {}", path, e))?;
     let metadata = tokio::fs::metadata(path).await.ok();
     Ok(json!({
@@ -137,7 +146,8 @@ async fn file_write(config: &HashMap<String, Value>) -> Result<Value> {
     if let Some(parent) = std::path::Path::new(path).parent() {
         tokio::fs::create_dir_all(parent).await.ok();
     }
-    tokio::fs::write(path, content).await
+    tokio::fs::write(path, content)
+        .await
         .map_err(|e| anyhow!("写入失败 [{}]: {}", path, e))?;
     let size = content.len();
     info!("写入文件: {} ({} bytes)", path, size);
@@ -147,12 +157,17 @@ async fn file_write(config: &HashMap<String, Value>) -> Result<Value> {
 async fn file_append(config: &HashMap<String, Value>) -> Result<Value> {
     let path = get_str(config, "path")?;
     let content = get_str(config, "content")?;
-    let newline = config.get("newline")
-        .and_then(|v| v.as_bool()).unwrap_or(true);
+    let newline = config
+        .get("newline")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     use tokio::io::AsyncWriteExt;
 
     let mut file = tokio::fs::OpenOptions::new()
-        .create(true).append(true).open(path).await
+        .create(true)
+        .append(true)
+        .open(path)
+        .await
         .map_err(|e| anyhow!("打开文件失败 [{}]: {}", path, e))?;
     if newline && !content.ends_with('\n') {
         file.write_all(format!("{}\n", content).as_bytes()).await?;
@@ -169,7 +184,8 @@ async fn file_copy(config: &HashMap<String, Value>) -> Result<Value> {
     if let Some(parent) = std::path::Path::new(to).parent() {
         tokio::fs::create_dir_all(parent).await.ok();
     }
-    tokio::fs::copy(from, to).await
+    tokio::fs::copy(from, to)
+        .await
         .map_err(|e| anyhow!("复制失败 [{} -> {}]: {}", from, to, e))?;
     info!("复制文件: {} -> {}", from, to);
     Ok(json!({ "from": from, "to": to }))
@@ -178,7 +194,8 @@ async fn file_copy(config: &HashMap<String, Value>) -> Result<Value> {
 async fn file_move(config: &HashMap<String, Value>) -> Result<Value> {
     let from = get_str(config, "from")?;
     let to = get_str(config, "to")?;
-    tokio::fs::rename(from, to).await
+    tokio::fs::rename(from, to)
+        .await
         .map_err(|e| anyhow!("移动失败 [{} -> {}]: {}", from, to, e))?;
     info!("移动文件: {} -> {}", from, to);
     Ok(json!({ "from": from, "to": to }))
@@ -189,11 +206,13 @@ async fn file_delete(config: &HashMap<String, Value>) -> Result<Value> {
     let metadata = tokio::fs::metadata(path).await;
     match metadata {
         Ok(m) if m.is_dir() => {
-            tokio::fs::remove_dir_all(path).await
+            tokio::fs::remove_dir_all(path)
+                .await
                 .map_err(|e| anyhow!("删除目录失败 [{}]: {}", path, e))?;
         }
         Ok(_) => {
-            tokio::fs::remove_file(path).await
+            tokio::fs::remove_file(path)
+                .await
                 .map_err(|e| anyhow!("删除文件失败 [{}]: {}", path, e))?;
         }
         Err(_) => return Err(anyhow!("文件不存在: {}", path)),
@@ -206,12 +225,19 @@ async fn file_list(config: &HashMap<String, Value>) -> Result<Value> {
     let path = get_str_opt(config, "path").unwrap_or(".");
     let pattern = get_str_opt(config, "pattern");
     let mut entries = vec![];
-    let mut dir = tokio::fs::read_dir(path).await
+    let mut dir = tokio::fs::read_dir(path)
+        .await
         .map_err(|e| anyhow!("读取目录失败 [{}]: {}", path, e))?;
-    while let Some(entry) = dir.next_entry().await.map_err(|e| anyhow!("遍历目录失败: {}", e))? {
+    while let Some(entry) = dir
+        .next_entry()
+        .await
+        .map_err(|e| anyhow!("遍历目录失败: {}", e))?
+    {
         let name = entry.file_name().to_string_lossy().to_string();
         if let Some(pat) = pattern {
-            if !glob_match(pat, &name) { continue; }
+            if !glob_match(pat, &name) {
+                continue;
+            }
         }
         let ft = entry.file_type().await.ok();
         entries.push(json!({
@@ -224,7 +250,10 @@ async fn file_list(config: &HashMap<String, Value>) -> Result<Value> {
         let a_dir = a["is_dir"].as_bool().unwrap_or(false);
         let b_dir = b["is_dir"].as_bool().unwrap_or(false);
         b_dir.cmp(&a_dir).then_with(|| {
-            a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or(""))
+            a["name"]
+                .as_str()
+                .unwrap_or("")
+                .cmp(b["name"].as_str().unwrap_or(""))
         })
     });
     Ok(json!({ "path": path, "entries": entries, "count": entries.len() }))
@@ -243,7 +272,12 @@ async fn file_glob(config: &HashMap<String, Value>) -> Result<Value> {
 
     // 优先使用 glob crate（如果可用），否则用 walkdir
     let walker = walkdir::WalkDir::new(base)
-        .max_depth(config.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(10) as usize)
+        .max_depth(
+            config
+                .get("max_depth")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(10) as usize,
+        )
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok());
@@ -266,24 +300,37 @@ async fn file_grep(config: &HashMap<String, Value>) -> Result<Value> {
     let pattern = get_str(config, "pattern")?;
     let path = get_str_opt(config, "path").unwrap_or(".");
     let file_pattern = get_str_opt(config, "file_pattern").unwrap_or("*");
-    let max_results = config.get("max_results")
-        .and_then(|v| v.as_u64()).unwrap_or(100) as usize;
+    let max_results = config
+        .get("max_results")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(100) as usize;
 
     let mut results = vec![];
     let walker = walkdir::WalkDir::new(path)
-        .max_depth(config.get("max_depth").and_then(|v| v.as_u64()).unwrap_or(5) as usize)
+        .max_depth(
+            config
+                .get("max_depth")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(5) as usize,
+        )
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file() && glob_match(file_pattern, &e.file_name().to_string_lossy()));
+        .filter(|e| {
+            e.file_type().is_file() && glob_match(file_pattern, &e.file_name().to_string_lossy())
+        });
 
     for entry in walker {
-        if results.len() >= max_results { break; }
+        if results.len() >= max_results {
+            break;
+        }
         let file_path = entry.path();
         match tokio::fs::read_to_string(file_path).await {
             Ok(content) => {
                 for (i, line) in content.lines().enumerate() {
-                    if results.len() >= max_results { break; }
+                    if results.len() >= max_results {
+                        break;
+                    }
                     if line.contains(pattern) {
                         results.push(json!({
                             "file": file_path.to_string_lossy(),
@@ -302,18 +349,28 @@ async fn file_grep(config: &HashMap<String, Value>) -> Result<Value> {
 
 /// 简单的 glob 匹配（支持 * 通配符）
 fn glob_match(pattern: &str, name: &str) -> bool {
-    if pattern == "*" { return true; }
-    if !pattern.contains('*') { return name == pattern; }
+    if pattern == "*" {
+        return true;
+    }
+    if !pattern.contains('*') {
+        return name == pattern;
+    }
 
     let parts: Vec<&str> = pattern.split('*').collect();
     let mut remaining = name;
     for (i, part) in parts.iter().enumerate() {
-        if part.is_empty() { continue; }
+        if part.is_empty() {
+            continue;
+        }
         if i == 0 {
-            if !remaining.starts_with(part) { return false; }
+            if !remaining.starts_with(part) {
+                return false;
+            }
             remaining = &remaining[part.len()..];
         } else if i == parts.len() - 1 && !pattern.ends_with('*') {
-            if !remaining.ends_with(part) { return false; }
+            if !remaining.ends_with(part) {
+                return false;
+            }
             return true;
         } else {
             if let Some(pos) = remaining.find(part) {

@@ -5,8 +5,11 @@
 
 use axum::{
     extract::Path,
-    response::{IntoResponse, Response, Json, sse::{Event, Sse}},
     http::StatusCode,
+    response::{
+        sse::{Event, Sse},
+        IntoResponse, Json, Response,
+    },
 };
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
@@ -68,23 +71,19 @@ pub struct PipelineRunBody {
     pub use_browser: Option<bool>,
 }
 
-
-
 // ═══════════════════════════════════════════════════════════
 // SSE handler
 // ═══════════════════════════════════════════════════════════
 
 pub async fn events_sse() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = events::get_tx().subscribe();
-    let stream = tokio_stream::wrappers::BroadcastStream::new(rx)
-        .filter_map(|result| {
-            match result {
-                Ok((event, data)) => {
-                    let data_str = data.to_string();
-                    Some(Ok(Event::default().event(event).data(data_str)))
-                }
-                Err(_) => None,
+    let stream =
+        tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|result| match result {
+            Ok((event, data)) => {
+                let data_str = data.to_string();
+                Some(Ok(Event::default().event(event).data(data_str)))
             }
+            Err(_) => None,
         });
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
@@ -93,15 +92,11 @@ pub async fn events_sse() -> Sse<impl Stream<Item = Result<Event, Infallible>>> 
     )
 }
 
-
-
 // ═══════════════════════════════════════════════════════════
 // Step test / debug / recording handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn step_test(
-    Json(body): Json<StepTestBody>,
-) -> Response {
+pub async fn step_test(Json(body): Json<StepTestBody>) -> Response {
     let app = crate::server::state::get();
     use crate::engine::context::ExecutionContext;
     use crate::engine::executor::StepExecutor;
@@ -166,9 +161,7 @@ pub async fn recording_status() -> Response {
 // 调试 handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn debug_step(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn debug_step(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let flags = app.step_mode_flags.read().await;
     match flags.get(&run_id) {
@@ -178,19 +171,20 @@ pub async fn debug_step(
             if let Some(bp) = app.breakpoint_flags.read().await.get(&run_id) {
                 bp.store(false, Ordering::Relaxed);
             }
-            events::emit("run-update", serde_json::json!({
-                "run_id": &run_id,
-                "status": "running",
-            }));
+            events::emit(
+                "run-update",
+                serde_json::json!({
+                    "run_id": &run_id,
+                    "status": "running",
+                }),
+            );
             ok_response(serde_json::json!({ "success": true }))
         }
         None => err_response(StatusCode::NOT_FOUND, "运行不存在或已结束"),
     }
 }
 
-pub async fn debug_continue(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn debug_continue(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     use std::sync::atomic::Ordering;
     if let Some(bp) = app.breakpoint_flags.read().await.get(&run_id) {
@@ -199,76 +193,89 @@ pub async fn debug_continue(
     if let Some(sm) = app.step_mode_flags.read().await.get(&run_id) {
         sm.store(false, Ordering::Relaxed);
     }
-    events::emit("run-update", serde_json::json!({
-        "run_id": &run_id,
-        "status": "running",
-    }));
+    events::emit(
+        "run-update",
+        serde_json::json!({
+            "run_id": &run_id,
+            "status": "running",
+        }),
+    );
     ok_response(serde_json::json!({ "success": true }))
 }
 
-pub async fn debug_set_breakpoint(
-    Json(body): Json<DebugSetBreakpointBody>,
-) -> Response {
+pub async fn debug_set_breakpoint(Json(body): Json<DebugSetBreakpointBody>) -> Response {
     let app = crate::server::state::get();
     let key = format!("breakpoints:{}", body.workflow_id);
-    let mut bps: Vec<String> = app.config.read().await
+    let mut bps: Vec<String> = app
+        .config
+        .read()
+        .await
         .get_temp(&key)
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     if !bps.contains(&body.step_id) {
         bps.push(body.step_id.clone());
-        app.config.write().await.set_temp(&key, serde_json::json!(bps));
+        app.config
+            .write()
+            .await
+            .set_temp(&key, serde_json::json!(bps));
     }
     ok_response(serde_json::json!({ "success": true }))
 }
 
-pub async fn debug_remove_breakpoint(
-    Json(body): Json<DebugSetBreakpointBody>,
-) -> Response {
+pub async fn debug_remove_breakpoint(Json(body): Json<DebugSetBreakpointBody>) -> Response {
     let app = crate::server::state::get();
     let key = format!("breakpoints:{}", body.workflow_id);
-    let mut bps: Vec<String> = app.config.read().await
+    let mut bps: Vec<String> = app
+        .config
+        .read()
+        .await
         .get_temp(&key)
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     bps.retain(|id| id != &body.step_id);
-    app.config.write().await.set_temp(&key, serde_json::json!(bps));
+    app.config
+        .write()
+        .await
+        .set_temp(&key, serde_json::json!(bps));
     ok_response(serde_json::json!({ "success": true }))
 }
 
-pub async fn debug_get_breakpoints(
-    Path(workflow_id): Path<String>,
-) -> Response {
+pub async fn debug_get_breakpoints(Path(workflow_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let key = format!("breakpoints:{}", workflow_id);
-    let bps: Vec<String> = app.config.read().await
+    let bps: Vec<String> = app
+        .config
+        .read()
+        .await
         .get_temp(&key)
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     ok_response(bps)
 }
 
-pub async fn debug_vars(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn debug_vars(Path(run_id): Path<String>) -> Response {
     let app = crate::server::state::get();
     let snapshots = app.debug_snapshots.read().await;
-    ok_response(snapshots.get(&run_id).cloned().unwrap_or(serde_json::json!({
-        "variables": {},
-        "step_outputs": {},
-    })))
+    ok_response(
+        snapshots
+            .get(&run_id)
+            .cloned()
+            .unwrap_or(serde_json::json!({
+                "variables": {},
+                "step_outputs": {},
+            })),
+    )
 }
 
 // ═══════════════════════════════════════════════════════════
 // Pipeline handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn run_pipeline(
-    Json(body): Json<PipelineRunBody>,
-) -> Response {
-    use std::process::Command as StdCommand;
+pub async fn run_pipeline(Json(body): Json<PipelineRunBody>) -> Response {
     #[cfg(target_os = "windows")]
     use std::os::windows::process::CommandExt;
+    use std::process::Command as StdCommand;
 
     let base = crate::data::paths::resolve_data_dir().join("examples");
     let script_path = base.join("run_full_pipeline.py");
@@ -279,12 +286,19 @@ pub async fn run_pipeline(
             if let Err(e) = std::fs::create_dir_all(&base) {
                 return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
             }
-            for file in &["run_full_pipeline.py", "test_data.xlsx", "report_template.docx"] {
+            for file in &[
+                "run_full_pipeline.py",
+                "test_data.xlsx",
+                "report_template.docx",
+            ] {
                 let src = project_examples.join(file);
                 let dst = base.join(file);
                 if src.exists() {
                     if let Err(e) = std::fs::copy(&src, &dst) {
-                        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("复制 {file} 失败: {e}"));
+                        return err_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("复制 {file} 失败: {e}"),
+                        );
                     }
                 }
             }
@@ -294,7 +308,10 @@ pub async fn run_pipeline(
     let script = if script_path.exists() {
         script_path.to_string_lossy().to_string()
     } else {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("管道脚本不存在: {:?}", script_path));
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("管道脚本不存在: {:?}", script_path),
+        );
     };
 
     let mut args = vec![script];
@@ -320,14 +337,22 @@ pub async fn run_pipeline(
     cmd.creation_flags(0x08000000);
     let output = match cmd.args(&args).output() {
         Ok(o) => o,
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("执行 Python 失败: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("执行 Python 失败: {e}"),
+            )
+        }
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if !output.status.success() {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("管道执行失败:\n{}\n{}", stdout, stderr));
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("管道执行失败:\n{}\n{}", stdout, stderr),
+        );
     }
 
     for line in stdout.lines() {
@@ -344,44 +369,37 @@ pub async fn run_pipeline(
     }))
 }
 
-
-
 // Re-export from managers
 pub use crate::server::managers::preview_manager::{
-    PreviewExcelBody, PreviewWordBody, WebScrapePreviewBody,
-    preview_excel, preview_word, get_trajectory, get_bundle_files,
-    read_bundle_file, web_scrape_preview,
+    get_bundle_files, get_trajectory, preview_excel, preview_word, read_bundle_file,
+    web_scrape_preview, PreviewExcelBody, PreviewWordBody, WebScrapePreviewBody,
 };
 
 pub use crate::server::managers::workflow_manager::{
-    WorkflowCreateBody, WorkflowUpdateBody, WorkflowLockBody, WorkflowSaveYamlBody,
-    WorkflowValidateBody, WorkflowAutoOrderBody, WorkflowExportBody,
-    WorkflowImportBody, WorkflowCreateFromRecordingBody,
-    workflow_list, workflow_create, workflow_get, workflow_update,
-    workflow_delete, workflow_lock, workflow_save_yaml, workflow_validate,
-    workflow_auto_order, workflow_export, workflow_import,
-    workflow_create_from_recording,
+    workflow_auto_order, workflow_create, workflow_create_from_recording, workflow_delete,
+    workflow_export, workflow_get, workflow_import, workflow_list, workflow_lock,
+    workflow_save_yaml, workflow_update, workflow_validate, WorkflowAutoOrderBody,
+    WorkflowCreateBody, WorkflowCreateFromRecordingBody, WorkflowExportBody, WorkflowImportBody,
+    WorkflowLockBody, WorkflowSaveYamlBody, WorkflowUpdateBody, WorkflowValidateBody,
 };
 
 pub use crate::server::managers::run_manager::{
-    RunStartBody, RunStartResponse,
-    run_start, run_cancel, run_pause, run_resume, run_status,
-    run_list, run_detail, run_logs, run_step_logs,
+    run_cancel, run_detail, run_list, run_logs, run_pause, run_resume, run_start, run_status,
+    run_step_logs, RunStartBody, RunStartResponse,
 };
 
 pub use crate::server::managers::schedule_manager::{
-    ScheduleCreateBody, ScheduleUpdateBody,
-    schedule_list, schedule_create, schedule_update, schedule_delete,
+    schedule_create, schedule_delete, schedule_list, schedule_update, ScheduleCreateBody,
+    ScheduleUpdateBody,
 };
 
 pub use crate::server::managers::approval_manager::{
-    ApprovalRespondBody,
-    approval_list_pending, approval_respond,
+    approval_list_pending, approval_respond, ApprovalRespondBody,
 };
 
 pub use crate::server::managers::system_manager::{
-    SettingsUpdateBody, PluginInstallBody, PluginUninstallBody,
-    system_health, sidecar_health, node_list_types, node_schema, settings_get, settings_update,
-    system_check_browser, get_log_path, open_log_dir, clear_logs, check_ipc,
-    plugin_list, plugin_install, plugin_uninstall, plugin_pick_file,
+    check_ipc, clear_logs, get_log_path, node_list_types, node_schema, open_log_dir,
+    plugin_install, plugin_list, plugin_pick_file, plugin_uninstall, settings_get, settings_update,
+    sidecar_health, system_check_browser, system_health, PluginInstallBody, PluginUninstallBody,
+    SettingsUpdateBody,
 };

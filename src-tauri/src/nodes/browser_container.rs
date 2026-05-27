@@ -51,11 +51,16 @@ fn default_timeout() -> u64 {
 
 /// 校验选择器：不能为空，返回友好错误
 fn require_selector(action: &ContainerAction) -> Result<&str> {
-    let selector = action.config.get("selector").and_then(|v| v.as_str()).unwrap_or("");
+    let selector = action
+        .config
+        .get("selector")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if selector.is_empty() {
         Err(anyhow!(
             "Action '{}' (type={}) 缺少 selector 参数，请在配置中指定 CSS 选择器",
-            action.label, action.action_type
+            action.label,
+            action.action_type
         ))
     } else {
         Ok(selector)
@@ -123,9 +128,7 @@ async fn execute_actions(
 
     // ── 清理上一容器遗留的状态（dialog、多余 tab）──
     // 多个 browser 容器共享同一个 sidecar 进程，此处在每次执行前重置
-    match crate::nodes::browser::send_sidecar_action(
-        "reset_state", &serde_json::json!({})
-    ).await {
+    match crate::nodes::browser::send_sidecar_action("reset_state", &serde_json::json!({})).await {
         Ok(_) => tracing::debug!("浏览器状态已重置"),
         Err(e) => tracing::warn!("浏览器重置失败（非致命）: {}", e),
     }
@@ -156,7 +159,8 @@ async fn execute_actions(
                     "url": url,
                     "wait_until": wait_until,
                 });
-                crate::nodes::browser::send_sidecar_action("navigate", &params).await
+                crate::nodes::browser::send_sidecar_action("navigate", &params)
+                    .await
                     .map_err(|e| anyhow!("导航失败: {}", e))?;
             }
 
@@ -176,7 +180,8 @@ async fn execute_actions(
                         "selector": selector,
                         "timeout": timeout,
                     });
-                    crate::nodes::browser::send_sidecar_action("wait", &params).await
+                    crate::nodes::browser::send_sidecar_action("wait", &params)
+                        .await
                         .map_err(|e| anyhow!("等待失败: {}", e))?;
                 }
             }
@@ -187,12 +192,17 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "selector": selector,
                 });
-                crate::nodes::browser::send_sidecar_action("click", &params).await
+                crate::nodes::browser::send_sidecar_action("click", &params)
+                    .await
                     .map_err(|e| anyhow!("点击失败: {}", e))?;
             }
 
             "scroll" => {
-                let y = action.config.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let y = action
+                    .config
+                    .get("y")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
                 // Py sidecar: scroll_to(to: "bottom"|"top"|pixels)
                 let to: serde_json::Value = if y > 0.0 {
                     serde_json::json!(y)
@@ -202,7 +212,8 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "to": to,
                 });
-                crate::nodes::browser::send_sidecar_action("scroll_to", &params).await
+                crate::nodes::browser::send_sidecar_action("scroll_to", &params)
+                    .await
                     .map_err(|e| anyhow!("滚动失败: {}", e))?;
             }
 
@@ -225,7 +236,8 @@ async fn execute_actions(
                     "value": value,
                     "clear": clear,
                 });
-                crate::nodes::browser::send_sidecar_action("fill", &params).await
+                crate::nodes::browser::send_sidecar_action("fill", &params)
+                    .await
                     .map_err(|e| anyhow!("填写失败: {}", e))?;
             }
 
@@ -245,14 +257,20 @@ async fn execute_actions(
                 let (py_action, py_params) = match mode {
                     "html" => ("extract_html", serde_json::json!({ "selector": selector })),
                     "attr" => {
-                        let attribute = action.config.get("attribute")
+                        let attribute = action
+                            .config
+                            .get("attribute")
                             .and_then(|v| v.as_str())
                             .unwrap_or("href");
-                        ("extract_attribute", serde_json::json!({ "selector": selector, "attribute": attribute }))
+                        (
+                            "extract_attribute",
+                            serde_json::json!({ "selector": selector, "attribute": attribute }),
+                        )
                     }
                     _ => ("extract_text", serde_json::json!({ "selector": selector })),
                 };
-                let resp = crate::nodes::browser::send_sidecar_action(py_action, &py_params).await
+                let resp = crate::nodes::browser::send_sidecar_action(py_action, &py_params)
+                    .await
                     .map_err(|e| anyhow!("提取失败: {}", e))?;
 
                 let data = resp
@@ -273,7 +291,8 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "fullPage": full_page,
                 });
-                let resp = crate::nodes::browser::send_sidecar_action("screenshot", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("screenshot", &params)
+                    .await
                     .map_err(|e| anyhow!("截图失败: {}", e))?;
 
                 let data = resp
@@ -294,7 +313,8 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "script": script,
                 });
-                let resp = crate::nodes::browser::send_sidecar_action("evaluate", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("evaluate", &params)
+                    .await
                     .map_err(|e| anyhow!("执行JS失败: {}", e))?;
 
                 let data = resp
@@ -309,7 +329,8 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "script": "document.title",
                 });
-                let resp = crate::nodes::browser::send_sidecar_action("evaluate", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("evaluate", &params)
+                    .await
                     .map_err(|e| anyhow!("获取标题失败: {}", e))?;
 
                 let title = resp
@@ -321,22 +342,29 @@ async fn execute_actions(
             }
 
             // ─── v1.1+ 扩展动作 ───
-
             "extract_table" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("table");
+                let selector = action
+                    .config
+                    .get("selector")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("table");
                 let params = serde_json::json!({ "selector": selector });
-                let resp = crate::nodes::browser::send_sidecar_action("extract_table", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("extract_table", &params)
+                    .await
                     .map_err(|e| anyhow!("表格提取失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
 
             "extract_links" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("body");
+                let selector = action
+                    .config
+                    .get("selector")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("body");
                 let params = serde_json::json!({ "selector": selector });
-                let resp = crate::nodes::browser::send_sidecar_action("extract_links", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("extract_links", &params)
+                    .await
                     .map_err(|e| anyhow!("链接提取失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
@@ -344,22 +372,32 @@ async fn execute_actions(
 
             "select" => {
                 let selector = require_selector(action)?;
-                let value = action.config.get("value")
+                let value = action
+                    .config
+                    .get("value")
                     .and_then(|v| v.as_str())
-                    .or_else(|| input_ports.get(&format!("{}_in", &action.id))
-                        .and_then(|v| v.as_str()))
+                    .or_else(|| {
+                        input_ports
+                            .get(&format!("{}_in", &action.id))
+                            .and_then(|v| v.as_str())
+                    })
                     .unwrap_or("");
                 let params = serde_json::json!({ "selector": selector, "value": value });
-                crate::nodes::browser::send_sidecar_action("select", &params).await
+                crate::nodes::browser::send_sidecar_action("select", &params)
+                    .await
                     .map_err(|e| anyhow!("下拉选择失败: {}", e))?;
             }
 
             "check" => {
                 let selector = require_selector(action)?;
-                let checked = action.config.get("checked")
-                    .and_then(|v| v.as_bool()).unwrap_or(true);
+                let checked = action
+                    .config
+                    .get("checked")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 let params = serde_json::json!({ "selector": selector, "checked": checked });
-                crate::nodes::browser::send_sidecar_action("check", &params).await
+                crate::nodes::browser::send_sidecar_action("check", &params)
+                    .await
                     .map_err(|e| anyhow!("勾选失败: {}", e))?;
             }
 
@@ -371,161 +409,218 @@ async fn execute_actions(
                     serde_json::to_string(selector).unwrap_or_default()
                 );
                 let params = serde_json::json!({ "script": script });
-                crate::nodes::browser::send_sidecar_action("evaluate", &params).await
+                crate::nodes::browser::send_sidecar_action("evaluate", &params)
+                    .await
                     .map_err(|e| anyhow!("悬停失败: {}", e))?;
             }
 
             "new_page" => {
                 let url = action.config.get("url").and_then(|v| v.as_str());
                 let params = serde_json::json!({ "url": url });
-                crate::nodes::browser::send_sidecar_action("new_page", &params).await
+                crate::nodes::browser::send_sidecar_action("new_page", &params)
+                    .await
                     .map_err(|e| anyhow!("新建标签页失败: {}", e))?;
             }
 
             "close_page" => {
                 let index = action.config.get("index").and_then(|v| v.as_u64());
                 let params = serde_json::json!({ "index": index });
-                crate::nodes::browser::send_sidecar_action("close_page", &params).await
+                crate::nodes::browser::send_sidecar_action("close_page", &params)
+                    .await
                     .map_err(|e| anyhow!("关闭标签页失败: {}", e))?;
             }
 
             "switch_page" => {
-                let index = action.config.get("index")
-                    .and_then(|v| v.as_u64()).unwrap_or(0);
+                let index = action
+                    .config
+                    .get("index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 let params = serde_json::json!({ "index": index });
-                crate::nodes::browser::send_sidecar_action("switch_page", &params).await
+                crate::nodes::browser::send_sidecar_action("switch_page", &params)
+                    .await
                     .map_err(|e| anyhow!("切换标签页失败: {}", e))?;
             }
 
             "pages" => {
-                let resp = crate::nodes::browser::send_sidecar_action("pages", &serde_json::json!({})).await
-                    .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
+                let resp =
+                    crate::nodes::browser::send_sidecar_action("pages", &serde_json::json!({}))
+                        .await
+                        .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
 
             "cookies" => {
-                let cookie_action = action.config.get("action")
-                    .and_then(|v| v.as_str()).unwrap_or("get");
+                let cookie_action = action
+                    .config
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("get");
                 let mut params = serde_json::json!({ "action": cookie_action });
                 if cookie_action == "set" {
                     if let Some(cookies) = action.config.get("cookies") {
                         params["cookies"] = cookies.clone();
                     }
                 }
-                let resp = crate::nodes::browser::send_sidecar_action("cookies", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("cookies", &params)
+                    .await
                     .map_err(|e| anyhow!("Cookie 操作失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
 
             "set_headers" => {
-                let headers = action.config.get("headers")
-                    .cloned().unwrap_or(serde_json::json!({}));
+                let headers = action
+                    .config
+                    .get("headers")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
                 let params = serde_json::json!({ "headers": headers });
-                crate::nodes::browser::send_sidecar_action("set_headers", &params).await
+                crate::nodes::browser::send_sidecar_action("set_headers", &params)
+                    .await
                     .map_err(|e| anyhow!("设置请求头失败: {}", e))?;
             }
 
             "back" => {
-                crate::nodes::browser::send_sidecar_action("back", &serde_json::json!({})).await
+                crate::nodes::browser::send_sidecar_action("back", &serde_json::json!({}))
+                    .await
                     .map_err(|e| anyhow!("后退失败: {}", e))?;
             }
 
             "forward" => {
-                crate::nodes::browser::send_sidecar_action("forward", &serde_json::json!({})).await
+                crate::nodes::browser::send_sidecar_action("forward", &serde_json::json!({}))
+                    .await
                     .map_err(|e| anyhow!("前进失败: {}", e))?;
             }
 
             "reload" => {
-                crate::nodes::browser::send_sidecar_action("reload", &serde_json::json!({})).await
+                crate::nodes::browser::send_sidecar_action("reload", &serde_json::json!({}))
+                    .await
                     .map_err(|e| anyhow!("刷新失败: {}", e))?;
             }
 
             "current_url" => {
-                let resp = crate::nodes::browser::send_sidecar_action("current_url", &serde_json::json!({})).await
-                    .map_err(|e| anyhow!("获取URL失败: {}", e))?;
+                let resp = crate::nodes::browser::send_sidecar_action(
+                    "current_url",
+                    &serde_json::json!({}),
+                )
+                .await
+                .map_err(|e| anyhow!("获取URL失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
 
             "pdf" => {
-                let path = action.config.get("path")
-                    .and_then(|v| v.as_str()).unwrap_or("output.pdf");
+                let path = action
+                    .config
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("output.pdf");
                 let params = serde_json::json!({ "path": path });
-                crate::nodes::browser::send_sidecar_action("pdf", &params).await
+                crate::nodes::browser::send_sidecar_action("pdf", &params)
+                    .await
                     .map_err(|e| anyhow!("生成PDF失败: {}", e))?;
             }
 
             // ─── 智能等待 (v2) ───
-
             "wait_network_idle" => {
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30000);
                 let params = serde_json::json!({ "timeout_ms": timeout });
-                crate::nodes::browser::send_sidecar_action("wait_network_idle", &params).await
+                crate::nodes::browser::send_sidecar_action("wait_network_idle", &params)
+                    .await
                     .map_err(|e| anyhow!("等待网络空闲失败: {}", e))?;
             }
 
             "wait_load_state" => {
-                let state = action.config.get("state")
-                    .and_then(|v| v.as_str()).unwrap_or("load");
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let state = action
+                    .config
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("load");
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30000);
                 let params = serde_json::json!({ "state": state, "timeout_ms": timeout });
-                crate::nodes::browser::send_sidecar_action("wait_load_state", &params).await
+                crate::nodes::browser::send_sidecar_action("wait_load_state", &params)
+                    .await
                     .map_err(|e| anyhow!("等待加载状态失败: {}", e))?;
             }
 
             "wait_url_contains" => {
-                let substring = action.config.get("substring")
-                    .and_then(|v| v.as_str()).unwrap_or("");
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let substring = action
+                    .config
+                    .get("substring")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30000);
                 let params = serde_json::json!({ "substring": substring, "timeout_ms": timeout });
-                crate::nodes::browser::send_sidecar_action("wait_url_contains", &params).await
+                crate::nodes::browser::send_sidecar_action("wait_url_contains", &params)
+                    .await
                     .map_err(|e| anyhow!("等待URL失败: {}", e))?;
             }
 
             // ─── 动作验证 (v2) ───
-
             "verify" => {
-                let resp = crate::nodes::browser::send_sidecar_action("verify", &serde_json::json!({})).await
-                    .map_err(|e| anyhow!("验证失败: {}", e))?;
+                let resp =
+                    crate::nodes::browser::send_sidecar_action("verify", &serde_json::json!({}))
+                        .await
+                        .map_err(|e| anyhow!("验证失败: {}", e))?;
                 let data = resp.clone();
                 let clean = data.get("clean").and_then(|v| v.as_bool()).unwrap_or(true);
                 if !clean {
                     let count = data.get("count").and_then(|v| v.as_u64()).unwrap_or(0);
-                    tracing::warn!("ActionGuard: action '{}' 后检测到 {} 个问题", action.label, count);
+                    tracing::warn!(
+                        "ActionGuard: action '{}' 后检测到 {} 个问题",
+                        action.label,
+                        count
+                    );
                 }
                 output_ports.insert(action.id.clone(), data);
             }
 
             // ─── 文件下载 (v1.6) ───
-
             "download" => {
-                let save_dir = action.config.get("save_dir")
-                    .and_then(|v| v.as_str()).unwrap_or(".");
-                let click_selector = action.config.get("click_selector")
-                    .and_then(|v| v.as_str());
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(30000);
+                let save_dir = action
+                    .config
+                    .get("save_dir")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(".");
+                let click_selector = action.config.get("click_selector").and_then(|v| v.as_str());
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30000);
                 let params = serde_json::json!({
                     "save_dir": save_dir,
                     "click_selector": click_selector,
                     "timeout_ms": timeout,
                 });
-                let resp = crate::nodes::browser::send_sidecar_action("download", &params).await
+                let resp = crate::nodes::browser::send_sidecar_action("download", &params)
+                    .await
                     .map_err(|e| anyhow!("下载失败: {}", e))?;
                 output_ports.insert(action.id.clone(), resp);
             }
 
             // ─── v1.7 办公自动化新动作 ───
-
             "upload" => {
                 let selector = require_selector(action)?;
                 let file_paths: Vec<String> = match action.config.get("file_paths") {
-                    Some(v) if v.is_array() => v.as_array().unwrap().iter()
+                    Some(v) if v.is_array() => v
+                        .as_array()
+                        .unwrap()
+                        .iter()
                         .filter_map(|x| x.as_str().map(|s| s.to_string()))
                         .collect(),
                     Some(v) => match v.as_str() {
@@ -538,14 +633,27 @@ async fn execute_actions(
                     "selector": selector,
                     "file_paths": file_paths,
                 });
-                crate::nodes::browser::send_sidecar_action("upload", &params).await
+                crate::nodes::browser::send_sidecar_action("upload", &params)
+                    .await
                     .map_err(|e| anyhow!("文件上传失败: {}", e))?;
             }
 
             "keyboard" => {
-                let key = action.config.get("key").and_then(|v| v.as_str()).unwrap_or("");
-                let text = action.config.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                let delay = action.config.get("delay").and_then(|v| v.as_u64()).unwrap_or(0);
+                let key = action
+                    .config
+                    .get("key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let text = action
+                    .config
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let delay = action
+                    .config
+                    .get("delay")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 if key.is_empty() && text.is_empty() {
                     return Err(anyhow!("keyboard 需要 key 或 text 参数"));
                 }
@@ -554,26 +662,37 @@ async fn execute_actions(
                     "text": text,
                     "delay": delay,
                 });
-                crate::nodes::browser::send_sidecar_action("keyboard", &params).await
+                crate::nodes::browser::send_sidecar_action("keyboard", &params)
+                    .await
                     .map_err(|e| anyhow!("键盘操作失败: {}", e))?;
             }
 
             "double_click" => {
                 let selector = require_selector(action)?;
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(5000);
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(5000);
                 let params = serde_json::json!({
                     "selector": selector,
                     "timeout_ms": timeout,
                 });
-                crate::nodes::browser::send_sidecar_action("double_click", &params).await
+                crate::nodes::browser::send_sidecar_action("double_click", &params)
+                    .await
                     .map_err(|e| anyhow!("双击失败: {}", e))?;
             }
 
             "drag_to" => {
-                let source = action.config.get("source").and_then(|v| v.as_str())
+                let source = action
+                    .config
+                    .get("source")
+                    .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("drag_to 缺少 source 参数"))?;
-                let target = action.config.get("target").and_then(|v| v.as_str())
+                let target = action
+                    .config
+                    .get("target")
+                    .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("drag_to 缺少 target 参数"))?;
                 let mut params = serde_json::json!({
                     "source": source,
@@ -585,57 +704,80 @@ async fn execute_actions(
                 if let Some(tp) = action.config.get("target_position") {
                     params["target_position"] = tp.clone();
                 }
-                crate::nodes::browser::send_sidecar_action("drag_to", &params).await
+                crate::nodes::browser::send_sidecar_action("drag_to", &params)
+                    .await
                     .map_err(|e| anyhow!("拖拽失败: {}", e))?;
             }
 
             "context_menu" => {
                 let selector = require_selector(action)?;
-                let timeout = action.config.get("timeout")
-                    .and_then(|v| v.as_u64()).unwrap_or(5000);
+                let timeout = action
+                    .config
+                    .get("timeout")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(5000);
                 let params = serde_json::json!({
                     "selector": selector,
                     "timeout_ms": timeout,
                 });
-                crate::nodes::browser::send_sidecar_action("context_menu", &params).await
+                crate::nodes::browser::send_sidecar_action("context_menu", &params)
+                    .await
                     .map_err(|e| anyhow!("右键菜单失败: {}", e))?;
             }
 
             "switch_frame" => {
-                let selector = action.config.get("selector")
-                    .and_then(|v| v.as_str()).unwrap_or("main");
+                let selector = action
+                    .config
+                    .get("selector")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("main");
                 let params = serde_json::json!({
                     "selector": selector,
                 });
-                crate::nodes::browser::send_sidecar_action("switch_frame", &params).await
+                crate::nodes::browser::send_sidecar_action("switch_frame", &params)
+                    .await
                     .map_err(|e| anyhow!("iframe 切换失败: {}", e))?;
             }
 
             "handle_dialog" => {
-                let action_type = action.config.get("action")
-                    .and_then(|v| v.as_str()).unwrap_or("accept");
-                let prompt_text = action.config.get("prompt_text")
-                    .and_then(|v| v.as_str()).unwrap_or("");
+                let action_type = action
+                    .config
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("accept");
+                let prompt_text = action
+                    .config
+                    .get("prompt_text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let params = serde_json::json!({
                     "action": action_type,
                     "prompt_text": prompt_text,
                 });
-                crate::nodes::browser::send_sidecar_action("handle_dialog", &params).await
+                crate::nodes::browser::send_sidecar_action("handle_dialog", &params)
+                    .await
                     .map_err(|e| anyhow!("弹窗处理设置失败: {}", e))?;
             }
 
             "scroll_to_element" => {
                 let selector = require_selector(action)?;
-                let behavior = action.config.get("behavior")
-                    .and_then(|v| v.as_str()).unwrap_or("instant");
-                let block = action.config.get("block")
-                    .and_then(|v| v.as_str()).unwrap_or("center");
+                let behavior = action
+                    .config
+                    .get("behavior")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("instant");
+                let block = action
+                    .config
+                    .get("block")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("center");
                 let params = serde_json::json!({
                     "selector": selector,
                     "behavior": behavior,
                     "block": block,
                 });
-                crate::nodes::browser::send_sidecar_action("scroll_to_element", &params).await
+                crate::nodes::browser::send_sidecar_action("scroll_to_element", &params)
+                    .await
                     .map_err(|e| anyhow!("滚动到元素失败: {}", e))?;
             }
 
@@ -690,7 +832,10 @@ impl NodeExecutor for BrowserContainerNode {
 
         // 返回 output_ports（含元数据）供下游节点使用
         let mut output = result.output_ports.clone();
-        output.insert("_container_type".to_string(), Value::String("browser".to_string()));
+        output.insert(
+            "_container_type".to_string(),
+            Value::String("browser".to_string()),
+        );
         output.insert("_step_name".to_string(), Value::String(step.name.clone()));
         Ok(serde_json::to_value(&output).unwrap_or(Value::Null))
     }

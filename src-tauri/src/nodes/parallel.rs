@@ -1,16 +1,16 @@
 // nodes/parallel.rs — 并行节点（join_all 并发执行多分支）
 // 支持 fail_fast: 任一分支失败立即取消其他分支
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
-use std::sync::Arc;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use futures::future::join_all;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use anyhow::{Result, anyhow};
-use futures::future::join_all;
-use serde_json::{Value, json};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ParallelNode;
@@ -23,15 +23,17 @@ impl NodeExecutor for ParallelNode {
         ctx: &mut ExecutionContext,
         executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let branches: Vec<Vec<Step>> = serde_json::from_value(
-            step.config.get("branches").cloned().unwrap_or(json!([]))
-        ).map_err(|e| anyhow!("并行 branches 解析失败: {}", e))?;
+        let branches: Vec<Vec<Step>> =
+            serde_json::from_value(step.config.get("branches").cloned().unwrap_or(json!([])))
+                .map_err(|e| anyhow!("并行 branches 解析失败: {}", e))?;
 
         if branches.is_empty() {
             return Err(anyhow!("并行节点 branches 不能为空"));
         }
 
-        let fail_fast = step.config.get("fail_fast")
+        let fail_fast = step
+            .config
+            .get("fail_fast")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         let failed = Arc::new(AtomicBool::new(false));

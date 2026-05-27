@@ -1,36 +1,43 @@
 // nodes/http.rs — HTTP 请求节点
-use async_trait::async_trait;
-use crate::engine::workflow::Step;
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::Step;
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[derive(Default)]
 pub struct HttpNode;
 
 #[async_trait]
 impl NodeExecutor for HttpNode {
-    async fn execute(&self, step: &Step, _ctx: &mut ExecutionContext, _executor: &Arc<StepExecutor>) -> Result<serde_json::Value> {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
         let config = &step.config;
         // 兼容旧格式 method 和新格式 action
-        let method = config.get("action")
+        let method = config
+            .get("action")
             .or_else(|| config.get("method"))
             .and_then(|v| v.as_str())
             .unwrap_or("GET");
-        let url = config.get("url").and_then(|v| v.as_str())
+        let url = config
+            .get("url")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("HTTP 节点缺少 url 参数"))?;
 
         info!("HTTP 请求: {} {}", method, url);
 
-        let connect_timeout = config.get("connect_timeout")
+        let connect_timeout = config
+            .get("connect_timeout")
             .and_then(|v| v.as_u64())
             .unwrap_or(5);
-        let read_timeout = config.get("timeout")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(30);
+        let read_timeout = config.get("timeout").and_then(|v| v.as_u64()).unwrap_or(30);
 
         let client = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(connect_timeout))

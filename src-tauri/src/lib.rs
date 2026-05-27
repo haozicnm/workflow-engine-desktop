@@ -1,7 +1,6 @@
 // lib.rs — 库导出
 #![recursion_limit = "512"]
 pub mod cli;
-pub mod server;
 pub mod data;
 pub mod engine;
 #[cfg(feature = "gui")]
@@ -9,20 +8,22 @@ pub mod ipc;
 pub mod ipc_client;
 pub mod nodes;
 #[cfg(feature = "gui")]
-pub mod system;
-#[cfg(feature = "gui")]
 pub mod platform;
+pub mod server;
+#[cfg(feature = "gui")]
+pub mod system;
 
-use std::sync::Arc;
+use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
-use anyhow::Result;
+use std::sync::Arc;
 
 /// 运行控制标志类型
 pub type RunFlags = Arc<tokio::sync::RwLock<HashMap<String, Arc<AtomicBool>>>>;
 
 /// 取消令牌类型（用于结构化取消）
-pub type CancelTokens = Arc<tokio::sync::RwLock<HashMap<String, tokio_util::sync::CancellationToken>>>;
+pub type CancelTokens =
+    Arc<tokio::sync::RwLock<HashMap<String, tokio_util::sync::CancellationToken>>>;
 
 /// 应用全局状态
 ///
@@ -40,11 +41,26 @@ fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
     info!("正在创建 5 个内置教学模板...");
 
     let builtins: &[(&str, &str)] = &[
-        (include_str!("../../library/stress/integration-smoke.wf.json"), "integration-smoke"),
-        (include_str!("../../library/monitoring/daily-monitor.wf.json"), "daily-monitor"),
-        (include_str!("../../library/batch/file-batch-approval.wf.json"), "file-batch-approval"),
-        (include_str!("../../library/batch/http-approval-pipeline.wf.json"), "http-approval-pipeline"),
-        (include_str!("../../library/monitoring/web-monitor-alert.wf.json"), "web-monitor-alert"),
+        (
+            include_str!("../../library/stress/integration-smoke.wf.json"),
+            "integration-smoke",
+        ),
+        (
+            include_str!("../../library/monitoring/daily-monitor.wf.json"),
+            "daily-monitor",
+        ),
+        (
+            include_str!("../../library/batch/file-batch-approval.wf.json"),
+            "file-batch-approval",
+        ),
+        (
+            include_str!("../../library/batch/http-approval-pipeline.wf.json"),
+            "http-approval-pipeline",
+        ),
+        (
+            include_str!("../../library/monitoring/web-monitor-alert.wf.json"),
+            "web-monitor-alert",
+        ),
     ];
 
     for (json_str, default_name) in builtins {
@@ -86,6 +102,9 @@ pub struct App {
 
 impl App {
     pub fn new() -> Result<Self> {
+        // 初始化节点注册表（运行时可扩展）
+        nodes::node_registry::init_runtime();
+
         let db = data::db::Database::open_default()?;
         seed_builtin_workflows(&db)?;
 

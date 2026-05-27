@@ -16,13 +16,17 @@ const TOKEN_FILE: &str = ".hermes/daemon-token";
 /// 读取 IPC token（从 ~/.hermes/daemon-token 或 WF_DAEMON_TOKEN 环境变量）
 fn read_token() -> Option<String> {
     if let Ok(t) = std::env::var("WF_DAEMON_TOKEN") {
-        if !t.is_empty() { return Some(t); }
+        if !t.is_empty() {
+            return Some(t);
+        }
     }
     if let Some(home) = dirs::home_dir() {
         let path = home.join(TOKEN_FILE);
         if let Ok(t) = std::fs::read_to_string(&path) {
             let trimmed = t.trim().to_string();
-            if !trimmed.is_empty() { return Some(trimmed); }
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
         }
     }
     None
@@ -62,7 +66,8 @@ impl IpcClient {
             "workflow_id": workflow_id,
             "vars": vars.unwrap_or_default(),
         });
-        sender.send(Message::Text(request.to_string()))
+        sender
+            .send(Message::Text(request.to_string()))
             .await
             .map_err(|e| format!("发送请求失败: {}", e))?;
 
@@ -103,11 +108,18 @@ impl IpcClient {
                 }
                 "run_complete" => {
                     let status = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    let elapsed = resp.get("elapsed_secs").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let elapsed = resp
+                        .get("elapsed_secs")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
                     let error = resp.get("error").and_then(|v| v.as_str());
                     match status {
                         "completed" => println!("\n✓ 完成 ({:.1}s)", elapsed),
-                        "failed" => eprintln!("\n✗ 失败 ({:.1}s): {}", elapsed, error.unwrap_or("未知错误")),
+                        "failed" => eprintln!(
+                            "\n✗ 失败 ({:.1}s): {}",
+                            elapsed,
+                            error.unwrap_or("未知错误")
+                        ),
                         _ => println!("\n状态: {}", status),
                     }
                     if status == "failed" {
@@ -116,7 +128,10 @@ impl IpcClient {
                     return Ok(());
                 }
                 "error" => {
-                    let message = resp.get("message").and_then(|v| v.as_str()).unwrap_or("未知错误");
+                    let message = resp
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("未知错误");
                     eprintln!("错误: {}", message);
                     return Err(message.to_string());
                 }
@@ -147,7 +162,8 @@ impl IpcClient {
             "template": template,
             "params": params.unwrap_or_default(),
         });
-        sender.send(Message::Text(request.to_string()))
+        sender
+            .send(Message::Text(request.to_string()))
             .await
             .map_err(|e| format!("发送请求失败: {}", e))?;
 
@@ -170,24 +186,38 @@ impl IpcClient {
                     let step_name = resp.get("step_name").and_then(|v| v.as_str()).unwrap_or("");
                     let status = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
                     let icon = match status {
-                        "running" => "⏳", "completed" => "✅", "failed" => "❌", "skipped" => "⏭️", _ => "  ",
+                        "running" => "⏳",
+                        "completed" => "✅",
+                        "failed" => "❌",
+                        "skipped" => "⏭️",
+                        _ => "  ",
                     };
                     println!("  {} {} ({})", icon, step_name, status);
                 }
                 "run_complete" => {
                     let status = resp.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    let elapsed = resp.get("elapsed_secs").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let elapsed = resp
+                        .get("elapsed_secs")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
                     let error = resp.get("error").and_then(|v| v.as_str());
                     if status == "completed" {
                         println!("\n✓ 完成 ({:.1}s)", elapsed);
                     } else {
-                        eprintln!("\n✗ 失败 ({:.1}s): {}", elapsed, error.unwrap_or("未知错误"));
+                        eprintln!(
+                            "\n✗ 失败 ({:.1}s): {}",
+                            elapsed,
+                            error.unwrap_or("未知错误")
+                        );
                         return Err(error.unwrap_or("执行失败").to_string());
                     }
                     return Ok(());
                 }
                 "error" => {
-                    let message = resp.get("message").and_then(|v| v.as_str()).unwrap_or("未知错误");
+                    let message = resp
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("未知错误");
                     eprintln!("错误: {}", message);
                     return Err(message.to_string());
                 }

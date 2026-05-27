@@ -1,13 +1,13 @@
 // nodes/sub_workflow.rs — 子流程节点（增强版）
 // 加载并执行另一个工作流，实现模块化复用
 // P4 增强：支持 DAG 上下文、输出映射、子流内部节点计数
-use async_trait::async_trait;
-use crate::engine::workflow::{Step, Workflow};
 use crate::engine::context::ExecutionContext;
-use crate::nodes::traits::NodeExecutor;
 use crate::engine::executor::StepExecutor;
+use crate::engine::workflow::{Step, Workflow};
+use crate::nodes::traits::NodeExecutor;
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 
 #[derive(Default)]
 pub struct SubWorkflowNode;
@@ -31,10 +31,11 @@ impl NodeExecutor for SubWorkflowNode {
             let yaml_str = wf_yaml
                 .as_str()
                 .or_else(|| {
-                    wf_yaml
-                        .as_object()
-                        .map(|_| "")
-                        .and_then(|_| serde_json::to_string(wf_yaml).ok().and_then(|_| wf_yaml.as_str()))
+                    wf_yaml.as_object().map(|_| "").and_then(|_| {
+                        serde_json::to_string(wf_yaml)
+                            .ok()
+                            .and_then(|_| wf_yaml.as_str())
+                    })
                 })
                 .ok_or_else(|| anyhow!("workflow_yaml 必须是字符串"))?;
 
@@ -129,14 +130,9 @@ impl NodeExecutor for SubWorkflowNode {
                 }
                 Err(e) => {
                     // 检查是否配置了 on_error 策略
-                    if let Some(crate::engine::workflow::ErrorStrategy::Ignore) =
-                        sub_step.on_error
+                    if let Some(crate::engine::workflow::ErrorStrategy::Ignore) = sub_step.on_error
                     {
-                        tracing::warn!(
-                            "子流程步骤 '{}' 失败但被忽略: {}",
-                            sub_step.id,
-                            e
-                        );
+                        tracing::warn!("子流程步骤 '{}' 失败但被忽略: {}", sub_step.id, e);
                         let err_val = serde_json::json!({
                             "error": e.to_string(),
                             "ignored": true
@@ -205,7 +201,8 @@ fn parse_inline_steps(value: &serde_json::Value) -> Result<Vec<Step>> {
         // 兼容 DAG FlowNode 格式：
         // FlowNode { id, type, label, position, config } → Step { id, name, step_type, config }
         if item.is_object() {
-            let obj = item.as_object()
+            let obj = item
+                .as_object()
                 .expect("item 应在 is_object 检查后为 Object");
             let id = obj
                 .get("id")

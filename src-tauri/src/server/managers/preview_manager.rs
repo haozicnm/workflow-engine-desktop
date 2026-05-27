@@ -4,12 +4,12 @@
 
 use axum::{
     extract::Path,
-    response::{Response, Json},
     http::StatusCode,
+    response::{Json, Response},
 };
 use serde::Deserialize;
 
-use crate::server::handlers::{ok_response, err_response};
+use crate::server::handlers::{err_response, ok_response};
 
 // ═══════════════════════════════════════════════════════════
 // Request body types
@@ -38,9 +38,7 @@ pub struct WebScrapePreviewBody {
 // 预览 handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn preview_excel(
-    Json(body): Json<PreviewExcelBody>,
-) -> Response {
+pub async fn preview_excel(Json(body): Json<PreviewExcelBody>) -> Response {
     let config = serde_json::json!({
         "path": &body.path,
         "sheet": body.sheet,
@@ -48,30 +46,32 @@ pub async fn preview_excel(
     });
     match crate::nodes::excel::excel_read(&body.path, &config).await {
         Ok(v) => ok_response(v),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Excel 预览失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Excel 预览失败: {e}"),
+        ),
     }
 }
 
-pub async fn preview_word(
-    Json(body): Json<PreviewWordBody>,
-) -> Response {
+pub async fn preview_word(Json(body): Json<PreviewWordBody>) -> Response {
     match crate::nodes::word::word_read(&body.path).await {
         Ok(v) => ok_response(v),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Word 预览失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Word 预览失败: {e}"),
+        ),
     }
 }
 
-pub async fn get_trajectory(
-    Path(run_id): Path<String>,
-) -> Response {
+pub async fn get_trajectory(Path(run_id): Path<String>) -> Response {
     let trajectory = crate::engine::preview::read_trajectory(&run_id);
     ok_response(trajectory)
 }
 
-pub async fn get_bundle_files(
-    Path((run_id, step_id)): Path<(String, String)>,
-) -> Response {
-    let bundle_dir = crate::engine::preview::preview_dir(&run_id).join("bundles").join(&step_id);
+pub async fn get_bundle_files(Path((run_id, step_id)): Path<(String, String)>) -> Response {
+    let bundle_dir = crate::engine::preview::preview_dir(&run_id)
+        .join("bundles")
+        .join(&step_id);
     if !bundle_dir.exists() {
         return ok_response(Vec::<String>::new());
     }
@@ -84,7 +84,12 @@ pub async fn get_bundle_files(
                 }
             }
         }
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("读取 bundle 目录失败: {e}")),
+        Err(e) => {
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("读取 bundle 目录失败: {e}"),
+            )
+        }
     }
     files.sort();
     ok_response(files)
@@ -100,7 +105,10 @@ pub async fn read_bundle_file(
     }
     match std::fs::read_to_string(&path) {
         Ok(content) => ok_response(serde_json::json!({ "content": content })),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("读取文件失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取文件失败: {e}"),
+        ),
     }
 }
 
@@ -108,9 +116,7 @@ pub async fn read_bundle_file(
 // Web scrape preview handler
 // ═══════════════════════════════════════════════════════════
 
-pub async fn web_scrape_preview(
-    Json(body): Json<WebScrapePreviewBody>,
-) -> Response {
+pub async fn web_scrape_preview(Json(body): Json<WebScrapePreviewBody>) -> Response {
     use crate::nodes::browser;
 
     let headless = body.headless.unwrap_or(true);
@@ -124,7 +130,10 @@ pub async fn web_scrape_preview(
     }
 
     if let Err(e) = browser::send_sidecar_action("launch", &launch_params).await {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("启动浏览器失败: {e}. 预览需要浏览器环境"));
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("启动浏览器失败: {e}. 预览需要浏览器环境"),
+        );
     }
 
     let preview_params = serde_json::json!({
@@ -134,6 +143,9 @@ pub async fn web_scrape_preview(
 
     match browser::send_sidecar_action("preview", &preview_params).await {
         Ok(result) => ok_response(result),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("页面预览失败: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("页面预览失败: {e}"),
+        ),
     }
 }

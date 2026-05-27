@@ -5,7 +5,7 @@
 //   2. 必填字段检查
 //   3. 变量格式检查
 
-use crate::engine::workflow::{Workflow, Step};
+use crate::engine::workflow::{Step, Workflow};
 use std::collections::HashSet;
 
 /// 校验结果
@@ -18,7 +18,11 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     pub fn new() -> Self {
-        Self { valid: true, errors: Vec::new(), warnings: Vec::new() }
+        Self {
+            valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
     }
 
     fn error(&mut self, msg: String) {
@@ -180,13 +184,14 @@ fn check_placeholders(s: &str, result: &mut ValidationResult) {
 
 /// 检查变量路径是否合法：字母数字下划线点
 fn is_valid_variable_path(path: &str) -> bool {
-    path.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-')
+    path.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-')
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::workflow::{RunCondition};
+    use crate::engine::workflow::RunCondition;
 
     fn make_step(id: &str, step_type: &str) -> Step {
         Step {
@@ -200,7 +205,11 @@ mod tests {
 
     #[test]
     fn empty_workflow_warns() {
-        let wf = Workflow { name: "test".into(), steps: vec![], ..Default::default() };
+        let wf = Workflow {
+            name: "test".into(),
+            steps: vec![],
+            ..Default::default()
+        };
         let r = validate_workflow(&wf);
         assert!(r.valid);
         assert!(r.warnings.iter().any(|w| w.contains("no steps")));
