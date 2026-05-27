@@ -56,19 +56,27 @@ jobs:
 
       - name: Package deb
         run: |
+          DEB_ARCH=arm64
           mkdir -p pkg/opt/workflow-engine pkg/usr/lib/systemd/user pkg/DEBIAN
           cp src-tauri/target/aarch64-unknown-linux-gnu/release/workflow-engine pkg/opt/workflow-engine/
           cp src-tauri/target/aarch64-unknown-linux-gnu/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
           cp -r node-schema.json pkg/opt/workflow-engine/
-          cp debian/wf-engine.service pkg/usr/lib/systemd/user/
-          cp debian/wf-engine.service pkg/opt/workflow-engine/
-          cp debian/control pkg/DEBIAN/
-          cp debian/postinst pkg/DEBIAN/
-          chmod 755 pkg/DEBIAN/postinst
+          if [ -f debian/wf-engine.service ]; then
+            cp debian/wf-engine.service pkg/usr/lib/systemd/user/
+            cp debian/wf-engine.service pkg/opt/workflow-engine/
+          fi
+          if [ -f debian/postinst ]; then
+            cp debian/postinst pkg/DEBIAN/
+            chmod 755 pkg/DEBIAN/postinst
+          fi
+          # 动态生成 DEBIAN/control（修正版本和架构）
+          sed -e "s/^Version:.*/Version: 7.2.0/" \
+              -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
+              debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.2.0_arm64.deb
+          dpkg-deb -Zgzip --build pkg workflow-engine-standalone_7.2.0_${DEB_ARCH}.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v4
