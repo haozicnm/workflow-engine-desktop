@@ -28,3 +28,13 @@ dist/
 src-tauri/python-runtime/
 
 # Internal docs
+AUDIT-*.md
+
+# Build artifacts
+*.zip
+workflow-engine-v*/
+
+# Dev scripts (Windows)
+debug.bat
+package.ps1
+start-server.bat
