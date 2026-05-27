@@ -13,10 +13,10 @@ permissions:
 
 jobs:
   # ═══════════════════════════════════════════
-  # ARM64 AppImage + deb
+  # ARM64 deb + tar.gz
   # ═══════════════════════════════════════════
   build-arm64:
-    name: ARM64 Linux (AppImage + deb)
+    name: ARM64 Linux (deb + tar.gz)
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -58,17 +58,23 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build & bundle (AppImage + deb)
+      - name: Build & bundle (deb)
         run: |
-          npx tauri build --bundles appimage,deb
+          npx tauri build --bundles deb
         env:
           CI: true
 
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-engine-arm64-appimage
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
+      - name: Package tar.gz (standalone)
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          TARGZ=workflow-engine-${VERSION}-linux-arm64.tar.gz
+          mkdir -p /tmp/wf-pkg
+          cp src-tauri/target/release/workflow-engine /tmp/wf-pkg/
+          cp src-tauri/target/release/wf-cli /tmp/wf-pkg/
+          cp -r dist /tmp/wf-pkg/
+          cp -r src-tauri/sidecars /tmp/wf-pkg/
+          cp node-schema.json /tmp/wf-pkg/
+          tar czf $TARGZ -C /tmp/wf-pkg .
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
@@ -76,19 +82,25 @@ jobs:
           name: workflow-engine-arm64-deb
           path: src-tauri/target/release/bundle/deb/*.deb
 
+      - name: Upload tar.gz
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-arm64-tarball
+          path: workflow-engine-*-linux-arm64.tar.gz
+
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
+            workflow-engine-*-linux-arm64.tar.gz
 
   # ═══════════════════════════════════════════
-  # x86_64 AppImage + deb
+  # x86_64 deb + tar.gz
   # ═══════════════════════════════════════════
   build-x64:
-    name: x86_64 Linux (AppImage + deb)
+    name: x86_64 Linux (deb + tar.gz)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -130,17 +142,23 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build & bundle (AppImage + deb)
+      - name: Build & bundle (deb)
         run: |
-          npx tauri build --bundles appimage,deb
+          npx tauri build --bundles deb
         env:
           CI: true
 
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-engine-x64-appimage
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
+      - name: Package tar.gz (standalone)
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          TARGZ=workflow-engine-${VERSION}-linux-x64.tar.gz
+          mkdir -p /tmp/wf-pkg
+          cp src-tauri/target/release/workflow-engine /tmp/wf-pkg/
+          cp src-tauri/target/release/wf-cli /tmp/wf-pkg/
+          cp -r dist /tmp/wf-pkg/
+          cp -r src-tauri/sidecars /tmp/wf-pkg/
+          cp node-schema.json /tmp/wf-pkg/
+          tar czf $TARGZ -C /tmp/wf-pkg .
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
@@ -148,19 +166,25 @@ jobs:
           name: workflow-engine-x64-deb
           path: src-tauri/target/release/bundle/deb/*.deb
 
+      - name: Upload tar.gz
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-x64-tarball
+          path: workflow-engine-*-linux-x64.tar.gz
+
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
+            workflow-engine-*-linux-x64.tar.gz
 
   # ═══════════════════════════════════════════
-  # Windows NSIS
+  # Windows NSIS + zip
   # ═══════════════════════════════════════════
   build-windows:
-    name: Windows (NSIS installer)
+    name: Windows (NSIS + zip)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -198,11 +222,40 @@ jobs:
         env:
           CI: true
 
+      - name: Package zip (standalone)
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          $pkgDir = "workflow-engine-$version-windows-x64"
+          New-Item -ItemType Directory -Force -Path $pkgDir
+          Copy-Item src-tauri/target/release/workflow-engine.exe $pkgDir/
+          Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
+          Copy-Item -Recurse dist $pkgDir/
+          Copy-Item -Recurse src-tauri/sidecars $pkgDir/sidecars
+          Copy-Item node-schema.json $pkgDir/
+          $lines = @(
+            'echo off'
+            'title Workflow Engine'
+            'cd /d "%~dp0"'
+            'start /MIN "" "workflow-engine.exe"'
+            'echo Workflow Engine started on http://localhost:19528'
+            'ping 127.0.0.1 -n 4 > nul'
+            'start http://localhost:19528'
+          )
+          $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
+          Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
+
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-installer
           path: src-tauri/target/release/bundle/nsis/*.exe
+
+      - name: Upload zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-engine-windows-zip
+          path: workflow-engine-*-windows-x64.zip
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -210,3 +263,4 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/nsis/*.exe
+            workflow-engine-*-windows-x64.zip
