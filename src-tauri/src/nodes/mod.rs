@@ -2,6 +2,8 @@
 pub mod approval;
 pub mod array;
 pub mod browser;
+pub mod clipboard;
+pub mod clipboard_container;
 pub mod browser_container;
 pub mod condition;
 pub mod convert;

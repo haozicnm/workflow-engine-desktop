@@ -63,6 +63,24 @@ impl StepExecutor {
         register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
 
         // ── 文件节点（v3: 独立 executor） ──
+        register!(executors, "file_read", crate::nodes::file::FileReadNode);
+        register!(executors, "file_write", crate::nodes::file::FileWriteNode);
+        register!(executors, "file_list", crate::nodes::file::FileListNode);
+        register!(executors, "file_delete", crate::nodes::file::FileDeleteNode);
+        register!(executors, "file_exists", crate::nodes::file::FileExistsNode);
+        register!(executors, "file_append", crate::nodes::file::FileAppendNode);
+        register!(executors, "file_mkdir", crate::nodes::file::FileMkdirNode);
+        register!(executors, "file_copy", crate::nodes::file::FileCopyNode);
+        register!(executors, "file_move", crate::nodes::file::FileMoveNode);
+        register!(executors, "file_glob", crate::nodes::file::FileGlobNode);
+        register!(executors, "file_checksum", crate::nodes::file::FileChecksumNode);
+
+        // ── 剪贴板节点 ──
+        register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
+        register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
+
+        // ── 浏览器子节点 ──
+        register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
 
         // ── 正则节点（v3: 独立 executor） ──
         register!(
@@ -156,7 +174,8 @@ impl StepExecutor {
             "excel"   => crate::nodes::excel_container::ExcelContainerNode,
             "word"    => crate::nodes::word_container::WordContainerNode,
             "logic"   => crate::nodes::condition::ConditionNode,
-            "file"    => crate::nodes::file_container::FileContainerNode,
+            "file"      => crate::nodes::file_container::FileContainerNode,
+            "clipboard" => crate::nodes::clipboard_container::ClipboardContainerNode,
         );
 
         // ── 其他节点 ──

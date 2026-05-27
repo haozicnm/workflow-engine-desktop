@@ -310,3 +310,269 @@ impl NodeExecutor for FileExistsNode {
         }
     }
 }
+
+// ═══════════════════════════════════════
+// file_append — 追加内容到文件末尾
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileAppendNode;
+
+#[async_trait]
+impl NodeExecutor for FileAppendNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let path = get_path(config)?;
+        let content = config
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("append 缺少 content 参数"))?;
+
+        // 确保父目录存在
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| anyhow!("创建父目录失败 [{}]: {}", parent.display(), e))?;
+            }
+        }
+
+        use tokio::io::AsyncWriteExt;
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .await
+            .map_err(|e| anyhow!("打开文件失败 [{}]: {}", path, e))?;
+
+        file.write_all(content.as_bytes())
+            .await
+            .map_err(|e| anyhow!("追加写入失败 [{}]: {}", path, e))?;
+
+        info!("追加文件: {} ({} bytes)", path, content.len());
+        Ok(serde_json::json!({ "path": path, "appended": content.len() }))
+    }
+}
+
+// ═══════════════════════════════════════
+// file_mkdir — 创建目录
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileMkdirNode;
+
+#[async_trait]
+impl NodeExecutor for FileMkdirNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let path = get_path(config)?;
+
+        tokio::fs::create_dir_all(path)
+            .await
+            .map_err(|e| anyhow!("创建目录失败 [{}]: {}", path, e))?;
+
+        info!("创建目录: {}", path);
+        Ok(serde_json::json!({ "path": path, "created": true }))
+    }
+}
+
+// ═══════════════════════════════════════
+// file_copy — 复制文件/目录
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileCopyNode;
+
+#[async_trait]
+impl NodeExecutor for FileCopyNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let src = get_path(config)?;
+        let dest = config
+            .get("dest")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("copy 缺少 dest 参数"))?;
+
+        let meta = tokio::fs::metadata(src)
+            .await
+            .map_err(|e| anyhow!("源路径不存在 [{}]: {}", src, e))?;
+
+        if meta.is_dir() {
+            // 递归复制目录
+            copy_dir_recursive(src, dest).await?;
+        } else {
+            // 确保目标父目录存在
+            if let Some(parent) = std::path::Path::new(dest).parent() {
+                if !parent.as_os_str().is_empty() && !parent.exists() {
+                    tokio::fs::create_dir_all(parent).await
+                        .map_err(|e| anyhow!("创建父目录失败: {}", e))?;
+                }
+            }
+            tokio::fs::copy(src, dest).await
+                .map_err(|e| anyhow!("复制文件失败 [{} -> {}]: {}", src, dest, e))?;
+        }
+
+        info!("复制: {} -> {}", src, dest);
+        Ok(serde_json::json!({ "src": src, "dest": dest, "copied": true }))
+    }
+}
+
+async fn copy_dir_recursive(src: &str, dest: &str) -> Result<()> {
+    tokio::fs::create_dir_all(dest).await
+        .map_err(|e| anyhow!("创建目标目录失败 [{}]: {}", dest, e))?;
+
+    let mut read_dir = tokio::fs::read_dir(src).await
+        .map_err(|e| anyhow!("读取源目录失败 [{}]: {}", src, e))?;
+
+    while let Some(entry) = read_dir.next_entry().await
+        .map_err(|e| anyhow!("遍历目录失败: {}", e))?
+    {
+        let src_path = entry.path();
+        let dest_path = std::path::Path::new(dest).join(entry.file_name());
+        let meta = entry.metadata().await
+            .map_err(|e| anyhow!("获取元数据失败: {}", e))?;
+
+        if meta.is_dir() {
+            Box::pin(copy_dir_recursive(
+                &src_path.to_string_lossy(),
+                &dest_path.to_string_lossy(),
+            )).await?;
+        } else {
+            tokio::fs::copy(&src_path, &dest_path).await
+                .map_err(|e| anyhow!("复制失败: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+// ═══════════════════════════════════════
+// file_move — 移动/重命名文件
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileMoveNode;
+
+#[async_trait]
+impl NodeExecutor for FileMoveNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let src = get_path(config)?;
+        let dest = config
+            .get("dest")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("move 缺少 dest 参数"))?;
+
+        // 确保目标父目录存在
+        if let Some(parent) = std::path::Path::new(dest).parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                tokio::fs::create_dir_all(parent).await
+                    .map_err(|e| anyhow!("创建父目录失败: {}", e))?;
+            }
+        }
+
+        tokio::fs::rename(src, dest).await
+            .map_err(|e| anyhow!("移动失败 [{} -> {}]: {}", src, dest, e))?;
+
+        info!("移动: {} -> {}", src, dest);
+        Ok(serde_json::json!({ "src": src, "dest": dest, "moved": true }))
+    }
+}
+
+// ═══════════════════════════════════════
+// file_glob — 通配符查找文件
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileGlobNode;
+
+#[async_trait]
+impl NodeExecutor for FileGlobNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let pattern = config
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("glob 缺少 pattern 参数"))?;
+
+        let paths: Vec<String> = glob::glob(pattern)
+            .map_err(|e| anyhow!("无效的 glob 模式 [{}]: {}", pattern, e))?
+            .filter_map(|entry| entry.ok())
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+
+        let count = paths.len();
+        info!("glob [{}]: {} 匹配", pattern, count);
+        Ok(serde_json::json!({ "pattern": pattern, "matches": paths, "count": count }))
+    }
+}
+
+// ═══════════════════════════════════════
+// file_checksum — 计算文件校验和
+// ═══════════════════════════════════════
+
+#[derive(Default)]
+pub struct FileChecksumNode;
+
+#[async_trait]
+impl NodeExecutor for FileChecksumNode {
+    async fn execute(
+        &self,
+        step: &Step,
+        _ctx: &mut ExecutionContext,
+        _executor: &Arc<StepExecutor>,
+    ) -> Result<serde_json::Value> {
+        let config = &step.config;
+        let path = get_path(config)?;
+
+        let bytes = tokio::fs::read(path).await
+            .map_err(|e| anyhow!("读取文件失败 [{}]: {}", path, e))?;
+
+        use md5::Md5;
+        use sha2::{Sha256, Digest};
+
+        let md5_hash = {
+            let mut hasher = Md5::new();
+            hasher.update(&bytes);
+            format!("{:x}", hasher.finalize())
+        };
+
+        let sha256_hash = {
+            let mut hasher = Sha256::new();
+            hasher.update(&bytes);
+            format!("{:x}", hasher.finalize())
+        };
+
+        info!("checksum [{}]: md5={}, sha256={}", path, md5_hash, sha256_hash);
+        Ok(serde_json::json!({
+            "path": path,
+            "size": bytes.len(),
+            "md5": md5_hash,
+            "sha256": sha256_hash,
+        }))
+    }
+}
