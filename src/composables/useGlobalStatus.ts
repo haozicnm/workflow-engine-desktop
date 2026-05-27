@@ -25,6 +25,8 @@ interface GlobalStatusState {
   schedulesLoaded: boolean
   ipcOnline: boolean
   apiOnline: boolean
+  sidecarHealthy: boolean
+  sidecarPingMs: number
 }
 
 const state = reactive<GlobalStatusState>({
@@ -33,6 +35,8 @@ const state = reactive<GlobalStatusState>({
   schedulesLoaded: false,
   ipcOnline: false,
   apiOnline: false,
+  sidecarHealthy: false,
+  sidecarPingMs: 0,
 })
 
 let scheduleRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -101,6 +105,21 @@ export function useGlobalStatus() {
     }
   }
 
+  async function refreshSidecarStatus() {
+    try {
+      const resp = await fetch('/api/sidecar/health')
+      if (resp.ok) {
+        const data = await resp.json()
+        state.sidecarHealthy = data.sidecar?.healthy ?? false
+        state.sidecarPingMs = data.sidecar?.last_ping_ms ?? 0
+      } else {
+        state.sidecarHealthy = false
+      }
+    } catch (e) {
+      state.sidecarHealthy = false
+    }
+  }
+
   function startSchedulePolling() {
     if (scheduleRefreshTimer) return
     refreshSchedules()
@@ -122,6 +141,7 @@ export function useGlobalStatus() {
     refreshSchedules,
     refreshIpcStatus,
     refreshApiStatus,
+    refreshSidecarStatus,
     startSchedulePolling,
     stopSchedulePolling,
   }

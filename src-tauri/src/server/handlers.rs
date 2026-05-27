@@ -381,7 +381,7 @@ pub use crate::server::managers::approval_manager::{
 
 pub use crate::server::managers::system_manager::{
     SettingsUpdateBody, PluginInstallBody, PluginUninstallBody,
-    system_health, node_list_types, settings_get, settings_update,
+    system_health, sidecar_health, node_list_types, node_schema, settings_get, settings_update,
     system_check_browser, get_log_path, open_log_dir, clear_logs, check_ipc,
     plugin_list, plugin_install, plugin_uninstall, plugin_pick_file,
 };

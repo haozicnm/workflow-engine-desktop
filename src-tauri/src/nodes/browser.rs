@@ -352,6 +352,16 @@ fn find_windows_python() -> Result<std::path::PathBuf> {
 // ─── 全局 sidecar 实例（RwLock<Option<Arc<...>>> 支持健康检查和自动重启） ───
 
 static SIDECAR: RwLock<Option<Arc<BrowserSidecar>>> = RwLock::const_new(None);
+/// 最近一次心跳结果（供 /api/sidecar/health 读取）
+static LAST_HEARTBEAT: RwLock<Option<HeartbeatInfo>> = RwLock::const_new(None);
+
+#[derive(Clone, serde::Serialize)]
+pub struct HeartbeatInfo {
+    pub healthy: bool,
+    pub last_ping_ms: u64,
+    pub last_check: String,
+    pub restart_count: u32,
+}
 
 async fn is_sidecar_healthy(sidecar: &Arc<BrowserSidecar>) -> bool {
     if !sidecar.is_healthy() {
@@ -368,6 +378,89 @@ async fn is_sidecar_healthy(sidecar: &Arc<BrowserSidecar>) -> bool {
             false
         }
     }
+}
+
+/// 后台心跳任务：每 30s ping sidecar，失败自动重启
+async fn sidecar_heartbeat_loop() {
+    let mut interval = tokio::time::interval(Duration::from_secs(30));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut restart_count: u32 = 0;
+
+    loop {
+        interval.tick().await;
+
+        let guard = SIDECAR.read().await;
+        let info = if let Some(ref sidecar) = *guard {
+            let start = std::time::Instant::now();
+            let healthy = is_sidecar_healthy(sidecar).await;
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+
+            HeartbeatInfo {
+                healthy,
+                last_ping_ms: elapsed_ms,
+                last_check: chrono::Utc::now().to_rfc3339(),
+                restart_count,
+            }
+        } else {
+            HeartbeatInfo {
+                healthy: false,
+                last_ping_ms: 0,
+                last_check: chrono::Utc::now().to_rfc3339(),
+                restart_count,
+            }
+        };
+        drop(guard);
+
+        // 写入心跳状态
+        {
+            let mut hb = LAST_HEARTBEAT.write().await;
+            *hb = Some(info.clone());
+        }
+
+        // 心跳失败 → 自动重启
+        if !info.healthy {
+            warn!("心跳检测 sidecar 不可用，尝试自动重启 (第 {} 次)...", restart_count + 1);
+            let mut guard = SIDECAR.write().await;
+            // 清理旧进程
+            if let Some(ref old) = *guard {
+                let mut child_guard = old.child.lock().await;
+                if let Some(ref mut old_child) = *child_guard {
+                    let _ = old_child.kill().await;
+                    let _ = old_child.wait().await;
+                }
+            }
+            *guard = None;
+            drop(guard);
+
+            // 尝试重启
+            match get_or_start_sidecar().await {
+                Ok(_) => {
+                    restart_count += 1;
+                    info!("Sidecar 自动重启成功 (第 {} 次)", restart_count);
+                }
+                Err(e) => {
+                    warn!("Sidecar 自动重启失败: {}", e);
+                }
+            }
+        }
+    }
+}
+
+/// 获取最近心跳状态（供 API handler 调用）
+pub async fn get_heartbeat_info() -> HeartbeatInfo {
+    let guard = LAST_HEARTBEAT.read().await;
+    guard.clone().unwrap_or(HeartbeatInfo {
+        healthy: false,
+        last_ping_ms: 0,
+        last_check: "尚未检查".to_string(),
+        restart_count: 0,
+    })
+}
+
+/// 启动后台心跳（应用启动时调用一次）
+pub fn start_heartbeat() {
+    tokio::spawn(sidecar_heartbeat_loop());
+    info!("Sidecar 心跳任务已启动（30s 间隔）");
 }
 
 /// 检查 Playwright Python 包是否已安装

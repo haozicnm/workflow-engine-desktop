@@ -6,7 +6,6 @@
  * source of truth for type/icon/color/params structure.
  */
 import { useI18n } from 'vue-i18n'
-import { safeInvoke } from '@/utils/tauri'
 import type { ContainerDef, ActionDef, ContainerType, Action, Step } from '@/types/types'
 import {
   CONTAINER_DEFS,
@@ -154,25 +153,27 @@ export function useRegistry() {
   /** 从后端同步动态节点类型（插件安装后调用） */
   async function refreshDynamicTypes() {
     try {
-      const types = await safeInvoke<string[]>('node_list_types')
-      if (!types || !Array.isArray(types)) return
+      const resp = await fetch('http://localhost:19528/api/nodes/schema')
+      if (!resp.ok) return
+      const nodes = await resp.json()
+      if (!Array.isArray(nodes)) return
       clearDynamicNodes()
-      for (const t of types) {
-        if (!CONTAINER_DEFS.some(d => d.type === t)) {
-          registerDynamicNode({
-            type: t as ContainerType,
-            label: t,
-            icon: 'Package',
-            color: '#a5d6ff',
-            description: `Plugin: ${t}`,
-            isContainer: false,
-            params: [{ key: 'config', label: '参数 (JSON)', type: 'textarea' as const }],
-          })
-        }
+      const existingTypes = new Set(CONTAINER_DEFS.map(d => d.type))
+      for (const node of nodes) {
+        if (existingTypes.has(node.type)) continue
+        registerDynamicNode({
+          type: node.type as unknown as ContainerType,
+          label: node.label || node.type,
+          icon: node.icon || 'Package',
+          color: '#a5d6ff',
+          description: node.desc || node.label || node.type,
+          isContainer: false,
+          params: [{ key: 'config', label: '参数 (JSON)', type: 'textarea' as const }],
+        })
       }
       // Invalidate cache so next access rebuilds with dynamic types
       _cache.delete(loc)
-    } catch (_) { /* backend may not have command yet */ }
+    } catch (_) { /* backend may not be ready */ }
   }
 
   return {

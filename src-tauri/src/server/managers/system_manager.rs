@@ -44,6 +44,13 @@ pub async fn system_health() -> Response {
     }))
 }
 
+pub async fn sidecar_health() -> Response {
+    let info = crate::nodes::browser::get_heartbeat_info().await;
+    ok_response(serde_json::json!({
+        "sidecar": info,
+    }))
+}
+
 pub async fn node_list_types() -> Response {
     let mut types: Vec<String> = crate::nodes::registry::all_nodes()
         .into_iter().map(|n| n.node_type).collect();
@@ -53,6 +60,15 @@ pub async fn node_list_types() -> Response {
         }
     }
     ok_response(types)
+}
+
+/// 返回完整 node-schema.json（前端动态加载节点定义）
+pub async fn node_schema() -> Response {
+    let json_str = include_str!("../../../node-schema.json");
+    match serde_json::from_str::<serde_json::Value>(json_str) {
+        Ok(val) => ok_response(val),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("node-schema.json 解析失败: {e}")),
+    }
 }
 
 pub async fn settings_get(

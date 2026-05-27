@@ -1,11 +1,13 @@
 // tests/parser_tests.rs — Parser 转换测试
 //
-// 测试范围：
-//   - Container type stays unchanged (v8)
-//   - Actions moved into config
-//   - action.params → action.config
-//   - logic container gets condition_group in config
-//   - Non-container types pass through unchanged
+// v8 行为：parser 是纯 1:1 透传（JSON → Step 结构体），不做字段搬运。
+//   - actions 保持在 step.actions，不移到 config
+//   - action.params 保持原样（归一化由 executor 的 normalize_actions 在运行时处理）
+//   - condition_group 保持在 step.condition_group，不移到 config
+//   - 容器类型名透传，不加 _container 后缀
+//
+// normalize_actions (params→config, 补 label) 由 executor 运行时调用，
+// 不在 parser 阶段执行，相关测试在 parser 内部 mod tests 中覆盖。
 
 use serde_json::json;
 use workflow_engine::engine::parser;
@@ -24,11 +26,11 @@ fn parse_steps(steps_json: serde_json::Value) -> Vec<workflow_engine::engine::wo
 }
 
 // ═══════════════════════════════════════════════════
-// 容器类型保持原名（v8 透传）
+// 容器类型名透传（v8: 不加 _container 后缀）
 // ═══════════════════════════════════════════════════
 
 #[test]
-fn container_type_browser_gets_suffix() {
+fn container_type_browser_passthrough() {
     let steps = parse_steps(json!([
         {"id": "b1", "name": "Browser", "type": "browser", "config": {}, "actions": []}
     ]));
@@ -36,7 +38,7 @@ fn container_type_browser_gets_suffix() {
 }
 
 #[test]
-fn container_type_excel_gets_suffix() {
+fn container_type_excel_passthrough() {
     let steps = parse_steps(json!([
         {"id": "e1", "name": "Excel", "type": "excel", "config": {}, "actions": []}
     ]));
@@ -44,7 +46,7 @@ fn container_type_excel_gets_suffix() {
 }
 
 #[test]
-fn container_type_word_gets_suffix() {
+fn container_type_word_passthrough() {
     let steps = parse_steps(json!([
         {"id": "w1", "name": "Word", "type": "word", "config": {}, "actions": []}
     ]));
@@ -52,7 +54,7 @@ fn container_type_word_gets_suffix() {
 }
 
 #[test]
-fn container_type_logic_gets_suffix() {
+fn container_type_logic_passthrough() {
     let steps = parse_steps(json!([
         {"id": "l1", "name": "Logic", "type": "logic", "config": {}, "actions": []}
     ]));
@@ -104,11 +106,11 @@ fn non_container_type_condition_unchanged() {
 }
 
 // ═══════════════════════════════════════════════════
-// Actions moved into config
+// v8: actions 保持在 step.actions（不移到 config）
 // ═══════════════════════════════════════════════════
 
 #[test]
-fn container_actions_moved_into_config() {
+fn container_actions_stay_in_step_actions() {
     let steps = parse_steps(json!([
         {
             "id": "b1",
@@ -122,47 +124,49 @@ fn container_actions_moved_into_config() {
         }
     ]));
 
-    // step.actions 应为 None（已移入 config）
-    assert!(steps[0].actions.is_none());
+    // v8: actions 保持在 step.actions，不移入 config
+    let actions = steps[0]
+        .actions
+        .as_ref()
+        .expect("actions should be preserved");
+    assert_eq!(actions.len(), 2);
+    assert_eq!(actions[0]["type"], json!("navigate"));
+    assert_eq!(actions[1]["type"], json!("click"));
 
-    // config.actions 应存在且有 2 个
-    let config_actions = steps[0].config["actions"].as_array().unwrap();
-    assert_eq!(config_actions.len(), 2);
-
-    // 原始 config 字段保留
+    // config 保持原样，不注入 actions
     assert_eq!(steps[0].config["headless"], json!(true));
+    assert!(steps[0].config.get("actions").is_none());
 }
 
 #[test]
-fn container_with_no_actions() {
+fn container_with_empty_actions() {
     let steps = parse_steps(json!([
         {"id": "b1", "name": "Browser", "type": "browser", "config": {}, "actions": []}
     ]));
 
-    // 空 actions 数组
-    let config_actions = steps[0].config["actions"].as_array().unwrap();
-    assert_eq!(config_actions.len(), 0);
+    // 空 actions → step.actions 为 Some([])
+    let actions = steps[0].actions.as_ref().unwrap();
+    assert_eq!(actions.len(), 0);
 }
 
 #[test]
-fn container_no_actions_field() {
+fn container_no_actions_field_stays_none() {
     let steps = parse_steps(json!([
         {"id": "b1", "name": "Browser", "type": "browser", "config": {"key": "val"}}
     ]));
 
-    // 没有 actions 字段 → config.actions 为空数组
-    let config_actions = steps[0].config["actions"].as_array().unwrap();
-    assert_eq!(config_actions.len(), 0);
-    // 原始 config 保留
+    // 没有 actions 字段 → step.actions 为 None
+    assert!(steps[0].actions.is_none());
+    // config 保持原样
     assert_eq!(steps[0].config["key"], json!("val"));
 }
 
 // ═══════════════════════════════════════════════════
-// action.params → action.config
+// v8: action.params 保持原样（归一化由 executor 运行时处理）
 // ═══════════════════════════════════════════════════
 
 #[test]
-fn action_params_converted_to_config() {
+fn action_params_preserved_as_is() {
     let steps = parse_steps(json!([
         {
             "id": "b1",
@@ -175,14 +179,13 @@ fn action_params_converted_to_config() {
         }
     ]));
 
-    let action = &steps[0].config["actions"][0];
-    // params 应被转换为 config
-    assert!(action.get("params").is_none(), "params should be removed");
-    assert_eq!(action["config"]["url"], json!("https://example.com"));
+    let action = &steps[0].actions.as_ref().unwrap()[0];
+    // v8: params 保持原样，不在 parser 阶段转换
+    assert_eq!(action["params"]["url"], json!("https://example.com"));
 }
 
 #[test]
-fn action_no_params_stays_unchanged() {
+fn action_without_params_stays_unchanged() {
     let steps = parse_steps(json!([
         {
             "id": "b1",
@@ -195,14 +198,13 @@ fn action_no_params_stays_unchanged() {
         }
     ]));
 
-    let action = &steps[0].config["actions"][0];
-    // 没有 params → 不应出现 config（除非原有）
+    let action = &steps[0].actions.as_ref().unwrap()[0];
     assert_eq!(action["type"], json!("screenshot"));
     assert_eq!(action["label"], json!("截图"));
 }
 
 #[test]
-fn action_label_auto_filled() {
+fn action_label_not_auto_filled_by_parser() {
     let steps = parse_steps(json!([
         {
             "id": "b1",
@@ -215,9 +217,9 @@ fn action_label_auto_filled() {
         }
     ]));
 
-    let action = &steps[0].config["actions"][0];
-    // label 应自动填充为 type
-    assert_eq!(action["label"], json!("navigate"));
+    let action = &steps[0].actions.as_ref().unwrap()[0];
+    // v8: parser 不补 label（由 executor normalize_actions 运行时处理）
+    assert!(action.get("label").is_none());
 }
 
 #[test]
@@ -234,16 +236,16 @@ fn action_existing_label_preserved() {
         }
     ]));
 
-    let action = &steps[0].config["actions"][0];
+    let action = &steps[0].actions.as_ref().unwrap()[0];
     assert_eq!(action["label"], json!("打开网页"));
 }
 
 // ═══════════════════════════════════════════════════
-// logic container gets condition_group in config
+// v8: condition_group 保持在 step.condition_group（不移到 config）
 // ═══════════════════════════════════════════════════
 
 #[test]
-fn logic_container_condition_group_in_config() {
+fn logic_condition_group_stays_in_step() {
     let cg = LogicConditionGroup {
         combinator: "or".to_string(),
         conditions: vec![
@@ -276,15 +278,21 @@ fn logic_container_condition_group_in_config() {
         }
     ]));
 
-    // condition_group 应在 config 中
-    assert_eq!(steps[0].config["condition_group"]["combinator"], json!("or"));
-    let conds = steps[0].config["condition_group"]["conditions"].as_array().unwrap();
-    assert_eq!(conds.len(), 2);
-    assert_eq!(conds[0]["op"], json!("equals"));
-    assert_eq!(conds[1]["op"], json!("gt"));
+    // v8: condition_group 保持在 step 级别
+    let step_cg = steps[0]
+        .condition_group
+        .as_ref()
+        .expect("condition_group should be preserved");
+    assert_eq!(step_cg.combinator, "or");
+    assert_eq!(step_cg.conditions.len(), 2);
+    assert_eq!(step_cg.conditions[0].op, "equals");
+    assert_eq!(step_cg.conditions[1].op, "gt");
 
-    // condition 也应在 config 中
-    assert_eq!(steps[0].config["condition"], json!("some_expr"));
+    // condition 保持在 step 级别
+    assert_eq!(steps[0].condition.as_deref(), Some("some_expr"));
+
+    // config 不注入 condition_group
+    assert!(steps[0].config.get("condition_group").is_none());
 }
 
 #[test]
@@ -299,8 +307,7 @@ fn logic_container_without_condition_group() {
         }
     ]));
 
-    // 没有 condition_group 字段 → config 中不应有
-    assert!(steps[0].config.get("condition_group").is_none());
+    assert!(steps[0].condition_group.is_none());
 }
 
 #[test]
@@ -315,9 +322,8 @@ fn non_logic_container_no_condition_group() {
         }
     ]));
 
-    // browser 容器不应在 config 中注入 condition_group
-    assert!(steps[0].config.get("condition_group").is_none());
-    assert!(steps[0].config.get("condition").is_none());
+    assert!(steps[0].condition_group.is_none());
+    assert!(steps[0].condition.is_none());
 }
 
 // ═══════════════════════════════════════════════════
@@ -342,11 +348,12 @@ fn mixed_container_and_non_container_steps() {
     assert_eq!(steps[2].step_type, "http");
     assert_eq!(steps[3].step_type, "excel");
 
-    // browser action params → config
-    assert_eq!(steps[0].config["actions"][0]["config"]["url"], json!("https://example.com"));
+    // v8: actions 保持在 step.actions，params 保持原样
+    let b_actions = steps[0].actions.as_ref().unwrap();
+    assert_eq!(b_actions[0]["params"]["url"], json!("https://example.com"));
 
-    // excel action params → config
-    assert_eq!(steps[3].config["actions"][0]["config"]["path"], json!("data.xlsx"));
+    let e_actions = steps[3].actions.as_ref().unwrap();
+    assert_eq!(e_actions[0]["params"]["path"], json!("data.xlsx"));
 }
 
 // ═══════════════════════════════════════════════════
@@ -355,7 +362,9 @@ fn mixed_container_and_non_container_steps() {
 
 #[test]
 fn parse_workflow_empty_name_fails() {
-    let result = parser::parse_workflow(r#"{"name": "  ", "steps": [{"id": "s1", "name": "A", "type": "http", "config": {}}]}"#);
+    let result = parser::parse_workflow(
+        r#"{"name": "  ", "steps": [{"id": "s1", "name": "A", "type": "http", "config": {}}]}"#,
+    );
     assert!(result.is_err());
 }
 

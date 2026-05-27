@@ -31,6 +31,15 @@ onMounted(() => {
 })
 onUnmounted(() => { if (apiTimer) clearInterval(apiTimer) })
 
+// Sidecar health polling
+let sidecarTimer: ReturnType<typeof setInterval> | null = null
+const { refreshSidecarStatus } = useGlobalStatus()
+onMounted(() => {
+  refreshSidecarStatus()
+  sidecarTimer = setInterval(refreshSidecarStatus, 30_000)
+})
+onUnmounted(() => { if (sidecarTimer) clearInterval(sidecarTimer) })
+
 const runningList = computed(() => {
   void now.value
   return Array.from(state.runningWorkflows.values())
@@ -77,6 +86,15 @@ function formatNextRun(iso: string | null): string {
     <span class="flex items-center gap-1.5" :title="state.apiOnline ? '后端服务在线' : '后端服务离线'">
       <span class="w-1.5 h-1.5 rounded-full" :class="state.apiOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
       <span class="text-muted-foreground/70">{{ state.apiOnline ? '服务在线' : '服务离线' }}</span>
+    </span>
+
+    <span class="text-border">│</span>
+
+    <!-- Browser sidecar status -->
+    <span class="flex items-center gap-1.5" :title="state.sidecarHealthy ? `浏览器引擎在线 (${state.sidecarPingMs}ms)` : '浏览器引擎离线'">
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.sidecarHealthy ? 'bg-success/80' : 'bg-warning/60'"></span>
+      <span class="text-muted-foreground/70">{{ state.sidecarHealthy ? '浏览器' : '浏览器未就绪' }}</span>
+      <span v-if="state.sidecarHealthy" class="text-muted-foreground/40 tabular-nums">{{ state.sidecarPingMs }}ms</span>
     </span>
 
     <span class="text-border">│</span>

@@ -479,7 +479,7 @@ export const BODY_STEP_ACTIONS: ActionDef[] = [
   ]},
 ]
 
-// ─── 文件容器 — 10 个动作 ✨ v6.9.0 ───
+// ─── 文件容器 — 10 个动作 v6.9.0 ───
 export const FILE_ACTIONS: ActionDef[] = [
   { type: 'read', label: '读取文件', icon: 'FileText', params: [
     { key: 'path', label: '文件路径', type: 'text', placeholder: 'C:\\data\\file.txt' },

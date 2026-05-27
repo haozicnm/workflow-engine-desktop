@@ -12,6 +12,9 @@ async fn main() {
 
     let app = Arc::new(App::new().expect("failed to initialize application"));
 
+    // 启动浏览器 sidecar 后台心跳（30s ping，失败自动重启）
+    workflow_engine::nodes::browser::start_heartbeat();
+
     let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
 

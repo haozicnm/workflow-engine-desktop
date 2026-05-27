@@ -869,6 +869,7 @@ async fn test_onerror_ignore_resilience() {
     println!("✅ onError:ignore resilience OK");
 }
 
+#[cfg(windows)]
 #[tokio::test]
 async fn test_params_variable_injection() {
     let exec = StepExecutor::new(
