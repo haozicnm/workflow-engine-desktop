@@ -121,6 +121,7 @@ pub fn build() -> Router {
         .route("/api/recording/status", get(handlers::recording_status))
         .route("/api/plugins", get(handlers::plugin_list))
         .route("/api/plugins/install", post(handlers::plugin_install))
+        .route("/api/plugins/upload", post(handlers::plugin_upload))
         .route("/api/plugins/uninstall", post(handlers::plugin_uninstall))
         .route("/api/pipeline/run", post(handlers::run_pipeline))
 }

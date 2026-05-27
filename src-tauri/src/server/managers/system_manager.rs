@@ -1,4 +1,5 @@
 use axum::{
+    extract::Multipart,
     http::StatusCode,
     response::{Json, Response},
 };
@@ -414,4 +415,89 @@ pub async fn plugin_pick_file() -> Response {
         StatusCode::NOT_IMPLEMENTED,
         "plugin_pick_file is not available in standalone server mode — use the REST API directly",
     )
+}
+
+/// 上传 .wfplug 文件并安装（multipart/form-data）
+pub async fn plugin_upload(mut multipart: Multipart) -> Response {
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut file_name = String::new();
+
+    while let Some(field) = match multipart.next_field().await {
+        Ok(f) => f,
+        Err(e) => {
+            return err_response(
+                StatusCode::BAD_REQUEST,
+                format!("读取上传文件失败: {e}"),
+            )
+        }
+    } {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "file" || name == "wfplug" {
+            file_name = field.file_name().unwrap_or("plugin.wfplug").to_string();
+            match field.bytes().await {
+                Ok(b) => file_bytes = Some(b.to_vec()),
+                Err(e) => {
+                    return err_response(
+                        StatusCode::BAD_REQUEST,
+                        format!("读取文件内容失败: {e}"),
+                    )
+                }
+            }
+            break;
+        }
+    }
+
+    let bytes = match file_bytes {
+        Some(b) => b,
+        None => {
+            return err_response(
+                StatusCode::BAD_REQUEST,
+                "未找到上传文件，请使用 'file' 字段上传 .wfplug 文件",
+            )
+        }
+    };
+
+    // 写入临时文件
+    let tmp_dir = std::env::temp_dir().join("wf-plugins");
+    if let Err(e) = std::fs::create_dir_all(&tmp_dir) {
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("创建临时目录失败: {e}"),
+        );
+    }
+    let tmp_path = tmp_dir.join(&file_name);
+    if let Err(e) = std::fs::write(&tmp_path, &bytes) {
+        return err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("保存临时文件失败: {e}"),
+        );
+    }
+
+    info!("插件上传: {} ({} bytes)", file_name, bytes.len());
+
+    let meta = match crate::engine::plugin_manager::install_plugin(&tmp_path) {
+        Ok(m) => m,
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            return err_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("安装失败: {e}"),
+            );
+        }
+    };
+
+    // 清理临时文件
+    let _ = std::fs::remove_file(&tmp_path);
+
+    ok_response(serde_json::json!({
+        "success": true,
+        "plugin": {
+            "name": meta.name,
+            "version": meta.version,
+            "title": meta.title,
+            "description": meta.description,
+            "mcp_count": meta.mcp_mappings.len(),
+            "template_count": meta.templates.len(),
+        }
+    }))
 }

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ActionIcon from './ActionIcon.vue'
 import Button from './ui/button/Button.vue'
-import { CONTAINER_DEFS } from '../types/node-registry'
+import { allContainerDefs } from '../types/node-registry'
 import type { ContainerType } from '../types/types'
 
 const { t } = useI18n()
@@ -20,7 +20,7 @@ const emit = defineEmits<{
 const showMcpNodes = ref(false)
 
 const translatedContainerDefs = computed(() =>
-  CONTAINER_DEFS.map(d => ({
+  allContainerDefs().map(d => ({
     ...d,
     label: t(`nodeLabel.${d.type}`, d.label),
     description: t(`nodeDesc.${d.type}`, d.description),

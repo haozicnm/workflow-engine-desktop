@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // pages/Plugins.vue — 插件管理页面（覆盖层面板）
+// 独立服务器模式：使用 HTTP API + multipart 文件上传
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { useToast } from '@/composables/useToast'
 import ActionIcon from '@/components/ActionIcon.vue'
 import Button from '@/components/ui/button/Button.vue'
@@ -22,30 +22,50 @@ interface PluginInfo {
 const plugins = ref<PluginInfo[]>([])
 const loading = ref(false)
 const installing = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 async function loadPlugins() {
   loading.value = true
   try {
-    const result: any = await invoke('plugin_list')
-    plugins.value = result.plugins || []
+    const res = await fetch('/api/plugins')
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    plugins.value = data.plugins || []
   } catch (e: any) {
-    toast(`加载插件列表失败: ${e}`, 'error')
+    toast(`加载插件列表失败: ${e.message}`, 'error')
   } finally {
     loading.value = false
   }
 }
 
-async function installPlugin() {
-  try {
-    const filePath: string | null = await invoke('plugin_pick_file')
-    if (!filePath) return
+function triggerFilePick() {
+  fileInput.value?.click()
+}
 
-    installing.value = true
-    const result: any = await invoke('plugin_install', { wfplugPath: filePath })
-    toast(`插件 ${result.plugin.title} v${result.plugin.version} 安装成功`, 'success')
+async function onFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = '' // 重置以便再次选择同一文件
+
+  if (!file.name.endsWith('.wfplug')) {
+    toast('请选择 .wfplug 格式的插件文件', 'error')
+    return
+  }
+
+  installing.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+
+    const res = await fetch('/api/plugins/upload', { method: 'POST', body: form })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+
+    toast(`插件 ${data.plugin.title} v${data.plugin.version} 安装成功`, 'success')
     await loadPlugins()
   } catch (e: any) {
-    toast(`安装失败: ${e}`, 'error')
+    toast(`安装失败: ${e.message}`, 'error')
   } finally {
     installing.value = false
   }
@@ -55,11 +75,18 @@ async function uninstallPlugin(plugin: PluginInfo) {
   if (!confirm(`确定要删除插件「${plugin.title}」吗？\n此操作将移除所有 MCP 节点和模板。`)) return
 
   try {
-    await invoke('plugin_uninstall', { name: plugin.name })
+    const res = await fetch('/api/plugins/uninstall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: plugin.name }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+
     toast(`插件 ${plugin.title} 已卸载`, 'success')
     await loadPlugins()
   } catch (e: any) {
-    toast(`卸载失败: ${e}`, 'error')
+    toast(`卸载失败: ${e.message}`, 'error')
   }
 }
 
@@ -87,9 +114,16 @@ onMounted(loadPlugins)
         <p class="text-xs text-muted-foreground mt-0.5">安装和管理 workflow 功能插件</p>
       </div>
       <div class="flex items-center gap-2">
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".wfplug"
+          class="hidden"
+          @change="onFileSelected"
+        />
         <Button
           :disabled="installing"
-          @click="installPlugin"
+          @click="triggerFilePick"
         >
           {{ installing ? '安装中...' : '+ 安装插件' }}
         </Button>
@@ -110,9 +144,7 @@ onMounted(loadPlugins)
         <p class="text-sm text-muted-foreground mb-4 max-w-sm">
           点击「安装插件」选择 .wfplug 文件，即可快速添加新功能包
         </p>
-        <Button
-          @click="installPlugin"
-        >
+        <Button @click="triggerFilePick">
           + 安装插件
         </Button>
       </div>

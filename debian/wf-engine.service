@@ -15,6 +15,7 @@ PrivateTmp=yes
 
 Environment=BIND=127.0.0.1:19528
 Environment=STATIC_DIR=/opt/workflow-engine/dist
+Environment=MCP_SERVERS_DIR=/opt/workflow-engine/sidecars
 
 [Install]
 WantedBy=default.target

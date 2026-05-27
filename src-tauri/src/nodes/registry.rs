@@ -126,39 +126,35 @@ impl NodeManifest {
     }
 }
 
-/// 编译期加载 schema
-fn load_schema() -> NodeSchema {
+/// 编译期嵌入 + 运行时懒解析（只解析一次）
+static SCHEMA: std::sync::LazyLock<NodeSchema> = std::sync::LazyLock::new(|| {
     let json_str = include_str!("../../node-schema.json");
     serde_json::from_str(json_str).expect("node-schema.json 格式错误")
-}
+});
 
 /// 返回所有已注册的容器类型
 pub fn container_types() -> Vec<String> {
-    load_schema().container_types
+    SCHEMA.container_types.clone()
 }
 
 /// 返回所有已注册的节点清单
 pub fn all_nodes() -> Vec<NodeManifest> {
-    load_schema()
-        .nodes
-        .iter()
-        .map(NodeManifest::from_schema)
-        .collect()
+    SCHEMA.nodes.iter().map(NodeManifest::from_schema).collect()
 }
 
 /// 检查某类型是否为容器
 pub fn is_container(node_type: &str) -> bool {
-    load_schema().container_types.iter().any(|t| t == node_type)
+    SCHEMA.container_types.iter().any(|t| t == node_type)
 }
 
 /// 检查某类型是否在 schema 中注册
 pub fn is_registered(node_type: &str) -> bool {
-    load_schema().nodes.iter().any(|n| n.node_type == node_type)
+    SCHEMA.nodes.iter().any(|n| n.node_type == node_type)
 }
 
 /// 按类型获取节点元数据
 pub fn get_node(node_type: &str) -> Option<NodeManifest> {
-    load_schema()
+    SCHEMA
         .nodes
         .iter()
         .find(|n| n.node_type == node_type)

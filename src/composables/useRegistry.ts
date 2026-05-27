@@ -10,8 +10,6 @@ import type { ContainerDef, ActionDef, ContainerType, Action, Step } from '@/typ
 import {
   CONTAINER_DEFS,
   allContainerDefs,
-  registerDynamicNode,
-  clearDynamicNodes,
   BROWSER_ACTIONS,
   EXCEL_ACTIONS,
   WORD_ACTIONS,
@@ -23,6 +21,7 @@ import {
   newAction as rawNewAction,
   newStep as rawNewStep,
 } from '@/types/node-registry'
+import { syncNodeSchema } from '@/composables/useNodeSchema'
 
 /** Build a locale-aware ContainerDef from the raw one */
 function localizeContainerDef(raw: ContainerDef, t: (key: string) => string): ContainerDef {
@@ -150,30 +149,13 @@ export function useRegistry() {
     return cache!.logicOperators
   }
 
-  /** 从后端同步动态节点类型（插件安装后调用） */
+  /** 从后端 schema 同步节点类型（插件安装后 / 首次加载时调用） */
   async function refreshDynamicTypes() {
-    try {
-      const resp = await fetch('http://localhost:19528/api/nodes/schema')
-      if (!resp.ok) return
-      const nodes = await resp.json()
-      if (!Array.isArray(nodes)) return
-      clearDynamicNodes()
-      const existingTypes = new Set(CONTAINER_DEFS.map(d => d.type))
-      for (const node of nodes) {
-        if (existingTypes.has(node.type)) continue
-        registerDynamicNode({
-          type: node.type as unknown as ContainerType,
-          label: node.label || node.type,
-          icon: node.icon || 'Package',
-          color: '#a5d6ff',
-          description: node.desc || node.label || node.type,
-          isContainer: false,
-          params: [{ key: 'config', label: '参数 (JSON)', type: 'textarea' as const }],
-        })
-      }
-      // Invalidate cache so next access rebuilds with dynamic types
+    const count = await syncNodeSchema()
+    if (count > 0) {
+      // schema 加载成功，清除 locale 缓存以重建
       _cache.delete(loc)
-    } catch (_) { /* backend may not be ready */ }
+    }
   }
 
   return {

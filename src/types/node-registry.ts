@@ -6,6 +6,7 @@ import type {
   Action, Step,
 } from './types'
 import { uid, nextStepId, nextActionId } from './types'
+import { getSchemaDefs } from './registry-state'
 
 /** i18n 翻译函数类型 */
 type TFn = (key: string, defaultMsg?: string) => string
@@ -183,7 +184,7 @@ const _dynamicDefs: ContainerDef[] = []
 
 /** 合并静态 + 动态定义的容器列表 */
 export function allContainerDefs(): ContainerDef[] {
-  return [...CONTAINER_DEFS, ..._dynamicDefs]
+  return getSchemaDefs() || [...CONTAINER_DEFS, ..._dynamicDefs]
 }
 
 /** 注册插件提供的动态节点类型 */
@@ -213,7 +214,8 @@ export function getContainerDef(type: string, t?: TFn): ContainerDef {
 
 /** 获取容器类型的主色 */
 export function getContainerColorVar(type: string): string {
-  const def = CONTAINER_DEFS.find(d => d.type === type)
+  const all = getSchemaDefs() || CONTAINER_DEFS
+  const def = all.find(d => d.type === type)
   return def?.color || '#8b949e'
 }
 

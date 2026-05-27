@@ -1,76 +1,149 @@
 /**
- * useNodeSchema — 应用启动时从后端 /api/nodes/schema 拉取完整节点目录，
- * 将前端未覆盖的节点注入 _dynamicDefs，使编辑器能显示后端全部节点类型。
+ * useNodeSchema — Schema-first 节点注册
+ *
+ * 设计原则：
+ *   - node-schema.json（/api/nodes/schema）是唯一真相源
+ *   - CONTAINER_DEFS 仅提供 UI 覆写（params 表单、颜色、outputHint）
+ *   - 加节点只改 node-schema.json，UI 覆写可选
  *
  * 调用时机：App.vue onMounted，仅执行一次。
  */
 import {
   CONTAINER_DEFS,
-  registerDynamicNode,
-  clearDynamicNodes,
 } from '@/types/node-registry'
-import type { ContainerType } from '@/types/types'
+import { setRegistryDefs } from '@/types/registry-state'
+import type { ContainerDef, ContainerType } from '@/types/types'
 
-// 后端 API 基础地址（与 status polling 保持一致）
 const API_BASE = 'http://localhost:19528'
 
-interface BackendNodeMeta {
+// ─── Schema 节点原始类型 ───
+
+interface SchemaNode {
   type: string
   label: string
-  icon: string
   category: string
+  icon: string
+  is_container: boolean
   desc: string
+  inputs: Array<{ name: string; data_type: string; required?: boolean; desc: string }>
+  outputs: Array<{ name: string; data_type: string; desc: string }>
 }
 
+interface SchemaFile {
+  nodes: SchemaNode[]
+  categories: Record<string, { label: string; order: number }>
+  container_types: string[]
+}
+
+// ─── 图标名转换 ───
+
+/** schema 用 kebab-case（git-branch），前端用 PascalCase（GitBranch） */
+function toPascalCase(kebab: string): string {
+  return kebab
+    .split('-')
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .join('')
+}
+
+// ─── category 默认颜色 ───
+
+const CATEGORY_COLORS: Record<string, string> = {
+  core: '#539bf5',
+  data: '#7ee787',
+  file: '#d2a8ff',
+  convert: '#daaa3e',
+  system: '#8b949e',
+  flow: '#d29922',
+  browser: '#79c0ff',
+  office: '#3fb950',
+  desktop: '#f0883e',
+  ai: '#f778ba',
+  mcp: '#a5d6ff',
+}
+
+// ─── 状态 ───
+
 let _loaded = false
+let _mergedDefs: ContainerDef[] = []
+let _schemaFile: SchemaFile | null = null
+
+/** 合并后的全部容器定义（schema + UI 覆写） */
+export function allContainerDefs(): ContainerDef[] {
+  return _mergedDefs
+}
+
+export function getSchemaFile(): SchemaFile | null {
+  return _schemaFile
+}
+
+/** 按 category 分组 */
+export function nodesByCategory(): Map<string, ContainerDef[]> {
+  const map = new Map<string, ContainerDef[]>()
+  for (const def of _mergedDefs) {
+    const cat = def.category || 'other'
+    if (!map.has(cat)) map.set(cat, [])
+    map.get(cat)!.push(def)
+  }
+  return map
+}
+
+/** category 元数据（label + order） */
+export function categoryMeta(): Record<string, { label: string; order: number }> {
+  return _schemaFile?.categories ?? {}
+}
+
+// ─── 主加载函数 ───
 
 /**
- * 从后端拉取节点 schema，将前端未定义的节点注册为 dynamic defs。
- * 前端已有的节点（CONTAINER_DEFS）保持不动——它们带有完整的 params/UI 元数据。
- * 后端独有的节点注册为 minimal def，至少能在节点选择器中显示。
- *
- * @returns 新注册的节点类型数量
+ * 从后端拉取 node-schema.json，与 CONTAINER_DEFS 合并。
+ * @returns 注册的节点总数
  */
 export async function syncNodeSchema(): Promise<number> {
-  if (_loaded) return 0
+  if (_loaded) return _mergedDefs.length
 
   try {
     const resp = await fetch(`${API_BASE}/api/nodes/schema`)
     if (!resp.ok) return 0
 
-    const nodes: BackendNodeMeta[] = await resp.json()
-    if (!Array.isArray(nodes) || nodes.length === 0) return 0
+    const schema: SchemaFile = await resp.json()
+    if (!schema?.nodes?.length) return 0
 
-    // 清除旧的动态节点（插件卸载场景）
-    clearDynamicNodes()
+    _schemaFile = schema
 
-    // 前端已有类型集合
-    const existingTypes = new Set<string>(CONTAINER_DEFS.map(d => d.type))
-
-    let count = 0
-    for (const node of nodes) {
-      if (existingTypes.has(node.type)) continue
-
-      // 后端类型可能是前端 ContainerType 未覆盖的新类型，用 as 强转
-      registerDynamicNode({
-        type: node.type as unknown as ContainerType,
-        label: node.label || node.type,
-        icon: node.icon || 'Package',
-        color: '#a5d6ff',
-        description: node.desc || node.label || node.type,
-        isContainer: false,
-        params: [{ key: 'config', label: '参数 (JSON)', type: 'textarea' as const }],
-        category: node.category,
-      })
-      count++
+    // 构建 UI 覆写索引（type → ContainerDef）
+    const overrides = new Map<string, ContainerDef>()
+    for (const def of CONTAINER_DEFS) {
+      overrides.set(def.type, def)
     }
 
+    // schema 是主源，逐个合并 UI 覆写
+    _mergedDefs = schema.nodes.map(node => {
+      const ui = overrides.get(node.type)
+
+      return {
+        type: node.type as ContainerType,
+        label: ui?.label || node.label,
+        icon: ui?.icon || toPascalCase(node.icon),
+        color: ui?.color || CATEGORY_COLORS[node.category] || '#8b949e',
+        description: ui?.description || node.desc,
+        isContainer: node.is_container,
+        params: ui?.params || [],
+        outputHint: ui?.outputHint || node.outputs.map(o => o.name).join(', '),
+        category: node.category,
+      } as ContainerDef
+    })
+
+    // 写入共享状态，让 node-registry 查询函数也能读到 schema 数据
+    setRegistryDefs(_mergedDefs)
+
     _loaded = true
-    console.log(`[NodeSchema] 同步完成：后端 ${nodes.length} 种，新增 ${count} 种`)
-    return count
+    console.log(
+      `[NodeSchema] Schema-first 加载完成：${_mergedDefs.length} 节点，` +
+      `${overrides.size} 有 UI 覆写，${_mergedDefs.filter(d => d.params.length > 0).length} 有表单定义`
+    )
+    return _mergedDefs.length
   } catch (e) {
-    // 后端可能还未就绪，静默处理
-    console.warn('[NodeSchema] 同步失败（后端未就绪？）:', e)
+    console.warn('[NodeSchema] 加载失败（后端未就绪？）:', e)
     return 0
   }
 }
