@@ -3,250 +3,1418 @@
   "version": "8.1",
   "description": "Workflow Engine node registry — single source of truth for Rust backend and Vue frontend",
   "nodes": [
-    { "type": "http",               "label": "HTTP 请求",      "category": "core",     "icon": "globe",       "is_container": false, "desc": "发送 HTTP 请求，支持 GET/POST/PUT/DELETE",
-      "inputs":  [],
-      "outputs": [{ "name": "status", "data_type": "number", "desc": "HTTP 状态码" }, { "name": "body", "data_type": "json", "desc": "响应体" }, { "name": "headers", "data_type": "json", "desc": "响应头" }] },
-    { "type": "script",             "label": "脚本",            "category": "core",     "icon": "code",        "is_container": false, "desc": "执行 Rhai 脚本，支持变量读写和复杂逻辑",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "脚本返回值" }] },
-    { "type": "condition",          "label": "条件判断",        "category": "core",     "icon": "git-branch",  "is_container": false, "desc": "根据条件表达式结果选择执行分支",
-      "inputs":  [],
-      "outputs": [{ "name": "branch", "data_type": "text", "desc": "分支名 (true/false)" }, { "name": "result", "data_type": "bool", "desc": "条件布尔值" }] },
-    { "type": "shell",              "label": "Shell",           "category": "core",     "icon": "terminal",    "is_container": false, "desc": "执行系统命令（bash/powershell/cmd）",
-      "inputs":  [],
-      "outputs": [{ "name": "stdout", "data_type": "text", "desc": "标准输出" }, { "name": "stderr", "data_type": "text", "desc": "标准错误" }, { "name": "exit_code", "data_type": "number", "desc": "退出码" }] },
-    { "type": "notify",             "label": "通知",            "category": "core",     "icon": "bell",        "is_container": false, "desc": "发送系统通知或消息到指定渠道",
-      "inputs":  [],
-      "outputs": [{ "name": "sent", "data_type": "bool", "desc": "是否发送成功" }] },
-    { "type": "delay",              "label": "延迟",            "category": "core",     "icon": "clock",       "is_container": false, "desc": "暂停执行指定毫秒",
-      "inputs":  [],
-      "outputs": [] },
-    { "type": "approval",           "label": "审批",            "category": "core",     "icon": "check-circle","is_container": false, "desc": "暂停执行等待人工审批",
-      "inputs":  [],
-      "outputs": [{ "name": "approved", "data_type": "bool", "desc": "是否通过" }, { "name": "comment", "data_type": "text", "desc": "审批意见" }] },
-    { "type": "web_scrape",         "label": "网页抓取",        "category": "data",     "icon": "globe",       "is_container": false, "desc": "提取网页内容",
-      "inputs":  [],
-      "outputs": [{ "name": "title", "data_type": "text", "desc": "页面标题" }, { "name": "text", "data_type": "text", "desc": "纯文本内容" }, { "name": "links", "data_type": "array", "desc": "链接列表" }] },
-    { "type": "json_parse",         "label": "JSON 解析",       "category": "data",     "icon": "braces",      "is_container": false, "desc": "用点号路径提取 JSON 字段",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "json", "desc": "提取的值" }] },
-    { "type": "text_template",      "label": "文本拼接",        "category": "data",     "icon": "type",        "is_container": false, "desc": "使用 {{变量}} 占位符模板替换",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "拼接后的文本" }] },
-    { "type": "data_set",           "label": "设置变量",        "category": "data",     "icon": "database",    "is_container": false, "desc": "写入或覆盖上下文变量",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "json", "desc": "写入的值" }] },
-    { "type": "data_get",           "label": "读取变量",        "category": "data",     "icon": "database",    "is_container": false, "desc": "从上下文读取指定变量的值",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "json", "desc": "读取的值" }] },
-    { "type": "data_length",        "label": "获取长度",        "category": "data",     "icon": "hash",        "is_container": false, "desc": "获取字符串、数组、对象的长度",
-      "inputs":  [],
-      "outputs": [{ "name": "length", "data_type": "number", "desc": "长度值" }] },
-    { "type": "data_default",       "label": "默认值",          "category": "data",     "icon": "shield",      "is_container": false, "desc": "变量为空时设置默认值",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "json", "desc": "最终值（原值或默认值）" }] },
-    { "type": "data_merge",         "label": "合并变量",        "category": "data",     "icon": "git-merge",   "is_container": false, "desc": "将源对象合并到目标对象",
-      "inputs":  [],
-      "outputs": [{ "name": "merged", "data_type": "json", "desc": "合并后的对象" }] },
-    { "type": "file_read",          "label": "读取文件",        "category": "file",     "icon": "file-text",   "is_container": false, "desc": "读取文件内容",
-      "inputs":  [],
-      "outputs": [{ "name": "content", "data_type": "text", "desc": "文件内容" }, { "name": "size", "data_type": "number", "desc": "文件大小(bytes)" }] },
-    { "type": "file_write",         "label": "写入文件",        "category": "file",     "icon": "file-plus",   "is_container": false, "desc": "写入内容到文件",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "写入的文件路径" }] },
-    { "type": "file_list",          "label": "列出文件",        "category": "file",     "icon": "folder",      "is_container": false, "desc": "列出目录内容",
-      "inputs":  [],
-      "outputs": [{ "name": "files", "data_type": "array", "desc": "文件列表" }, { "name": "count", "data_type": "number", "desc": "文件数量" }] },
-    { "type": "file_delete",        "label": "删除文件",        "category": "file",     "icon": "trash-2",     "is_container": false, "desc": "删除文件或目录",
-      "inputs":  [],
-      "outputs": [{ "name": "deleted", "data_type": "bool", "desc": "是否删除成功" }] },
-    { "type": "file_append",        "label": "追加文件",        "category": "file",     "icon": "file-plus",   "is_container": false, "desc": "追加内容到文件末尾",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "file_exists",        "label": "文件存在检查",    "category": "file",     "icon": "search",      "is_container": false, "desc": "检查文件或目录是否存在",
-      "inputs":  [],
-      "outputs": [{ "name": "exists", "data_type": "bool", "desc": "是否存在" }] },
-    { "type": "file_mkdir",         "label": "创建目录",        "category": "file",     "icon": "folder-plus", "is_container": false, "desc": "创建目录（含父目录）",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "创建的目录路径" }] },
-    { "type": "file_copy",          "label": "复制文件",        "category": "file",     "icon": "copy",        "is_container": false, "desc": "复制文件或目录",
-      "inputs":  [],
-      "outputs": [{ "name": "dest", "data_type": "text", "desc": "目标路径" }] },
-    { "type": "file_move",          "label": "移动文件",        "category": "file",     "icon": "move",        "is_container": false, "desc": "移动/重命名文件或目录",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "新路径" }] },
-    { "type": "file_glob",          "label": "通配符查找",      "category": "file",     "icon": "search",      "is_container": false, "desc": "用通配符模式搜索文件",
-      "inputs":  [],
-      "outputs": [{ "name": "matches", "data_type": "array", "desc": "匹配的文件列表" }, { "name": "count", "data_type": "number", "desc": "匹配数量" }] },
-    { "type": "file_checksum",      "label": "文件校验",        "category": "file",     "icon": "shield-check","is_container": false, "desc": "计算文件 MD5/SHA256 校验和",
-      "inputs":  [],
-      "outputs": [{ "name": "md5", "data_type": "text", "desc": "MD5 哈希" }, { "name": "sha256", "data_type": "text", "desc": "SHA256 哈希" }] },
-    { "type": "clipboard_read",     "label": "读取剪贴板",      "category": "system",   "icon": "clipboard",   "is_container": false, "desc": "读取系统剪贴板内容",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "剪贴板文本" }] },
-    { "type": "clipboard_write",    "label": "写入剪贴板",      "category": "system",   "icon": "clipboard",   "is_container": false, "desc": "写入内容到系统剪贴板",
-      "inputs":  [],
-      "outputs": [] },
-    { "type": "clipboard",          "label": "剪贴板容器",      "category": "system",   "icon": "clipboard",   "is_container": true,  "desc": "剪贴板读写容器",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "剪贴板文本" }] },
-    { "type": "regex_extract",      "label": "正则提取",        "category": "data",     "icon": "regex",       "is_container": false, "desc": "用正则表达式提取文本",
-      "inputs":  [],
-      "outputs": [{ "name": "matches", "data_type": "array", "desc": "匹配结果数组" }, { "name": "first", "data_type": "text", "desc": "第一个匹配" }] },
-    { "type": "regex_replace",      "label": "正则替换",        "category": "data",     "icon": "regex",       "is_container": false, "desc": "用正则表达式替换文本",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "替换后的文本" }] },
-    { "type": "regex_match",        "label": "正则匹配",        "category": "data",     "icon": "regex",       "is_container": false, "desc": "测试正则表达式是否匹配",
-      "inputs":  [],
-      "outputs": [{ "name": "matched", "data_type": "bool", "desc": "是否匹配" }] },
-    { "type": "array_filter",       "label": "数组过滤",        "category": "data",     "icon": "filter",      "is_container": false, "desc": "按条件过滤数组元素",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "过滤后的数组" }, { "name": "count", "data_type": "number", "desc": "元素数量" }] },
-    { "type": "array_sort",         "label": "数组排序",        "category": "data",     "icon": "arrow-up-down","is_container": false, "desc": "对数组元素排序",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "排序后的数组" }] },
-    { "type": "array_dedup",        "label": "数组去重",        "category": "data",     "icon": "list",        "is_container": false, "desc": "移除数组中的重复元素",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "去重后的数组" }, { "name": "removed", "data_type": "number", "desc": "移除数量" }] },
-    { "type": "array_paginate",     "label": "数组分页",        "category": "data",     "icon": "pagination",  "is_container": false, "desc": "对数组进行分页",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "当前页数据" }, { "name": "total", "data_type": "number", "desc": "总页数" }] },
-    { "type": "array_map",          "label": "数组映射",        "category": "data",     "icon": "map",         "is_container": false, "desc": "对数组每个元素执行操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "映射后的数组" }] },
-    { "type": "array_join",         "label": "数组连接",        "category": "data",     "icon": "link",        "is_container": false, "desc": "将数组元素连接为字符串",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "连接后的字符串" }] },
-    { "type": "array_reduce",       "label": "数组归约",        "category": "data",     "icon": "sigma",       "is_container": false, "desc": "对数组元素执行累积操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "累积结果" }] },
-    { "type": "convert_to_text",    "label": "转文本",          "category": "convert",  "icon": "type",        "is_container": false, "desc": "将值转换为文本格式",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "text", "desc": "文本值" }] },
-    { "type": "convert_to_number",  "label": "转数字",          "category": "convert",  "icon": "hash",        "is_container": false, "desc": "将值转换为数字格式",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "number", "desc": "数值" }] },
-    { "type": "convert_to_json",    "label": "转 JSON",         "category": "convert",  "icon": "braces",      "is_container": false, "desc": "将值转换为 JSON 格式",
-      "inputs":  [],
-      "outputs": [{ "name": "value", "data_type": "json", "desc": "JSON 值" }] },
-    { "type": "convert_to_csv",     "label": "转 CSV",          "category": "convert",  "icon": "file-spreadsheet","is_container": false, "desc": "将值转换为 CSV 格式",
-      "inputs":  [],
-      "outputs": [{ "name": "csv", "data_type": "text", "desc": "CSV 文本" }] },
-    { "type": "convert_to_html",    "label": "转 HTML",         "category": "convert",  "icon": "code",        "is_container": false, "desc": "将值转换为 HTML 格式",
-      "inputs":  [],
-      "outputs": [{ "name": "html", "data_type": "text", "desc": "HTML 文本" }] },
-    { "type": "convert_to_base64",  "label": "转 Base64",       "category": "convert",  "icon": "binary",      "is_container": false, "desc": "将值转换为 Base64 编码",
-      "inputs":  [],
-      "outputs": [{ "name": "encoded", "data_type": "text", "desc": "Base64 编码" }] },
-    { "type": "loop",               "label": "循环",            "category": "flow",     "icon": "repeat",      "is_container": true,  "desc": "遍历数组，对每个元素执行子步骤",
-      "inputs":  [{ "name": "array", "data_type": "array", "required": true, "desc": "要遍历的数组" }],
-      "outputs": [{ "name": "results", "data_type": "array", "desc": "每次迭代的结果数组" }, { "name": "count", "data_type": "number", "desc": "迭代次数" }] },
-    { "type": "while",              "label": "While 循环",      "category": "flow",     "icon": "refresh-cw",  "is_container": true,  "desc": "条件循环，满足条件时重复执行子步骤",
-      "inputs":  [],
-      "outputs": [{ "name": "iterations", "data_type": "number", "desc": "迭代次数" }] },
-    { "type": "cursor",             "label": "游标迭代",        "category": "flow",     "icon": "move-right",  "is_container": true,  "desc": "一次处理一项，跨次持久化游标",
-      "inputs":  [{ "name": "array", "data_type": "array", "required": true, "desc": "要遍历的数组" }],
-      "outputs": [{ "name": "current", "data_type": "json", "desc": "当前项" }, { "name": "index", "data_type": "number", "desc": "当前索引" }] },
-    { "type": "parallel",           "label": "并行执行",        "category": "flow",     "icon": "layout-panel-top","is_container": false,"desc": "并行执行多个子步骤",
-      "inputs":  [],
-      "outputs": [{ "name": "results", "data_type": "array", "desc": "各分支结果" }] },
-    { "type": "map",                "label": "Map 映射",        "category": "flow",     "icon": "map-pin",     "is_container": false, "desc": "对每个输入元素应用映射函数",
-      "inputs":  [{ "name": "array", "data_type": "array", "required": true, "desc": "输入数组" }],
-      "outputs": [{ "name": "result", "data_type": "array", "desc": "映射结果" }] },
-    { "type": "sub_workflow",       "label": "子工作流",        "category": "flow",     "icon": "workflow",    "is_container": false, "desc": "调用另一个工作流作为子流程",
-      "inputs":  [],
-      "outputs": [{ "name": "output", "data_type": "json", "desc": "子工作流输出" }] },
-    { "type": "mouse_keyboard",     "label": "键鼠操作",        "category": "desktop",  "icon": "mouse-pointer-click","is_container": false, "desc": "模拟鼠标和键盘操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "操作结果" }] },
-    { "type": "window",             "label": "窗口管理",        "category": "desktop",  "icon": "monitor",     "is_container": false, "desc": "管理桌面窗口",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "窗口信息" }] },
-    { "type": "ocr",                "label": "OCR 识别",        "category": "ai",       "icon": "scan-text",   "is_container": false, "desc": "从图片中识别文字",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "识别的文本" }] },
-    { "type": "recording",          "label": "录制回放",        "category": "desktop",  "icon": "video",       "is_container": false, "desc": "录制和回放桌面操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "回放结果" }] },
-    { "type": "print",              "label": "打印",            "category": "system",   "icon": "printer",     "is_container": false, "desc": "打印文档或内容",
-      "inputs":  [],
-      "outputs": [] },
-    { "type": "browser_pdf",        "label": "浏览器PDF",       "category": "browser",  "icon": "file",        "is_container": false, "desc": "将当前页面生成 PDF 文件",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "PDF 文件路径" }] },
-    { "type": "browser",            "label": "浏览器容器",      "category": "browser",  "icon": "container",   "is_container": true,  "desc": "在一个浏览器窗口内按顺序执行多个操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "最后操作结果" }] },
-    { "type": "excel",              "label": "Excel 容器",      "category": "office",   "icon": "container",   "is_container": true,  "desc": "在一个 Excel 文件内按顺序执行多个操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "操作结果" }] },
-    { "type": "word",               "label": "Word 容器",       "category": "office",   "icon": "container",   "is_container": true,  "desc": "在一个 Word 文件内按顺序执行多个操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "操作结果" }] },
-    { "type": "logic",              "label": "逻辑判断",        "category": "flow",     "icon": "git-branch",  "is_container": true,  "desc": "逻辑判断容器，输出 true/false 分支",
-      "inputs":  [],
-      "outputs": [{ "name": "branch", "data_type": "text", "desc": "分支名" }, { "name": "result", "data_type": "bool", "desc": "判断结果" }] },
-    { "type": "file",               "label": "文件容器",        "category": "file",     "icon": "container",   "is_container": true,  "desc": "在一个目录内按顺序执行多个文件操作",
-      "inputs":  [],
-      "outputs": [{ "name": "result", "data_type": "json", "desc": "操作结果" }] },
-    { "type": "mcp_script",         "label": "MCP 脚本",       "category": "mcp",      "icon": "code",        "is_container": false, "desc": "通过 MCP 执行 Python 脚本",
-      "inputs":  [],
-      "outputs": [{ "name": "output", "data_type": "text", "desc": "脚本输出" }] },
-    { "type": "mcp_shell",          "label": "MCP Shell",      "category": "mcp",      "icon": "terminal",    "is_container": false, "desc": "通过 MCP 执行 Shell 命令",
-      "inputs":  [],
-      "outputs": [{ "name": "stdout", "data_type": "text", "desc": "标准输出" }, { "name": "exit_code", "data_type": "number", "desc": "退出码" }] },
-    { "type": "mcp_excel_read",     "label": "MCP 读Excel",    "category": "mcp",      "icon": "file-spreadsheet","is_container": false, "desc": "通过 MCP 读取 Excel 文件",
-      "inputs":  [],
-      "outputs": [{ "name": "data", "data_type": "array", "desc": "表格数据" }] },
-    { "type": "mcp_excel_write",    "label": "MCP 写Excel",    "category": "mcp",      "icon": "file-spreadsheet","is_container": false, "desc": "通过 MCP 写入 Excel 文件",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "mcp_excel_create",   "label": "MCP 创建Excel",  "category": "mcp",      "icon": "file-spreadsheet","is_container": false, "desc": "通过 MCP 创建 Excel 文件",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "mcp_excel_filter",   "label": "MCP 过滤Excel",  "category": "mcp",      "icon": "filter",      "is_container": false, "desc": "通过 MCP 过滤 Excel 数据",
-      "inputs":  [],
-      "outputs": [{ "name": "data", "data_type": "array", "desc": "过滤结果" }, { "name": "count", "data_type": "number", "desc": "行数" }] },
-    { "type": "mcp_excel_sort",     "label": "MCP 排序Excel",  "category": "mcp",      "icon": "arrow-up-down","is_container": false, "desc": "通过 MCP 排序 Excel 数据",
-      "inputs":  [],
-      "outputs": [{ "name": "data", "data_type": "array", "desc": "排序结果" }] },
-    { "type": "mcp_excel_append",   "label": "MCP 追加Excel",  "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 追加 Excel 数据",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "mcp_excel_csv",      "label": "MCP Excel转CSV", "category": "mcp",      "icon": "file-text",   "is_container": false, "desc": "通过 MCP 将 Excel 转为 CSV",
-      "inputs":  [],
-      "outputs": [{ "name": "csv_path", "data_type": "text", "desc": "CSV 文件路径" }] },
-    { "type": "mcp_word_read",      "label": "MCP 读Word",     "category": "mcp",      "icon": "file-text",   "is_container": false, "desc": "通过 MCP 读取 Word 文档",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "文档文本" }] },
-    { "type": "mcp_word_write",     "label": "MCP 写Word",     "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 写入 Word 文档",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "mcp_word_create",    "label": "MCP 创建Word",   "category": "mcp",      "icon": "file-plus",   "is_container": false, "desc": "通过 MCP 创建 Word 文档",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }] },
-    { "type": "mcp_word_replace",   "label": "MCP 替换Word",   "category": "mcp",      "icon": "replace",     "is_container": false, "desc": "通过 MCP 替换 Word 文本",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "文件路径" }, { "name": "replacements", "data_type": "number", "desc": "替换次数" }] },
-    { "type": "mcp_word_merge",     "label": "MCP 合并Word",   "category": "mcp",      "icon": "git-merge",   "is_container": false, "desc": "通过 MCP 合并 Word 文档",
-      "inputs":  [],
-      "outputs": [{ "name": "path", "data_type": "text", "desc": "合并后文件路径" }] },
-    { "type": "mcp_web_scrape",     "label": "MCP 网页抓取",   "category": "mcp",      "icon": "globe",       "is_container": false, "desc": "通过 MCP 提取网页内容",
-      "inputs":  [],
-      "outputs": [{ "name": "text", "data_type": "text", "desc": "网页文本" }, { "name": "links", "data_type": "array", "desc": "链接列表" }] }
+    {
+      "type": "http",
+      "label": "HTTP 请求",
+      "category": "core",
+      "icon": "globe",
+      "is_container": false,
+      "desc": "发送 HTTP 请求，支持 GET/POST/PUT/DELETE",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "status",
+          "data_type": "number",
+          "desc": "HTTP 状态码"
+        },
+        {
+          "name": "body",
+          "data_type": "json",
+          "desc": "响应体"
+        },
+        {
+          "name": "headers",
+          "data_type": "json",
+          "desc": "响应头"
+        }
+      ]
+    },
+    {
+      "type": "script",
+      "label": "脚本",
+      "category": "core",
+      "icon": "code",
+      "is_container": false,
+      "desc": "执行 Rhai 脚本，支持变量读写和复杂逻辑",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "脚本返回值"
+        }
+      ]
+    },
+    {
+      "type": "condition",
+      "label": "条件判断",
+      "category": "core",
+      "icon": "git-branch",
+      "is_container": false,
+      "desc": "根据条件表达式结果选择执行分支",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "branch",
+          "data_type": "text",
+          "desc": "分支名 (true/false)"
+        },
+        {
+          "name": "result",
+          "data_type": "bool",
+          "desc": "条件布尔值"
+        }
+      ]
+    },
+    {
+      "type": "shell",
+      "label": "Shell",
+      "category": "core",
+      "icon": "terminal",
+      "is_container": false,
+      "desc": "执行系统命令（bash/powershell/cmd）",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "stdout",
+          "data_type": "text",
+          "desc": "标准输出"
+        },
+        {
+          "name": "stderr",
+          "data_type": "text",
+          "desc": "标准错误"
+        },
+        {
+          "name": "exit_code",
+          "data_type": "number",
+          "desc": "退出码"
+        }
+      ]
+    },
+    {
+      "type": "notify",
+      "label": "通知",
+      "category": "core",
+      "icon": "bell",
+      "is_container": false,
+      "desc": "发送系统通知或消息到指定渠道",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "sent",
+          "data_type": "bool",
+          "desc": "是否发送成功"
+        }
+      ]
+    },
+    {
+      "type": "delay",
+      "label": "延迟",
+      "category": "core",
+      "icon": "clock",
+      "is_container": false,
+      "desc": "暂停执行指定毫秒",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "approval",
+      "label": "审批",
+      "category": "core",
+      "icon": "check-circle",
+      "is_container": false,
+      "desc": "暂停执行等待人工审批",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "approved",
+          "data_type": "bool",
+          "desc": "是否通过"
+        },
+        {
+          "name": "comment",
+          "data_type": "text",
+          "desc": "审批意见"
+        }
+      ]
+    },
+    {
+      "type": "web_scrape",
+      "label": "网页抓取",
+      "category": "data",
+      "icon": "globe",
+      "is_container": false,
+      "desc": "提取网页内容（支持单页/批量 urls 数组）",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "title",
+          "data_type": "text",
+          "desc": "页面标题"
+        },
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "纯文本内容"
+        },
+        {
+          "name": "links",
+          "data_type": "array",
+          "desc": "链接列表"
+        }
+      ],
+      "params": {
+        "url": "单个 URL（与 urls 二选一）",
+        "urls": "URL 数组，批量抓取",
+        "extract": "提取规则数组 [{selector, fields}]",
+        "max_concurrent": "最大并发数（默认 3）",
+        "fail_fast": "单个失败是否中止全部（默认 false）"
+      }
+    },
+    {
+      "type": "json_parse",
+      "label": "JSON 解析",
+      "category": "data",
+      "icon": "braces",
+      "is_container": false,
+      "desc": "用点号路径提取 JSON 字段",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "提取的值"
+        }
+      ]
+    },
+    {
+      "type": "text_template",
+      "label": "文本拼接",
+      "category": "data",
+      "icon": "type",
+      "is_container": false,
+      "desc": "使用 {{变量}} 占位符模板替换",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "拼接后的文本"
+        }
+      ]
+    },
+    {
+      "type": "data_set",
+      "label": "设置变量",
+      "category": "data",
+      "icon": "database",
+      "is_container": false,
+      "desc": "写入或覆盖上下文变量",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "写入的值"
+        }
+      ]
+    },
+    {
+      "type": "data_get",
+      "label": "读取变量",
+      "category": "data",
+      "icon": "database",
+      "is_container": false,
+      "desc": "从上下文读取指定变量的值",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "读取的值"
+        }
+      ]
+    },
+    {
+      "type": "data_length",
+      "label": "获取长度",
+      "category": "data",
+      "icon": "hash",
+      "is_container": false,
+      "desc": "获取字符串、数组、对象的长度",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "length",
+          "data_type": "number",
+          "desc": "长度值"
+        }
+      ]
+    },
+    {
+      "type": "data_default",
+      "label": "默认值",
+      "category": "data",
+      "icon": "shield",
+      "is_container": false,
+      "desc": "变量为空时设置默认值",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "最终值（原值或默认值）"
+        }
+      ]
+    },
+    {
+      "type": "data_merge",
+      "label": "合并变量",
+      "category": "data",
+      "icon": "git-merge",
+      "is_container": false,
+      "desc": "将源对象合并到目标对象",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "merged",
+          "data_type": "json",
+          "desc": "合并后的对象"
+        }
+      ]
+    },
+    {
+      "type": "file_read",
+      "label": "读取文件",
+      "category": "file",
+      "icon": "file-text",
+      "is_container": false,
+      "desc": "读取文件内容",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "content",
+          "data_type": "text",
+          "desc": "文件内容"
+        },
+        {
+          "name": "size",
+          "data_type": "number",
+          "desc": "文件大小(bytes)"
+        }
+      ]
+    },
+    {
+      "type": "file_write",
+      "label": "写入文件",
+      "category": "file",
+      "icon": "file-plus",
+      "is_container": false,
+      "desc": "写入内容到文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "写入的文件路径"
+        }
+      ]
+    },
+    {
+      "type": "file_list",
+      "label": "列出文件",
+      "category": "file",
+      "icon": "folder",
+      "is_container": false,
+      "desc": "列出目录内容",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "files",
+          "data_type": "array",
+          "desc": "文件列表"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "文件数量"
+        }
+      ]
+    },
+    {
+      "type": "file_delete",
+      "label": "删除文件",
+      "category": "file",
+      "icon": "trash-2",
+      "is_container": false,
+      "desc": "删除文件或目录",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "deleted",
+          "data_type": "bool",
+          "desc": "是否删除成功"
+        }
+      ]
+    },
+    {
+      "type": "file_append",
+      "label": "追加文件",
+      "category": "file",
+      "icon": "file-plus",
+      "is_container": false,
+      "desc": "追加内容到文件末尾",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "file_exists",
+      "label": "文件存在检查",
+      "category": "file",
+      "icon": "search",
+      "is_container": false,
+      "desc": "检查文件或目录是否存在",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "exists",
+          "data_type": "bool",
+          "desc": "是否存在"
+        }
+      ]
+    },
+    {
+      "type": "file_mkdir",
+      "label": "创建目录",
+      "category": "file",
+      "icon": "folder-plus",
+      "is_container": false,
+      "desc": "创建目录（含父目录）",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "创建的目录路径"
+        }
+      ]
+    },
+    {
+      "type": "file_copy",
+      "label": "复制文件",
+      "category": "file",
+      "icon": "copy",
+      "is_container": false,
+      "desc": "复制文件或目录",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "dest",
+          "data_type": "text",
+          "desc": "目标路径"
+        }
+      ]
+    },
+    {
+      "type": "file_move",
+      "label": "移动文件",
+      "category": "file",
+      "icon": "move",
+      "is_container": false,
+      "desc": "移动/重命名文件或目录",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "新路径"
+        }
+      ]
+    },
+    {
+      "type": "file_glob",
+      "label": "通配符查找",
+      "category": "file",
+      "icon": "search",
+      "is_container": false,
+      "desc": "用通配符模式搜索文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "matches",
+          "data_type": "array",
+          "desc": "匹配的文件列表"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "匹配数量"
+        }
+      ]
+    },
+    {
+      "type": "file_checksum",
+      "label": "文件校验",
+      "category": "file",
+      "icon": "shield-check",
+      "is_container": false,
+      "desc": "计算文件 MD5/SHA256 校验和",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "md5",
+          "data_type": "text",
+          "desc": "MD5 哈希"
+        },
+        {
+          "name": "sha256",
+          "data_type": "text",
+          "desc": "SHA256 哈希"
+        }
+      ]
+    },
+    {
+      "type": "clipboard_read",
+      "label": "读取剪贴板",
+      "category": "system",
+      "icon": "clipboard",
+      "is_container": false,
+      "desc": "读取系统剪贴板内容",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "剪贴板文本"
+        }
+      ]
+    },
+    {
+      "type": "clipboard_write",
+      "label": "写入剪贴板",
+      "category": "system",
+      "icon": "clipboard",
+      "is_container": false,
+      "desc": "写入内容到系统剪贴板",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "clipboard",
+      "label": "剪贴板容器",
+      "category": "system",
+      "icon": "clipboard",
+      "is_container": true,
+      "desc": "剪贴板读写容器",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "剪贴板文本"
+        }
+      ]
+    },
+    {
+      "type": "regex_extract",
+      "label": "正则提取",
+      "category": "data",
+      "icon": "regex",
+      "is_container": false,
+      "desc": "用正则表达式提取文本",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "matches",
+          "data_type": "array",
+          "desc": "匹配结果数组"
+        },
+        {
+          "name": "first",
+          "data_type": "text",
+          "desc": "第一个匹配"
+        }
+      ]
+    },
+    {
+      "type": "regex_replace",
+      "label": "正则替换",
+      "category": "data",
+      "icon": "regex",
+      "is_container": false,
+      "desc": "用正则表达式替换文本",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "替换后的文本"
+        }
+      ]
+    },
+    {
+      "type": "regex_match",
+      "label": "正则匹配",
+      "category": "data",
+      "icon": "regex",
+      "is_container": false,
+      "desc": "测试正则表达式是否匹配",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "matched",
+          "data_type": "bool",
+          "desc": "是否匹配"
+        }
+      ]
+    },
+    {
+      "type": "array_filter",
+      "label": "数组过滤",
+      "category": "data",
+      "icon": "filter",
+      "is_container": false,
+      "desc": "按条件过滤数组元素",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "过滤后的数组"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "元素数量"
+        }
+      ]
+    },
+    {
+      "type": "array_sort",
+      "label": "数组排序",
+      "category": "data",
+      "icon": "arrow-up-down",
+      "is_container": false,
+      "desc": "对数组元素排序",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "排序后的数组"
+        }
+      ]
+    },
+    {
+      "type": "array_dedup",
+      "label": "数组去重",
+      "category": "data",
+      "icon": "list",
+      "is_container": false,
+      "desc": "移除数组中的重复元素",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "去重后的数组"
+        },
+        {
+          "name": "removed",
+          "data_type": "number",
+          "desc": "移除数量"
+        }
+      ]
+    },
+    {
+      "type": "array_paginate",
+      "label": "数组分页",
+      "category": "data",
+      "icon": "pagination",
+      "is_container": false,
+      "desc": "对数组进行分页",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "当前页数据"
+        },
+        {
+          "name": "total",
+          "data_type": "number",
+          "desc": "总页数"
+        }
+      ]
+    },
+    {
+      "type": "array_map",
+      "label": "数组映射",
+      "category": "data",
+      "icon": "map",
+      "is_container": false,
+      "desc": "对数组每个元素执行操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "映射后的数组"
+        }
+      ]
+    },
+    {
+      "type": "array_join",
+      "label": "数组连接",
+      "category": "data",
+      "icon": "link",
+      "is_container": false,
+      "desc": "将数组元素连接为字符串",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "连接后的字符串"
+        }
+      ]
+    },
+    {
+      "type": "array_reduce",
+      "label": "数组归约",
+      "category": "data",
+      "icon": "sigma",
+      "is_container": false,
+      "desc": "对数组元素执行累积操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "累积结果"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_text",
+      "label": "转文本",
+      "category": "convert",
+      "icon": "type",
+      "is_container": false,
+      "desc": "将值转换为文本格式",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "text",
+          "desc": "文本值"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_number",
+      "label": "转数字",
+      "category": "convert",
+      "icon": "hash",
+      "is_container": false,
+      "desc": "将值转换为数字格式",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "number",
+          "desc": "数值"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_json",
+      "label": "转 JSON",
+      "category": "convert",
+      "icon": "braces",
+      "is_container": false,
+      "desc": "将值转换为 JSON 格式",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "JSON 值"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_csv",
+      "label": "转 CSV",
+      "category": "convert",
+      "icon": "file-spreadsheet",
+      "is_container": false,
+      "desc": "将值转换为 CSV 格式",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "csv",
+          "data_type": "text",
+          "desc": "CSV 文本"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_html",
+      "label": "转 HTML",
+      "category": "convert",
+      "icon": "code",
+      "is_container": false,
+      "desc": "将值转换为 HTML 格式",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "html",
+          "data_type": "text",
+          "desc": "HTML 文本"
+        }
+      ]
+    },
+    {
+      "type": "convert_to_base64",
+      "label": "转 Base64",
+      "category": "convert",
+      "icon": "binary",
+      "is_container": false,
+      "desc": "将值转换为 Base64 编码",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "encoded",
+          "data_type": "text",
+          "desc": "Base64 编码"
+        }
+      ]
+    },
+    {
+      "type": "loop",
+      "label": "循环",
+      "category": "flow",
+      "icon": "repeat",
+      "is_container": true,
+      "desc": "遍历数组，对每个元素执行子步骤",
+      "inputs": [
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "要遍历的数组"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "results",
+          "data_type": "array",
+          "desc": "每次迭代的结果数组"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "迭代次数"
+        }
+      ]
+    },
+    {
+      "type": "while",
+      "label": "While 循环",
+      "category": "flow",
+      "icon": "refresh-cw",
+      "is_container": true,
+      "desc": "条件循环，满足条件时重复执行子步骤",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "iterations",
+          "data_type": "number",
+          "desc": "迭代次数"
+        }
+      ]
+    },
+    {
+      "type": "cursor",
+      "label": "游标迭代",
+      "category": "flow",
+      "icon": "move-right",
+      "is_container": true,
+      "desc": "一次处理一项，跨次持久化游标",
+      "inputs": [
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "要遍历的数组"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "current",
+          "data_type": "json",
+          "desc": "当前项"
+        },
+        {
+          "name": "index",
+          "data_type": "number",
+          "desc": "当前索引"
+        }
+      ]
+    },
+    {
+      "type": "parallel",
+      "label": "并行执行",
+      "category": "flow",
+      "icon": "layout-panel-top",
+      "is_container": false,
+      "desc": "并行执行多个子步骤",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "results",
+          "data_type": "array",
+          "desc": "各分支结果"
+        }
+      ]
+    },
+    {
+      "type": "map",
+      "label": "Map 映射",
+      "category": "flow",
+      "icon": "map-pin",
+      "is_container": false,
+      "desc": "对每个输入元素应用映射函数",
+      "inputs": [
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "输入数组"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "映射结果"
+        }
+      ]
+    },
+    {
+      "type": "sub_workflow",
+      "label": "子工作流",
+      "category": "flow",
+      "icon": "workflow",
+      "is_container": false,
+      "desc": "调用另一个工作流作为子流程",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output",
+          "data_type": "json",
+          "desc": "子工作流输出"
+        }
+      ]
+    },
+    {
+      "type": "mouse_keyboard",
+      "label": "键鼠操作",
+      "category": "desktop",
+      "icon": "mouse-pointer-click",
+      "is_container": false,
+      "desc": "模拟鼠标和键盘操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
+      ]
+    },
+    {
+      "type": "window",
+      "label": "窗口管理",
+      "category": "desktop",
+      "icon": "monitor",
+      "is_container": false,
+      "desc": "管理桌面窗口",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "窗口信息"
+        }
+      ]
+    },
+    {
+      "type": "ocr",
+      "label": "OCR 识别",
+      "category": "ai",
+      "icon": "scan-text",
+      "is_container": false,
+      "desc": "从图片中识别文字",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "识别的文本"
+        }
+      ]
+    },
+    {
+      "type": "recording",
+      "label": "录制回放",
+      "category": "desktop",
+      "icon": "video",
+      "is_container": false,
+      "desc": "录制和回放桌面操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "回放结果"
+        }
+      ]
+    },
+    {
+      "type": "print",
+      "label": "打印",
+      "category": "system",
+      "icon": "printer",
+      "is_container": false,
+      "desc": "打印文档或内容",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "type": "browser_pdf",
+      "label": "浏览器PDF",
+      "category": "browser",
+      "icon": "file",
+      "is_container": false,
+      "desc": "将当前页面生成 PDF 文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "PDF 文件路径"
+        }
+      ]
+    },
+    {
+      "type": "browser",
+      "label": "浏览器容器",
+      "category": "browser",
+      "icon": "container",
+      "is_container": true,
+      "desc": "在一个浏览器窗口内按顺序执行多个操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "最后操作结果"
+        }
+      ]
+    },
+    {
+      "type": "excel",
+      "label": "Excel 容器",
+      "category": "office",
+      "icon": "container",
+      "is_container": true,
+      "desc": "在一个 Excel 文件内按顺序执行多个操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
+      ]
+    },
+    {
+      "type": "word",
+      "label": "Word 容器",
+      "category": "office",
+      "icon": "container",
+      "is_container": true,
+      "desc": "在一个 Word 文件内按顺序执行多个操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
+      ]
+    },
+    {
+      "type": "logic",
+      "label": "逻辑判断",
+      "category": "flow",
+      "icon": "git-branch",
+      "is_container": true,
+      "desc": "逻辑判断容器，输出 true/false 分支",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "branch",
+          "data_type": "text",
+          "desc": "分支名"
+        },
+        {
+          "name": "result",
+          "data_type": "bool",
+          "desc": "判断结果"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "label": "文件容器",
+      "category": "file",
+      "icon": "container",
+      "is_container": true,
+      "desc": "在一个目录内按顺序执行多个文件操作",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
+      ]
+    },
+    {
+      "type": "mcp_script",
+      "label": "MCP 脚本",
+      "category": "mcp",
+      "icon": "code",
+      "is_container": false,
+      "desc": "通过 MCP 执行 Python 脚本",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "output",
+          "data_type": "text",
+          "desc": "脚本输出"
+        }
+      ]
+    },
+    {
+      "type": "mcp_shell",
+      "label": "MCP Shell",
+      "category": "mcp",
+      "icon": "terminal",
+      "is_container": false,
+      "desc": "通过 MCP 执行 Shell 命令",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "stdout",
+          "data_type": "text",
+          "desc": "标准输出"
+        },
+        {
+          "name": "exit_code",
+          "data_type": "number",
+          "desc": "退出码"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_read",
+      "label": "MCP 读Excel",
+      "category": "mcp",
+      "icon": "file-spreadsheet",
+      "is_container": false,
+      "desc": "通过 MCP 读取 Excel 文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "data",
+          "data_type": "array",
+          "desc": "表格数据"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_write",
+      "label": "MCP 写Excel",
+      "category": "mcp",
+      "icon": "file-spreadsheet",
+      "is_container": false,
+      "desc": "通过 MCP 写入 Excel 文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_create",
+      "label": "MCP 创建Excel",
+      "category": "mcp",
+      "icon": "file-spreadsheet",
+      "is_container": false,
+      "desc": "通过 MCP 创建 Excel 文件",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_filter",
+      "label": "MCP 过滤Excel",
+      "category": "mcp",
+      "icon": "filter",
+      "is_container": false,
+      "desc": "通过 MCP 过滤 Excel 数据",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "data",
+          "data_type": "array",
+          "desc": "过滤结果"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "行数"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_sort",
+      "label": "MCP 排序Excel",
+      "category": "mcp",
+      "icon": "arrow-up-down",
+      "is_container": false,
+      "desc": "通过 MCP 排序 Excel 数据",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "data",
+          "data_type": "array",
+          "desc": "排序结果"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_append",
+      "label": "MCP 追加Excel",
+      "category": "mcp",
+      "icon": "file-plus",
+      "is_container": false,
+      "desc": "通过 MCP 追加 Excel 数据",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_excel_csv",
+      "label": "MCP Excel转CSV",
+      "category": "mcp",
+      "icon": "file-text",
+      "is_container": false,
+      "desc": "通过 MCP 将 Excel 转为 CSV",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "csv_path",
+          "data_type": "text",
+          "desc": "CSV 文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_word_read",
+      "label": "MCP 读Word",
+      "category": "mcp",
+      "icon": "file-text",
+      "is_container": false,
+      "desc": "通过 MCP 读取 Word 文档",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "文档文本"
+        }
+      ]
+    },
+    {
+      "type": "mcp_word_write",
+      "label": "MCP 写Word",
+      "category": "mcp",
+      "icon": "file-plus",
+      "is_container": false,
+      "desc": "通过 MCP 写入 Word 文档",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_word_create",
+      "label": "MCP 创建Word",
+      "category": "mcp",
+      "icon": "file-plus",
+      "is_container": false,
+      "desc": "通过 MCP 创建 Word 文档",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_word_replace",
+      "label": "MCP 替换Word",
+      "category": "mcp",
+      "icon": "replace",
+      "is_container": false,
+      "desc": "通过 MCP 替换 Word 文本",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        },
+        {
+          "name": "replacements",
+          "data_type": "number",
+          "desc": "替换次数"
+        }
+      ]
+    },
+    {
+      "type": "mcp_word_merge",
+      "label": "MCP 合并Word",
+      "category": "mcp",
+      "icon": "git-merge",
+      "is_container": false,
+      "desc": "通过 MCP 合并 Word 文档",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "合并后文件路径"
+        }
+      ]
+    },
+    {
+      "type": "mcp_web_scrape",
+      "label": "MCP 网页抓取",
+      "category": "mcp",
+      "icon": "globe",
+      "is_container": false,
+      "desc": "通过 MCP 提取网页内容",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "网页文本"
+        },
+        {
+          "name": "links",
+          "data_type": "array",
+          "desc": "链接列表"
+        }
+      ]
+    }
   ],
   "categories": {
-    "core":    { "label": "核心",     "order": 1 },
-    "data":    { "label": "数据",     "order": 2 },
-    "file":    { "label": "文件",     "order": 3 },
-    "convert": { "label": "转换",     "order": 4 },
-    "system":  { "label": "系统",     "order": 5 },
-    "flow":    { "label": "流程控制", "order": 6 },
-    "browser": { "label": "浏览器",   "order": 7 },
-    "office":  { "label": "办公",     "order": 8 },
-    "desktop": { "label": "桌面",     "order": 9 },
-    "ai":      { "label": "AI",       "order": 10 },
-    "mcp":     { "label": "MCP 扩展", "order": 11 }
+    "core": {
+      "label": "核心",
+      "order": 1
+    },
+    "data": {
+      "label": "数据",
+      "order": 2
+    },
+    "file": {
+      "label": "文件",
+      "order": 3
+    },
+    "convert": {
+      "label": "转换",
+      "order": 4
+    },
+    "system": {
+      "label": "系统",
+      "order": 5
+    },
+    "flow": {
+      "label": "流程控制",
+      "order": 6
+    },
+    "browser": {
+      "label": "浏览器",
+      "order": 7
+    },
+    "office": {
+      "label": "办公",
+      "order": 8
+    },
+    "desktop": {
+      "label": "桌面",
+      "order": 9
+    },
+    "ai": {
+      "label": "AI",
+      "order": 10
+    },
+    "mcp": {
+      "label": "MCP 扩展",
+      "order": 11
+    }
   },
-  "container_types": ["browser", "excel", "word", "logic", "file", "cursor", "loop", "while"]
+  "container_types": [
+    "browser",
+    "excel",
+    "word",
+    "logic",
+    "file",
+    "cursor",
+    "loop",
+    "while"
+  ]
 }
