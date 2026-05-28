@@ -278,12 +278,16 @@ jobs:
           Copy-Item src-tauri/node-schema.json $pkgDir/
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
           $lines = @(
-            'echo off'
+            '@echo off'
             'title Workflow Engine'
             'cd /d "%~dp0"'
             'start /MIN "" "workflow-engine.exe"'
+            'echo Waiting for Workflow Engine to start...'
+            ':wait'
+            'ping 127.0.0.1 -n 2 > nul'
+            'curl -s http://localhost:19528/api/health >nul 2>&1'
+            'if errorlevel 1 goto wait'
             'echo Workflow Engine started on http://localhost:19528'
-            'ping 127.0.0.1 -n 4 > nul'
             'start http://localhost:19528'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
