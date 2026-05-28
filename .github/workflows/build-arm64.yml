@@ -22,7 +22,7 @@ jobs:
 
       - name: Build wf-cli
         working-directory: src-tauri
-        run: cargo build --bin wf-cli --release --features gui
+        run: cargo build --bin wf-cli --release
 
       - name: Upload wf-cli
         uses: actions/upload-artifact@v4
