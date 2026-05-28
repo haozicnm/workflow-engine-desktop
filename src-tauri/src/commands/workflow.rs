@@ -167,62 +167,6 @@ pub async fn workflow_auto_order(yaml: String) -> Result<serde_json::Value, Stri
     }))
 }
 
-/// 从录制操作创建新工作流（录制 → YAML → 保存到数据库）
-#[tauri::command]
-pub async fn workflow_create_from_recording(
-    app: State<'_, App>,
-    actions: Vec<serde_json::Value>,
-    workflow_name: String,
-    source: Option<String>,
-) -> Result<serde_json::Value, String> {
-    use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
-
-    let recorded_actions: Vec<RecordedAction> = actions
-        .iter()
-        .filter_map(|a| serde_json::from_value(a.clone()).ok())
-        .collect();
-
-    let src = match source.as_deref() {
-        Some("desktop") => RecordingSource::Desktop,
-        Some("mixed") => RecordingSource::Mixed,
-        _ => RecordingSource::Browser,
-    };
-
-    let conversion = recording_converter::convert_actions_to_workflow(
-        &recorded_actions, &workflow_name, src,
-    );
-
-    if conversion.yaml.is_empty() {
-        return Err("Recording is empty, cannot generate workflow".to_string());
-    }
-
-    // 创建并保存工作流到数据库
-    let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    app.db.create_workflow(&id, &workflow_name, "由录制操作生成", &now, &now)
-        .map_err(|e| format!("Failed to create workflow: {e}"))?;
-    app.db.save_workflow_yaml(&id, &conversion.yaml)
-        .map_err(|e| format!("Failed to save workflow YAML: {e}"))?;
-
-    Ok(serde_json::json!({
-        "id": id,
-        "name": workflow_name,
-        "yaml": conversion.yaml,
-        "step_count": conversion.step_count,
-        "action_count": conversion.action_count,
-        "merged_count": conversion.merged_count,
-        "step_summary": conversion.step_summary,
-    }))
-}
-
-/// 查询录制状态（跨 step_test 调用）
-#[tauri::command]
-pub async fn recording_status() -> Result<serde_json::Value, String> {
-    use crate::nodes::recording;
-    let result = recording::get_recording_status().await;
-    Ok(result)
-}
-
 /// 测试单个步骤（不保存，直接执行一次）
 #[tauri::command]
 pub async fn step_test(

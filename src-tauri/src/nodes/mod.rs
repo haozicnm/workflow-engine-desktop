@@ -28,8 +28,6 @@ pub mod ocr;
 pub mod parallel;
 #[cfg(feature = "gui")]
 pub mod print;
-#[cfg(feature = "gui")]
-pub mod recording;
 pub mod regex;
 pub mod registry;
 pub mod script;

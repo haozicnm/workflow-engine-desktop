@@ -29,22 +29,6 @@ pub trait InputBackend: Send + Sync {
     fn platform_name(&self) -> &str;
 }
 
-/// 全局录制后端（键鼠事件监听）
-///
-/// 实现者：
-///   - Windows: 通过 desktop_recorder.py sidecar（保留现有代码）
-///   - Linux:   通过 rdev crate 全局钩子
-pub trait RecordingBackend: Send + Sync {
-    /// 开始录制
-    fn start(&self) -> Result<()>;
-
-    /// 停止录制，返回操作列表
-    fn stop(&self) -> Result<Vec<serde_json::Value>>;
-
-    /// 是否正在录制
-    fn is_recording(&self) -> bool;
-}
-
 /// 窗口信息
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WindowInfo {

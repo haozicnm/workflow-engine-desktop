@@ -3,11 +3,9 @@
 // 设计原则：
 //   - trait 定义在 traits.rs，与平台无关
 //   - 各平台实现在 windows.rs / linux.rs
-//   - 录制实现在 recording.rs
 //   - 启动时根据 cfg 自动选择实现
 //   - 所有节点代码只依赖 trait，不直接调平台 API
 
-pub mod recording;
 pub mod traits;
 
 #[cfg(target_os = "windows")]

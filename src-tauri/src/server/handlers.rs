@@ -93,7 +93,7 @@ pub async fn events_sse() -> Sse<impl Stream<Item = Result<Event, Infallible>>> 
 }
 
 // ═══════════════════════════════════════════════════════════
-// Step test / debug / recording handler
+// Step test / debug handler
 // ═══════════════════════════════════════════════════════════
 
 pub async fn step_test(Json(body): Json<StepTestBody>) -> Response {
@@ -139,21 +139,6 @@ pub async fn step_test(Json(body): Json<StepTestBody>) -> Response {
             "success": false,
             "error": e.to_string(),
         })),
-    }
-}
-
-pub async fn recording_status() -> Response {
-    #[cfg(feature = "gui")]
-    {
-        let result = crate::nodes::recording::get_recording_status().await;
-        ok_response(result)
-    }
-    #[cfg(not(feature = "gui"))]
-    {
-        ok_response(serde_json::json!({
-            "recording": false,
-            "message": "Recording is only available in GUI mode"
-        }))
     }
 }
 
@@ -376,10 +361,10 @@ pub use crate::server::managers::preview_manager::{
 };
 
 pub use crate::server::managers::workflow_manager::{
-    workflow_auto_order, workflow_create, workflow_create_from_recording, workflow_delete,
+    workflow_auto_order, workflow_create, workflow_delete,
     workflow_export, workflow_get, workflow_import, workflow_list, workflow_lock,
     workflow_save_yaml, workflow_update, workflow_validate, WorkflowAutoOrderBody,
-    WorkflowCreateBody, WorkflowCreateFromRecordingBody, WorkflowExportBody, WorkflowImportBody,
+    WorkflowCreateBody, WorkflowExportBody, WorkflowImportBody,
     WorkflowLockBody, WorkflowSaveYamlBody, WorkflowUpdateBody, WorkflowValidateBody,
 };
 

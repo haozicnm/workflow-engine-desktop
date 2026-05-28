@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Settings, Circle, Square, Plus } from 'lucide-vue-next'
+import { Settings, Plus } from 'lucide-vue-next'
 import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
@@ -21,7 +21,6 @@ const props = defineProps<{
   runState?: StepRunState
   totalSteps?: number
   currentStepIndex?: number
-  isRecording?: boolean
   steps?: Step[]  // 工作流所有步骤（传给 LogicBranch / ParamField 用于变量引用）
 }>()
 
@@ -39,8 +38,6 @@ const emit = defineEmits<{
   'update-step-config': [stepId: string, key: string, value: unknown]
   'open-config': [stepId: string]
   'update-error-strategy': [stepId: string, strategy: ErrorStrategy]
-  'start-recording': [stepId: string]
-  'stop-recording': [stepId: string]
 }>()
 
 // ─── Action expand/collapse ───
@@ -292,24 +289,6 @@ function closeAllMenus() {
             @click="emit('open-config', step.id); closeAllMenus()"
           >
             <Settings class="w-4 h-4 inline" /> {{ t('stepCard.containerSettings') }}
-          </Button>
-
-          <!-- 录制 (Browser only) -->
-          <Button
-            v-if="step.type === 'browser' && !isRecording"
-            variant="ghost"
-            class="w-full justify-start px-3 py-2 text-sm"
-            @click="emit('start-recording', step.id); closeAllMenus()"
-          >
-            <Circle class="w-4 h-4 text-red-500 fill-red-500" /> {{ t('stepCard.recordActions') }}
-          </Button>
-          <Button
-            v-if="step.type === 'browser' && isRecording"
-            variant="ghost"
-            class="w-full justify-start px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
-            @click="emit('stop-recording', step.id); closeAllMenus()"
-          >
-            <Square class="w-4 h-4" /> {{ t('stepCard.stopRecording') }}
           </Button>
 
           <!-- 条件执行 -->

@@ -230,7 +230,6 @@ onUnmounted(() => {
                 :run-state="a.store.runStates[step.id]"
                 :total-steps="a.filteredSteps.value.length"
                 :current-step-index="index"
-                :is-recording="a.isRecording.value"
                 :steps="a.workflow.value?.steps"
                 @add-action="a.onAddAction"
                 @remove-action="a.onRemoveAction"
@@ -244,8 +243,6 @@ onUnmounted(() => {
                 @update-step-config="(sId, key, val) => a.store.updateStepConfig(sId, key, val)"
                 @open-config="a.onOpenConfig"
                 @update-error-strategy="a.onErrorStrategyChange"
-                @start-recording="a.onStartRecording"
-                @stop-recording="a.onStopRecording"
               />
             </div>
 

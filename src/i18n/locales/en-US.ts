@@ -191,8 +191,6 @@ export default {
     moreActions: 'More actions',
     deleteStepAria: 'Delete step',
     containerSettings: 'Container Settings',
-    recordActions: 'Record Actions',
-    stopRecording: 'Stop Recording',
     removeCondition: 'Remove Condition',
     errDescFail: 'Stop the entire workflow on step failure',
     errDescIgnore: 'Skip error, continue to next step',

@@ -207,12 +207,6 @@ impl StepExecutor {
         register!(executors, "delay", crate::nodes::delay::DelayNode);
         register!(executors, "ocr", crate::nodes::ocr::OcrNode);
         #[cfg(feature = "gui")]
-        register!(
-            executors,
-            "recording",
-            crate::nodes::recording::RecordingNode
-        );
-        #[cfg(feature = "gui")]
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
 

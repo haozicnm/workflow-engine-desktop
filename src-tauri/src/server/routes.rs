@@ -59,10 +59,6 @@ pub fn build() -> Router {
         )
         .route("/api/workflows/export", post(handlers::workflow_export))
         .route("/api/workflows/import", post(handlers::workflow_import))
-        .route(
-            "/api/workflows/create-from-recording",
-            post(handlers::workflow_create_from_recording),
-        )
         .route("/api/runs", post(handlers::run_start))
         .route("/api/runs", get(handlers::run_list))
         .route("/api/runs/{run_id}/cancel", post(handlers::run_cancel))
@@ -118,7 +114,6 @@ pub fn build() -> Router {
         )
         .route("/api/debug/vars/{run_id}", get(handlers::debug_vars))
         .route("/api/step-test", post(handlers::step_test))
-        .route("/api/recording/status", get(handlers::recording_status))
         .route("/api/plugins", get(handlers::plugin_list))
         .route("/api/plugins/install", post(handlers::plugin_install))
         .route("/api/plugins/upload", post(handlers::plugin_upload))

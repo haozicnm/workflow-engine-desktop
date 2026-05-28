@@ -196,8 +196,6 @@ export default {
     moreActions: '更多操作',
     deleteStepAria: '删除步骤',
     containerSettings: '容器设置',
-    recordActions: '录制操作',
-    stopRecording: '停止录制',
     removeCondition: '移除条件',
     errDescFail: '步骤失败时终止整个工作流',
     errDescIgnore: '跳过错误，继续下一步',

@@ -29,8 +29,6 @@ export function useEditorActions() {
   const selectedStepId = ref<string | null>(null)
   const configStepId = ref<string | null>(null)
   const showAddStep = ref(false)
-  const isRecording = ref(false)
-  const recordingError = ref('')
   const showDeleteConfirm = ref(false)
   const pendingDelete = ref<{ name: string; id: string }>({ name: '', id: '' })
   const addActionStepId = ref<string | null>(null)
@@ -266,51 +264,11 @@ export function useEditorActions() {
     dropIndex.value = null
   }
 
-  // ─── Recording ───
-  function getContainerUrl(): string | undefined {
-    if (!workflow.value || !selectedStepId.value) return undefined
-    const step = store.findStep(selectedStepId.value)
-    if (!step) return undefined
-    const navAction = step.actions?.find(a => a.type === 'navigate')
-    if (navAction?.params?.url) return navAction.params.url as string
-    if (step.config?.url) return step.config.url as string
-    return undefined
-  }
-
-  async function onStartRecording(_stepId?: string) {
-    try {
-      const url = getContainerUrl()
-      await safeInvoke('browser_recording_start', { url: url || null })
-      isRecording.value = true
-      recordingError.value = ''
-      toast.info(url ? `录制已开始，已打开 ${url}` : t('toast.running'))
-    } catch (e: unknown) {
-      recordingError.value = (e as Error).message || t('error.generic')
-      toast.error('启动录制失败: ' + recordingError.value)
-    }
-  }
-
-  async function onStopRecording(_stepId?: string) {
-    try {
-      const result = await safeInvoke<{ actions?: unknown[]; workflow_json?: unknown }>('browser_recording_stop')
-      isRecording.value = false
-      if (result?.workflow_json) {
-        toast.success(`录制完成，已捕获 ${Array.isArray(result.actions) ? result.actions.length : 0} 个操作`)
-      } else {
-        toast.info(t('common.stop'))
-      }
-    } catch (e: unknown) {
-      isRecording.value = false
-      toast.error('停止录制失败: ' + ((e as Error).message || e))
-    }
-  }
-
   return {
     // State
     store, workflow, isRunning, isLocked,
     editingName, nameInput,
     selectedStepId, configStepId, showAddStep,
-    isRecording, recordingError,
     showDeleteConfirm, pendingDelete,
     addActionStepId, addActionOptions,
     dragIndex, dropIndex,
@@ -328,6 +286,5 @@ export function useEditorActions() {
     onOpenConfig, onUpdateContainerConfig, onCloseConfig,
     onUpdateCondition, onErrorStrategyChange,
     onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
-    onStartRecording, onStopRecording,
   }
 }

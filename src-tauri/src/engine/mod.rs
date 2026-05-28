@@ -8,7 +8,6 @@ pub mod executor;
 pub mod parser;
 pub mod plugin_manager;
 pub mod preview;
-pub mod recording_converter;
 pub mod scheduler;
 pub mod skill_generator;
 pub mod state;

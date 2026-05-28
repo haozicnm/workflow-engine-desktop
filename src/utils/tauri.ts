@@ -59,8 +59,6 @@ const BROWSER_COMMANDS = new Set([
   'browser_pick_next',
   'browser_pick_session_start',
   'browser_pick_session_stop',
-  'browser_recording_start',
-  'browser_recording_stop',
 ])
 
 // ═══════════════════════════════════════════════════════════════

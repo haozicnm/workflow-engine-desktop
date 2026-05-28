@@ -66,13 +66,6 @@ pub struct WorkflowImportBody {
     pub yaml_content: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct WorkflowCreateFromRecordingBody {
-    pub actions: Vec<serde_json::Value>,
-    pub workflow_name: String,
-    pub source: Option<String>,
-}
-
 // ═══════════════════════════════════════════════════════════
 // 工作流 CRUD handler
 // ═══════════════════════════════════════════════════════════
@@ -439,62 +432,4 @@ pub async fn workflow_import(Json(body): Json<WorkflowImportBody>) -> Response {
     }))
 }
 
-pub async fn workflow_create_from_recording(
-    Json(body): Json<WorkflowCreateFromRecordingBody>,
-) -> Response {
-    let app = state::get();
-    use crate::engine::recording_converter::{self, RecordedAction, RecordingSource};
 
-    let recorded_actions: Vec<RecordedAction> = body
-        .actions
-        .iter()
-        .filter_map(|a| serde_json::from_value(a.clone()).ok())
-        .collect();
-
-    let src = match body.source.as_deref() {
-        Some("desktop") => RecordingSource::Desktop,
-        Some("mixed") => RecordingSource::Mixed,
-        _ => RecordingSource::Browser,
-    };
-
-    let conversion = recording_converter::convert_actions_to_workflow(
-        &recorded_actions,
-        &body.workflow_name,
-        src,
-    );
-
-    if conversion.yaml.is_empty() {
-        return err_response(
-            StatusCode::BAD_REQUEST,
-            "Recording is empty, cannot generate workflow",
-        );
-    }
-
-    let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    if let Err(e) = app
-        .db
-        .create_workflow(&id, &body.workflow_name, "由录制操作生成", &now, &now)
-    {
-        return err_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to create workflow: {e}"),
-        );
-    }
-    if let Err(e) = app.db.save_workflow_yaml(&id, &conversion.yaml) {
-        return err_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to save workflow YAML: {e}"),
-        );
-    }
-
-    ok_response(serde_json::json!({
-        "id": id,
-        "name": body.workflow_name,
-        "yaml": conversion.yaml,
-        "step_count": conversion.step_count,
-        "action_count": conversion.action_count,
-        "merged_count": conversion.merged_count,
-        "step_summary": conversion.step_summary,
-    }))
-}

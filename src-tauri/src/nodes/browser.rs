@@ -775,8 +775,7 @@ pub async fn send_sidecar_action(
         && action != "pick_next"
         && action != "pick_stop"
     {
-        // 录制需要用户可见浏览器，非 headless
-        let headless = action != "recording_start";
+        let headless = true;
         let launch_params = serde_json::json!({"headless": headless});
         let _ = sidecar.send_action("launch", launch_params).await;
     }
@@ -819,7 +818,7 @@ impl NodeExecutor for BrowserNode {
 
         // 对于需要 launch 的操作，自动先 launch
         if action != "launch" && action != "close" && action != "ping" {
-            let headless = action != "recording_start" && action != "pick";
+            let headless = action != "pick";
             let mut launch_params = config
                 .get("launch")
                 .cloned()
@@ -901,7 +900,7 @@ async fn ensure_sidecar(
 ) -> Result<Arc<BrowserSidecar>> {
     let sidecar = get_or_start_sidecar().await?;
     if action != "launch" && action != "close" && action != "ping" {
-        let headless = action != "recording_start" && action != "pick";
+        let headless = action != "pick";
         let mut launch_params = config
             .get("launch")
             .cloned()
