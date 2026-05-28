@@ -88,6 +88,7 @@ function onParamChange(key: string, value: unknown) {
 // ─── Element picker (continuous mode) ───
 const pickingElement = ref(false)
 let pickSessionActive = false
+const pickedElementInfo = ref<Record<string, unknown> | null>(null)
 
 function getStepUrl(): string | undefined {
   if (!props.steps?.length) return undefined
@@ -112,11 +113,15 @@ async function onPickElement(fieldKey: string) {
       pickSessionActive = true
     }
     // 等待用户点选下一个元素
-    const result = await safeInvoke<{ success?: boolean; data?: { selector: string }; selector?: string }>('browser_pick_next')
+    const result = await safeInvoke<{ success?: boolean; data?: { selector: string; element?: Record<string, unknown> }; selector?: string }>('browser_pick_next')
     const selector = result?.data?.selector ?? result?.selector
+    const elementInfo = result?.data?.element
     if (selector) {
       localParams.value[fieldKey] = selector
       emit('update-params', { ...localParams.value })
+    }
+    if (elementInfo && elementInfo.tag) {
+      pickedElementInfo.value = elementInfo as Record<string, unknown>
     }
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : (typeof e === 'string' ? e : String(e || ''))
@@ -270,6 +275,31 @@ function isSelectorField(key: string): boolean {
           @update:model-value="v => onParamChange(param.key, v)"
           @pick-element="onPickElement(param.key)"
         />
+
+        <!-- Element preview (shown after picking an element) -->
+        <div
+          v-if="pickedElementInfo"
+          class="mt-1 px-2.5 py-2 rounded-md bg-muted/60 border border-border/40 text-[11px] space-y-1.5"
+        >
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-primary">&lt;{{ pickedElementInfo.tag }}&gt;</span>
+            <span v-if="pickedElementInfo.id" class="font-mono text-purple-500 dark:text-purple-400">#{{ pickedElementInfo.id }}</span>
+            <span
+              v-for="cls in (pickedElementInfo.classes as string[] || []).slice(0, 3)"
+              :key="cls"
+              class="font-mono text-green-600 dark:text-green-400 bg-green-500/10 px-1 rounded"
+            >.{{ cls }}</span>
+            <span v-if="pickedElementInfo.text" class="text-muted-foreground italic truncate max-w-[200px]">
+              "{{ (pickedElementInfo.text as string).slice(0, 80) }}"
+            </span>
+          </div>
+          <details class="group/html">
+            <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+              HTML preview
+            </summary>
+            <pre class="mt-1 p-2 rounded bg-background/80 text-[10px] font-mono overflow-x-auto max-h-32 text-muted-foreground whitespace-pre-wrap break-all">{{ pickedElementInfo.html_preview }}</pre>
+          </details>
+        </div>
       </div>
     </Transition>
   </div>

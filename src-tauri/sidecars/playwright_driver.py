@@ -205,7 +205,7 @@ async def handle_action(action: str, params: dict) -> dict:
             case "pick_start":
                 return await _pick_start(params)
             case "pick_next":
-                return await _pick_next()
+                return await _pick_next(params)
             case "pick_stop":
                 return await _pick_stop()
             # v1.6 文件下载
@@ -1332,36 +1332,80 @@ async def _pick(params: dict) -> dict:
             let _hovered = null;
 
             function buildSelector(el) {
-                // 优先级 1: id
-                if (el.id) return '#' + CSS.escape(el.id);
-
-                // 优先级 2: data-testid / data-id / data-key
-                const testId = el.getAttribute('data-testid');
-                if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
-                const dataId = el.getAttribute('data-id');
-                if (dataId) return '[data-id="' + CSS.escape(dataId) + '"]';
-                const dataKey = el.getAttribute('data-key');
-                if (dataKey) return '[data-key="' + CSS.escape(dataKey) + '"]';
-
-                // 优先级 3: 唯一 class
+                const candidates = [];
                 const tag = el.tagName.toLowerCase();
+
+                function tryAdd(sel, method, score) {
+                    try {
+                        if (document.querySelectorAll(sel).length === 1) {
+                            candidates.push({selector: sel, method: method, score: score});
+                        }
+                    } catch(e) {}
+                }
+
+                // 1. #id (score 100)
+                if (el.id) {
+                    tryAdd('#' + CSS.escape(el.id), 'id', 100);
+                }
+
+                // 2. [data-testid] (score 90)
+                const testId = el.getAttribute('data-testid');
+                if (testId) {
+                    tryAdd('[data-testid="' + CSS.escape(testId) + '"]', 'data-testid', 90);
+                }
+
+                // 3. Text-based :has-text (score 85)
+                const text = el.textContent.trim();
+                if (text && text.length < 50) {
+                    try {
+                        const matchingEls = Array.from(document.querySelectorAll(tag)).filter(
+                            function(e) { return e.textContent.trim() === text; }
+                        );
+                        if (matchingEls.length === 1) {
+                            candidates.push({selector: tag + ':has-text("' + text.replace(/"/g, '\\\\"') + '")', method: 'has-text', score: 85});
+                        }
+                    } catch(e) {}
+                }
+
+                // 4. Unique class combo (score 80)
                 if (typeof el.className === 'string' && el.className.trim()) {
                     const classes = el.className.trim().split(/\\s+/);
+                    if (classes.length > 1) {
+                        tryAdd(tag + '.' + classes.map(function(c) { return CSS.escape(c); }).join('.'), 'multi-class', 80);
+                    }
                     for (const cls of classes) {
                         if (!cls) continue;
-                        const sel = tag + '.' + CSS.escape(cls);
-                        if (document.querySelectorAll(sel).length === 1) return sel;
+                        tryAdd(tag + '.' + CSS.escape(cls), 'class', 80);
                     }
                 }
 
-                // 优先级 4: nth-child 路径
+                // 5. [data-id] / [data-key] (score 75)
+                const dataId = el.getAttribute('data-id');
+                if (dataId) {
+                    tryAdd('[data-id="' + CSS.escape(dataId) + '"]', 'data-id', 75);
+                }
+                const dataKey = el.getAttribute('data-key');
+                if (dataKey) {
+                    tryAdd('[data-key="' + CSS.escape(dataKey) + '"]', 'data-key', 75);
+                }
+
+                // 6. aria role + label (score 70)
+                const role = el.getAttribute('role');
+                const ariaLabel = el.getAttribute('aria-label');
+                if (role && ariaLabel) {
+                    tryAdd('[role="' + CSS.escape(role) + '"][aria-label="' + CSS.escape(ariaLabel) + '"]', 'aria', 70);
+                } else if (role) {
+                    tryAdd('[role="' + CSS.escape(role) + '"]', 'role', 70);
+                }
+
+                // 7. nth-of-type path (score 50, last resort)
                 const path = [];
                 let cur = el;
                 while (cur && cur !== document.body && cur !== document.documentElement) {
                     const parent = cur.parentElement;
                     if (!parent) break;
                     const siblings = Array.from(parent.children).filter(
-                        c => c.tagName === cur.tagName
+                        function(c) { return c.tagName === cur.tagName; }
                     );
                     if (siblings.length > 1) {
                         const idx = siblings.indexOf(cur) + 1;
@@ -1371,7 +1415,10 @@ async def _pick(params: dict) -> dict:
                     }
                     cur = parent;
                 }
-                return path.join(' > ');
+                candidates.push({selector: path.join(' > '), method: 'nth-of-type-path', score: 50});
+
+                candidates.sort(function(a, b) { return b.score - a.score; });
+                return {candidates: candidates.slice(0, 5)};
             }
 
             window.__wfPickMouseover = function(e) {
@@ -1384,8 +1431,8 @@ async def _pick(params: dict) -> dict:
                 e.stopPropagation();
                 e.preventDefault();
                 if (_hovered) _hovered.classList.remove('wf-pick-hover');
-                const sel = buildSelector(e.target);
-                window.__wfPickResult = sel;
+                var result = buildSelector(e.target);
+                window.__wfPickResult = result;
                 window.__wfPickCleanup();
             };
 
@@ -1403,19 +1450,21 @@ async def _pick(params: dict) -> dict:
         })()
         """)
 
-        # 轮询等待用户点击（最多 30 秒）
-        for _ in range(300):
+        # 轮询等待用户点击（可配置超时，默认 30 秒）
+        timeout_ms = params.get("timeout_ms", 30000)
+        iterations = max(1, int(timeout_ms / 100))
+        for _ in range(iterations):
             await asyncio.sleep(0.1)
             result = await page.evaluate("window.__wfPickResult")
             if result:
-                return {"success": True, "data": {"selector": result}}
+                return {"success": True, "data": result}
 
         # 超时，清理注入的 JS
         try:
             await page.evaluate("window.__wfPickCleanup && window.__wfPickCleanup()")
         except Exception:
             pass
-        return {"success": False, "error": "元素选择超时（30 秒内未点击任何元素）"}
+        return {"success": False, "error": f"元素选择超时（{timeout_ms}ms 内未点击任何元素）"}
 
     except Exception as e:
         return {"success": False, "error": f"pick 失败: {e}"}
@@ -1433,40 +1482,98 @@ async def _inject_picker_js(page) -> None:
         }
         window.__wfPickActive = true;
         window.__wfPickResult = null;
+        window.__wfPickedElementInfo = null;
 
         const style = document.createElement('style');
         style.id = '__wf-pick-style';
         style.textContent = `
             .wf-pick-hover { outline: 2px solid #58a6ff !important; outline-offset: 1px; }
             .wf-pick-selected { outline: 2px solid #3fb950 !important; outline-offset: 1px; }
+            #__wf-pick-tooltip {
+                position: fixed; z-index: 999999; pointer-events: none;
+                background: rgba(20,20,20,0.92); color: #f0f0f0;
+                font: 11px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+                padding: 6px 10px; border-radius: 6px;
+                max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+                transition: opacity 0.1s; opacity: 0;
+            }
+            #__wf-pick-tooltip .__wf-tip-tag { color: #79c0ff; font-weight: 600; }
+            #__wf-pick-tooltip .__wf-tip-id { color: #d2a8ff; }
+            #__wf-pick-tooltip .__wf-tip-cls { color: #7ee787; }
+            #__wf-pick-tooltip .__wf-tip-text { color: #e6edf3; font-style: italic; }
         `;
         document.head.appendChild(style);
+
+        // Create tooltip element
+        let _tooltip = document.getElementById('__wf-pick-tooltip');
+        if (!_tooltip) {
+            _tooltip = document.createElement('div');
+            _tooltip.id = '__wf-pick-tooltip';
+            document.body.appendChild(_tooltip);
+        }
 
         let _hovered = null;
 
         function buildSelector(el) {
-            if (el.id) return '#' + CSS.escape(el.id);
-            const testId = el.getAttribute('data-testid');
-            if (testId) return '[data-testid="' + CSS.escape(testId) + '"]';
-            const dataId = el.getAttribute('data-id');
-            if (dataId) return '[data-id="' + CSS.escape(dataId) + '"]';
-            const dataKey = el.getAttribute('data-key');
-            if (dataKey) return '[data-key="' + CSS.escape(dataKey) + '"]';
+            const candidates = [];
             const tag = el.tagName.toLowerCase();
+
+            function tryAdd(sel, method, score) {
+                try {
+                    if (document.querySelectorAll(sel).length === 1) {
+                        candidates.push({selector: sel, method: method, score: score});
+                    }
+                } catch(e) {}
+            }
+
+            if (el.id) { tryAdd('#' + CSS.escape(el.id), 'id', 100); }
+
+            const testId = el.getAttribute('data-testid');
+            if (testId) { tryAdd('[data-testid="' + CSS.escape(testId) + '"]', 'data-testid', 90); }
+
+            const text = el.textContent.trim();
+            if (text && text.length < 50) {
+                try {
+                    const matchingEls = Array.from(document.querySelectorAll(tag)).filter(
+                        function(e) { return e.textContent.trim() === text; }
+                    );
+                    if (matchingEls.length === 1) {
+                        candidates.push({selector: tag + ':has-text("' + text.replace(/"/g, '\\\\"') + '")', method: 'has-text', score: 85});
+                    }
+                } catch(e) {}
+            }
+
             if (typeof el.className === 'string' && el.className.trim()) {
                 const classes = el.className.trim().split(/\\s+/);
+                if (classes.length > 1) {
+                    tryAdd(tag + '.' + classes.map(function(c) { return CSS.escape(c); }).join('.'), 'multi-class', 80);
+                }
                 for (const cls of classes) {
                     if (!cls) continue;
-                    const sel = tag + '.' + CSS.escape(cls);
-                    if (document.querySelectorAll(sel).length === 1) return sel;
+                    tryAdd(tag + '.' + CSS.escape(cls), 'class', 80);
                 }
             }
+
+            const dataId = el.getAttribute('data-id');
+            if (dataId) { tryAdd('[data-id="' + CSS.escape(dataId) + '"]', 'data-id', 75); }
+            const dataKey = el.getAttribute('data-key');
+            if (dataKey) { tryAdd('[data-key="' + CSS.escape(dataKey) + '"]', 'data-key', 75); }
+
+            const role = el.getAttribute('role');
+            const ariaLabel = el.getAttribute('aria-label');
+            if (role && ariaLabel) {
+                tryAdd('[role="' + CSS.escape(role) + '"][aria-label="' + CSS.escape(ariaLabel) + '"]', 'aria', 70);
+            } else if (role) {
+                tryAdd('[role="' + CSS.escape(role) + '"]', 'role', 70);
+            }
+
             const path = [];
             let cur = el;
             while (cur && cur !== document.body && cur !== document.documentElement) {
                 const parent = cur.parentElement;
                 if (!parent) break;
-                const siblings = Array.from(parent.children).filter(c => c.tagName === cur.tagName);
+                const siblings = Array.from(parent.children).filter(function(c) { return c.tagName === cur.tagName; });
                 if (siblings.length > 1) {
                     const idx = siblings.indexOf(cur) + 1;
                     path.unshift(cur.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
@@ -1475,23 +1582,74 @@ async def _inject_picker_js(page) -> None:
                 }
                 cur = parent;
             }
-            return path.join(' > ');
+            candidates.push({selector: path.join(' > '), method: 'nth-of-type-path', score: 50});
+
+            candidates.sort(function(a, b) { return b.score - a.score; });
+            return {candidates: candidates.slice(0, 5)};
         }
 
         window.__wfPickMouseover = function(e) {
             if (_hovered) _hovered.classList.remove('wf-pick-hover');
             _hovered = e.target;
             _hovered.classList.add('wf-pick-hover');
+
+            // Build tooltip content
+            const el = e.target;
+            const tag = el.tagName.toLowerCase();
+            const id = el.id || '';
+            const clsStr = (typeof el.className === 'string') ? el.className.trim() : '';
+            const classes = clsStr ? clsStr.split(/\s+/).slice(0, 2) : [];
+            const rawText = (el.textContent || '').trim().replace(/\s+/g, ' ');
+            const text = rawText.length > 60 ? rawText.slice(0, 60) + '…' : rawText;
+            const rect = el.getBoundingClientRect();
+
+            let html = '<span class="__wf-tip-tag">&lt;' + tag;
+            if (id) html += ' <span class="__wf-tip-id">#' + id + '</span>';
+            if (classes.length) html += ' <span class="__wf-tip-cls">.' + classes.join('.') + '</span>';
+            html += '&gt;</span>';
+            if (text) html += ' <span class="__wf-tip-text">"' + text + '"</span>';
+            html += ' <span style="color:#8b949e;font-size:10px">[' + Math.round(rect.width) + '×' + Math.round(rect.height) + ']</span>';
+
+            _tooltip.innerHTML = html;
+            _tooltip.style.opacity = '1';
+
+            // Position tooltip near cursor, keeping it in viewport
+            let tx = e.clientX + 12;
+            let ty = e.clientY + 18;
+            if (tx + 360 > window.innerWidth) tx = e.clientX - 360 - 8;
+            if (ty + 40 > window.innerHeight) ty = e.clientY - 40;
+            _tooltip.style.left = tx + 'px';
+            _tooltip.style.top = ty + 'px';
         };
 
         window.__wfPickClick = function(e) {
             e.stopPropagation();
             e.preventDefault();
             if (_hovered) _hovered.classList.remove('wf-pick-hover');
-            const sel = buildSelector(e.target);
+            const result = buildSelector(e.target);
             e.target.classList.add('wf-pick-selected');
             setTimeout(() => e.target.classList.remove('wf-pick-selected'), 600);
-            window.__wfPickResult = sel;
+            window.__wfPickResult = result;
+            // Store element info for retrieval
+            const el = e.target;
+            const elTag = el.tagName.toLowerCase();
+            const elId = el.id || '';
+            const elClsStr = (typeof el.className === 'string') ? el.className.trim() : '';
+            const elClasses = elClsStr ? elClsStr.split(/\s+/) : [];
+            const elText = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+            // Build outerHTML preview (truncated)
+            let outerHtml = '';
+            try { outerHtml = el.outerHTML; } catch(ex) {}
+            if (outerHtml.length > 500) outerHtml = outerHtml.slice(0, 500) + '…';
+            window.__wfPickedElementInfo = {
+                tag: elTag,
+                id: elId,
+                classes: elClasses,
+                text: elText,
+                html_preview: outerHtml
+            };
+            // Hide tooltip on click
+            if (_tooltip) _tooltip.style.opacity = '0';
             // 不调用 cleanup，保持拾取模式
         };
 
@@ -1500,9 +1658,12 @@ async def _inject_picker_js(page) -> None:
             document.removeEventListener('click', window.__wfPickClick, true);
             const s = document.getElementById('__wf-pick-style');
             if (s) s.remove();
+            const tt = document.getElementById('__wf-pick-tooltip');
+            if (tt) tt.remove();
             if (_hovered) _hovered.classList.remove('wf-pick-hover');
             window.__wfPickActive = false;
             window.__wfPickResult = null;
+            window.__wfPickedElementInfo = null;
         };
 
         document.addEventListener('mouseover', window.__wfPickMouseover, true);
@@ -1551,7 +1712,7 @@ async def _pick_start(params: dict) -> dict:
         return {"success": False, "error": f"pick_start 失败: {e}"}
 
 
-async def _pick_next() -> dict:
+async def _pick_next(params: dict | None = None) -> dict:
     """等待用户点选下一个元素，返回 selector"""
     global _pick_session_active
 
@@ -1567,16 +1728,21 @@ async def _pick_next() -> dict:
         # 清除上次结果
         await page.evaluate("window.__wfPickResult = null")
 
-        # 轮询等待点击
-        for _ in range(300):
+        # 轮询等待点击（可配置超时，默认 30 秒）
+        timeout_ms = (params or {}).get("timeout_ms", 30000)
+        iterations = max(1, int(timeout_ms / 100))
+        for _ in range(iterations):
             await asyncio.sleep(0.1)
             result = await page.evaluate("window.__wfPickResult")
             if result:
-                return {"success": True, "data": {"selector": result}}
+                # Retrieve element info stored by the click handler
+                element_info = await page.evaluate("window.__wfPickedElementInfo")
+                data = result if isinstance(result, dict) else {"selector": result}
+                if element_info:
+                    data["element"] = element_info
+                return {"success": True, "data": data}
 
-        # 超时
-        await _pick_stop()
-        return {"success": False, "error": "拾取超时（30 秒）"}
+        return {"success": False, "error": f"拾取超时（{timeout_ms}ms）"}
     except Exception as e:
         _pick_session_active = False
         return {"success": False, "error": f"pick_next 失败: {e}"}
