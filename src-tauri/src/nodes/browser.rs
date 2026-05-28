@@ -540,15 +540,29 @@ async fn kill_process_tree(sidecar: &BrowserSidecar) {
                     .output()
                     .await;
             }
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(target_os = "linux")]
             {
-                // kill 进程组（负 PID = 进程组）
-                let _ = std::process::Command::new("kill")
-                    .args(["--", &format!("-{}", pid)])
-                    .output();
+                // 递归杀进程树：先杀子进程的子进程（Chromium），再杀子进程
+                // pkill -P <pid> 杀指定 pid 的所有子进程
+                // 多层调用覆盖孙进程
+                for _ in 0..3 {
+                    let _ = tokio::process::Command::new("pkill")
+                        .args(["-9", "-P", &pid.to_string()])
+                        .output()
+                        .await;
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
+            }
+            #[cfg(target_os = "macos")]
+            {
+                // macOS: kill 进程组
+                let _ = tokio::process::Command::new("pkill")
+                    .args(["-9", "-P", &pid.to_string()])
+                    .output()
+                    .await;
             }
         }
-        // 兜底：直接 kill
+        // 兜底：直接 kill 父进程
         let _ = child.kill().await;
     }
 }
