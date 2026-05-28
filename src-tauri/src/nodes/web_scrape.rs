@@ -553,6 +553,14 @@ async fn scrape_single_url_inner(
         }
     }
 
+    // 注入来源信息到每条 item
+    for (i, item) in all_items.iter_mut().enumerate() {
+        if let Some(obj) = item.as_object_mut() {
+            obj.insert("_source_url".to_string(), serde_json::json!(url));
+            obj.insert("_index".to_string(), serde_json::json!(i));
+        }
+    }
+
     Ok(serde_json::json!({
         "pages_scraped": pages_scraped,
         "total_items": all_items.len(),
