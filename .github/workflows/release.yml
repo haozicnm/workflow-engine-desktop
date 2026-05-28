@@ -65,7 +65,7 @@ jobs:
           cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
-          cp node-schema.json pkg/opt/workflow-engine/
+          cp src-tauri/node-schema.json pkg/opt/workflow-engine/
           if [ -f debian/wf-engine.service ]; then
             cp debian/wf-engine.service pkg/usr/lib/systemd/user/
           fi
@@ -90,7 +90,7 @@ jobs:
           cp src-tauri/target/release/wf-cli /tmp/wf-pkg/
           cp -r dist /tmp/wf-pkg/
           cp -r src-tauri/sidecars /tmp/wf-pkg/
-          cp node-schema.json /tmp/wf-pkg/
+          cp src-tauri/node-schema.json /tmp/wf-pkg/
           tar czf $TARGZ -C /tmp/wf-pkg .
 
       - name: Upload deb
@@ -166,7 +166,7 @@ jobs:
           cp src-tauri/target/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
-          cp node-schema.json pkg/opt/workflow-engine/
+          cp src-tauri/node-schema.json pkg/opt/workflow-engine/
           if [ -f debian/wf-engine.service ]; then
             cp debian/wf-engine.service pkg/usr/lib/systemd/user/
           fi
@@ -190,7 +190,7 @@ jobs:
           cp src-tauri/target/release/wf-cli /tmp/wf-pkg/
           cp -r dist /tmp/wf-pkg/
           cp -r src-tauri/sidecars /tmp/wf-pkg/
-          cp node-schema.json /tmp/wf-pkg/
+          cp src-tauri/node-schema.json /tmp/wf-pkg/
           tar czf $TARGZ -C /tmp/wf-pkg .
 
       - name: Upload deb
@@ -275,7 +275,7 @@ jobs:
           Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
           Copy-Item -Recurse dist $pkgDir/
           Copy-Item -Recurse src-tauri/sidecars $pkgDir/sidecars
-          Copy-Item node-schema.json $pkgDir/
+          Copy-Item src-tauri/node-schema.json $pkgDir/
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
           $lines = @(
             'echo off'
