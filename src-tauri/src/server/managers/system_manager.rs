@@ -22,6 +22,13 @@ pub struct SettingsUpdateBody {
     pub browser_channel: String,
     pub browser_executable_path: String,
     pub working_dir: String,
+    // ── P1 新增（serde default 兼容旧前端） ──
+    #[serde(default)]
+    pub timeouts: Option<crate::data::config::TimeoutConfig>,
+    #[serde(default)]
+    pub logging: Option<crate::data::config::LogConfig>,
+    #[serde(default)]
+    pub execution: Option<crate::data::config::ExecutionConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,6 +96,9 @@ pub async fn settings_get() -> Response {
         "browser_channel": config.browser_channel,
         "browser_executable_path": config.browser_executable_path,
         "working_dir": config.working_dir,
+        "timeouts": config.timeouts,
+        "logging": config.logging,
+        "execution": config.execution,
     }))
 }
 
@@ -103,6 +113,10 @@ pub async fn settings_update(Json(body): Json<SettingsUpdateBody>) -> Response {
     config.browser_channel = body.browser_channel;
     config.browser_executable_path = body.browser_executable_path;
     config.working_dir = body.working_dir;
+    // P1: 可选子配置（前端未传则保留旧值）
+    if let Some(t) = body.timeouts { config.timeouts = t; }
+    if let Some(l) = body.logging { config.logging = l; }
+    if let Some(e) = body.execution { config.execution = e; }
     info!("设置已更新");
     match config.save() {
         Ok(()) => ok_response(serde_json::json!({ "success": true })),

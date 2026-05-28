@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
 import { useTheme, type Theme } from '../composables/useTheme'
 import { setStoredLocale, type Locale } from '@/i18n'
 import pkg from '../../package.json'
+import changelogData from '../assets/changelog.json'
 import Button from '../components/ui/button/Button.vue'
 import Input from '../components/ui/input/Input.vue'
 import Label from '../components/ui/label/Label.vue'
@@ -29,6 +30,11 @@ const localeOptions = computed<{ value: Locale; label: string }[]>(() => [
   { value: 'en-US', label: t('settingsPage.langEn') },
 ])
 
+// ── Settings data ──
+interface TimeoutCfg { http_request_ms: number; browser_page_ms: number; workflow_total_ms: number; node_exec_ms: number }
+interface LogCfg { max_size_mb: number; max_files: number; auto_clean_days: number }
+interface ExecCfg { max_concurrent_runs: number; default_retries: number; retry_delay_ms: number }
+
 const settings = ref({
   theme: 'system',
   language: 'zh-CN',
@@ -36,11 +42,26 @@ const settings = ref({
   log_level: 'info',
   python_path: '',
   browser_channel: 'auto',
+  browser_executable_path: '',
+  working_dir: '',
+  timeouts: { http_request_ms: 30000, browser_page_ms: 60000, workflow_total_ms: 600000, node_exec_ms: 120000 } as TimeoutCfg,
+  logging: { max_size_mb: 50, max_files: 10, auto_clean_days: 30 } as LogCfg,
+  execution: { max_concurrent_runs: 3, default_retries: 0, retry_delay_ms: 1000 } as ExecCfg,
+})
+
+// ── Dirty state tracking ──
+const savedSnapshot = ref('')
+const isDirty = computed(() => {
+  try { return JSON.stringify(settings.value) !== savedSnapshot.value } catch { return false }
 })
 
 const sysInfo = ref<any>(null)
 const saving = ref(false)
 const loading = ref(true)
+
+// ── Changelog ──
+const changelog = changelogData as { version: string; desc: string }[]
+const showChangelog = ref(false)
 
 const browserOptions = computed(() => [
   { value: 'auto', label: t('settingsPage.browserAuto'), desc: t('settingsPage.browserAutoDesc') },
@@ -67,6 +88,11 @@ onMounted(async () => {
   try {
     const s = await safeInvoke<any>('settings_get').catch(() => ({}))
     settings.value = { ...settings.value, ...(s || {}) }
+    // 确保子对象正确合并
+    if (s?.timeouts) settings.value.timeouts = { ...settings.value.timeouts, ...s.timeouts }
+    if (s?.logging) settings.value.logging = { ...settings.value.logging, ...s.logging }
+    if (s?.execution) settings.value.execution = { ...settings.value.execution, ...s.execution }
+    savedSnapshot.value = JSON.stringify(settings.value)
   } catch (e: any) {
     console.warn('Settings load failed, using defaults:', e)
   }
@@ -88,6 +114,7 @@ async function save() {
   saving.value = true
   try {
     await safeInvoke('settings_update', { settings: settings.value })
+    savedSnapshot.value = JSON.stringify(settings.value)
     toast.success(t('toast.saved'))
   } catch (e: any) {
     toast.error(t('error.saveFailed') + ': ' + e)
@@ -96,21 +123,18 @@ async function save() {
   }
 }
 
+// Switch 类型即时保存
+async function toggleAutoStart() {
+  settings.value.auto_start = !settings.value.auto_start
+  await save()
+}
+
 async function openLogDir() {
-  try {
-    await safeInvoke('open_log_dir')
-  } catch (e: any) {
-    toast.error(t('settingsPage.logOpenFailed') + ': ' + e)
-  }
+  try { await safeInvoke('open_log_dir') } catch (e: any) { toast.error(t('settingsPage.logOpenFailed') + ': ' + e) }
 }
 
 async function clearLogs() {
-  try {
-    await safeInvoke('clear_logs')
-    toast.success(t('settingsPage.logCleared'))
-  } catch (e: any) {
-    toast.error(t('settingsPage.logClearFailed') + ': ' + e)
-  }
+  try { await safeInvoke('clear_logs'); toast.success(t('settingsPage.logCleared')) } catch (e: any) { toast.error(t('settingsPage.logClearFailed') + ': ' + e) }
 }
 
 function truncatePath(path: string, maxLen: number): string {
@@ -130,10 +154,14 @@ function downloadSkill() {
   URL.revokeObjectURL(url)
   toast.success(t('settingsPage.skillDownloaded'))
 }
+
+function resetTimeouts() { settings.value.timeouts = { http_request_ms: 30000, browser_page_ms: 60000, workflow_total_ms: 600000, node_exec_ms: 120000 } }
+function resetLogging() { settings.value.logging = { max_size_mb: 50, max_files: 10, auto_clean_days: 30 } }
+function resetExecution() { settings.value.execution = { max_concurrent_runs: 3, default_retries: 0, retry_delay_ms: 1000 } }
 </script>
 
 <template>
-  <div class="max-w-[640px] mx-auto px-5 py-6">
+  <div class="max-w-[640px] mx-auto px-5 py-6 pb-20">
     <!-- Header -->
     <header class="mb-6">
       <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← {{ t('common.back') }}</Button>
@@ -144,22 +172,19 @@ function downloadSkill() {
     <div v-if="loading" class="text-center py-10 text-muted-foreground">{{ t('common.loading') }}</div>
 
     <div v-else class="space-y-4">
-      <!-- Appearance -->
+      <!-- ═══ Appearance ═══ -->
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-1.5">🎨 {{ t('settingsPage.appearance') }}</h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.theme') }}</p>
           <div class="grid grid-cols-3 gap-3">
             <Button
-              v-for="opt in themeOptions"
-              :key="opt.value"
+              v-for="opt in themeOptions" :key="opt.value"
               variant="outline"
               :aria-pressed="currentTheme === opt.value"
               :class="cn(
                 'flex flex-col items-center gap-2 p-4 h-auto border-2',
-                currentTheme === opt.value
-                  ? 'border-primary bg-primary/5 shadow-sm'
-                  : 'border-border hover:border-primary/50',
+                currentTheme === opt.value ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/50',
               )"
               @click="setTheme(opt.value)"
             >
@@ -171,51 +196,38 @@ function downloadSkill() {
         </div>
       </Card>
 
-      <!-- Language -->
+      <!-- ═══ Language ═══ -->
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 {{ t('settingsPage.language') }}</h2>
           <div class="flex gap-2">
             <Button
-              v-for="opt in localeOptions"
-              :key="opt.value"
-              variant="outline"
-              size="sm"
+              v-for="opt in localeOptions" :key="opt.value"
+              variant="outline" size="sm"
               :aria-pressed="locale === opt.value"
-              :class="cn(
-                'px-4',
-                locale === opt.value
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-border',
-              )"
+              :class="cn('px-4', locale === opt.value ? 'border-primary bg-primary/5 text-primary' : 'border-border')"
               @click="setLocale(opt.value)"
-            >
-              {{ opt.label }}
-            </Button>
+            >{{ opt.label }}</Button>
           </div>
         </div>
       </Card>
 
-      <!-- Browser settings -->
+      <!-- ═══ Browser ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.browserNode') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 {{ t('settingsPage.browserNode') }}</h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.browserAutoDesc') }}</p>
 
           <div class="space-y-2 mb-4">
             <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserNode') }}</Label>
             <div class="flex flex-col gap-2" role="radiogroup" aria-label="Browser channel">
               <button
-                v-for="(opt, idx) in browserOptions"
-                :key="opt.value"
-                role="radio"
-                :aria-checked="settings.browser_channel === opt.value"
+                v-for="(opt, idx) in browserOptions" :key="opt.value"
+                role="radio" :aria-checked="settings.browser_channel === opt.value"
                 :tabindex="settings.browser_channel === opt.value ? 0 : -1"
                 :class="cn(
                   'flex items-start gap-2.5 px-3 py-2.5 border rounded-md cursor-pointer transition-colors text-left',
-                  settings.browser_channel === opt.value
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary',
+                  settings.browser_channel === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary',
                 )"
                 @click="settings.browser_channel = opt.value"
                 @keydown.up.prevent="browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value !== opt.value && (settings.browser_channel = browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value)"
@@ -232,6 +244,13 @@ function downloadSkill() {
             </div>
           </div>
 
+          <!-- P0-1: Browser executable path -->
+          <div class="space-y-1.5 mb-4">
+            <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserExecPath') }}</Label>
+            <Input v-model="settings.browser_executable_path" :placeholder="t('settingsPage.browserExecPathPlaceholder')" class="h-8 text-xs" />
+            <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.browserExecPathHint') }}</p>
+          </div>
+
           <!-- System check -->
           <div v-if="sysInfo" class="mt-4 p-3 bg-background rounded-md">
             <h3 class="text-xs text-muted-foreground mb-2.5 flex items-center gap-2">
@@ -241,7 +260,6 @@ function downloadSkill() {
               </Badge>
             </h3>
             <div class="flex flex-col gap-1.5">
-              <!-- Python -->
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">{{ t('settingsPage.envPython') }}</span>
                 <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
@@ -256,16 +274,12 @@ function downloadSkill() {
                 {{ t('settingsPage.installPython') }}
                 <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">Download</a>
               </div>
-
-              <!-- Playwright -->
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">{{ t('settingsPage.envPlaywright') }}</span>
                 <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
                   {{ sysInfo.has_playwright_pkg ? t('settingsPage.envInstalled') : t('settingsPage.envAutoInstall') }}
                 </span>
               </div>
-
-              <!-- Browser -->
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">{{ t('settingsPage.envBrowser') }}</span>
                 <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
@@ -291,44 +305,143 @@ function downloadSkill() {
         </div>
       </Card>
 
-      <!-- Advanced settings -->
+      <!-- ═══ P1: Execution Engine ═══ -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">⚙️ {{ t('settingsPage.executionEngine') }}</h2>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.executionEngineDesc') }}</p>
+
+          <!-- Timeouts -->
+          <div class="space-y-3 mb-4">
+            <h3 class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.timeouts') }}</h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.timeoutHttpRequest') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.timeouts.http_request_ms" class="h-8 text-xs" min="1000" step="1000" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">ms</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.timeoutBrowserPage') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.timeouts.browser_page_ms" class="h-8 text-xs" min="1000" step="1000" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">ms</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.timeoutWorkflowTotal') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.timeouts.workflow_total_ms" class="h-8 text-xs" min="0" step="60000" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">ms</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.timeoutNodeExec') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.timeouts.node_exec_ms" class="h-8 text-xs" min="1000" step="1000" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">ms</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.timeoutZeroHint') }}</p>
+            <Button variant="ghost" size="sm" class="text-xs" @click="resetTimeouts">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+          </div>
+
+          <!-- Concurrency & Retry -->
+          <div class="space-y-3 pt-3 border-t border-border">
+            <h3 class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.concurrencyRetry') }}</h3>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.maxConcurrentRuns') }}</Label>
+                <Input type="number" v-model.number="settings.execution.max_concurrent_runs" class="h-8 text-xs" min="1" max="10" />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.defaultRetries') }}</Label>
+                <Input type="number" v-model.number="settings.execution.default_retries" class="h-8 text-xs" min="0" max="10" />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.retryDelay') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.execution.retry_delay_ms" class="h-8 text-xs" min="100" step="100" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">ms</span>
+                </div>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" class="text-xs" @click="resetExecution">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- ═══ P1: Log Management ═══ -->
+      <Card>
+        <div class="p-5">
+          <h2 class="text-sm font-semibold text-foreground mb-1.5">📋 {{ t('settingsPage.logSection') }}</h2>
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.logHint') }}</p>
+
+          <div class="space-y-3 mb-4">
+            <div class="flex items-center gap-2">
+              <Label class="text-xs text-muted-foreground font-semibold min-w-[80px]">{{ t('settingsPage.logLevel') }}</Label>
+              <Select :model-value="settings.log_level" @update:model-value="v => settings.log_level = v" :options="logLevelOptions" />
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.logMaxSize') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.logging.max_size_mb" class="h-8 text-xs" min="1" max="500" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">MB</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.logMaxFiles') }}</Label>
+                <Input type="number" v-model.number="settings.logging.max_files" class="h-8 text-xs" min="1" max="100" />
+              </div>
+              <div class="space-y-1">
+                <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.logAutoCleanDays') }}</Label>
+                <div class="flex items-center gap-1.5">
+                  <Input type="number" v-model.number="settings.logging.auto_clean_days" class="h-8 text-xs" min="1" max="365" />
+                  <span class="text-[11px] text-muted-foreground whitespace-nowrap">{{ t('settingsPage.days') }}</span>
+                </div>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" class="text-xs" @click="resetLogging">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+          </div>
+
+          <div class="flex gap-2.5 flex-wrap pt-3 border-t border-border">
+            <Button variant="outline" size="sm" @click="openLogDir">{{ t('settingsPage.viewLogFile') }}</Button>
+            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">{{ t('settingsPage.clearLogs') }}</Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- ═══ P0-1: Advanced (Python + Working Dir + Auto-start) ═══ -->
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-4">{{ t('settingsPage.advanced') }}</h2>
-
           <div class="space-y-4">
             <div class="space-y-1.5">
-              <Label class="text-xs text-muted-foreground font-semibold">Python Path (Optional)</Label>
+              <Label class="text-xs text-muted-foreground font-semibold">Python Path</Label>
               <Input v-model="settings.python_path" :placeholder="t('settingsPage.pythonPathPlaceholder')" class="h-8 text-xs" />
               <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.pythonPathHint') }}</p>
             </div>
-
             <div class="space-y-1.5">
-              <Label class="text-xs text-muted-foreground font-semibold">Log level</Label>
-              <Select
-                :model-value="settings.log_level"
-                @update:model-value="v => settings.log_level = v"
-                :options="logLevelOptions"
-              />
+              <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.workingDirectory') }}</Label>
+              <Input v-model="settings.working_dir" :placeholder="t('settingsPage.workingDirPlaceholder')" class="h-8 text-xs" />
+              <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.workingDirHint') }}</p>
             </div>
-
             <div class="flex items-center gap-2.5">
-              <Switch v-model="settings.auto_start" />
+              <Switch :model-value="settings.auto_start" @update:model-value="toggleAutoStart" />
               <Label class="text-sm text-foreground cursor-pointer">Auto-start</Label>
             </div>
           </div>
         </div>
       </Card>
 
-      <!-- Agent integration -->
+      <!-- ═══ Agent Integration ═══ -->
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.agentIntegration') }}</h2>
-          <p class="text-xs text-muted-foreground mb-4">
-            {{ t('settingsPage.agentDesc') }}
-          </p>
-
-          <!-- CLI command preview -->
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.agentDesc') }}</p>
           <div class="bg-muted rounded-md p-3 mb-4 font-mono text-xs space-y-1">
             <div class="text-muted-foreground">{{ t('settingsPage.cliComment1') }}</div>
             <div class="text-foreground">wf-cli list --json</div>
@@ -339,28 +452,12 @@ function downloadSkill() {
             <div class="text-muted-foreground mt-2">{{ t('settingsPage.cliComment4') }}</div>
             <div class="text-foreground">wf-cli schedule list --json</div>
           </div>
-
-          <p class="text-xs text-muted-foreground mb-4">
-            {{ t('settingsPage.cliDocNote') }}
-          </p>
-
+          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.cliDocNote') }}</p>
           <Button variant="outline" size="sm" @click="downloadSkill">{{ t('settingsPage.downloadSkill') }}</Button>
         </div>
       </Card>
 
-      <!-- Log management -->
-      <Card>
-        <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.logSection') }}</h2>
-          <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.logHint') }}</p>
-          <div class="flex gap-2.5 flex-wrap">
-            <Button variant="outline" size="sm" @click="openLogDir">{{ t('settingsPage.viewLogFile') }}</Button>
-            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">{{ t('settingsPage.clearLogs') }}</Button>
-          </div>
-        </div>
-      </Card>
-
-      <!-- Version info -->
+      <!-- ═══ Version + Changelog ═══ -->
       <Card>
         <div class="p-5">
           <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.versionInfo') }}</h2>
@@ -368,35 +465,33 @@ function downloadSkill() {
           <div class="mb-4">
             <Badge variant="default" class="text-sm px-3 py-1">v{{ APP_VERSION }}</Badge>
           </div>
-          <h3 class="text-sm text-foreground mb-2">{{ t('settingsPage.changelog') }}</h3>
-          <div class="space-y-0">
-            <div v-for="(item, i) in [
-              { version: 'v6.9.0', desc: '修复 runCondition 被 parser 抹除 · cursor/loop items 变量解析 · 模板库前端浏览+实例化 · IPC 守护进程状态指示' },
-              { version: 'v6.8.0', desc: 'Shell Command 节点(万能原语) · File Operations 统一容器(10操作+grep) · 节点标准化 · ABCD 四轮交付(35测试)' },
-              { version: 'v6.7.0', desc: 'CLI 执行器升级：支持条件分支、错误恢复(Ignore/Branch)、重试机制、步骤延迟、游标迭代 · Import 读取工作流名称' },
-              { version: 'v6.6.0', desc: 'GitHub 迁移 · 项目结构整理 · CLI 双模入口(独立二进制) · 调度管理' },
-              { version: 'v6.5.0', desc: 'Browser容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素' },
-              { version: 'v6.4.0', desc: '生产风险修复：启动清理/事务保护/HTTP超时/空选择器校验/整体超时 · 帮助文档' },
-              { version: 'v6.3.0', desc: '变量选择器改版（树形分组+点击插入）· 容器内数据流可视化' },
-              { version: 'v6.2.0', desc: '引用系统简化（短ID+稳定引用+端口key统一）' },
-              { version: 'v6.1.1', desc: '审批系统重构（channel暂停/恢复+推荐选项+全局审批队列）· SQLite 持久化' },
-              { version: 'v5.1.1', desc: 'shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计' },
-              { version: 'v5.1.0', desc: 'v5 步骤编辑器正式版 · shadcn-vue 组件体系 · 容器模板系统 · 多容器类型' },
-              { version: 'v5.0', desc: '去掉 LiteGraph · 自研步骤编辑器 · Steps→Actions 模型 · Vue Draggable' },
-              { version: 'v2.x', desc: 'Grid 布局 · LiteGraph 画布 · 模板系统 · Browser自动化' },
-              { version: 'v1.x', desc: 'YAML 工作流引擎原型 · Web 前端 · Playwright 自动化' },
-            ]" :key="item.version"
+          <Button variant="ghost" size="sm" class="text-xs" @click="showChangelog = !showChangelog">
+            {{ showChangelog ? '▾' : '▸' }} {{ t('settingsPage.changelog') }}
+          </Button>
+          <div v-if="showChangelog" class="mt-3 space-y-0">
+            <div
+              v-for="(item, i) in changelog" :key="item.version"
               class="text-xs text-muted-foreground py-1.5"
-              :class="i < 11 ? 'border-b border-border' : ''"
+              :class="i < changelog.length - 1 ? 'border-b border-border' : ''"
             >
               <strong class="text-foreground">{{ item.version }}</strong> — {{ item.desc }}
             </div>
           </div>
         </div>
       </Card>
+    </div>
+  </div>
 
-      <!-- Save bar -->
-      <div class="text-right">
+  <!-- ═══ P0-2: Sticky save bar ═══ -->
+  <div
+    v-if="isDirty"
+    class="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-t border-border px-5 py-3"
+    style="box-shadow: 0 -4px 12px rgba(0,0,0,0.1)"
+  >
+    <div class="max-w-[640px] mx-auto flex items-center justify-between">
+      <span class="text-sm text-muted-foreground">{{ t('settingsPage.unsavedChanges') }}</span>
+      <div class="flex gap-2">
+        <Button variant="outline" size="sm" @click="emit('back')">{{ t('common.cancel') }}</Button>
         <Button
           class="bg-success hover:bg-success/90 text-success-foreground font-semibold"
           :disabled="saving"

@@ -19,6 +19,13 @@ pub struct AppSettings {
     pub browser_executable_path: String,
     /// 软件工作目录
     pub working_dir: String,
+    // ── P1 新增 ──
+    #[serde(default)]
+    pub timeouts: Option<crate::data::config::TimeoutConfig>,
+    #[serde(default)]
+    pub logging: Option<crate::data::config::LogConfig>,
+    #[serde(default)]
+    pub execution: Option<crate::data::config::ExecutionConfig>,
 }
 
 #[tauri::command]
@@ -169,6 +176,9 @@ pub async fn settings_get(
         browser_channel: config.browser_channel.clone(),
         browser_executable_path: config.browser_executable_path.clone(),
         working_dir: config.working_dir.clone(),
+        timeouts: Some(config.timeouts.clone()),
+        logging: Some(config.logging.clone()),
+        execution: Some(config.execution.clone()),
     })
 }
 
@@ -186,6 +196,10 @@ pub async fn settings_update(
     config.browser_channel = settings.browser_channel;
     config.browser_executable_path = settings.browser_executable_path;
     config.working_dir = settings.working_dir;
+    // P1: 可选子配置
+    if let Some(t) = settings.timeouts { config.timeouts = t; }
+    if let Some(l) = settings.logging { config.logging = l; }
+    if let Some(e) = settings.execution { config.execution = e; }
     info!("设置已更新");
     config.save().map_err(|e| e.to_string())
 }

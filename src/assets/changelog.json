@@ -1,0 +1,17 @@
+[
+  { "version": "v7.2.0", "desc": "Schema-First 改造 · 77 节点全可用 · Tauri → axum 服务器化 · Rust 后端 axum · PWA 优先 · 设置增强（P0+P1）" },
+  { "version": "v6.9.0", "desc": "修复 runCondition 被 parser 抹除 · cursor/loop items 变量解析 · 模板库前端浏览+实例化 · IPC 守护进程状态指示" },
+  { "version": "v6.8.0", "desc": "Shell Command 节点(万能原语) · File Operations 统一容器(10操作+grep) · 节点标准化 · ABCD 四轮交付(35测试)" },
+  { "version": "v6.7.0", "desc": "CLI 执行器升级：支持条件分支、错误恢复(Ignore/Branch)、重试机制、步骤延迟、游标迭代 · Import 读取工作流名称" },
+  { "version": "v6.6.0", "desc": "GitHub 迁移 · 项目结构整理 · CLI 双模入口(独立二进制) · 调度管理" },
+  { "version": "v6.5.0", "desc": "Browser容器新增 8 种动作：上传文件/键盘操作/双击/拖拽/右键菜单/iframe切换/弹窗处理/滚动到元素" },
+  { "version": "v6.4.0", "desc": "生产风险修复：启动清理/事务保护/HTTP超时/空选择器校验/整体超时 · 帮助文档" },
+  { "version": "v6.3.0", "desc": "变量选择器改版（树形分组+点击插入）· 容器内数据流可视化" },
+  { "version": "v6.2.0", "desc": "引用系统简化（短ID+稳定引用+端口key统一）" },
+  { "version": "v6.1.1", "desc": "审批系统重构（channel暂停/恢复+推荐选项+全局审批队列）· SQLite 持久化" },
+  { "version": "v5.1.1", "desc": "shadcn-vue 全组件化 · 浅色/深色主题切换 · 单页 Sidebar 布局 · 动作行 Card 重设计" },
+  { "version": "v5.1.0", "desc": "v5 步骤编辑器正式版 · shadcn-vue 组件体系 · 容器模板系统 · 多容器类型" },
+  { "version": "v5.0", "desc": "去掉 LiteGraph · 自研步骤编辑器 · Steps→Actions 模型 · Vue Draggable" },
+  { "version": "v2.x", "desc": "Grid 布局 · LiteGraph 画布 · 模板系统 · Browser自动化" },
+  { "version": "v1.x", "desc": "YAML 工作流引擎原型 · Web 前端 · Playwright 自动化" }
+]
