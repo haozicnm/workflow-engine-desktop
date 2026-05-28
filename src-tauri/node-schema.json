@@ -124,7 +124,7 @@
       "category": "core",
       "icon": "check-circle",
       "is_container": false,
-      "desc": "暂停执行等待人工审批",
+      "desc": "暂停执行等待人工审批，recommended 支持变量引用（如 {{step_check.branch}}）",
       "inputs": [],
       "outputs": [
         {
@@ -137,7 +137,18 @@
           "data_type": "text",
           "desc": "审批意见"
         }
-      ]
+      ],
+      "params": {
+        "title": "审批标题",
+        "message": "审批消息，支持 {{step_x.field}} 变量",
+        "options": "逗号分隔选项（默认：同意,拒绝）",
+        "recommended": "推荐选项，支持 {{step_x.branch}} 从条件节点读取",
+        "require_review": "true=人工审批（默认）, false=自动用 recommended 决策",
+        "timeout": "超时秒数（默认 300）",
+        "timeout_action": "超时动作：recommended/reject/approve",
+        "timeout_behavior": "auto=超时自动（默认）, manual=永不过期",
+        "data_source": "上游步骤 ID，用于 item 上下文"
+      }
     },
     {
       "type": "web_scrape",

@@ -1,6 +1,6 @@
 {
   "name": "file-batch-approval",
-  "description": "【教学模板 ③】智能文件审批管道 — 文件扫描→条件筛选→逐项审批（条件推荐）→归档通知。演示 Cursor 游标迭代、approval_conditions 条件推荐、runCondition 分支。",
+  "description": "【教学模板 ③】智能文件审批管道 — 文件扫描→条件筛选→逐项审批（条件推荐）→归档通知。演示 Cursor 游标迭代、condition → approval 变量引用、runCondition 分支。",
   "params": {
     "data_dir": "C:\\Users\\haozi\\AppData\\Local\\Temp\\wf-approval-batch",
     "file_pattern": "doc-*.txt",
@@ -120,17 +120,11 @@
           }
         },
         {
-          "id": "body_5_3",
-          "type": "approval",
+          "id": "body_5_3_cond",
+          "name": "条件评估",
+          "type": "condition",
           "config": {
-            "title": "文件审批: {{__item.file}}",
-            "message": "风险等级: {{__item.risk_level}}\n风险评分: {{body_5_2.risk_score}}分\n内容预览: {{body_5_2.preview}}",
-            "options": "同意发布,拒绝发布,需修改后重审",
-            "require_review": false,
-            "timeout": "{{params.approval_timeout_ms}}",
-            "timeout_behavior": "auto",
-            "timeout_action": "recommended",
-            "approval_conditions": [
+            "conditions": [
               {
                 "id": "ac1",
                 "left": "{{body_5_2.risk_score}}",
@@ -143,7 +137,25 @@
                 "op": "equals",
                 "right": "false"
               }
-            ]
+            ],
+            "branches": {
+              "true": "同意发布",
+              "false": "需修改后重审"
+            }
+          }
+        },
+        {
+          "id": "body_5_3",
+          "type": "approval",
+          "config": {
+            "title": "文件审批: {{__item.file}}",
+            "message": "风险等级: {{__item.risk_level}}\n风险评分: {{body_5_2.risk_score}}分\n内容预览: {{body_5_2.preview}}",
+            "options": "同意发布,拒绝发布,需修改后重审",
+            "require_review": false,
+            "timeout": "{{params.approval_timeout_ms}}",
+            "timeout_behavior": "auto",
+            "timeout_action": "recommended",
+            "recommended": "{{body_5_3_cond.branch}}"
           }
         },
         {

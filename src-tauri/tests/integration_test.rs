@@ -1031,10 +1031,31 @@ async fn test_approval_with_conditions_auto() {
     );
     let mut ctx = ExecutionContext::new("test-approval-auto", &Default::default());
 
-    // 设置上下文数据（模拟上游步骤输出）
-    // 注意：approval_conditions 的 right 是字符串，left 也应为字符串以确保类型一致
+    // Step 1: 条件节点评估 quality >= 60
     ctx.set_var("quality".to_string(), json!("85"));
+    let cond_step = make_step(
+        "cond_1",
+        "条件评估",
+        "condition",
+        json!({
+            "condition_group": {
+                "combinator": "and",
+                "conditions": [
+                    {"id": "c1", "left": "{{quality}}", "op": "gte", "right": "60"}
+                ]
+            }
+        }),
+    );
+    let cond_result = exec.execute(&cond_step, &mut ctx).await;
+    assert!(cond_result.is_ok(), "Condition failed: {:?}", cond_result.err());
+    let cond_out = cond_result.unwrap();
+    assert_eq!(cond_out["branch"].as_str(), Some("true"));
+    assert_eq!(cond_out["result"].as_bool(), Some(true));
+    // 将条件结果存入上下文，供审批节点引用
+    ctx.set_output("cond_1", cond_out.clone());
 
+    // Step 2: 审批节点引用条件结果（require_review=false → 自动决策）
+    // 条件节点的 branch 输出是 "true"/"false"，审批节点的 options 和 recommended 要对齐
     let approval_step = make_step(
         "step_1",
         "审批",
@@ -1042,15 +1063,12 @@ async fn test_approval_with_conditions_auto() {
         json!({
             "title": "质量审批",
             "message": "质量评分: {{quality}}",
-            "options": "通过,驳回,需修改",
-            "recommended": "通过",
+            "options": "true,false",
+            "recommended": "{{cond_1.branch}}",
             "require_review": false,
             "timeout": 5,
             "timeout_behavior": "auto",
-            "timeout_action": "recommended",
-            "approval_conditions": [
-                {"id": "ac1", "left": "{{quality}}", "op": "gte", "right": "60"}
-            ]
+            "timeout_action": "recommended"
         }),
     );
 
@@ -1058,18 +1076,18 @@ async fn test_approval_with_conditions_auto() {
     assert!(result.is_ok(), "Approval auto failed: {:?}", result.err());
     let out = result.unwrap();
 
-    // require_review=false → 自动决策
+    // require_review=false → 自动决策，recommended={{cond_1.branch}}="true"
     assert_eq!(
         out["decision"].as_str(),
-        Some("通过"),
-        "Should auto-approve with quality >= 60"
+        Some("true"),
+        "Should auto-approve: condition branch=true → recommended=true"
     );
     assert!(
         out["comment"].as_str().unwrap_or("").contains("无需审核"),
         "Comment should mention auto decision"
     );
 
-    println!("✅ Approval auto with conditions OK");
+    println!("✅ Approval auto with condition → variable reference OK");
 }
 
 #[tokio::test]

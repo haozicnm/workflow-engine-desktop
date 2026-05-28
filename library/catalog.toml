@@ -22,7 +22,7 @@ file = "monitoring/daily-monitor.wf.json"
 [[templates]]
 name = "file-batch-approval"
 version = "2.0.0"
-description = "【教学模板 ③】智能文件审批管道 — Shell创建→文件扫描→脚本分析→条件预判→Cursor游标迭代→文件读取→风险评估→条件审批(approval_conditions动态推荐)→双分支归档→结果统计→通知。演示游标迭代、条件审批、runCondition分支归档。"
+description = "【教学模板 ③】智能文件审批管道 — Shell创建→文件扫描→脚本分析→条件预判→Cursor游标迭代→文件读取→风险评估→条件审批(condition → approval 变量引用)→双分支归档→结果统计→通知。演示游标迭代、条件审批、runCondition分支归档。"
 params = ["data_dir", "file_pattern", "approval_timeout_ms"]
 schedule = ""
 category = "batch"
@@ -31,7 +31,7 @@ file = "batch/file-batch-approval.wf.json"
 [[templates]]
 name = "http-approval-pipeline"
 version = "2.0.0"
-description = "【教学模板 ④】API数据审批决策链 — HTTP获取→JSON解析→脚本质量评估→条件预筛选→人工审批(条件推荐+auto超时)→逻辑判断→双分支处理(归档/日志)→分级通知。演示approval_conditions动态推荐、timeout_behavior、runCondition多分支。"
+description = "【教学模板 ④】API数据审批决策链 — HTTP获取→JSON解析→脚本质量评估→条件预筛选→人工审批(条件推荐+auto超时)→逻辑判断→双分支处理(归档/日志)→分级通知。演示condition → approval 变量引用、timeout_behavior、runCondition多分支。"
 params = ["api_url", "approval_timeout_ms", "notify_title", "work_dir"]
 schedule = ""
 category = "batch"
