@@ -398,6 +398,10 @@ fn find_windows_python() -> Result<std::path::PathBuf> {
 static SIDECAR: RwLock<Option<Arc<BrowserSidecar>>> = RwLock::const_new(None);
 /// 最近一次心跳结果（供 /api/sidecar/health 读取）
 static LAST_HEARTBEAT: RwLock<Option<HeartbeatInfo>> = RwLock::const_new(None);
+/// 最近一次 sidecar 被使用的时间（epoch secs），用于 idle timeout
+static LAST_USED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// 空闲超时秒数：超过此时间未使用则自动关闭 sidecar
+const SIDECAR_IDLE_TIMEOUT_SECS: u64 = 300; // 5 分钟
 
 #[derive(Clone, serde::Serialize)]
 pub struct HeartbeatInfo {
@@ -463,6 +467,34 @@ async fn sidecar_heartbeat_loop() {
             *hb = Some(info.clone());
         }
 
+        // ── 空闲超时检查：超过 SIDECAR_IDLE_TIMEOUT_SECS 未使用则自动关闭 ──
+        let last_used = LAST_USED.load(std::sync::atomic::Ordering::Relaxed);
+        if last_used > 0 {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            if now.saturating_sub(last_used) > SIDECAR_IDLE_TIMEOUT_SECS {
+                info!(
+                    "Sidecar 空闲超过 {}s，自动关闭释放资源",
+                    SIDECAR_IDLE_TIMEOUT_SECS
+                );
+                let mut guard = SIDECAR.write().await;
+                if let Some(ref sidecar) = *guard {
+                    // 先发 shutdown 让 Playwright 优雅退出
+                    let _ = sidecar
+                        .send_action_inner("shutdown", serde_json::json!({}))
+                        .await;
+                    // kill 进程树（包括 Chromium 子进程）
+                    kill_process_tree(sidecar).await;
+                }
+                *guard = None;
+                LAST_USED.store(0, std::sync::atomic::Ordering::Relaxed);
+                drop(guard);
+                continue;
+            }
+        }
+
         // 心跳失败 → 自动重启
         if !info.healthy {
             warn!(
@@ -492,6 +524,32 @@ async fn sidecar_heartbeat_loop() {
                 }
             }
         }
+    }
+}
+
+/// kill 进程树：包括 Python 子进程和 Chromium 孙进程
+async fn kill_process_tree(sidecar: &BrowserSidecar) {
+    let mut child_guard = sidecar.child.lock().await;
+    if let Some(ref mut child) = *child_guard {
+        if let Some(pid) = child.id() {
+            #[cfg(target_os = "windows")]
+            {
+                // taskkill /T 杀整个进程树（Python + Chromium）
+                let _ = tokio::process::Command::new("taskkill")
+                    .args(["/T", "/F", "/PID", &pid.to_string()])
+                    .output()
+                    .await;
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                // kill 进程组（负 PID = 进程组）
+                let _ = std::process::Command::new("kill")
+                    .args(["--", &format!("-{}", pid)])
+                    .output();
+            }
+        }
+        // 兜底：直接 kill
+        let _ = child.kill().await;
     }
 }
 
@@ -779,6 +837,15 @@ pub async fn send_sidecar_action(
         let launch_params = serde_json::json!({"headless": headless});
         let _ = sidecar.send_action("launch", launch_params).await;
     }
+
+    // 记录使用时间（用于 idle timeout）
+    LAST_USED.store(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        std::sync::atomic::Ordering::Relaxed,
+    );
 
     sidecar.send_action(action, params.clone()).await
 }
