@@ -41,8 +41,11 @@ pub async fn run_start(
     app.db.create_run(&run_id, &workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
-    // 4. 读取浏览器通道设置
-    let browser_channel = app.config.read().await.browser_channel.clone();
+    // 4. 读取浏览器通道设置 + 超时配置
+    let config_guard = app.config.read().await;
+    let browser_channel = config_guard.browser_channel.clone();
+    let timeouts = config_guard.timeouts.clone();
+    drop(config_guard);
 
     // 5. 创建取消令牌（支持结构化取消 + AtomicBool 兼容）
     let cancel_flag = Arc::new(AtomicBool::new(false));
@@ -98,12 +101,17 @@ pub async fn run_start(
             step_mode_flag,
             debug_snapshots,
         };
-        // 全局超时（默认 30 分钟）
-        let global_timeout = std::time::Duration::from_secs(30 * 60);
+        // 全局超时（从配置读取，默认 10 分钟，0=不限）
+        let global_timeout_ms = timeouts.workflow_total_ms;
+        let global_timeout = if global_timeout_ms == 0 {
+            std::time::Duration::from_secs(365 * 24 * 3600)
+        } else {
+            std::time::Duration::from_millis(global_timeout_ms)
+        };
         let result = tokio::time::timeout(
             global_timeout,
             crate::engine::scheduler::run_workflow(
-                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl,
+                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl, &timeouts,
             ),
         ).await;
         let result = match result {

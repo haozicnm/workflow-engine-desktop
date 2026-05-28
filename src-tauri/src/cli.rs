@@ -421,6 +421,7 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
     let total = workflow.steps.len();
     println!("▶ {} (共 {} 步)", workflow_name, total);
     let start = std::time::Instant::now();
+    let timeouts = app.config.read().await.timeouts.clone();
 
     // 委托 scheduler::run_workflow 执行（CLI 模式不传 app_handle → 无 Tauri 事件推送）
     let result = scheduler::run_workflow(
@@ -432,6 +433,7 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         "auto", // browser_channel: CLI 默认 auto
         vars,
         &ctrl,
+        &timeouts,
     )
     .await;
 
@@ -1726,6 +1728,7 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
     let total = workflow.steps.len();
     println!("  {} (共 {} 步)", workflow_name, total);
     let start = std::time::Instant::now();
+    let timeouts = app.config.read().await.timeouts.clone();
 
     let result = scheduler::run_workflow(
         &workflow,
@@ -1736,6 +1739,7 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
         "auto",
         vars,
         &ctrl,
+        &timeouts,
     )
     .await;
 

@@ -19,6 +19,8 @@ pub struct ExecutionContext {
     pub input_ports: HashMap<String, serde_json::Value>,
     /// v4.1: 容器 session 管理 — node_id → session 信息
     pub sessions: HashMap<String, ContainerSession>,
+    /// 全局默认超时配置（节点可从这里获取回退值）
+    pub default_timeouts: crate::data::config::TimeoutConfig,
 }
 
 /// 容器 session 状态
@@ -48,6 +50,7 @@ impl ExecutionContext {
             browser_executable_path: String::new(),
             input_ports: HashMap::new(),
             sessions: HashMap::new(),
+            default_timeouts: crate::data::config::TimeoutConfig::default(),
         }
     }
 

@@ -68,8 +68,13 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
         return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
     }
 
-    // 4. 读取浏览器通道设置
-    let browser_channel = app.config.read().await.browser_channel.clone();
+    // 4. 读取浏览器通道设置 + 超时配置
+    let config_guard = app.config.read().await;
+    let browser_channel = config_guard.browser_channel.clone();
+    let timeouts = config_guard.timeouts.clone();
+    let max_retries = config_guard.execution.default_retries;
+    let retry_delay_ms = config_guard.execution.retry_delay_ms;
+    drop(config_guard);
 
     // 5. 创建取消/暂停/断点/单步标志
     use std::sync::atomic::AtomicBool;
@@ -145,7 +150,12 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
             step_mode_flag,
             debug_snapshots,
         };
-        let global_timeout = std::time::Duration::from_secs(30 * 60);
+        let global_timeout_ms = timeouts.workflow_total_ms;
+        let global_timeout = if global_timeout_ms == 0 {
+            std::time::Duration::from_secs(365 * 24 * 3600) // effectively unlimited
+        } else {
+            std::time::Duration::from_millis(global_timeout_ms)
+        };
         let result = tokio::time::timeout(
             global_timeout,
             crate::engine::scheduler::run_workflow(
@@ -157,6 +167,7 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
                 &browser_channel,
                 &[],
                 &ctrl,
+                &timeouts,
             ),
         )
         .await;

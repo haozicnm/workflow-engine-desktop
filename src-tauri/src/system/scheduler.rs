@@ -120,15 +120,16 @@ async fn start_scheduled_run(
         warn!("emit run-update failed: {}", e);
     }
 
-    // 读取浏览器通道设置
+    // 读取浏览器通道设置 + 超时配置
     use tauri::Manager;
-    let browser_channel = app_handle
+    let config_guard = app_handle
         .state::<crate::App>()
         .config
         .read()
-        .await
-        .browser_channel
-        .clone();
+        .await;
+    let browser_channel = config_guard.browser_channel.clone();
+    let timeouts = config_guard.timeouts.clone();
+    drop(config_guard);
 
     let run_id_clone = run_id.clone();
     let db_clone = db.clone();
@@ -159,6 +160,7 @@ async fn start_scheduled_run(
             &browser_channel,
             &[],
             &ctrl,
+            &timeouts,
         )
         .await
         {

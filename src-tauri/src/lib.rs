@@ -119,10 +119,7 @@ impl App {
         }
 
         let config = data::config::AppConfig::load_default().unwrap_or_default();
-        let max_concurrent = std::env::var("MAX_CONCURRENT_WORKFLOWS")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(10);
+        let max_concurrent = config.execution.max_concurrent_runs as usize;
 
         Ok(App {
             db: Arc::new(db),
