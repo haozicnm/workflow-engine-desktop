@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
@@ -88,7 +88,6 @@ onMounted(async () => {
   try {
     const s = await safeInvoke<any>('settings_get').catch(() => ({}))
     settings.value = { ...settings.value, ...(s || {}) }
-    // 确保子对象正确合并
     if (s?.timeouts) settings.value.timeouts = { ...settings.value.timeouts, ...s.timeouts }
     if (s?.logging) settings.value.logging = { ...settings.value.logging, ...s.logging }
     if (s?.execution) settings.value.execution = { ...settings.value.execution, ...s.execution }
@@ -123,7 +122,6 @@ async function save() {
   }
 }
 
-// Switch 类型即时保存
 async function toggleAutoStart() {
   settings.value.auto_start = !settings.value.auto_start
   await save()
@@ -164,7 +162,10 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
   <div class="max-w-[640px] mx-auto px-5 py-6 pb-20">
     <!-- Header -->
     <header class="mb-6">
-      <Button variant="outline" size="sm" class="mb-2 text-xs" @click="emit('back')">← {{ t('common.back') }}</Button>
+      <Button variant="outline" size="sm" class="mb-2 text-xs gap-1" @click="emit('back')">
+        <ActionIcon name="ArrowLeft" cls="w-3.5 h-3.5" />
+        {{ t('common.back') }}
+      </Button>
       <h1 class="text-xl font-bold text-foreground">{{ t('settingsPage.title') }}</h1>
       <p class="text-sm text-muted-foreground">{{ t('settingsPage.general') }}</p>
     </header>
@@ -175,7 +176,10 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
       <!-- ═══ Appearance ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🎨 {{ t('settingsPage.appearance') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Palette" cls="w-4 h-4" />
+            {{ t('settingsPage.appearance') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.theme') }}</p>
           <div class="grid grid-cols-3 gap-3">
             <Button
@@ -199,7 +203,10 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
       <!-- ═══ Language ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 {{ t('settingsPage.language') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Globe" cls="w-4 h-4" />
+            {{ t('settingsPage.language') }}
+          </h2>
           <div class="flex gap-2">
             <Button
               v-for="opt in localeOptions" :key="opt.value"
@@ -215,7 +222,10 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
       <!-- ═══ Browser ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">🌐 {{ t('settingsPage.browserNode') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Globe" cls="w-4 h-4" />
+            {{ t('settingsPage.browserNode') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.browserAutoDesc') }}</p>
 
           <div class="space-y-2 mb-4">
@@ -244,7 +254,7 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
             </div>
           </div>
 
-          <!-- P0-1: Browser executable path -->
+          <!-- Browser executable path -->
           <div class="space-y-1.5 mb-4">
             <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserExecPath') }}</Label>
             <Input v-model="settings.browser_executable_path" :placeholder="t('settingsPage.browserExecPathPlaceholder')" class="h-8 text-xs" />
@@ -272,7 +282,7 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
               </div>
               <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
                 {{ t('settingsPage.installPython') }}
-                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">Download</a>
+                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">{{ t('settingsPage.downloadLink') }}</a>
               </div>
               <div class="flex justify-between items-center text-xs">
                 <span class="text-foreground">{{ t('settingsPage.envPlaywright') }}</span>
@@ -305,15 +315,21 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
         </div>
       </Card>
 
-      <!-- ═══ P1: Execution Engine ═══ -->
+      <!-- ═══ Execution Engine ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">⚙️ {{ t('settingsPage.executionEngine') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Settings" cls="w-4 h-4" />
+            {{ t('settingsPage.executionEngine') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.executionEngineDesc') }}</p>
 
           <!-- Timeouts -->
           <div class="space-y-3 mb-4">
-            <h3 class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.timeouts') }}</h3>
+            <h3 class="text-xs text-muted-foreground font-semibold flex items-center gap-1.5">
+              <ActionIcon name="Clock" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.timeouts') }}
+            </h3>
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1">
                 <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.timeoutHttpRequest') }}</Label>
@@ -345,12 +361,18 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
               </div>
             </div>
             <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.timeoutZeroHint') }}</p>
-            <Button variant="ghost" size="sm" class="text-xs" @click="resetTimeouts">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+            <Button variant="ghost" size="sm" class="text-xs gap-1" @click="resetTimeouts">
+              <ActionIcon name="RotateCcw" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.resetDefaults') }}
+            </Button>
           </div>
 
           <!-- Concurrency & Retry -->
           <div class="space-y-3 pt-3 border-t border-border">
-            <h3 class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.concurrencyRetry') }}</h3>
+            <h3 class="text-xs text-muted-foreground font-semibold flex items-center gap-1.5">
+              <ActionIcon name="Repeat" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.concurrencyRetry') }}
+            </h3>
             <div class="grid grid-cols-3 gap-3">
               <div class="space-y-1">
                 <Label class="text-[11px] text-muted-foreground">{{ t('settingsPage.maxConcurrentRuns') }}</Label>
@@ -368,15 +390,21 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
                 </div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" class="text-xs" @click="resetExecution">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+            <Button variant="ghost" size="sm" class="text-xs gap-1" @click="resetExecution">
+              <ActionIcon name="RotateCcw" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.resetDefaults') }}
+            </Button>
           </div>
         </div>
       </Card>
 
-      <!-- ═══ P1: Log Management ═══ -->
+      <!-- ═══ Log Management ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">📋 {{ t('settingsPage.logSection') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="FileText" cls="w-4 h-4" />
+            {{ t('settingsPage.logSection') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.logHint') }}</p>
 
           <div class="space-y-3 mb-4">
@@ -404,23 +432,35 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
                 </div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" class="text-xs" @click="resetLogging">↺ {{ t('settingsPage.resetDefaults') }}</Button>
+            <Button variant="ghost" size="sm" class="text-xs gap-1" @click="resetLogging">
+              <ActionIcon name="RotateCcw" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.resetDefaults') }}
+            </Button>
           </div>
 
           <div class="flex gap-2.5 flex-wrap pt-3 border-t border-border">
-            <Button variant="outline" size="sm" @click="openLogDir">{{ t('settingsPage.viewLogFile') }}</Button>
-            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10" @click="clearLogs">{{ t('settingsPage.clearLogs') }}</Button>
+            <Button variant="outline" size="sm" class="gap-1" @click="openLogDir">
+              <ActionIcon name="FolderOpen" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.viewLogFile') }}
+            </Button>
+            <Button variant="outline" size="sm" class="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1" @click="clearLogs">
+              <ActionIcon name="Trash2" cls="w-3.5 h-3.5" />
+              {{ t('settingsPage.clearLogs') }}
+            </Button>
           </div>
         </div>
       </Card>
 
-      <!-- ═══ P0-1: Advanced (Python + Working Dir + Auto-start) ═══ -->
+      <!-- ═══ Advanced ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-4">{{ t('settingsPage.advanced') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <ActionIcon name="Settings" cls="w-4 h-4" />
+            {{ t('settingsPage.advanced') }}
+          </h2>
           <div class="space-y-4">
             <div class="space-y-1.5">
-              <Label class="text-xs text-muted-foreground font-semibold">Python Path</Label>
+              <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.pythonPath') }}</Label>
               <Input v-model="settings.python_path" :placeholder="t('settingsPage.pythonPathPlaceholder')" class="h-8 text-xs" />
               <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.pythonPathHint') }}</p>
             </div>
@@ -431,7 +471,7 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
             </div>
             <div class="flex items-center gap-2.5">
               <Switch :model-value="settings.auto_start" @update:model-value="toggleAutoStart" />
-              <Label class="text-sm text-foreground cursor-pointer">Auto-start</Label>
+              <Label class="text-sm text-foreground cursor-pointer">{{ t('settingsPage.autoStart') }}</Label>
             </div>
           </div>
         </div>
@@ -440,7 +480,10 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
       <!-- ═══ Agent Integration ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.agentIntegration') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Terminal" cls="w-4 h-4" />
+            {{ t('settingsPage.agentIntegration') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.agentDesc') }}</p>
           <div class="bg-muted rounded-md p-3 mb-4 font-mono text-xs space-y-1">
             <div class="text-muted-foreground">{{ t('settingsPage.cliComment1') }}</div>
@@ -453,20 +496,27 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
             <div class="text-foreground">wf-cli schedule list --json</div>
           </div>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.cliDocNote') }}</p>
-          <Button variant="outline" size="sm" @click="downloadSkill">{{ t('settingsPage.downloadSkill') }}</Button>
+          <Button variant="outline" size="sm" class="gap-1" @click="downloadSkill">
+            <ActionIcon name="Download" cls="w-3.5 h-3.5" />
+            {{ t('settingsPage.downloadSkill') }}
+          </Button>
         </div>
       </Card>
 
       <!-- ═══ Version + Changelog ═══ -->
       <Card>
         <div class="p-5">
-          <h2 class="text-sm font-semibold text-foreground mb-1.5">{{ t('settingsPage.versionInfo') }}</h2>
+          <h2 class="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+            <ActionIcon name="Info" cls="w-4 h-4" />
+            {{ t('settingsPage.versionInfo') }}
+          </h2>
           <p class="text-xs text-muted-foreground mb-4">{{ t('settingsPage.versionHint') }}</p>
           <div class="mb-4">
             <Badge variant="default" class="text-sm px-3 py-1">v{{ APP_VERSION }}</Badge>
           </div>
-          <Button variant="ghost" size="sm" class="text-xs" @click="showChangelog = !showChangelog">
-            {{ showChangelog ? '▾' : '▸' }} {{ t('settingsPage.changelog') }}
+          <Button variant="ghost" size="sm" class="text-xs gap-1" @click="showChangelog = !showChangelog">
+            <ActionIcon :name="showChangelog ? 'ChevronDown' : 'ChevronRight'" cls="w-3.5 h-3.5" />
+            {{ t('settingsPage.changelog') }}
           </Button>
           <div v-if="showChangelog" class="mt-3 space-y-0">
             <div
@@ -482,21 +532,26 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
     </div>
   </div>
 
-  <!-- ═══ P0-2: Sticky save bar ═══ -->
+  <!-- ═══ Sticky save bar ═══ -->
   <div
     v-if="isDirty"
     class="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-t border-border px-5 py-3"
     style="box-shadow: 0 -4px 12px rgba(0,0,0,0.1)"
   >
     <div class="max-w-[640px] mx-auto flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">{{ t('settingsPage.unsavedChanges') }}</span>
+      <span class="text-sm text-muted-foreground flex items-center gap-1.5">
+        <ActionIcon name="Info" cls="w-4 h-4" />
+        {{ t('settingsPage.unsavedChanges') }}
+      </span>
       <div class="flex gap-2">
         <Button variant="outline" size="sm" @click="emit('back')">{{ t('common.cancel') }}</Button>
         <Button
-          class="bg-success hover:bg-success/90 text-success-foreground font-semibold"
+          class="bg-success hover:bg-success/90 text-success-foreground font-semibold gap-1"
           :disabled="saving"
           @click="save"
         >
+          <ActionIcon v-if="!saving" name="Save" cls="w-3.5 h-3.5" />
+          <ActionIcon v-else name="Loader" cls="w-3.5 h-3.5 animate-spin" />
           {{ saving ? t('settingsPage.saving') : t('settingsPage.saveSettings') }}
         </Button>
       </div>

@@ -23,6 +23,7 @@ import {
   Network,
   FileCheck,
   CodeXml, Braces, ListFilter, Replace, GitMerge,
+  Palette, RotateCcw,
 } from 'lucide-vue-next'
 
 
@@ -138,5 +139,7 @@ withDefaults(defineProps<{
   <ListFilter v-else-if="name === 'Filter'" :class="cls" />
   <Replace v-else-if="name === 'Replace'" :class="cls" />
   <GitMerge v-else-if="name === 'GitMerge'" :class="cls" />
+  <Palette v-else-if="name === 'Palette'" :class="cls" />
+  <RotateCcw v-else-if="name === 'RotateCcw'" :class="cls" />
   <span v-else :class="cls || 'text-base'" class="inline-flex items-center justify-center">{{ name }}</span>
 </template>

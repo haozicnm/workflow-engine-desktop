@@ -451,6 +451,9 @@ export default {
     days: 'days',
     workingDirPlaceholder: 'Leave empty for default path',
     unsavedChanges: 'Unsaved changes',
+    autoStart: 'Auto-start',
+    pythonPath: 'Python Path',
+    downloadLink: 'Download',
   },
 
   error: {

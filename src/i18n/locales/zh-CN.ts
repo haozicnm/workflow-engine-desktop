@@ -462,6 +462,9 @@ export default {
     days: '天',
     workingDirPlaceholder: '留空使用默认路径',
     unsavedChanges: '有未保存的修改',
+    autoStart: '开机自启',
+    pythonPath: 'Python 路径',
+    downloadLink: '下载',
   },
 
   // ─── 错误和状态 ───
