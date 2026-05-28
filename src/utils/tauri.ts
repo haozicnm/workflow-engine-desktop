@@ -52,13 +52,14 @@ const DYNAMIC_ROUTES: Record<string, RouteEntry> = {
   get_trajectory:     { method: 'GET',    path: '/api/preview/trajectory/{run_id}' },
   get_bundle_files:   { method: 'GET',    path: '/api/preview/bundle-files/{run_id}/{step_id}' },
   read_bundle_file:   { method: 'GET',    path: '/api/preview/bundle-file/{run_id}/{step_id}/{filename}' },
+  browser_pick_session_start: { method: 'POST', path: '/api/browser/pick-start' },
+  browser_pick_next:  { method: 'GET',    path: '/api/browser/pick-next' },
+  browser_pick_session_stop:  { method: 'POST', path: '/api/browser/pick-stop' },
 }
 
-/** Browser-only recording commands — not available in HTTP mode */
-const BROWSER_COMMANDS = new Set([
-  'browser_pick_next',
-  'browser_pick_session_start',
-  'browser_pick_session_stop',
+/** Browser-only commands — now available via HTTP */
+const BROWSER_COMMANDS = new Set<string>([
+  // pick commands now have HTTP endpoints
 ])
 
 // ═══════════════════════════════════════════════════════════════
@@ -186,7 +187,9 @@ async function httpInvoke<T = unknown>(
 
   const url = buildUrl(entry, args)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30_000)
+  // pick_next blocks up to 30s waiting for user interaction, give it 60s
+  const timeoutMs = command.includes('pick_next') ? 60_000 : 30_000
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   const start = Date.now()
 

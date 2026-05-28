@@ -119,4 +119,7 @@ pub fn build() -> Router {
         .route("/api/plugins/upload", post(handlers::plugin_upload))
         .route("/api/plugins/uninstall", post(handlers::plugin_uninstall))
         .route("/api/pipeline/run", post(handlers::run_pipeline))
+        .route("/api/browser/pick-start", post(handlers::browser_pick_start))
+        .route("/api/browser/pick-next", get(handlers::browser_pick_next))
+        .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
 }

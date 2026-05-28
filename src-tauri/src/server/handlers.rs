@@ -383,8 +383,9 @@ pub use crate::server::managers::approval_manager::{
 };
 
 pub use crate::server::managers::system_manager::{
-    check_ipc, clear_logs, get_log_path, node_list_types, node_schema, open_log_dir,
-    plugin_install, plugin_list, plugin_pick_file, plugin_uninstall, plugin_upload, settings_get, settings_update,
-    sidecar_health, system_check_browser, system_health, PluginInstallBody, PluginUninstallBody,
+    browser_pick_next, browser_pick_start, browser_pick_stop, check_ipc, clear_logs, get_log_path,
+    node_list_types, node_schema, open_log_dir, plugin_install, plugin_list, plugin_pick_file,
+    plugin_uninstall, plugin_upload, settings_get, settings_update, sidecar_health,
+    system_check_browser, system_health, PickStartBody, PluginInstallBody, PluginUninstallBody,
     SettingsUpdateBody,
 };

@@ -112,9 +112,10 @@ async function onPickElement(fieldKey: string) {
       pickSessionActive = true
     }
     // 等待用户点选下一个元素
-    const result = await safeInvoke<{ selector: string }>('browser_pick_next')
-    if (result?.selector) {
-      localParams.value[fieldKey] = result.selector
+    const result = await safeInvoke<{ success?: boolean; data?: { selector: string }; selector?: string }>('browser_pick_next')
+    const selector = result?.data?.selector ?? result?.selector
+    if (selector) {
+      localParams.value[fieldKey] = selector
       emit('update-params', { ...localParams.value })
     }
   } catch (e) {

@@ -501,3 +501,36 @@ pub async fn plugin_upload(mut multipart: Multipart) -> Response {
         }
     }))
 }
+
+// ═══════════════════════════════════════════════════════════
+// Browser element picker handlers
+// ═══════════════════════════════════════════════════════════
+
+use axum::extract::Json as AxumJson;
+
+#[derive(Debug, Deserialize)]
+pub struct PickStartBody {
+    pub url: Option<String>,
+}
+
+pub async fn browser_pick_start(AxumJson(body): AxumJson<PickStartBody>) -> Response {
+    let params = serde_json::json!({ "url": body.url });
+    match crate::nodes::browser::send_sidecar_action("pick_start", &params).await {
+        Ok(val) => ok_response(val),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_start failed: {e}")),
+    }
+}
+
+pub async fn browser_pick_next() -> Response {
+    match crate::nodes::browser::send_sidecar_action("pick_next", &serde_json::json!({})).await {
+        Ok(val) => ok_response(val),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_next failed: {e}")),
+    }
+}
+
+pub async fn browser_pick_stop() -> Response {
+    match crate::nodes::browser::send_sidecar_action("pick_stop", &serde_json::json!({})).await {
+        Ok(val) => ok_response(val),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_stop failed: {e}")),
+    }
+}
