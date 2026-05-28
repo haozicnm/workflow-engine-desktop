@@ -145,7 +145,7 @@
       "category": "data",
       "icon": "globe",
       "is_container": false,
-      "desc": "提取网页内容（支持单页/批量 urls 数组）",
+      "desc": "提取网页内容（支持单页/批量/url_pattern/重试/限速/Excel输出）",
       "inputs": [],
       "outputs": [
         {
@@ -165,11 +165,15 @@
         }
       ],
       "params": {
-        "url": "单个 URL（与 urls 二选一）",
+        "url": "单个 URL（与 urls/url_pattern 三选一）",
         "urls": "URL 数组，批量抓取",
+        "url_pattern": "URL 模式，如 https://site.com/page/{{1..10}}",
         "extract": "提取规则数组 [{selector, fields}]",
-        "max_concurrent": "最大并发数（默认 3）",
-        "fail_fast": "单个失败是否中止全部（默认 false）"
+        "retry": "每 URL 最大重试次数（默认 0）",
+        "retry_delay_ms": "重试间隔毫秒（默认 1000）",
+        "delay_between_ms": "URL 间延迟毫秒（默认 0，防封）",
+        "fail_fast": "单个失败是否中止全部（默认 false）",
+        "excel_output": "结果输出到 Excel 文件路径"
       }
     },
     {

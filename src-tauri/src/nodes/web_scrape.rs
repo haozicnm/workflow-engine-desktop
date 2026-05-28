@@ -3,14 +3,18 @@
 // 两种模式：
 //   单页：url: "https://example.com"
 //   批量：urls: ["https://a.com", "https://b.com"]
+//   模式：url_pattern: "https://site.com/page/{{1..10}}"
 //
-// 批量额外参数：
-//   max_concurrent: 3   // 最大并发（默认 3）
-//   fail_fast: false    // 单个失败是否中止（默认 false）
+// 批量/模式额外参数：
+//   retry: 2            // 每个 URL 最大重试次数（默认 0）
+//   retry_delay_ms: 2000 // 重试间隔（默认 1000）
+//   delay_between_ms: 1000 // URL 之间的延迟（默认 0，防封）
+//   fail_fast: false     // 单个失败是否中止全部（默认 false）
+//   excel_output: "result.xlsx" // 结果输出到 Excel（可选）
 //
 // 输出：
 //   单页：{ pages_scraped, total_items, items }
-//   批量：{ total_urls, success_count, fail_count, results: [{url, items, error?}, ...] }
+//   批量：{ total_urls, success_count, fail_count, results: [...] }
 
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
@@ -41,13 +45,24 @@ impl NodeExecutor for WebScrapeNode {
             }
         }
 
+        // ── 模式生成：url_pattern ──
+        if let Some(pattern) = config.get("url_pattern").and_then(|v| v.as_str()) {
+            let urls = expand_url_pattern(pattern)?;
+            if urls.is_empty() {
+                return Err(anyhow!("url_pattern 展开后为空: {}", pattern));
+            }
+            info!("url_pattern 展开 {} 个 URL", urls.len());
+            let url_values: Vec<serde_json::Value> =
+                urls.into_iter().map(serde_json::Value::String).collect();
+            return scrape_url_list(&url_values, config).await;
+        }
+
         // ── 单页模式 ──
         let url = config
             .get("url")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("web_scrape 节点缺少 url 或 urls 参数"))?;
+            .ok_or_else(|| anyhow!("web_scrape 节点缺少 url、urls 或 url_pattern 参数"))?;
 
-        // 离线模式
         if url.starts_with("file://") {
             return scrape_local_file(url, config);
         }
@@ -67,16 +82,42 @@ async fn scrape_url_list(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
+    let retry = config
+        .get("retry")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as usize;
+
+    let retry_delay_ms = config
+        .get("retry_delay_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1000);
+
+    let delay_between_ms = config
+        .get("delay_between_ms")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+
+    let excel_output = config
+        .get("excel_output")
+        .and_then(|v| v.as_str());
+
     let url_strings: Vec<String> = urls
         .iter()
-        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .filter_map(|v| {
+            v.as_str()
+                .map(|s| s.to_string())
+                .or_else(|| v.get("url").and_then(|u| u.as_str()).map(|s| s.to_string()))
+        })
         .collect();
 
     if url_strings.is_empty() {
         return Err(anyhow!("urls 数组为空"));
     }
 
-    info!("批量抓取 {} 个 URL", url_strings.len());
+    info!(
+        "批量抓取 {} 个 URL（重试 {} 次，间隔 {}ms）",
+        url_strings.len(), retry, delay_between_ms
+    );
 
     // 启动浏览器
     let launch_params = build_launch_params(config);
@@ -92,38 +133,213 @@ async fn scrape_url_list(
     let mut success_count = 0u64;
     let mut fail_count = 0u64;
 
-    for url in &url_strings {
-        match scrape_single_url_inner(url, config, extract_rules).await {
-            Ok(data) => {
-                success_count += 1;
-                results.push(serde_json::json!({
-                    "url": url,
-                    "items": data.get("items").cloned().unwrap_or(serde_json::Value::Array(vec![])),
-                    "total_items": data.get("total_items").cloned().unwrap_or(serde_json::json!(0)),
-                }));
-            }
-            Err(e) => {
-                fail_count += 1;
-                warn!("抓取 {} 失败: {}", url, e);
-                if fail_fast {
-                    return Err(anyhow!("fail_fast: {} 抓取失败: {}", url, e));
+    for (idx, url) in url_strings.iter().enumerate() {
+        // URL 间延迟（第一个不延迟）
+        if idx > 0 && delay_between_ms > 0 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_between_ms)).await;
+        }
+
+        // 带重试的抓取
+        let mut last_err = None;
+        let mut attempt = 0;
+        let max_attempts = 1 + retry; // 首次 + 重试次数
+
+        loop {
+            attempt += 1;
+            match scrape_single_url_inner(url, config, extract_rules).await {
+                Ok(data) => {
+                    success_count += 1;
+                    results.push(serde_json::json!({
+                        "url": url,
+                        "items": data.get("items").cloned().unwrap_or(serde_json::Value::Array(vec![])),
+                        "total_items": data.get("total_items").cloned().unwrap_or(serde_json::json!(0)),
+                    }));
+                    break;
                 }
-                results.push(serde_json::json!({
-                    "url": url,
-                    "error": e.to_string(),
-                    "items": [],
-                    "total_items": 0,
-                }));
+                Err(e) => {
+                    if attempt < max_attempts {
+                        warn!("抓取 {} 第 {} 次失败: {}，{}ms 后重试", url, attempt, e, retry_delay_ms);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms)).await;
+                    } else {
+                        last_err = Some(e);
+                        break;
+                    }
+                }
             }
+        }
+
+        if let Some(e) = last_err {
+            fail_count += 1;
+            warn!("抓取 {} 最终失败: {}", url, e);
+            if fail_fast {
+                return Err(anyhow!("fail_fast: {} 抓取失败: {}", url, e));
+            }
+            results.push(serde_json::json!({
+                "url": url,
+                "error": e.to_string(),
+                "items": [],
+                "total_items": 0,
+            }));
+        }
+
+        // 进度日志
+        if (idx + 1) % 10 == 0 || idx + 1 == total {
+            info!("抓取进度: {}/{}", idx + 1, total);
         }
     }
 
-    Ok(serde_json::json!({
+    let output = serde_json::json!({
         "total_urls": total,
         "success_count": success_count,
         "fail_count": fail_count,
         "results": results,
-    }))
+    });
+
+    // ── 写入 Excel ──
+    if let Some(path) = excel_output {
+        write_excel_output(path, &results)?;
+        info!("结果已写入 Excel: {}", path);
+    }
+
+    Ok(output)
+}
+
+// ─── URL Pattern 展开 ─────────────────────────────────
+// 支持格式：
+//   "https://site.com/page/{{1..10}}"         → page/1 ~ page/10
+//   "https://site.com/page/{{1..10..2}}"      → page/1, 3, 5, 7, 9
+//   "https://site.com/{{a,b,c}}/detail"       → /a/detail, /b/detail, /c/detail
+
+fn expand_url_pattern(pattern: &str) -> Result<Vec<String>> {
+    let mut result = vec![pattern.to_string()];
+
+    // 找到所有 {{...}} 占位符
+    while let Some(start) = result[0].find("{{") {
+        if let Some(end) = result[0][start + 2..].find("}}") {
+            let inner = &result[0][start + 2..start + 2 + end].trim();
+            let expansions = if inner.contains("..") {
+                expand_range(inner)?
+            } else {
+                // 逗号分隔列表
+                inner.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>()
+            };
+
+            let mut new_result = Vec::new();
+            for template in &result {
+                let prefix = &template[..start];
+                let suffix = &template[start + 2 + end + 2..];
+                for val in &expansions {
+                    new_result.push(format!("{}{}{}", prefix, val, suffix));
+                }
+            }
+            result = new_result;
+        } else {
+            break;
+        }
+    }
+
+    Ok(result)
+}
+
+/// 展开范围表达式：1..10, 1..10..2, 001..010（补零）
+fn expand_range(inner: &str) -> Result<Vec<String>> {
+    let parts: Vec<&str> = inner.split("..").collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Err(anyhow!("无效范围格式: {{ {} }}", inner));
+    }
+
+    let start: i64 = parts[0]
+        .trim()
+        .parse()
+        .map_err(|_| anyhow!("范围起始值不是数字: {}", parts[0]))?;
+    let end: i64 = parts[1]
+        .trim()
+        .parse()
+        .map_err(|_| anyhow!("范围结束值不是数字: {}", parts[1]))?;
+    let step: i64 = if parts.len() == 3 {
+        parts[2]
+            .trim()
+            .parse()
+            .map_err(|_| anyhow!("范围步长不是数字: {}", parts[2]))?
+    } else {
+        if end >= start { 1 } else { -1 }
+    };
+
+    if step == 0 {
+        return Err(anyhow!("范围步长不能为 0"));
+    }
+
+    // 检测是否需要补零（如 001..010）
+    let pad_width = if parts[0].starts_with('0') && parts[0].len() > 1 {
+        Some(parts[0].len())
+    } else {
+        None
+    };
+
+    let mut result = Vec::new();
+    let mut current = start;
+    loop {
+        if (step > 0 && current > end) || (step < 0 && current < end) {
+            break;
+        }
+        let s = if let Some(width) = pad_width {
+            format!("{:0width$}", current, width = width)
+        } else {
+            current.to_string()
+        };
+        result.push(s);
+        current += step;
+    }
+
+    Ok(result)
+}
+
+// ─── Excel 输出 ────────────────────────────────────────
+
+fn write_excel_output(path: &str, results: &[serde_json::Value]) -> Result<()> {
+    use rust_xlsxwriter::Workbook;
+
+    let mut workbook = Workbook::new();
+    let worksheet = workbook.add_worksheet();
+
+    // 表头
+    worksheet.write_string(0, 0, "url")?;
+    worksheet.write_string(0, 1, "success")?;
+    worksheet.write_string(0, 2, "total_items")?;
+    worksheet.write_string(0, 3, "error")?;
+    worksheet.write_string(0, 4, "items_json")?;
+
+    // 列宽
+    worksheet.set_column_width(0, 40)?;
+    worksheet.set_column_width(2, 12)?;
+    worksheet.set_column_width(4, 80)?;
+
+    for (row, result) in results.iter().enumerate() {
+        let r = row as u32 + 1;
+        let url = result.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("");
+        let total = result.get("total_items").and_then(|v| v.as_u64()).unwrap_or(0);
+        let items = result.get("items").and_then(|v| v.as_array());
+        let success = error.is_empty();
+
+        worksheet.write_string(r, 0, url)?;
+        worksheet.write_string(r, 1, if success { "✓" } else { "✗" })?;
+        worksheet.write(r, 2, total)?;
+        worksheet.write_string(r, 3, error)?;
+
+        if let Some(items) = items {
+            let json_str = serde_json::to_string(items).unwrap_or_default();
+            // 截断过长内容（Excel 单元格限制 32767 字符）
+            if json_str.len() > 32000 {
+                worksheet.write_string(r, 4, &json_str[..32000])?;
+            } else {
+                worksheet.write_string(r, 4, &json_str)?;
+            }
+        }
+    }
+
+    workbook.save(path)?;
+    Ok(())
 }
 
 // ─── 单页模式（公共入口） ──────────────────────────────
@@ -179,13 +395,11 @@ async fn scrape_single_url_inner(
     let launch_params = build_launch_params(config);
     let _ = crate::nodes::browser::send_sidecar_action("launch", &launch_params).await?;
 
-    // 翻页抓取循环
     let mut all_items: Vec<serde_json::Value> = Vec::new();
     let mut pages_scraped = 0usize;
     let mut current_url = url.to_string();
 
     for page_num in 0..max_pages {
-        // 导航
         let nav_params = serde_json::json!({
             "url": current_url,
             "wait_until": "domcontentloaded",
@@ -204,14 +418,12 @@ async fn scrape_single_url_inner(
             return Err(anyhow!("第 {} 页导航失败: {}", page_num + 1, err));
         }
 
-        // 等待目标元素
         let wait_params = serde_json::json!({
             "selector": wait_for,
             "timeout_ms": 10000,
         });
         let _ = crate::nodes::browser::send_sidecar_action("wait", &wait_params).await;
 
-        // 滚动加载
         if scroll && scroll_times > 0 {
             let scroll_params = serde_json::json!({
                 "to": "bottom",
@@ -222,7 +434,6 @@ async fn scrape_single_url_inner(
                 crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
         }
 
-        // 提取数据
         for rule in extract_rules {
             let item_selector = rule
                 .get("selector")
@@ -231,7 +442,6 @@ async fn scrape_single_url_inner(
             let fields = rule.get("fields").and_then(|v| v.as_object());
 
             if let Some(fields) = fields {
-                // 字段模式
                 let count_script = format!(
                     "document.querySelectorAll({}).length",
                     serde_json::json!(item_selector)
@@ -290,7 +500,6 @@ async fn scrape_single_url_inner(
                     all_items.push(serde_json::Value::Object(item));
                 }
             } else {
-                // 简单文本模式
                 let result = crate::nodes::browser::send_sidecar_action(
                     "extract_text",
                     &serde_json::json!({ "selector": item_selector }),
@@ -310,7 +519,6 @@ async fn scrape_single_url_inner(
 
         pages_scraped += 1;
 
-        // 翻页
         if let Some(next_sel) = next_selector {
             if page_num < max_pages - 1 {
                 let click_params = serde_json::json!({
