@@ -72,8 +72,8 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
     let config_guard = app.config.read().await;
     let browser_channel = config_guard.browser_channel.clone();
     let timeouts = config_guard.timeouts.clone();
-    let max_retries = config_guard.execution.default_retries;
-    let retry_delay_ms = config_guard.execution.retry_delay_ms;
+    let _max_retries = config_guard.execution.default_retries;
+    let _retry_delay_ms = config_guard.execution.retry_delay_ms;
     drop(config_guard);
 
     // 5. 创建取消/暂停/断点/单步标志
