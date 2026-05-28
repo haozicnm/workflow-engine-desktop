@@ -62,7 +62,7 @@ jobs:
           cp src-tauri/target/aarch64-unknown-linux-gnu/release/wf-cli pkg/opt/workflow-engine/
           cp -r dist pkg/opt/workflow-engine/
           cp -r src-tauri/sidecars pkg/opt/workflow-engine/
-          cp -r node-schema.json pkg/opt/workflow-engine/
+          cp -r src-tauri/node-schema.json pkg/opt/workflow-engine/
           if [ -f debian/wf-engine.service ]; then
             cp debian/wf-engine.service pkg/usr/lib/systemd/user/
             cp debian/wf-engine.service pkg/opt/workflow-engine/
@@ -141,7 +141,7 @@ jobs:
           Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
           Copy-Item -Recurse dist $pkgDir/
           Copy-Item -Recurse src-tauri/sidecars $pkgDir/sidecars
-          Copy-Item node-schema.json $pkgDir/
+          Copy-Item src-tauri/node-schema.json $pkgDir/
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
 
           $lines = @(
