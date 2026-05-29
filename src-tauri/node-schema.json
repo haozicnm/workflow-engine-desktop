@@ -1031,6 +1031,33 @@
       ]
     },
     {
+      "type": "kimi_browser",
+      "label": "Kimi 浏览器",
+      "category": "browser",
+      "icon": "globe",
+      "is_container": false,
+      "desc": "通过 Kimi WebBridge 控制真实浏览器（有登录态）。支持 17 种操作：navigate/find_tab/snapshot/click/mouse_click/fill/key_type/send_keys/evaluate/network/cdp/upload/screenshot/save_as_pdf/list_tabs/close_tab/close_session",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "success",
+          "data_type": "bool",
+          "desc": "是否成功"
+        },
+        {
+          "name": "data",
+          "data_type": "json",
+          "desc": "返回数据"
+        }
+      ],
+      "params": {
+        "action": "操作类型：navigate/find_tab/snapshot/click/mouse_click/fill/key_type/send_keys/evaluate/network/cdp/upload/screenshot/save_as_pdf/list_tabs/close_tab/close_session",
+        "args": "参数对象。navigate:{url,newTab?,group_title?} | click/mouse_click:{selector或@e ref} | fill:{selector,value} | key_type:{selector?,text} | send_keys:{keys} | evaluate:{code} | network:{url_pattern?,method?,status?} | cdp:{method,params?} | upload:{selector,file_path} | screenshot:{format?,quality?,full_page?} | save_as_pdf:{} | find_tab:{query} | close_tab:{tabId?} | list_tabs:{} | close_session:{}",
+        "port": "WebBridge 端口（默认 10086）",
+        "timeout": "超时秒数（默认 30）"
+      }
+    },
+    {
       "type": "browser",
       "label": "浏览器容器",
       "category": "browser",

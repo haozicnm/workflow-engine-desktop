@@ -17,6 +17,7 @@ pub mod file_container;
 pub mod file_save;
 pub mod http;
 pub mod json_parse;
+pub mod kimi_browser;
 pub mod loop_node;
 pub mod map;
 pub mod mcp_node;

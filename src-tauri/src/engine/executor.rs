@@ -81,6 +81,7 @@ impl StepExecutor {
 
         // ── 浏览器子节点 ──
         register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
+        register!(executors, "kimi_browser", crate::nodes::kimi_browser::KimiBrowserNode);
 
         // ── 正则节点（v3: 独立 executor） ──
         register!(
