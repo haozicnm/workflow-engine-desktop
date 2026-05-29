@@ -236,6 +236,13 @@ function closeAllMenus() {
         :title="conditionLabel"
       >{{ conditionLabel }}</Badge>
 
+      <Badge
+        v-if="containerDef?.dangerous"
+        variant="warning"
+        class="text-[10px] px-1.5 py-0.5 shrink-0"
+        title="此步骤可执行任意系统命令，请谨慎使用"
+      >⚠ 高危</Badge>
+
       <!-- Duration + Status -->
       <span v-if="runState?.duration" class="text-[10px] text-muted-foreground font-mono shrink-0">
         {{ formatDuration(runState.duration) }}

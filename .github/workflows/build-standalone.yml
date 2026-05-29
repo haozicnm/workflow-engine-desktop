@@ -72,17 +72,17 @@ jobs:
             chmod 755 pkg/DEBIAN/postinst
           fi
           # 动态生成 DEBIAN/control（修正版本和架构）
-          sed -e "s/^Version:.*/Version: 7.2.0/" \
+          sed -e "s/^Version:.*/Version: 7.3.0/" \
               -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
               debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb --build pkg workflow-engine-standalone_7.2.0_${DEB_ARCH}.deb
+          dpkg-deb --build pkg workflow-engine-standalone_7.3.0_${DEB_ARCH}.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-standalone-arm64-deb
-          path: workflow-engine-standalone_7.2.0_arm64.deb
+          path: workflow-engine-standalone_7.3.0_arm64.deb
 
   build-windows:
     name: Windows x86_64
@@ -133,7 +133,7 @@ jobs:
       - name: Package zip
         shell: pwsh
         run: |
-          $version = "7.2.0"
+          $version = "7.3.0"
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
 
@@ -161,4 +161,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-x64
-          path: workflow-engine-7.2.0-windows-x64.zip
+          path: workflow-engine-7.3.0-windows-x64.zip

@@ -98,7 +98,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '标记失败', value: 'fail' },
     ], default: 'recommended' },
   ]},
-  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: 'stdout, stderr, exit_code', params: [
+  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', dangerous: true, description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: 'stdout, stderr, exit_code', params: [
     { key: 'command', label: '命令', type: 'textarea', placeholder: 'echo "Hello {{name}}"' },
     { key: 'shell', label: 'Shell 类型', type: 'select', options: [
       { label: '自动检测', value: 'auto' },
@@ -115,7 +115,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   { type: 'mcp_script',       label: 'MCP 脚本',        icon: 'Code',          color: '#a5d6ff', description: '通过 MCP 执行 Python 脚本',               outputHint: '脚本返回值', params: [
     { key: 'script', label: 'Python 代码', type: 'textarea', placeholder: 'print("hello")' },
   ]},
-  { type: 'mcp_shell',        label: 'MCP Shell',        icon: 'Terminal',      color: '#a5d6ff', description: '通过 MCP 执行 Shell 命令',                outputHint: 'stdout, stderr, exit_code', params: [
+  { type: 'mcp_shell',        label: 'MCP Shell',        icon: 'Terminal',      color: '#a5d6ff', dangerous: true, description: '通过 MCP 执行 Shell 命令',                outputHint: 'stdout, stderr, exit_code', params: [
     { key: 'command', label: '命令', type: 'text', placeholder: 'echo hello' },
     { key: 'cwd', label: '工作目录', type: 'text' },
   ]},
