@@ -638,12 +638,18 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
                 let mut item = serde_json::Map::new();
                 for (name, field_sel) in fields {
                     let field_str = field_sel.as_str().unwrap_or("");
-                    let value = if field_str.is_empty() {
+                    let value = if field_str.is_empty() || field_str == "text()" {
                         element
                             .text()
                             .collect::<Vec<_>>()
                             .join(" ")
                             .trim()
+                            .to_string()
+                    } else if let Some(attr_name) = extract_attr_from_selector(field_str) {
+                        // 属性提取：[href] → 提取 href 属性
+                        element
+                            .attr(attr_name)
+                            .unwrap_or("")
                             .to_string()
                     } else if let Ok(sub_sel) = scraper::Selector::parse(field_str) {
                         element
@@ -656,7 +662,8 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
                     } else {
                         String::new()
                     };
-                    item.insert(name.clone(), serde_json::Value::String(value));
+                    item.insert(name.clone(), serde_json::Value::String(value.clone()));
+                    tracing::info!("field '{}' = '{}' (selector: '{}')", name, value, field_str);
                 }
                 items.push(serde_json::Value::Object(item));
             } else {

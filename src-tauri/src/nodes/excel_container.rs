@@ -95,10 +95,11 @@ pub async fn execute_excel_container(
                     "sheet": config.sheet,
                     "data": match &value { Value::Array(_) => value.clone(), _ => json!([[value]]) },
                 });
-                if let Err(e) =
-                    crate::nodes::excel::excel_write(&config.file_path, &write_cfg).await
-                {
-                    record_error(&mut output_ports, &action.id, "Excel write failed", &e);
+                match crate::nodes::excel::excel_write(&config.file_path, &write_cfg).await {
+                    Ok(data) => {
+                        output_ports.insert(action.id.clone(), data);
+                    }
+                    Err(e) => record_error(&mut output_ports, &action.id, "Excel write failed", &e),
                 }
             }
             "filter" => {
