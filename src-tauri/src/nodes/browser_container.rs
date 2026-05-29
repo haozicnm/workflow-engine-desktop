@@ -810,7 +810,7 @@ impl NodeExecutor for BrowserContainerNode {
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
         // 解析配置
-        let mut config: BrowserContainerConfig = serde_json::from_value(step.config.clone())
+        let config: BrowserContainerConfig = serde_json::from_value(step.config.clone())
             .map_err(|e| anyhow!("浏览器容器配置解析失败: {}", e))?;
 
         // Phase 3: 占位符机制已在 executor 层处理，不需要容器内部 resolve

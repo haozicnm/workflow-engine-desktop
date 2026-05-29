@@ -1784,7 +1784,7 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
                     .unwrap()
                 );
             } else {
-                println!("{:<40} {}", "Run ID", "步骤数");
+                println!("{:<40} 步骤数", "Run ID");
                 println!("{}", "-".repeat(60));
                 for run_id in &runs {
                     let steps = preview::read_trajectory(run_id).len();
@@ -1803,7 +1803,7 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
             let run_id = runs.last().unwrap();
             print_preview(run_id, step_id, json)?;
         }
-        "live" => match step_id.as_deref() {
+        "live" => match step_id {
             Some("list") | None => {
                 let sessions = preview::list_live_sessions();
                 if sessions.is_empty() {
@@ -1818,8 +1818,8 @@ fn cmd_preview(run_or_action: &str, step_id: Option<&str>, json: bool) -> Result
                     println!("{}", serde_json::to_string_pretty(&sessions).unwrap());
                 } else {
                     println!(
-                        "{:<40} {:<20} {:<10} {}/{}",
-                        "Run ID", "工作流", "状态", "进度", "总步数"
+                        "{:<40} {:<20} {:<10} 进度/总步数",
+                        "Run ID", "工作流", "状态"
                     );
                     println!("{}", "-".repeat(90));
                     for s in &sessions {
@@ -1899,8 +1899,8 @@ fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), 
         } else {
             println!("运行: {}", run_id);
             println!(
-                "{:<4} {:<18} {:<12} {:<8} {}",
-                "#", "步骤名称", "类型", "状态", "摘要"
+                "{:<4} {:<18} {:<12} {:<8} 摘要",
+                "#", "步骤名称", "类型", "状态"
             );
             println!("{}", "-".repeat(90));
             for (i, p) in trajectory.iter().enumerate() {
@@ -1996,7 +1996,7 @@ async fn cmd_serve(app: Arc<App>, bind: &str, static_dir: &str) -> Result<(), St
     use tower_http::services::ServeDir;
 
     let router =
-        crate::server::build_router(app).fallback_service(ServeDir::new(static_dir.to_string()));
+        crate::server::build_router(app).fallback_service(ServeDir::new(static_dir));
 
     tracing::info!("服务器启动: http://{}  (静态文件: {})", bind, static_dir);
 

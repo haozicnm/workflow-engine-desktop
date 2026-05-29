@@ -40,7 +40,7 @@ impl NodeExecutor for HttpNode {
         let read_timeout = config
             .get("timeout")
             .and_then(|v| v.as_u64())
-            .unwrap_or_else(|| _ctx.default_timeouts.http_request_ms / 1000);
+            .unwrap_or(_ctx.default_timeouts.http_request_ms / 1000);
 
         let client = reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(connect_timeout))

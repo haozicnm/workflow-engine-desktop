@@ -497,7 +497,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         if entry.file_type()?.is_dir() {
             copy_dir_recursive(&entry.path(), &dest)?;
         } else {
-            fs::copy(&entry.path(), &dest)?;
+            fs::copy(entry.path(), &dest)?;
         }
     }
     Ok(())

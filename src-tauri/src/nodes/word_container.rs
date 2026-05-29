@@ -193,8 +193,7 @@ pub async fn execute_word_container(
                                 .cloned()
                                 .unwrap_or(Value::Array(vec![]));
                             let mut all_paras: Vec<Value> = existing_paras
-                                .as_array()
-                                .map(|a| a.clone())
+                                .as_array().cloned()
                                 .unwrap_or_default();
                             all_paras.push(table_para);
                             crate::nodes::word::word_write(
@@ -240,7 +239,7 @@ impl NodeExecutor for WordContainerNode {
         ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let mut config: WordContainerConfig = serde_json::from_value(step.config.clone())
+        let config: WordContainerConfig = serde_json::from_value(step.config.clone())
             .map_err(|e| anyhow!("Word 容器配置解析失败: {}", e))?;
 
         // Phase 3: 占位符机制已在 executor 层处理，不需要容器内部 resolve

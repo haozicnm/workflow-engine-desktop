@@ -211,7 +211,7 @@ pub fn validate_step_ports(
             Value::Object(map) => {
                 if let Some(val) = map.get(port_name.as_str()) {
                     // 非 null 非空字符串 = 有值
-                    !val.is_null() && !(val.is_string() && val.as_str().unwrap_or("").is_empty())
+                    !(val.is_null() || val.is_string() && val.as_str().unwrap_or("").is_empty())
                 } else {
                     false
                 }

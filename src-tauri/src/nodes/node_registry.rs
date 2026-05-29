@@ -31,6 +31,12 @@ pub struct NodeRegistry {
     plugin_nodes: HashMap<String, NodeMeta>,
 }
 
+impl Default for NodeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeRegistry {
     pub fn new() -> Self {
         Self {

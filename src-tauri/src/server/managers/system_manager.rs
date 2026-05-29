@@ -79,7 +79,7 @@ pub async fn node_schema() -> Response {
         Ok(val) => ok_response(val),
         Err(e) => err_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            &format!("node-schema.json 解析失败: {e}"),
+            format!("node-schema.json 解析失败: {e}"),
         ),
     }
 }

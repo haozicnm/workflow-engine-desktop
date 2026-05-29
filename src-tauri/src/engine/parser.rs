@@ -132,7 +132,7 @@ trait StepParser {
 struct ContainerParser;
 impl StepParser for ContainerParser {
     fn can_parse(step_type: &str) -> bool {
-        crate::nodes::registry::is_container(&step_type)
+        crate::nodes::registry::is_container(step_type)
     }
 
     fn parse(step: &Step, _is_recursive: bool) -> Result<(String, Value, Option<Vec<Step>>)> {
@@ -155,7 +155,7 @@ impl StepParser for IterationParser {
         } else {
             actions
                 .iter()
-                .map(|a| convert_action_to_step(a))
+                .map(convert_action_to_step)
                 .collect::<Result<Vec<_>>>()?
         };
 
@@ -278,12 +278,11 @@ fn convert_action_to_step(action: &Value) -> Result<Step> {
         .unwrap_or(serde_json::json!({}));
 
     // v8: 提取容器类型的 actions — 从 params.actions 中提取并放在 Step.actions
-    let actions = if crate::nodes::registry::is_container(&step_type.as_str()) {
+    let actions = if crate::nodes::registry::is_container(step_type.as_str()) {
         config
             .as_object()
             .and_then(|c| c.get("actions"))
-            .and_then(|v| v.as_array())
-            .map(|a| a.clone())
+            .and_then(|v| v.as_array()).cloned()
     } else {
         None
     };

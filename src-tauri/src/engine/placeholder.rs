@@ -18,6 +18,12 @@ pub struct PlaceholderMap {
     next_index: usize,
 }
 
+impl Default for PlaceholderMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlaceholderMap {
     pub fn new() -> Self {
         Self {

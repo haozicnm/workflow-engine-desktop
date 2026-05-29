@@ -81,11 +81,7 @@ impl NodeExecutor for ApprovalNode {
             .and_then(|v| {
                 if let Some(b) = v.as_bool() {
                     Some(b)
-                } else if let Some(s) = v.as_str() {
-                    Some(s == "true")
-                } else {
-                    None
-                }
+                } else { v.as_str().map(|s| s == "true") }
             })
             .unwrap_or(true);
 

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::warn;
 
 /// Lightweight step result summary for human and Agent consumption.
@@ -583,7 +583,7 @@ pub fn bundle_step_output(run_id: &str, step: &Step, output: &Value) -> Option<P
     }
 }
 
-fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
+fn bundle_http(dir: &Path, _step: &Step, output: &Value) -> bool {
     let status = output.get("status").and_then(|v| v.as_u64()).unwrap_or(0);
     let body = output.get("body").and_then(|v| v.as_str()).unwrap_or("");
     let headers = output.get("headers");
@@ -611,7 +611,7 @@ fn bundle_http(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
     ok
 }
 
-fn bundle_shell(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_shell(dir: &Path, output: &Value) -> bool {
     let stdout = output.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
     let stderr = output.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
     let exit_code = output
@@ -637,7 +637,7 @@ fn bundle_shell(dir: &PathBuf, output: &Value) -> bool {
     ok
 }
 
-fn bundle_script(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_script(dir: &Path, output: &Value) -> bool {
     match serde_json::to_string_pretty(output) {
         Ok(json) => {
             if let Err(e) = fs::write(dir.join("result.json"), json) {
@@ -654,11 +654,11 @@ fn bundle_script(dir: &PathBuf, output: &Value) -> bool {
     }
 }
 
-fn bundle_json(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_json(dir: &Path, output: &Value) -> bool {
     bundle_script(dir, output) // same behavior: write output as pretty JSON
 }
 
-fn bundle_text(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_text(dir: &Path, output: &Value) -> bool {
     let text = output.get("result").and_then(|v| v.as_str()).unwrap_or("");
     if let Err(e) = fs::write(dir.join("output.txt"), text) {
         warn!("bundle text output.txt: {}", e);
@@ -668,7 +668,7 @@ fn bundle_text(dir: &PathBuf, output: &Value) -> bool {
     }
 }
 
-fn bundle_browser(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_browser(dir: &Path, output: &Value) -> bool {
     let mut ok = true;
     // Save screenshot if present
     if let Some(screenshot_path) = output.get("screenshot_path").and_then(|v| v.as_str()) {
@@ -705,7 +705,7 @@ fn bundle_browser(dir: &PathBuf, output: &Value) -> bool {
     ok
 }
 
-fn bundle_file(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
+fn bundle_file(dir: &Path, _step: &Step, output: &Value) -> bool {
     match serde_json::to_string_pretty(output) {
         Ok(json) => {
             if let Err(e) = fs::write(dir.join("file_list.json"), json) {
@@ -722,7 +722,7 @@ fn bundle_file(dir: &PathBuf, _step: &Step, output: &Value) -> bool {
     }
 }
 
-fn bundle_generic(dir: &PathBuf, output: &Value) -> bool {
+fn bundle_generic(dir: &Path, output: &Value) -> bool {
     match serde_json::to_string_pretty(output) {
         Ok(json) => {
             if let Err(e) = fs::write(dir.join("output.json"), json) {

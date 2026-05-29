@@ -39,6 +39,7 @@ type AppHandleRef<'a> = Option<&'a tauri::AppHandle>;
 #[cfg(not(feature = "gui"))]
 type AppHandleRef<'a> = Option<&'a ()>;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_workflow(
     workflow: &Workflow,
     run_id: &str,

@@ -49,7 +49,7 @@ pub fn generate_skill(workflow: &Workflow) -> String {
                 desc
             ));
         }
-        md.push_str("\n");
+        md.push('\n');
     }
 
     // Configuration section

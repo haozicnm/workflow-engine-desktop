@@ -49,10 +49,10 @@ impl NodeExecutor for FileContainerNode {
     async fn execute(
         &self,
         step: &Step,
-        ctx: &mut ExecutionContext,
+        _ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        let mut actions: Vec<FileAction> = step
+        let actions: Vec<FileAction> = step
             .config
             .get("actions")
             .and_then(|v| serde_json::from_value(v.clone()).ok())

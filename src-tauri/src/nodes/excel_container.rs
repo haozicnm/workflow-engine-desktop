@@ -330,7 +330,7 @@ impl NodeExecutor for ExcelContainerNode {
             }
         }
 
-        let mut config: ExcelContainerConfig = serde_json::from_value(raw_config)
+        let config: ExcelContainerConfig = serde_json::from_value(raw_config)
             .map_err(|e| anyhow!("Excel 容器配置解析失败: {}", e))?;
 
         // Phase 3: 占位符机制已在 executor 层处理，不需要容器内部 resolve

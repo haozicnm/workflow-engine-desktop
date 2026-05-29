@@ -552,7 +552,7 @@ pub fn generate_ts_metadata() -> String {
         for action in *actions {
             ts.push_str(&format!("    {{\n      action_type: '{}',\n      label: '{}',\n      category: '{}',\n      description: '{}',\n      params: [\n",
                 action.action_type, action.label,
-                to_snake_case(&serde_json::to_string(&action.category).unwrap_or_default().trim_matches('"')),
+                to_snake_case(serde_json::to_string(&action.category).unwrap_or_default().trim_matches('"')),
                 action.description));
             for param in action.params {
                 let opts_str = if let Some(opts) = param.options {
@@ -569,7 +569,7 @@ pub fn generate_ts_metadata() -> String {
                 ts.push_str(&format!(
                     "        {{ key: '{}', label: '{}', param_type: '{}', required: {}, default_value: {}, placeholder: {}, options: {}, hint: {} }},\n",
                     param.key, param.label,
-                    to_snake_case(&serde_json::to_string(&param.param_type).unwrap_or_default().trim_matches('"')),
+                    to_snake_case(serde_json::to_string(&param.param_type).unwrap_or_default().trim_matches('"')),
                     param.required,
                     param.default_value.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "undefined".to_string()),
                     param.placeholder.map(|s| format!("'{}'", s)).unwrap_or_else(|| "undefined".to_string()),

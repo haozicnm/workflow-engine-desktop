@@ -720,6 +720,7 @@ impl Database {
     // ─── Approval CRUD ───
 
     /// 插入审批记录
+    #[allow(clippy::too_many_arguments)]
     pub fn insert_approval(
         &self,
         id: &str,
