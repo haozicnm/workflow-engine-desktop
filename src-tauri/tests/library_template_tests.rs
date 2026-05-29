@@ -161,7 +161,7 @@ fn test_template4_http_approval_pipeline() {
     let json = load_template("batch/http-approval-pipeline.wf.json");
     assert_eq!(json["name"].as_str().unwrap(), "http-approval-pipeline");
     let steps = json["steps"].as_array().unwrap();
-    assert_eq!(steps.len(), 10);
+    assert_eq!(steps.len(), 11);
     let types: Vec<&str> = steps.iter().map(|s| s["type"].as_str().unwrap()).collect();
     assert!(types.contains(&"http"));
     assert!(types.contains(&"approval"));

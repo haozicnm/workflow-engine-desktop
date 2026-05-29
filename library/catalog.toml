@@ -45,3 +45,12 @@ params = ["target_url", "alert_threshold", "notify_title", "work_dir"]
 schedule = "0 */30 * * * * *"
 category = "monitoring"
 file = "monitoring/web-monitor-alert.wf.json"
+
+[[templates]]
+name = "ithome-news-excel"
+version = "1.0.0"
+description = "IT之家热榜新闻→Excel — 抓取IT之家首页热榜前N条新闻，自动生成带序号、标题、链接的Excel报表。演示 web_scrape CSS选择器提取 + script 数据格式化 + excel 容器写入。"
+params = ["output_dir", "top_n"]
+schedule = "0 0 9 * * * *"
+category = "data"
+file = "data/ithome-news-excel.wf.json"

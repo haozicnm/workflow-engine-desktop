@@ -1,0 +1,72 @@
+{
+  "name": "IT之家热榜新闻→Excel",
+  "description": "抓取IT之家热榜前10条新闻，生成Excel列表。演示 web_scrape + script + excel 节点串联。",
+  "params": {
+    "output_dir": "C:\\Users\\haozi\\AppData\\Local\\Temp\\wf-ithome",
+    "top_n": "10"
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "type": "web_scrape",
+      "label": "1.抓取IT之家首页",
+      "config": {
+        "url": "https://www.ithome.com/",
+        "extract": [
+          {
+            "selector": "ul.bd.order.sel li a",
+            "fields": {
+              "title": "",
+              "link": "[href]"
+            }
+          }
+        ],
+        "timeout": 15000,
+        "retry": 2,
+        "retry_delay_ms": 3000
+      }
+    },
+    {
+      "id": "step_2",
+      "type": "script",
+      "label": "2.提取前N条并格式化",
+      "config": {
+        "script": "let items = step_1.items;\nlet top_n = to_int(\"{{params.top_n}}\");\nlet result = [];\nlet count = if items.len > top_n { top_n } else { items.len };\nfor i in 0..count {\n    let item = items[i];\n    let idx = i + 1;\n    let title = if item.title != () { item.title.trim() } else { \"\" };\n    let link = if item.link != () { item.link } else { \"\" };\n    result.push([to_string(idx), title, link]);\n}\n#{rows: result, count: count}"
+      }
+    },
+    {
+      "id": "step_3",
+      "type": "excel",
+      "label": "3.生成Excel文件",
+      "config": {
+        "file_path": "{{params.output_dir}}/IT之家热榜.xlsx",
+        "actions": [
+          {
+            "id": "a3_1",
+            "type": "create",
+            "config": {
+              "headers": "序号,新闻标题,链接"
+            }
+          },
+          {
+            "id": "a3_2",
+            "type": "write",
+            "config": {
+              "value": "{{step_2.rows}}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "step_4",
+      "type": "notify",
+      "label": "4.完成通知",
+      "config": {
+        "notify_type": "system",
+        "title": "📰 IT之家热榜已生成",
+        "body": "共 {{step_2.count}} 条新闻\n文件：{{params.output_dir}}/IT之家热榜.xlsx"
+      }
+    }
+  ]
+}
