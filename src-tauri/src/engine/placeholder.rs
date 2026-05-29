@@ -111,7 +111,8 @@ impl PlaceholderMap {
     }
 
     /// 检查是否是已知的变量引用格式
-    /// 已知格式：step_xxx.yyy、params.xxx、vars.xxx、__item、__index 等
+    /// 已知格式：step_xxx.yyy、params.xxx、vars.xxx 等
+    /// 注意：__item、__index 等延迟注入变量不在此列
     fn is_known_variable(expr: &str) -> bool {
         // step_xxx.yyy 格式
         if expr.starts_with("step_") && expr.contains('.') {
@@ -123,10 +124,6 @@ impl PlaceholderMap {
         }
         // vars.xxx 格式
         if expr.starts_with("vars.") {
-            return true;
-        }
-        // 迭代变量：__item、__index、__index1、loop
-        if expr == "__item" || expr == "__index" || expr == "__index1" || expr == "loop" {
             return true;
         }
         // 其他格式不处理

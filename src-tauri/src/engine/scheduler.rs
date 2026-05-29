@@ -499,11 +499,6 @@ pub fn determine_next_step(
         }
     }
 
-    // 循环/并行节点：结束（不自动流转）
-    if step.step_type == "loop" || step.step_type == "parallel" || step.step_type == "while" {
-        return None;
-    }
-
     // 默认：next 字段或列表中下一个步骤
     if let Some(next) = &step.next {
         Some(next.clone())
