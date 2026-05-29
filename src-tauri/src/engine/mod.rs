@@ -4,6 +4,7 @@ pub mod approval_store;
 pub mod collect;
 pub mod common;
 pub mod context;
+pub mod placeholder;
 pub mod executor;
 pub mod parser;
 pub mod plugin_manager;

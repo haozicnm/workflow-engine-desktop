@@ -58,12 +58,7 @@ impl NodeExecutor for FileContainerNode {
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .ok_or_else(|| anyhow!("file 容器缺少 actions 参数"))?;
 
-        // 容器不再走全局 resolve_config，这里解析每个 action 的模板变量
-        for action in &mut actions {
-            for (_, v) in action.config.iter_mut() {
-                *v = ctx.resolve_config(v);
-            }
-        }
+        // Phase 3: 占位符机制已在 executor 层处理，不需要容器内部 resolve
 
         let mut results = serde_json::Map::new();
 

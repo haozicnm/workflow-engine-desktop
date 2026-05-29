@@ -264,7 +264,12 @@ impl StepExecutor {
         let is_container = crate::nodes::registry::is_container(&step.step_type);
         // v8.1: 节点可声明自行解析模板变量（如 map 的 {{__item}}），跳过全局预解析
         let resolve_self = executor.resolve_config_self();
-        let resolved_config = if is_container || resolve_self {
+
+        // Phase 3: 两阶段 resolve
+        // - 容器节点：占位符替换 → 反序列化 → 后处理替换（避免类型破坏）
+        // - resolve_self 节点：跳过全局 resolve（如 map 的 {{__item}}）
+        // - 非容器节点：全局 resolve_config（原有行为）
+        let (resolved_config, placeholder_map) = if is_container {
             // v8: 归一化 actions — 前端 actions 在 step.actions，需合并到 config 供容器反序列化
             let mut config = if step.config.is_object() {
                 step.config.clone()
@@ -279,13 +284,33 @@ impl StepExecutor {
                     }
                 }
             }
-            // 容器节点跳过全局 resolve_config：容器 config 有类型化 struct 字段，
-            // 全量递归解析会把模板变量变成数字/对象，导致反序列化失败。
-            // 各容器自己负责解析内部 action config。
-            config
+            // Phase 3: 占位符替换
+            // 注意：condition_group 也在 config 中，需要一起处理
+            let mut ph = crate::engine::placeholder::PlaceholderMap::new();
+            let _ = ph.scan_and_replace(&mut config);
+            (config, Some(ph))
+        } else if resolve_self {
+            (step.config.clone(), None)
         } else {
-            ctx.resolve_config(&step.config)
+            (ctx.resolve_config(&step.config), None)
         };
+        // Phase 3: condition_group 也需要占位符处理
+        // 优先从 step.condition_group 读（parser 提取的），回退到 config.condition_group
+        let condition_group_raw = step.condition_group.clone().or_else(|| {
+            resolved_config
+                .get("condition_group")
+                .and_then(|cg| serde_json::from_value(cg.clone()).ok())
+        });
+        let condition_group = if let Some(ref cg) = condition_group_raw {
+            let mut cg_value = serde_json::to_value(cg).unwrap_or(serde_json::Value::Null);
+            if let Some(ref ph) = placeholder_map {
+                let _ = ph.resolve_value(&mut cg_value, ctx);
+            }
+            serde_json::from_value(cg_value).ok()
+        } else {
+            None
+        };
+
         let resolved_step = Step {
             id: step.id.clone(),
             name: step.name.clone(),
@@ -301,12 +326,32 @@ impl StepExecutor {
             actions: step.actions.clone(),
             expanded: step.expanded,
             condition: step.condition.clone(),
-            condition_group: step.condition_group.clone(),
+            condition_group,
 
             run_condition: None,
         };
 
-        Box::pin(async move { executor.execute(&resolved_step, ctx, self).await })
+        // Phase 3: 后处理替换占位符
+        // 对于容器节点，需要在 executor.execute 之前解析占位符
+        // 把 placeholder_map 传递到 async 块中执行后处理
+
+        Box::pin(async move {
+            // Phase 3: 后处理替换占位符
+            if let Some(ph) = placeholder_map {
+                // 把 resolved_step.config 转为 mutable Value，执行后处理替换
+                let mut config_value = serde_json::to_value(&resolved_step.config)
+                    .unwrap_or(serde_json::Value::Null);
+                ph.resolve_value(&mut config_value, ctx)?;
+                // 创建新的 resolved_step，使用解析后的 config
+                let mut new_step = resolved_step.clone();
+                new_step.config = config_value;
+                let result = executor.execute(&new_step, ctx, self).await;
+                result
+            } else {
+                let result = executor.execute(&resolved_step, ctx, self).await;
+                result
+            }
+        })
     }
 }
 

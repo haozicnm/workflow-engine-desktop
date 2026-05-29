@@ -243,12 +243,8 @@ impl NodeExecutor for WordContainerNode {
         let mut config: WordContainerConfig = serde_json::from_value(step.config.clone())
             .map_err(|e| anyhow!("Word 容器配置解析失败: {}", e))?;
 
-        // 容器不再走全局 resolve_config，这里解析每个 action 的模板变量
-        for action in &mut config.actions {
-            for (_, v) in action.config.iter_mut() {
-                *v = ctx.resolve_config(v);
-            }
-        }
+        // Phase 3: 占位符机制已在 executor 层处理，不需要容器内部 resolve
+        // 保留 input_ports 处理（用于 DAG 连线）
 
         let input_ports = ctx.input_ports.clone();
         let result = execute_word_container(&config, &input_ports).await?;

@@ -39,13 +39,15 @@ impl NodeExecutor for ConditionNode {
             .unwrap_or(serde_json::Value::Null);
 
         // ── 新格式：conditionGroup（可视化条件构建器） ──
-        // 优先从 step.condition_group 读，回退到 config.condition_group
+        // Phase 3: 从 config 或 step 读取 condition_group
+        // normalize_condition_group 处理占位符解析后的类型不匹配（left/right 可能是数字）
         let condition_group_owned: Option<crate::engine::workflow::LogicConditionGroup> =
-            step.condition_group.clone().or_else(|| {
-                config
-                    .get("condition_group")
-                    .and_then(|cg| serde_json::from_value(cg.clone()).ok())
-            });
+            config
+                .get("condition_group")
+                .or_else(|| config.get("conditionGroup"))
+                .cloned()
+                .and_then(|cg| normalize_condition_group(&cg))
+                .or_else(|| step.condition_group.clone());
         if let Some(ref group) = condition_group_owned {
             if !group.conditions.is_empty() {
                 let results: Vec<bool> = group
@@ -190,6 +192,38 @@ fn resolve_output_template(
 }
 
 // ─── 条件求值（pub(crate) 让 approval 等节点可复用） ───
+
+/// 将 JSON Value 转换为字符串（处理占位符解析后 left/right 可能是数字的问题）
+fn value_to_condition_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Null => String::new(),
+        other => serde_json::to_string(other).unwrap_or_default(),
+    }
+}
+
+/// 从 JSON Value 解析 condition_group，处理 left/right 可能是非字符串类型的情况
+fn normalize_condition_group(v: &serde_json::Value) -> Option<crate::engine::workflow::LogicConditionGroup> {
+    let obj = v.as_object()?;
+    let combinator = obj.get("combinator")
+        .and_then(|c| c.as_str())
+        .unwrap_or("and")
+        .to_string();
+    let conditions_val = obj.get("conditions")?.as_array()?;
+    let mut conditions = Vec::new();
+    for cond in conditions_val {
+        let cond_obj = cond.as_object()?;
+        conditions.push(crate::engine::workflow::LogicCondition {
+            id: cond_obj.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            left: cond_obj.get("left").map(value_to_condition_string).unwrap_or_default(),
+            op: cond_obj.get("op").and_then(|v| v.as_str()).unwrap_or("==").to_string(),
+            right: cond_obj.get("right").map(value_to_condition_string).unwrap_or_default(),
+        });
+    }
+    Some(crate::engine::workflow::LogicConditionGroup { combinator, conditions })
+}
 
 pub(crate) fn eval_condition(
     left: &serde_json::Value,
