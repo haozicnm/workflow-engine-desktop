@@ -111,6 +111,32 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: 'actionId: result, ...', isContainer: true, params: []},
 
+  // ─── Kimi WebBridge 浏览器节点 ───
+  { type: 'kimi_browser', label: 'Kimi 浏览器', icon: 'Globe', color: '#79c0ff', description: '通过 Kimi WebBridge 控制真实浏览器（有登录态），支持 17 种操作', outputHint: 'success, data', params: [
+    { key: 'action', label: '操作', type: 'select', options: [
+      { label: '导航', value: 'navigate' },
+      { label: '快照（获取元素树）', value: 'snapshot' },
+      { label: '点击元素', value: 'click' },
+      { label: '物理鼠标点击', value: 'mouse_click' },
+      { label: '填写表单', value: 'fill' },
+      { label: '键盘输入', value: 'key_type' },
+      { label: '发送按键', value: 'send_keys' },
+      { label: '执行 JavaScript', value: 'evaluate' },
+      { label: '截图', value: 'screenshot' },
+      { label: '保存为 PDF', value: 'save_as_pdf' },
+      { label: '网络拦截', value: 'network' },
+      { label: '文件上传', value: 'upload' },
+      { label: 'CDP 原始命令', value: 'cdp' },
+      { label: '查找标签页', value: 'find_tab' },
+      { label: '列出标签页', value: 'list_tabs' },
+      { label: '关闭标签页', value: 'close_tab' },
+      { label: '关闭会话', value: 'close_session' },
+    ], default: 'navigate' },
+    { key: 'args', label: '参数 (JSON)', type: 'textarea', placeholder: '{"url": "https://example.com"}' },
+    { key: 'port', label: 'WebBridge 端口', type: 'number', default: 10086 },
+    { key: 'timeout', label: '超时(秒)', type: 'number', default: 30 },
+  ]},
+
   // ─── MCP 扩展节点（Python sidecar 驱动）───
   { type: 'mcp_script',       label: 'MCP 脚本',        icon: 'Code',          color: '#a5d6ff', description: '通过 MCP 执行 Python 脚本',               outputHint: '脚本返回值', params: [
     { key: 'script', label: 'Python 代码', type: 'textarea', placeholder: 'print("hello")' },

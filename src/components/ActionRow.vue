@@ -177,10 +177,49 @@ const statusDotClass = computed(() => {
 
 const hasParams = computed(() => (actionDef.value?.params?.length ?? 0) > 0)
 const isBrowser = computed(() => props.containerType === 'browser')
+const isKimiBrowser = computed(() => props.action.type === 'kimi_browser' || props.containerType === 'kimi_browser')
 
 // Selector fields (for element picker)
 function isSelectorField(key: string): boolean {
   return isBrowser.value && (key === 'selector' || key.includes('selector'))
+}
+
+// ─── Smart extract templates for kimi_browser evaluate ───
+const smartExtractTemplates = [
+  { label: '页面标题', code: 'document.title' },
+  { label: '所有链接', code: '[...document.querySelectorAll("a")].map(a => ({text: a.innerText.trim(), href: a.href})).filter(x => x.text)' },
+  { label: '所有图片', code: '[...document.querySelectorAll("img")].map(img => ({src: img.src, alt: img.alt})).filter(x => x.src)' },
+  { label: '表格数据', code: '[...document.querySelectorAll("table tr")].map(tr => [...tr.cells].map(td => td.innerText.trim()))' },
+  { label: '页面文本', code: 'document.body.innerText.substring(0, 5000)' },
+  { label: '自定义选择器...', code: '[...document.querySelectorAll("CSS选择器")].map(el => el.innerText.trim())' },
+]
+
+const showSmartExtract = ref(false)
+
+function applySmartExtract(code: string) {
+  localParams.value['args'] = JSON.stringify({ code }, null, 2)
+  emit('update-params', { ...localParams.value })
+  showSmartExtract.value = false
+}
+
+// ─── Quick actions for kimi_browser (no JSON needed) ───
+const quickActions = [
+  { label: '🔗 打开网页', action: 'navigate', args: { url: 'https://example.com' } },
+  { label: '📸 获取快照', action: 'snapshot', args: {} },
+  { label: '📄 获取页面标题', action: 'evaluate', args: { code: 'document.title' } },
+  { label: '📋 获取页面文本', action: 'evaluate', args: { code: 'document.body.innerText.substring(0, 3000)' } },
+  { label: '🖼️ 截图', action: 'screenshot', args: {} },
+  { label: '📑 保存为 PDF', action: 'save_as_pdf', args: {} },
+  { label: '📋 列出标签页', action: 'list_tabs', args: {} },
+]
+
+const showQuickActions = ref(false)
+
+function applyQuickAction(qa: typeof quickActions[0]) {
+  localParams.value['action'] = qa.action
+  localParams.value['args'] = JSON.stringify(qa.args, null, 2)
+  emit('update-params', { ...localParams.value })
+  showQuickActions.value = false
 }
 </script>
 
@@ -253,6 +292,33 @@ function isSelectorField(key: string): boolean {
           {{ t('actionRow.noParamsHint') }}
         </div>
 
+        <!-- Quick actions for kimi_browser -->
+        <div v-if="isKimiBrowser" class="mb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7 text-[11px] gap-1"
+            @click="showQuickActions = !showQuickActions"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            {{ showQuickActions ? '收起常用操作' : '常用操作（免写JSON）' }}
+          </Button>
+
+          <div v-if="showQuickActions" class="mt-1.5 p-2 rounded-md bg-muted/60 border border-border/40 space-y-1">
+            <div
+              v-for="qa in quickActions"
+              :key="qa.label"
+              class="flex items-center px-2 py-1.5 rounded hover:bg-accent/50 cursor-pointer text-[11px] transition-colors"
+              @click="applyQuickAction(qa)"
+            >
+              <span class="text-foreground">{{ qa.label }}</span>
+              <span class="ml-auto text-muted-foreground font-mono text-[10px]">{{ qa.action }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Data flow hint -->
         <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
           <template v-if="prevAction">
@@ -275,6 +341,34 @@ function isSelectorField(key: string): boolean {
           @update:model-value="v => onParamChange(param.key, v)"
           @pick-element="onPickElement(param.key)"
         />
+
+        <!-- Smart extract button for kimi_browser evaluate -->
+        <div v-if="isKimiBrowser && localParams.action === 'evaluate'" class="mt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7 text-[11px] gap-1"
+            @click="showSmartExtract = !showSmartExtract"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            {{ showSmartExtract ? '收起模板' : '智能提取模板' }}
+          </Button>
+
+          <!-- Template dropdown -->
+          <div v-if="showSmartExtract" class="mt-1.5 p-2 rounded-md bg-muted/60 border border-border/40 space-y-1">
+            <div
+              v-for="tpl in smartExtractTemplates"
+              :key="tpl.label"
+              class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-accent/50 cursor-pointer text-[11px] transition-colors"
+              @click="applySmartExtract(tpl.code)"
+            >
+              <span class="text-foreground">{{ tpl.label }}</span>
+              <span class="text-muted-foreground font-mono truncate max-w-[180px]">{{ tpl.code.slice(0, 40) }}...</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Element preview (shown after picking an element) -->
         <div
