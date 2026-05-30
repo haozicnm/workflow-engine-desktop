@@ -180,6 +180,26 @@ impl ExecutionContext {
         }
         serde_json::Value::String(self.interpolate(s))
     }
+    /// 访问 JSON 值的字段，支持对象字段和数组索引
+    /// "name" → obj.name, "0" → arr[0], "items[0]" → obj.items[0]
+    fn get_field<'a>(value: &'a serde_json::Value, field: &str) -> Option<&'a serde_json::Value> {
+        // 处理 "items[0]" 格式
+        if let Some(bracket_pos) = field.find('[') {
+            let key = &field[..bracket_pos];
+            let index_str = &field[bracket_pos + 1..field.len() - 1]; // 去掉 [ 和 ]
+            let obj = value.as_object()?;
+            let arr = obj.get(key)?.as_array()?;
+            let index = index_str.parse::<usize>().ok()?;
+            arr.get(index)
+        } else if let Some(obj) = value.as_object() {
+            obj.get(field)
+        } else if let Some(arr) = value.as_array() {
+            field.parse::<usize>().ok().and_then(|i| arr.get(i))
+        } else {
+            None
+        }
+    }
+
     pub fn resolve_var(&self, key: &str) -> Option<&serde_json::Value> {
         let parts: Vec<&str> = key.split('.').collect();
         let root_key = parts[0];
@@ -189,7 +209,7 @@ impl ExecutionContext {
             if let Some(root) = self.variables.get(parts[1]) {
                 let mut current = root;
                 for part in &parts[2..] {
-                    current = current.get(*part)?;
+                    current = Self::get_field(current, *part)?;
                 }
                 return Some(current);
             }
@@ -200,7 +220,7 @@ impl ExecutionContext {
             if let Some(root) = self.variables.get(parts[1]) {
                 let mut current = root;
                 for part in &parts[2..] {
-                    current = current.get(*part)?;
+                    current = Self::get_field(current, *part)?;
                 }
                 return Some(current);
             }
@@ -212,7 +232,7 @@ impl ExecutionContext {
             if let Some(root) = self.step_outputs.get(root_key) {
                 let mut current = root;
                 for part in &parts[1..] {
-                    current = current.get(*part)?;
+                    current = Self::get_field(current, *part)?;
                 }
                 return Some(current);
             }
@@ -220,7 +240,7 @@ impl ExecutionContext {
             if let Some(root) = self.step_outputs.get(step_id) {
                 let mut current = root;
                 for part in &parts[1..] {
-                    current = current.get(*part)?;
+                    current = Self::get_field(current, *part)?;
                 }
                 return Some(current);
             }
@@ -232,14 +252,14 @@ impl ExecutionContext {
         if let Some(root) = self.step_outputs.get(root_key) {
             let mut current = root;
             for part in &parts[1..] {
-                current = current.get(*part)?;
+                current = Self::get_field(current, *part)?;
             }
             return Some(current);
         }
         if let Some(root) = self.variables.get(root_key) {
             let mut current = root;
             for part in &parts[1..] {
-                current = current.get(*part)?;
+                current = Self::get_field(current, *part)?;
             }
             return Some(current);
         }

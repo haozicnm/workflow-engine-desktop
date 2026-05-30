@@ -933,3 +933,38 @@ async fn u3_eval_condition_operator_aliases() {
     let s3 = result.output("step_3");
     assert_eq!(s3["branch"].as_str().unwrap(), "true", "ne 'inactive' should pass");
 }
+
+// ═══════════════════════════════════════════════════════════════
+// U2: 数组索引变量引用
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn u2_array_index_variable_reference() {
+    let result = TestChain::new()
+        .step("step_1", "script", json!({"script": r#"
+            let items = [
+                #{name: "Alice", scores: [90, 85, 92]},
+                #{name: "Bob", scores: [78, 88, 95]},
+                #{name: "Charlie", scores: [65, 72, 80]}
+            ];
+            #{items: items}
+        "#}))
+        // 测试数组索引访问：step_1.items[0].name
+        .step("step_2", "script", json!({"script": r#"
+            let first_name = step_1.items[0].name;
+            let first_score = step_1.items[0].scores[0];
+            let second_name = step_1.items[1].name;
+            let third_score = step_1.items[2].scores[2];
+            #{first_name: first_name, first_score: first_score, second_name: second_name, third_score: third_score}
+        "#}))
+        .run().await;
+
+    assert!(result.is_ok("step_1"));
+    assert!(result.is_ok("step_2"), "Array indexing should work");
+
+    let s2 = result.output("step_2");
+    assert_eq!(s2["first_name"].as_str().unwrap(), "Alice");
+    assert_eq!(s2["first_score"].as_i64().unwrap(), 90);
+    assert_eq!(s2["second_name"].as_str().unwrap(), "Bob");
+    assert_eq!(s2["third_score"].as_i64().unwrap(), 80);
+}

@@ -120,8 +120,8 @@ impl PlaceholderMap {
     /// 已知格式：step_xxx.yyy、params.xxx、vars.xxx 等
     /// 注意：__item、__index 等延迟注入变量不在此列
     fn is_known_variable(expr: &str) -> bool {
-        // step_xxx.yyy 格式
-        if expr.starts_with("step_") && expr.contains('.') {
+        // step_xxx.yyy 格式（支持数组索引：step_1.items[0].name）
+        if expr.starts_with("step_") && (expr.contains('.') || expr.contains('[')) {
             return true;
         }
         // params.xxx 格式
