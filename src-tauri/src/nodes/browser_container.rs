@@ -781,9 +781,58 @@ async fn execute_actions(
                     .map_err(|e| anyhow!("滚动到元素失败: {}", e))?;
             }
 
+            // ─── v1.8 snapshot + @e ref（对标 Kimi WebBridge）───
+            "snapshot" => {
+                let resp = crate::nodes::browser::send_sidecar_action("snapshot", &serde_json::json!({}))
+                    .await
+                    .map_err(|e| anyhow!("snapshot 失败: {}", e))?;
+                let data = resp.get("data").cloned().unwrap_or(Value::Null);
+                output_ports.insert(action.id.clone(), data);
+            }
+
+            "click_by_ref" => {
+                let ref_id = action
+                    .config
+                    .get("ref")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if ref_id.is_empty() {
+                    return Err(anyhow!("click_by_ref 缺少 ref 参数"));
+                }
+                let params = serde_json::json!({ "ref": ref_id });
+                crate::nodes::browser::send_sidecar_action("click_by_ref", &params)
+                    .await
+                    .map_err(|e| anyhow!("click_by_ref 失败: {}", e))?;
+            }
+
+            "fill_by_ref" => {
+                let ref_id = action
+                    .config
+                    .get("ref")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let value = action
+                    .config
+                    .get("value")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| {
+                        input_ports
+                            .get(&format!("{}_in", &action.id))
+                            .and_then(|v| v.as_str())
+                    })
+                    .unwrap_or("");
+                if ref_id.is_empty() {
+                    return Err(anyhow!("fill_by_ref 缺少 ref 参数"));
+                }
+                let params = serde_json::json!({ "ref": ref_id, "value": value });
+                crate::nodes::browser::send_sidecar_action("fill_by_ref", &params)
+                    .await
+                    .map_err(|e| anyhow!("fill_by_ref 失败: {}", e))?;
+            }
+
             _ => {
                 return Err(anyhow!(
-                    "浏览器容器遇到未知 action 类型: '{}' (label: '{}')。支持的类型: navigate, wait, click, scroll, input, fill, extract, screenshot, evaluate, get_title, extract_table, extract_links, select, check, hover, new_page, close_page, switch_page, pages, cookies, set_headers, back, forward, reload, current_url, pdf, wait_network_idle, wait_load_state, wait_url_contains, verify, download, upload, keyboard, double_click, drag_to, context_menu, switch_frame, handle_dialog, scroll_to_element",
+                    "浏览器容器遇到未知 action 类型: '{}' (label: '{}')。支持的类型: navigate, wait, click, scroll, input, fill, extract, screenshot, evaluate, get_title, extract_table, extract_links, select, check, hover, new_page, close_page, switch_page, pages, cookies, set_headers, back, forward, reload, current_url, pdf, wait_network_idle, wait_load_state, wait_url_contains, verify, download, upload, keyboard, double_click, drag_to, context_menu, switch_frame, handle_dialog, scroll_to_element, snapshot, click_by_ref, fill_by_ref",
                     action.action_type, action.label
                 ));
             }

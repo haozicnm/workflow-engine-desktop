@@ -69,6 +69,18 @@ _extra_headers = {}
 _cdp_session = None
 _cdp_queue = collections.deque()
 
+# ── @e ref 系统（对标 Kimi WebBridge） ──
+_ref_map = {}      # {ref_id: {backendDOMNodeId, role, name}}
+_ref_counter = 1
+
+# 需要 ref 标记的无障碍角色（与 Kimi 一致）
+_REF_ROLES = frozenset([
+    'button', 'link', 'textbox', 'checkbox', 'radio',
+    'combobox', 'listbox', 'menuitem', 'menuitemcheckbox',
+    'menuitemradio', 'option', 'searchbox', 'slider',
+    'spinbutton', 'switch', 'tab', 'treeitem',
+])
+
 
 def _detect_browser_channel() -> str:
     """自动检测系统可用的 Chromium 内核浏览器（跳过 Edge，已知兼容性问题）"""
@@ -230,6 +242,13 @@ async def handle_action(action: str, params: dict) -> dict:
                 return await _scroll_to_element(params)
             case "reset_state":
                 return await _reset_state(params)
+            # v1.8 snapshot + @e ref（对标 Kimi WebBridge）
+            case "snapshot":
+                return await _snapshot(params)
+            case "click_by_ref":
+                return await _click_by_ref(params)
+            case "fill_by_ref":
+                return await _fill_by_ref(params)
             case _:
                 return {"success": False, "error": f"未知操作: {action}"}
     except Exception as e:
@@ -2214,6 +2233,296 @@ async def _scroll_to_element(params: dict) -> dict:
         return {"success": True, "data": {"selector": selector}}
     except Exception as e:
         return {"success": False, "error": f"滚动到元素失败: {e}"}
+
+
+
+# ═══════════════════════════════════════════════
+# v1.8 — snapshot + @e ref（对标 Kimi WebBridge）
+# ═══════════════════════════════════════════════
+
+async def _get_cdp_session():
+    """获取或创建 CDP session"""
+    global _cdp_session
+    page = _get_page()
+    if page is None:
+        return None
+    if _cdp_session is None:
+        try:
+            _cdp_session = await page.context.new_cdp_session(page)
+        except Exception:
+            _cdp_session = None
+    return _cdp_session
+
+
+def _reset_refs():
+    """清空 ref 映射（每次 snapshot 前调用）"""
+    global _ref_map, _ref_counter
+    _ref_map.clear()
+    _ref_counter = 1
+
+
+def _make_ref(backend_node_id: int, role: str, name: str) -> str:
+    """生成 @eN ref 标记并记录映射"""
+    global _ref_counter
+    ref_id = f"e{_ref_counter}"
+    _ref_counter += 1
+    _ref_map[ref_id] = {
+        "backendDOMNodeId": backend_node_id,
+        "role": role,
+        "name": name,
+    }
+    return ref_id
+
+
+def _build_ax_tree(nodes: list) -> list:
+    """从 Accessibility.getFullAXTree 结果构建格式化树
+
+    与 Kimi WebBridge 逻辑一致：
+    - 跳过 none/generic 角色，递归到子节点
+    - 交互角色（button/link/textbox 等）生成 @eN ref
+    """
+    node_map = {n["nodeId"]: n for n in nodes}
+
+    def format_node(node):
+        role_raw = node.get("role")
+        if isinstance(role_raw, dict):
+            role = role_raw.get("value")
+        else:
+            role = role_raw
+
+        # 跳过无意义角色
+        if not role or role in ("none", "generic"):
+            children = []
+            for cid in (node.get("childIds") or []):
+                child = node_map.get(cid)
+                if child:
+                    result = format_node(child)
+                    if result:
+                        if isinstance(result, list):
+                            children.extend(result)
+                        else:
+                            children.append(result)
+            return children[0] if len(children) == 1 else (children if children else None)
+
+        # 有意义的角色
+        entry = {"role": role}
+        name_raw = node.get("name")
+        name_val = name_raw.get("value") if isinstance(name_raw, dict) else name_raw
+        if name_val:
+            entry["name"] = name_val
+        value_raw = node.get("value")
+        value_val = value_raw.get("value") if isinstance(value_raw, dict) else value_raw
+        if value_val:
+            entry["value"] = value_val
+
+        # 交互角色生成 @eN ref
+        backend_id = node.get("backendDOMNodeId")
+        if role in _REF_ROLES and backend_id is not None:
+            entry["ref"] = f"@{_make_ref(backend_id, role, name_val or '')}"
+
+        # 递归子节点
+        children = []
+        for cid in (node.get("childIds") or []):
+            child = node_map.get(cid)
+            if child:
+                result = format_node(child)
+                if result:
+                    if isinstance(result, list):
+                        children.extend(result)
+                    else:
+                        children.append(result)
+        if children:
+            entry["children"] = children
+
+        return entry
+
+    if not nodes:
+        return []
+    root = nodes[0]
+    result = format_node(root)
+    if result is None:
+        return []
+    return [result] if not isinstance(result, list) else result
+
+
+async def _snapshot(_params: dict) -> dict:
+    """获取页面无障碍树快照（带 @eN ref 标记）
+
+    对标 Kimi WebBridge 的 snapshot 工具：
+    - 使用 CDP Accessibility.getFullAXTree
+    - 交互元素自动标记 @eN
+    - 返回 {url, title, tree, refs}
+    """
+    page = _get_page()
+    if page is None:
+        return {"success": False, "error": "浏览器未启动"}
+
+    cdp = await _get_cdp_session()
+    if cdp is None:
+        return {"success": False, "error": "无法创建 CDP 会话"}
+
+    try:
+        _reset_refs()
+        ax_result = await cdp.send("Accessibility.getFullAXTree")
+        nodes = ax_result.get("nodes", [])
+        tree = _build_ax_tree(nodes)
+
+        return {
+            "success": True,
+            "data": {
+                "url": page.url,
+                "title": await page.title(),
+                "tree": tree,
+                "refs": {k: {"role": v["role"], "name": v["name"]}
+                          for k, v in _ref_map.items()},
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": f"snapshot 失败: {e}"}
+
+
+async def _click_by_ref(params: dict) -> dict:
+    """通过 @eN ref 点击元素
+
+    用法：click_by_ref({"ref": "@e1"})
+    先 scrollIntoView，再用 Input.dispatchMouseEvent 点击
+    """
+    ref = params.get("ref", "")
+    if not ref:
+        return {"success": False, "error": "click_by_ref 缺少 ref 参数"}
+
+    ref_id = ref.lstrip("@")
+    ref_info = _ref_map.get(ref_id)
+    if not ref_info:
+        return {"success": False, "error": f'未知 ref "{ref}"，请先执行 snapshot'}
+
+    cdp = await _get_cdp_session()
+    if cdp is None:
+        return {"success": False, "error": "无法创建 CDP 会话"}
+
+    try:
+        # 1. 解析 backendNodeId → DOM node
+        resolved = await cdp.send("DOM.resolveNode", {
+            "backendNodeId": ref_info["backendDOMNodeId"]
+        })
+        object_id = resolved.get("object", {}).get("objectId")
+        if not object_id:
+            return {"success": False, "error": f'无法解析 ref "{ref}"'}
+
+        # 2. scrollIntoView
+        await cdp.send("Runtime.callFunctionOn", {
+            "objectId": object_id,
+            "functionDeclaration": "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+        })
+
+        # 3. 获取元素中心坐标
+        box_model = await cdp.send("DOM.getBoxModel", {"objectId": object_id})
+        content = box_model.get("model", {}).get("content", [])
+        if len(content) < 8:
+            return {"success": False, "error": f'ref "{ref}" 无可见区域'}
+
+        cx = (content[0] + content[2] + content[4] + content[6]) / 4
+        cy = (content[1] + content[3] + content[5] + content[7]) / 4
+
+        # 4. 模拟鼠标点击
+        await cdp.send("Input.dispatchMouseEvent", {
+            "type": "mouseMoved", "x": cx, "y": cy,
+            "button": "none", "buttons": 0,
+        })
+        await cdp.send("Input.dispatchMouseEvent", {
+            "type": "mousePressed", "x": cx, "y": cy,
+            "button": "left", "buttons": 1, "clickCount": 1,
+        })
+        await cdp.send("Input.dispatchMouseEvent", {
+            "type": "mouseReleased", "x": cx, "y": cy,
+            "button": "left", "buttons": 0, "clickCount": 1,
+        })
+
+        return {
+            "success": True,
+            "data": {
+                "ref": ref, "role": ref_info["role"],
+                "name": ref_info["name"],
+                "x": round(cx), "y": round(cy),
+            },
+        }
+    except Exception as e:
+        return {"success": False, "error": f"click_by_ref 失败: {e}"}
+
+
+async def _fill_by_ref(params: dict) -> dict:
+    """通过 @eN ref 填写表单
+
+    用法：fill_by_ref({"ref": "@e3", "value": "hello"})
+    支持 input/textarea/contenteditable
+    """
+    ref = params.get("ref", "")
+    value = params.get("value", "")
+    if not ref:
+        return {"success": False, "error": "fill_by_ref 缺少 ref 参数"}
+
+    ref_id = ref.lstrip("@")
+    ref_info = _ref_map.get(ref_id)
+    if not ref_info:
+        return {"success": False, "error": f'未知 ref "{ref}"，请先执行 snapshot'}
+
+    cdp = await _get_cdp_session()
+    if cdp is None:
+        return {"success": False, "error": "无法创建 CDP 会话"}
+
+    try:
+        resolved = await cdp.send("DOM.resolveNode", {
+            "backendNodeId": ref_info["backendDOMNodeId"]
+        })
+        object_id = resolved.get("object", {}).get("objectId")
+        if not object_id:
+            return {"success": False, "error": f'无法解析 ref "{ref}"'}
+
+        # 用 JS 填写值（与 Kimi 的 fill 逻辑一致）
+        escaped_value = json.dumps(value)
+        js_code = f"""function() {{
+            const el = this;
+            el.focus();
+            if (el.isContentEditable) {{
+                const sel = window.getSelection();
+                if (sel) {{
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }}
+                let inserted = false;
+                try {{ inserted = document.execCommand('insertText', false, {escaped_value}); }} catch(_e) {{ inserted = false; }}
+                if (!inserted) {{
+                    el.textContent = {escaped_value};
+                    el.dispatchEvent(new InputEvent('input', {{inputType:'insertText', data:{escaped_value}, bubbles:true}}));
+                }}
+                return {{success:true, tag:el.tagName, mode:'contenteditable'}};
+            }}
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+                || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+            if (setter) setter.call(el, {escaped_value});
+            else el.value = {escaped_value};
+            el.dispatchEvent(new Event('input', {{bubbles:true}}));
+            el.dispatchEvent(new Event('change', {{bubbles:true}}));
+            return {{success:true, tag:el.tagName, mode:'value'}};
+        }}"""
+
+        result = await cdp.send("Runtime.callFunctionOn", {
+            "objectId": object_id,
+            "functionDeclaration": js_code,
+            "returnByValue": True,
+        })
+
+        if result.get("exceptionDetails"):
+            return {"success": False, "error": f'fill_by_ref JS 异常: {result["exceptionDetails"].get("text", "")}'}
+
+        return {
+            "success": True,
+            "data": {"ref": ref, "value": value},
+        }
+    except Exception as e:
+        return {"success": False, "error": f"fill_by_ref 失败: {e}"}
 
 
 async def main():
