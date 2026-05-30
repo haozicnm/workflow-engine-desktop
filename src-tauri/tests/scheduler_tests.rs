@@ -239,33 +239,33 @@ fn approval_no_output_continues() {
 // ═══════════════════════════════════════════════════
 
 #[test]
-fn loop_node_returns_none() {
+fn loop_node_continues_after_completion() {
     let step = make_step_with_next("loop1", "loop", "next1");
     let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, None, "loop node should always return None");
+    assert_eq!(next, Some("next1".to_string()), "loop node should continue to next step after completion");
 }
 
 #[test]
-fn parallel_node_returns_none() {
+fn parallel_node_continues_after_completion() {
     let step = make_step_with_next("par1", "parallel", "next1");
     let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, None, "parallel node should always return None");
+    assert_eq!(next, Some("next1".to_string()), "parallel node should continue to next step after completion");
 }
 
 #[test]
-fn while_node_returns_none() {
+fn while_node_continues_after_completion() {
     let step = make_step_with_next("while1", "while", "next1");
     let wf = make_workflow(vec![step.clone(), make_step("next1", "http", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, None, "while node should always return None");
+    assert_eq!(next, Some("next1".to_string()), "while node should continue to next step after completion");
 }
 
 // ═══════════════════════════════════════════════════

@@ -824,6 +824,14 @@ async fn get_or_start_sidecar() -> Result<Arc<BrowserSidecar>> {
     let sidecar = BrowserSidecar::start().await?;
     let arc = Arc::new(sidecar);
     *guard = Some(Arc::clone(&arc));
+    // 记录启动时间，确保空闲超时机制能正常触发
+    LAST_USED.store(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        std::sync::atomic::Ordering::Relaxed,
+    );
     info!("Sidecar 启动成功 ✓");
     Ok(arc)
 }
