@@ -968,3 +968,27 @@ async fn u2_array_index_variable_reference() {
     assert_eq!(s2["second_name"].as_str().unwrap(), "Bob");
     assert_eq!(s2["third_score"].as_i64().unwrap(), 80);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// U2: 变量解析失败返回 Null
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn u2_missing_variable_returns_null() {
+    let result = TestChain::new()
+        .step("step_1", "script", json!({"script": r#"#{value: 42}"#}))
+        // 引用不存在的字段
+        .step("step_2", "script", json!({"script": r#"
+            let missing = step_1.nonexistent;
+            let existing = step_1.value;
+            #{missing: missing, existing: existing}
+        "#}))
+        .run().await;
+
+    assert!(result.is_ok("step_1"));
+    assert!(result.is_ok("step_2"), "Missing variables should return null, not error");
+
+    let s2 = result.output("step_2");
+    assert!(s2["missing"].is_null(), "step_1.nonexistent should be null");
+    assert_eq!(s2["existing"].as_i64().unwrap(), 42, "step_1.value should work");
+}
