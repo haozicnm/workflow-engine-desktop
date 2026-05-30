@@ -33,7 +33,7 @@ pub struct BridgeResponse {
 }
 
 /// 扩展注册消息
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BridgeRegister {
     #[serde(rename = "type")]
     pub msg_type: String,
@@ -83,7 +83,7 @@ impl WebBridgeState {
 
     /// 获取扩展信息
     pub async fn get_info(&self) -> Option<BridgeRegister> {
-        self.info.read().await.clone()
+        self.info.read().await.as_ref().cloned()
     }
 
     /// 生成命令 ID
@@ -192,15 +192,15 @@ pub fn get_state() -> Arc<WebBridgeState> {
 
 /// 发送命令到 WebBridge 扩展
 pub async fn send_command(action: &str, params: Value) -> Result<Value> {
-    WEBBRIDGE.send_command(action, params).await
+    get_state().send_command(action, params).await
 }
 
 /// 检查 WebBridge 是否可用
 pub async fn is_available() -> bool {
-    WEBBRIDGE.is_connected().await
+    get_state().is_connected().await
 }
 
 /// 获取连接信息
 pub async fn get_info() -> Option<BridgeRegister> {
-    WEBBRIDGE.get_info().await
+    get_state().get_info().await
 }

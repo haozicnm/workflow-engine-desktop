@@ -134,7 +134,7 @@ async fn ws_browser_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(handle_ws_browser)
 }
 
-async fn handle_ws_browser(mut socket: WebSocket) {
+async fn handle_ws_browser(socket: WebSocket) {
     use futures_util::{SinkExt, StreamExt};
     use crate::nodes::webbridge;
 

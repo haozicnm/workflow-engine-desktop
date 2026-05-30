@@ -72,7 +72,7 @@ async fn send_browser_action(action: &str, params: &Value) -> Result<Value> {
     if crate::nodes::webbridge::is_available().await {
         crate::nodes::webbridge::send_command(action, params.clone()).await
     } else {
-        send_browser_action(action, params).await
+        crate::nodes::browser::send_sidecar_action(action, params).await
     }
 }
 

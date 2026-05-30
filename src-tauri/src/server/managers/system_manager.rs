@@ -67,7 +67,7 @@ pub async fn webbridge_health() -> Response {
         "connected": connected,
         "version": info.as_ref().map(|i| i.version.as_str()).unwrap_or(""),
         "client": info.as_ref().map(|i| i.client.as_str()).unwrap_or(""),
-        "capabilities": info.as_ref().map(|i| &i.capabilities).unwrap(&vec![]),
+        "capabilities": info.as_ref().map(|i| &i.capabilities).unwrap_or(&vec![]),
     }))
 }
 
