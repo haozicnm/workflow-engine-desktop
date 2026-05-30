@@ -767,3 +767,69 @@ async fn scenario_3_condition_or_branch() {
     assert_eq!(result.output("step_2")["branch"].as_str().unwrap(), "true");
     assert_eq!(result.output("step_3")["channel"].as_str().unwrap(), "VIP通道");
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 4: 循环处理 — script → loop(body: script) → 汇总
+// 验证：__item/__index 注入、collect 收集、嵌套字段访问
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_4_loop_collect_summary() {
+    let result = TestChain::new()
+        // Step 1: 准备数据
+        .step("step_1", "script", json!({"script": r#"
+            let products = [
+                #{name: "键盘", price: 299, qty: 3},
+                #{name: "鼠标", price: 99, qty: 5},
+                #{name: "显示器", price: 1999, qty: 1},
+                #{name: "耳机", price: 399, qty: 2}
+            ];
+            #{products: products}
+        "#}))
+        // Step 2: 循环计算每个商品的小计
+        .step("step_2", "loop", json!({
+            "items": "{{step_1.products}}",
+            "body": [{
+                "id": "calc",
+                "type": "script",
+                "config": {"script": r#"
+                    let item = __item;
+                    let subtotal = item.price * item.qty;
+                    #{name: item.name, subtotal: subtotal}
+                "#}
+            }],
+            "collect": {"names": "calc.name", "subtotals": "calc.subtotal"}
+        }))
+        // Step 3: 汇总
+        .step("step_3", "script", json!({"script": r#"
+            let collected = step_2.collected;
+            let subtotals = collected.subtotals;
+            let names = collected.names;
+            let total = 0;
+            for s in subtotals { total += s; }
+            let count = step_2.count;
+            let summary = "";
+            for i in 0..count {
+                summary += names[i] + ": ¥" + to_string(subtotals[i]);
+                if i < count - 1 { summary += ", "; }
+            }
+            #{total: total, count: count, summary: summary}
+        "#}))
+        .run().await;
+
+    // 断言
+    assert!(result.is_ok("step_1"));
+    assert!(result.is_ok("step_2"));
+
+    let s2 = result.output("step_2");
+    assert_eq!(s2["count"].as_i64().unwrap(), 4, "Should iterate 4 products");
+
+    assert!(result.is_ok("step_3"));
+    let s3 = result.output("step_3");
+    assert_eq!(s3["count"].as_i64().unwrap(), 4);
+    // 299*3 + 99*5 + 1999*1 + 399*2 = 897 + 495 + 1999 + 798 = 4189
+    assert_eq!(s3["total"].as_i64().unwrap(), 4189, "Total should be 4189");
+    let summary = s3["summary"].as_str().unwrap();
+    assert!(summary.contains("键盘"), "Summary should mention 键盘");
+    assert!(summary.contains("显示器"), "Summary should mention 显示器");
+}
