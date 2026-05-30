@@ -41,13 +41,12 @@ impl NodeExecutor for ConditionNode {
         // ── 新格式：conditionGroup（可视化条件构建器） ──
         // Phase 3: 从 config 或 step 读取 condition_group
         // normalize_condition_group 处理占位符解析后的类型不匹配（left/right 可能是数字）
-        let condition_group_owned: Option<crate::engine::workflow::LogicConditionGroup> =
-            config
-                .get("condition_group")
-                .or_else(|| config.get("conditionGroup"))
-                .cloned()
-                .and_then(|cg| normalize_condition_group(&cg))
-                .or_else(|| step.condition_group.clone());
+        let condition_group_owned: Option<crate::engine::workflow::LogicConditionGroup> = config
+            .get("condition_group")
+            .or_else(|| config.get("conditionGroup"))
+            .cloned()
+            .and_then(|cg| normalize_condition_group(&cg))
+            .or_else(|| step.condition_group.clone());
         if let Some(ref group) = condition_group_owned {
             if !group.conditions.is_empty() {
                 let results: Vec<bool> = group
@@ -205,9 +204,12 @@ fn value_to_condition_string(v: &serde_json::Value) -> String {
 }
 
 /// 从 JSON Value 解析 condition_group，处理 left/right 可能是非字符串类型的情况
-fn normalize_condition_group(v: &serde_json::Value) -> Option<crate::engine::workflow::LogicConditionGroup> {
+fn normalize_condition_group(
+    v: &serde_json::Value,
+) -> Option<crate::engine::workflow::LogicConditionGroup> {
     let obj = v.as_object()?;
-    let combinator = obj.get("combinator")
+    let combinator = obj
+        .get("combinator")
         .and_then(|c| c.as_str())
         .unwrap_or("and")
         .to_string();
@@ -216,13 +218,30 @@ fn normalize_condition_group(v: &serde_json::Value) -> Option<crate::engine::wor
     for cond in conditions_val {
         let cond_obj = cond.as_object()?;
         conditions.push(crate::engine::workflow::LogicCondition {
-            id: cond_obj.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            left: cond_obj.get("left").map(value_to_condition_string).unwrap_or_default(),
-            op: cond_obj.get("op").and_then(|v| v.as_str()).unwrap_or("==").to_string(),
-            right: cond_obj.get("right").map(value_to_condition_string).unwrap_or_default(),
+            id: cond_obj
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            left: cond_obj
+                .get("left")
+                .map(value_to_condition_string)
+                .unwrap_or_default(),
+            op: cond_obj
+                .get("op")
+                .and_then(|v| v.as_str())
+                .unwrap_or("==")
+                .to_string(),
+            right: cond_obj
+                .get("right")
+                .map(value_to_condition_string)
+                .unwrap_or_default(),
         });
     }
-    Some(crate::engine::workflow::LogicConditionGroup { combinator, conditions })
+    Some(crate::engine::workflow::LogicConditionGroup {
+        combinator,
+        conditions,
+    })
 }
 
 pub(crate) fn eval_condition(

@@ -42,8 +42,8 @@ impl NodeExecutor for ClipboardContainerNode {
         match config.action.as_str() {
             "read" => {
                 let text = tokio::task::spawn_blocking(|| {
-                    let mut clipboard = arboard::Clipboard::new()
-                        .map_err(|e| anyhow!("无法打开剪贴板: {}", e))?;
+                    let mut clipboard =
+                        arboard::Clipboard::new().map_err(|e| anyhow!("无法打开剪贴板: {}", e))?;
                     clipboard
                         .get_text()
                         .map_err(|e| anyhow!("读取剪贴板失败: {}", e))
@@ -58,8 +58,8 @@ impl NodeExecutor for ClipboardContainerNode {
                 let len = text_owned.len();
 
                 tokio::task::spawn_blocking(move || {
-                    let mut clipboard = arboard::Clipboard::new()
-                        .map_err(|e| anyhow!("无法打开剪贴板: {}", e))?;
+                    let mut clipboard =
+                        arboard::Clipboard::new().map_err(|e| anyhow!("无法打开剪贴板: {}", e))?;
                     clipboard
                         .set_text(&text_owned)
                         .map_err(|e| anyhow!("写入剪贴板失败: {}", e))

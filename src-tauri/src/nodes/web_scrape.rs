@@ -82,10 +82,7 @@ async fn scrape_url_list(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let retry = config
-        .get("retry")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as usize;
+    let retry = config.get("retry").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
     let retry_delay_ms = config
         .get("retry_delay_ms")
@@ -97,9 +94,7 @@ async fn scrape_url_list(
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
-    let excel_output = config
-        .get("excel_output")
-        .and_then(|v| v.as_str());
+    let excel_output = config.get("excel_output").and_then(|v| v.as_str());
 
     let url_strings: Vec<String> = urls
         .iter()
@@ -116,7 +111,9 @@ async fn scrape_url_list(
 
     info!(
         "批量抓取 {} 个 URL（重试 {} 次，间隔 {}ms）",
-        url_strings.len(), retry, delay_between_ms
+        url_strings.len(),
+        retry,
+        delay_between_ms
     );
 
     // 启动浏览器
@@ -158,8 +155,12 @@ async fn scrape_url_list(
                 }
                 Err(e) => {
                     if attempt < max_attempts {
-                        warn!("抓取 {} 第 {} 次失败: {}，{}ms 后重试", url, attempt, e, retry_delay_ms);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms)).await;
+                        warn!(
+                            "抓取 {} 第 {} 次失败: {}，{}ms 后重试",
+                            url, attempt, e, retry_delay_ms
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms))
+                            .await;
                     } else {
                         last_err = Some(e);
                         break;
@@ -221,7 +222,10 @@ fn expand_url_pattern(pattern: &str) -> Result<Vec<String>> {
                 expand_range(inner)?
             } else {
                 // 逗号分隔列表
-                inner.split(',').map(|s| s.trim().to_string()).collect::<Vec<_>>()
+                inner
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect::<Vec<_>>()
             };
 
             let mut new_result = Vec::new();
@@ -262,7 +266,11 @@ fn expand_range(inner: &str) -> Result<Vec<String>> {
             .parse()
             .map_err(|_| anyhow!("范围步长不是数字: {}", parts[2]))?
     } else {
-        if end >= start { 1 } else { -1 }
+        if end >= start {
+            1
+        } else {
+            -1
+        }
     };
 
     if step == 0 {
@@ -318,7 +326,10 @@ fn write_excel_output(path: &str, results: &[serde_json::Value]) -> Result<()> {
         let r = row as u32 + 1;
         let url = result.get("url").and_then(|v| v.as_str()).unwrap_or("");
         let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("");
-        let total = result.get("total_items").and_then(|v| v.as_u64()).unwrap_or(0);
+        let total = result
+            .get("total_items")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         let items = result.get("items").and_then(|v| v.as_array());
         let success = error.is_empty();
 
@@ -430,8 +441,7 @@ async fn scrape_single_url_inner(
                 "times": scroll_times,
                 "delay_ms": delay_ms,
             });
-            let _ =
-                crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
+            let _ = crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
         }
 
         for rule in extract_rules {
@@ -647,10 +657,7 @@ fn scrape_local_file(url: &str, config: &serde_json::Value) -> Result<serde_json
                             .to_string()
                     } else if let Some(attr_name) = extract_attr_from_selector(field_str) {
                         // 属性提取：[href] → 提取 href 属性
-                        element
-                            .attr(attr_name)
-                            .unwrap_or("")
-                            .to_string()
+                        element.attr(attr_name).unwrap_or("").to_string()
                     } else if let Ok(sub_sel) = scraper::Selector::parse(field_str) {
                         element
                             .select(&sub_sel)

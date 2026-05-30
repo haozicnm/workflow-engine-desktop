@@ -2,14 +2,15 @@
 pub mod approval;
 pub mod array;
 pub mod browser;
+pub mod browser_container;
 pub mod clipboard;
 pub mod clipboard_container;
-pub mod browser_container;
 pub mod condition;
 pub mod convert;
 pub mod cursor;
 pub mod data;
 pub mod delay;
+pub mod error_utils;
 pub mod excel;
 pub mod excel_container;
 pub mod file;

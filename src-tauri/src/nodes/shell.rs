@@ -168,7 +168,8 @@ fn resolve_shell(shell: &str) -> (String, String) {
         "bash" | "sh" => ("bash".into(), "-c".into()),
         "powershell" | "pwsh" => ("powershell".into(), "-Command".into()),
         "cmd" => ("cmd".into(), "/C".into()),
-        _ => {  // "auto" or any other
+        _ => {
+            // "auto" or any other
             #[cfg(target_os = "windows")]
             {
                 ("cmd".into(), "/C".into())

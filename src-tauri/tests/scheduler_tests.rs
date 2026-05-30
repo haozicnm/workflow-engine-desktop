@@ -245,7 +245,11 @@ fn loop_node_continues_after_completion() {
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, Some("next1".to_string()), "loop node should continue to next step after completion");
+    assert_eq!(
+        next,
+        Some("next1".to_string()),
+        "loop node should continue to next step after completion"
+    );
 }
 
 #[test]
@@ -255,7 +259,11 @@ fn parallel_node_continues_after_completion() {
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, Some("next1".to_string()), "parallel node should continue to next step after completion");
+    assert_eq!(
+        next,
+        Some("next1".to_string()),
+        "parallel node should continue to next step after completion"
+    );
 }
 
 #[test]
@@ -265,7 +273,11 @@ fn while_node_continues_after_completion() {
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
-    assert_eq!(next, Some("next1".to_string()), "while node should continue to next step after completion");
+    assert_eq!(
+        next,
+        Some("next1".to_string()),
+        "while node should continue to next step after completion"
+    );
 }
 
 // ═══════════════════════════════════════════════════

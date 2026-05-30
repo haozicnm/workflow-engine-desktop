@@ -1047,7 +1047,11 @@ async fn test_approval_with_conditions_auto() {
         }),
     );
     let cond_result = exec.execute(&cond_step, &mut ctx).await;
-    assert!(cond_result.is_ok(), "Condition failed: {:?}", cond_result.err());
+    assert!(
+        cond_result.is_ok(),
+        "Condition failed: {:?}",
+        cond_result.err()
+    );
     let cond_out = cond_result.unwrap();
     assert_eq!(cond_out["branch"].as_str(), Some("true"));
     assert_eq!(cond_out["result"].as_bool(), Some(true));

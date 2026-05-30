@@ -192,9 +192,8 @@ pub async fn execute_word_container(
                                 .get("paragraphs")
                                 .cloned()
                                 .unwrap_or(Value::Array(vec![]));
-                            let mut all_paras: Vec<Value> = existing_paras
-                                .as_array().cloned()
-                                .unwrap_or_default();
+                            let mut all_paras: Vec<Value> =
+                                existing_paras.as_array().cloned().unwrap_or_default();
                             all_paras.push(table_para);
                             crate::nodes::word::word_write(
                                 &config.file_path,

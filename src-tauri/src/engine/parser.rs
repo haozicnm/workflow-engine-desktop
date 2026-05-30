@@ -282,7 +282,8 @@ fn convert_action_to_step(action: &Value) -> Result<Step> {
         config
             .as_object()
             .and_then(|c| c.get("actions"))
-            .and_then(|v| v.as_array()).cloned()
+            .and_then(|v| v.as_array())
+            .cloned()
     } else {
         None
     };

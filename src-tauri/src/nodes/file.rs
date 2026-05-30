@@ -419,11 +419,13 @@ impl NodeExecutor for FileCopyNode {
             // 确保目标父目录存在
             if let Some(parent) = std::path::Path::new(dest).parent() {
                 if !parent.as_os_str().is_empty() && !parent.exists() {
-                    tokio::fs::create_dir_all(parent).await
+                    tokio::fs::create_dir_all(parent)
+                        .await
                         .map_err(|e| anyhow!("创建父目录失败: {}", e))?;
                 }
             }
-            tokio::fs::copy(src, dest).await
+            tokio::fs::copy(src, dest)
+                .await
                 .map_err(|e| anyhow!("复制文件失败 [{} -> {}]: {}", src, dest, e))?;
         }
 
@@ -433,27 +435,35 @@ impl NodeExecutor for FileCopyNode {
 }
 
 async fn copy_dir_recursive(src: &str, dest: &str) -> Result<()> {
-    tokio::fs::create_dir_all(dest).await
+    tokio::fs::create_dir_all(dest)
+        .await
         .map_err(|e| anyhow!("创建目标目录失败 [{}]: {}", dest, e))?;
 
-    let mut read_dir = tokio::fs::read_dir(src).await
+    let mut read_dir = tokio::fs::read_dir(src)
+        .await
         .map_err(|e| anyhow!("读取源目录失败 [{}]: {}", src, e))?;
 
-    while let Some(entry) = read_dir.next_entry().await
+    while let Some(entry) = read_dir
+        .next_entry()
+        .await
         .map_err(|e| anyhow!("遍历目录失败: {}", e))?
     {
         let src_path = entry.path();
         let dest_path = std::path::Path::new(dest).join(entry.file_name());
-        let meta = entry.metadata().await
+        let meta = entry
+            .metadata()
+            .await
             .map_err(|e| anyhow!("获取元数据失败: {}", e))?;
 
         if meta.is_dir() {
             Box::pin(copy_dir_recursive(
                 &src_path.to_string_lossy(),
                 &dest_path.to_string_lossy(),
-            )).await?;
+            ))
+            .await?;
         } else {
-            tokio::fs::copy(&src_path, &dest_path).await
+            tokio::fs::copy(&src_path, &dest_path)
+                .await
                 .map_err(|e| anyhow!("复制失败: {}", e))?;
         }
     }
@@ -485,12 +495,14 @@ impl NodeExecutor for FileMoveNode {
         // 确保目标父目录存在
         if let Some(parent) = std::path::Path::new(dest).parent() {
             if !parent.as_os_str().is_empty() && !parent.exists() {
-                tokio::fs::create_dir_all(parent).await
+                tokio::fs::create_dir_all(parent)
+                    .await
                     .map_err(|e| anyhow!("创建父目录失败: {}", e))?;
             }
         }
 
-        tokio::fs::rename(src, dest).await
+        tokio::fs::rename(src, dest)
+            .await
             .map_err(|e| anyhow!("移动失败 [{} -> {}]: {}", src, dest, e))?;
 
         info!("移动: {} -> {}", src, dest);
@@ -549,11 +561,12 @@ impl NodeExecutor for FileChecksumNode {
         let config = &step.config;
         let path = get_path(config)?;
 
-        let bytes = tokio::fs::read(path).await
+        let bytes = tokio::fs::read(path)
+            .await
             .map_err(|e| anyhow!("读取文件失败 [{}]: {}", path, e))?;
 
         use md5::Md5;
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
         let md5_hash = {
             let mut hasher = Md5::new();
@@ -567,7 +580,10 @@ impl NodeExecutor for FileChecksumNode {
             format!("{:x}", hasher.finalize())
         };
 
-        info!("checksum [{}]: md5={}, sha256={}", path, md5_hash, sha256_hash);
+        info!(
+            "checksum [{}]: md5={}, sha256={}",
+            path, md5_hash, sha256_hash
+        );
         Ok(serde_json::json!({
             "path": path,
             "size": bytes.len(),

@@ -457,10 +457,9 @@ async fn execute_actions(
             }
 
             "pages" => {
-                let resp =
-                    send_browser_action("pages", &serde_json::json!({}))
-                        .await
-                        .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
+                let resp = send_browser_action("pages", &serde_json::json!({}))
+                    .await
+                    .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
@@ -515,12 +514,9 @@ async fn execute_actions(
             }
 
             "current_url" => {
-                let resp = send_browser_action(
-                    "current_url",
-                    &serde_json::json!({}),
-                )
-                .await
-                .map_err(|e| anyhow!("获取URL失败: {}", e))?;
+                let resp = send_browser_action("current_url", &serde_json::json!({}))
+                    .await
+                    .map_err(|e| anyhow!("获取URL失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
                 output_ports.insert(action.id.clone(), data);
             }
@@ -586,10 +582,9 @@ async fn execute_actions(
 
             // ─── 动作验证 (v2) ───
             "verify" => {
-                let resp =
-                    send_browser_action("verify", &serde_json::json!({}))
-                        .await
-                        .map_err(|e| anyhow!("验证失败: {}", e))?;
+                let resp = send_browser_action("verify", &serde_json::json!({}))
+                    .await
+                    .map_err(|e| anyhow!("验证失败: {}", e))?;
                 let data = resp.clone();
                 let clean = data.get("clean").and_then(|v| v.as_bool()).unwrap_or(true);
                 if !clean {

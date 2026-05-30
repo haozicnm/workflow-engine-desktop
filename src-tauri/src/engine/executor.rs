@@ -73,15 +73,35 @@ impl StepExecutor {
         register!(executors, "file_copy", crate::nodes::file::FileCopyNode);
         register!(executors, "file_move", crate::nodes::file::FileMoveNode);
         register!(executors, "file_glob", crate::nodes::file::FileGlobNode);
-        register!(executors, "file_checksum", crate::nodes::file::FileChecksumNode);
+        register!(
+            executors,
+            "file_checksum",
+            crate::nodes::file::FileChecksumNode
+        );
 
         // ── 剪贴板节点 ──
-        register!(executors, "clipboard_read", crate::nodes::clipboard::ClipboardReadNode);
-        register!(executors, "clipboard_write", crate::nodes::clipboard::ClipboardWriteNode);
+        register!(
+            executors,
+            "clipboard_read",
+            crate::nodes::clipboard::ClipboardReadNode
+        );
+        register!(
+            executors,
+            "clipboard_write",
+            crate::nodes::clipboard::ClipboardWriteNode
+        );
 
         // ── 浏览器子节点 ──
-        register!(executors, "browser_pdf", crate::nodes::browser::BrowserPdfNode);
-        register!(executors, "kimi_browser", crate::nodes::kimi_browser::KimiBrowserNode);
+        register!(
+            executors,
+            "browser_pdf",
+            crate::nodes::browser::BrowserPdfNode
+        );
+        register!(
+            executors,
+            "kimi_browser",
+            crate::nodes::kimi_browser::KimiBrowserNode
+        );
 
         // ── 正则节点（v3: 独立 executor） ──
         register!(
@@ -340,8 +360,8 @@ impl StepExecutor {
             // Phase 3: 后处理替换占位符
             if let Some(ph) = placeholder_map {
                 // 把 resolved_step.config 转为 mutable Value，执行后处理替换
-                let mut config_value = serde_json::to_value(&resolved_step.config)
-                    .unwrap_or(serde_json::Value::Null);
+                let mut config_value =
+                    serde_json::to_value(&resolved_step.config).unwrap_or(serde_json::Value::Null);
                 ph.resolve_value(&mut config_value, ctx)?;
                 // 创建新的 resolved_step，使用解析后的 config
                 let mut new_step = resolved_step.clone();

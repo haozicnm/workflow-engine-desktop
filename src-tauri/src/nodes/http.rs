@@ -32,10 +32,7 @@ impl NodeExecutor for HttpNode {
             .ok_or_else(|| anyhow!("HTTP 节点缺少 url 参数"))?;
 
         // 重试配置
-        let max_retries = config
-            .get("retry")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32;
+        let max_retries = config.get("retry").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
         let retry_delay_ms = config
             .get("retry_delay_ms")
             .and_then(|v| v.as_u64())
@@ -122,17 +119,25 @@ impl NodeExecutor for HttpNode {
                     if attempt < max_attempts {
                         warn!(
                             "HTTP 请求失败 ({} {}) 第 {}/{} 次: {}，{}ms 后重试",
-                            method, url, attempt, max_attempts,
-                            last_err.as_ref().unwrap(), retry_delay_ms
+                            method,
+                            url,
+                            attempt,
+                            max_attempts,
+                            last_err.as_ref().unwrap(),
+                            retry_delay_ms
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms))
+                            .await;
                     }
                 }
             }
         }
 
         let e = last_err.unwrap();
-        error!("HTTP 请求失败 ({} {}): {} (已重试 {} 次)", method, url, e, max_retries);
+        error!(
+            "HTTP 请求失败 ({} {}): {} (已重试 {} 次)",
+            method, url, e, max_retries
+        );
         Err(anyhow!("HTTP 请求失败: {} (已重试 {} 次)", e, max_retries))
     }
 }

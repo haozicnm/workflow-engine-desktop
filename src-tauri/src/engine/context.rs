@@ -177,7 +177,10 @@ impl ExecutionContext {
                     return result;
                 }
                 // 纯变量引用解析失败 → 返回 Null 并警告
-                warn!("变量引用 '{{{{{}}}}}' 解析失败 → 返回 null（步骤输出或变量不存在）", inner);
+                warn!(
+                    "变量引用 '{{{{{}}}}}' 解析失败 → 返回 null（步骤输出或变量不存在）",
+                    inner
+                );
                 return serde_json::Value::Null;
             }
         }

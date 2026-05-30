@@ -126,9 +126,15 @@ pub async fn settings_update(Json(body): Json<SettingsUpdateBody>) -> Response {
     config.browser_executable_path = body.browser_executable_path;
     config.working_dir = body.working_dir;
     // P1: 可选子配置（前端未传则保留旧值）
-    if let Some(t) = body.timeouts { config.timeouts = t; }
-    if let Some(l) = body.logging { config.logging = l; }
-    if let Some(e) = body.execution { config.execution = e; }
+    if let Some(t) = body.timeouts {
+        config.timeouts = t;
+    }
+    if let Some(l) = body.logging {
+        config.logging = l;
+    }
+    if let Some(e) = body.execution {
+        config.execution = e;
+    }
     info!("设置已更新");
     match config.save() {
         Ok(()) => ok_response(serde_json::json!({ "success": true })),
@@ -450,12 +456,7 @@ pub async fn plugin_upload(mut multipart: Multipart) -> Response {
 
     while let Some(field) = match multipart.next_field().await {
         Ok(f) => f,
-        Err(e) => {
-            return err_response(
-                StatusCode::BAD_REQUEST,
-                format!("读取上传文件失败: {e}"),
-            )
-        }
+        Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("读取上传文件失败: {e}")),
     } {
         let name = field.name().unwrap_or("").to_string();
         if name == "file" || name == "wfplug" {
@@ -463,10 +464,7 @@ pub async fn plugin_upload(mut multipart: Multipart) -> Response {
             match field.bytes().await {
                 Ok(b) => file_bytes = Some(b.to_vec()),
                 Err(e) => {
-                    return err_response(
-                        StatusCode::BAD_REQUEST,
-                        format!("读取文件内容失败: {e}"),
-                    )
+                    return err_response(StatusCode::BAD_REQUEST, format!("读取文件内容失败: {e}"))
                 }
             }
             break;
@@ -505,10 +503,7 @@ pub async fn plugin_upload(mut multipart: Multipart) -> Response {
         Ok(m) => m,
         Err(e) => {
             let _ = std::fs::remove_file(&tmp_path);
-            return err_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("安装失败: {e}"),
-            );
+            return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("安装失败: {e}"));
         }
     };
 
@@ -543,20 +538,29 @@ pub async fn browser_pick_start(AxumJson(body): AxumJson<PickStartBody>) -> Resp
     let params = serde_json::json!({ "url": body.url });
     match crate::nodes::browser::send_sidecar_action("pick_start", &params).await {
         Ok(val) => ok_response(val),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_start failed: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("pick_start failed: {e}"),
+        ),
     }
 }
 
 pub async fn browser_pick_next() -> Response {
     match crate::nodes::browser::send_sidecar_action("pick_next", &serde_json::json!({})).await {
         Ok(val) => ok_response(val),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_next failed: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("pick_next failed: {e}"),
+        ),
     }
 }
 
 pub async fn browser_pick_stop() -> Response {
     match crate::nodes::browser::send_sidecar_action("pick_stop", &serde_json::json!({})).await {
         Ok(val) => ok_response(val),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("pick_stop failed: {e}")),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("pick_stop failed: {e}"),
+        ),
     }
 }

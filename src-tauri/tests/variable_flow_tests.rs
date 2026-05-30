@@ -60,7 +60,10 @@ impl TestChain {
                 }
                 Err(e) => {
                     // on_error: Ignore → 设置 Null 输出，继续执行
-                    if matches!(on_error, Some(workflow_engine::engine::workflow::ErrorStrategy::Ignore)) {
+                    if matches!(
+                        on_error,
+                        Some(workflow_engine::engine::workflow::ErrorStrategy::Ignore)
+                    ) {
                         eprintln!("Step '{}' failed (ignored): {:?}", id, e);
                         ctx.set_output(id, serde_json::Value::Null);
                         outputs.insert(id.clone(), Ok(serde_json::Value::Null));
@@ -89,7 +92,10 @@ impl TestResult {
     }
 
     fn is_ok(&self, step_id: &str) -> bool {
-        self.outputs.get(step_id).map(|r| r.is_ok()).unwrap_or(false)
+        self.outputs
+            .get(step_id)
+            .map(|r| r.is_ok())
+            .unwrap_or(false)
     }
 }
 
@@ -105,7 +111,9 @@ fn make_chain_step(id: &str, name: &str, step_type: &str, config: &Value) -> Ste
         .get("body_steps")
         .and_then(|v| serde_json::from_value(v.clone()).ok());
     // on_error 从 config 中提取
-    let on_error = config.get("on_error").and_then(|v| serde_json::from_value(v.clone()).ok());
+    let on_error = config
+        .get("on_error")
+        .and_then(|v| serde_json::from_value(v.clone()).ok());
 
     Step {
         id: id.to_string(),
@@ -237,7 +245,10 @@ async fn test_chain_web_scrape_to_script_to_excel() {
     let s1 = result.output("step_1");
     assert_eq!(s1["total_items"].as_i64().unwrap(), 3);
     assert_eq!(s1["items"][0]["title"].as_str().unwrap(), "第一条新闻标题");
-    assert_eq!(s1["items"][0]["link"].as_str().unwrap(), "https://example.com/1");
+    assert_eq!(
+        s1["items"][0]["link"].as_str().unwrap(),
+        "https://example.com/1"
+    );
 
     let s2 = result.output("step_2");
     assert_eq!(s2["count"].as_i64().unwrap(), 3);
@@ -533,7 +544,11 @@ async fn test_chain_script_to_convert_to_csv() {
     // convert_to_csv 可能返回 result 字符串或 row_count
     let csv = s2["result"].as_str().unwrap_or("");
     let row_count = s2["row_count"].as_i64().unwrap_or(0);
-    assert!(row_count == 2 || csv.contains("Alice"), "Expected 2 rows or CSV with Alice, got: {:?}", s2);
+    assert!(
+        row_count == 2 || csv.contains("Alice"),
+        "Expected 2 rows or CSV with Alice, got: {:?}",
+        s2
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -691,7 +706,10 @@ async fn scenario_2_data_pipeline() {
     let out_dir = tempfile::tempdir().unwrap();
     let out_path = format!("{}/output.csv", out_dir.path().display());
     let result = TestChain::new()
-        .step("fetch_data", "script", json!({"script": r#"
+        .step(
+            "fetch_data",
+            "script",
+            json!({"script": r#"
             let items = [
                 #{id: 1, name: "Alice", age: 30, city: "Beijing"},
                 #{id: 2, name: "Bob", age: 25, city: "Shanghai"},
@@ -700,14 +718,28 @@ async fn scenario_2_data_pipeline() {
                 #{id: 5, name: "Eve", age: 22, city: "Beijing"}
             ];
             #{items: items}
-        "#}))
-        .step("filter_beijing", "array_filter", json!({
-            "source": "{{fetch_data.items}}",
-            "condition": {"field": "city", "op": "==", "value": "Beijing"}
-        }))
-        .step("to_csv", "convert_to_csv", json!({"input": "{{filter_beijing.result}}"}))
-        .step("save_csv", "file_write", json!({"path": out_path, "content": "{{to_csv.result}}"}))
-        .run().await;
+        "#}),
+        )
+        .step(
+            "filter_beijing",
+            "array_filter",
+            json!({
+                "source": "{{fetch_data.items}}",
+                "condition": {"field": "city", "op": "==", "value": "Beijing"}
+            }),
+        )
+        .step(
+            "to_csv",
+            "convert_to_csv",
+            json!({"input": "{{filter_beijing.result}}"}),
+        )
+        .step(
+            "save_csv",
+            "file_write",
+            json!({"path": out_path, "content": "{{to_csv.result}}"}),
+        )
+        .run()
+        .await;
     assert!(result.is_ok("fetch_data"));
     let filtered = result.output("filter_beijing");
     assert_eq!(filtered["result_count"].as_i64().unwrap(), 3);
@@ -725,23 +757,36 @@ async fn scenario_2_data_pipeline() {
 #[tokio::test]
 async fn scenario_3_condition_and_branch() {
     let result = TestChain::new()
-        .step("step_1", "script", json!({"script": r#"#{amount: 1500, level: "VIP", order_id: "ORD-001"}"#}))
-        .step("step_2", "logic", json!({
-            "config": {"value": "{{step_1.amount}}"},
-            "conditionGroup": {
-                "combinator": "and",
-                "conditions": [
-                    {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "1000"},
-                    {"id": "c2", "left": "{{step_1.level}}", "op": "==", "right": "VIP"}
-                ]
-            }
-        }))
-        .step("step_3", "script", json!({"script": r#"
+        .step(
+            "step_1",
+            "script",
+            json!({"script": r#"#{amount: 1500, level: "VIP", order_id: "ORD-001"}"#}),
+        )
+        .step(
+            "step_2",
+            "logic",
+            json!({
+                "config": {"value": "{{step_1.amount}}"},
+                "conditionGroup": {
+                    "combinator": "and",
+                    "conditions": [
+                        {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "1000"},
+                        {"id": "c2", "left": "{{step_1.level}}", "op": "==", "right": "VIP"}
+                    ]
+                }
+            }),
+        )
+        .step(
+            "step_3",
+            "script",
+            json!({"script": r#"
             let b = step_2.branch;
             let msg = if b == "true" { "审批通过 " + step_1.order_id } else { "拒绝" };
             #{branch: b, message: msg}
-        "#}))
-        .run().await;
+        "#}),
+        )
+        .run()
+        .await;
     assert_eq!(result.output("step_2")["branch"].as_str().unwrap(), "true");
     let s3 = result.output("step_3");
     assert_eq!(s3["branch"].as_str().unwrap(), "true");
@@ -755,25 +800,41 @@ async fn scenario_3_condition_and_branch() {
 #[tokio::test]
 async fn scenario_3_condition_or_branch() {
     let result = TestChain::new()
-        .step("step_1", "script", json!({"script": r#"#{amount: 3000, urgent: 1}"#}))
-        .step("step_2", "logic", json!({
-            "config": {"value": "{{step_1.amount}}"},
-            "conditionGroup": {
-                "combinator": "or",
-                "conditions": [
-                    {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "5000"},
-                    {"id": "c2", "left": "{{step_1.urgent}}", "op": "==", "right": "1"}
-                ]
-            }
-        }))
-        .step("step_3", "script", json!({"script": r#"
+        .step(
+            "step_1",
+            "script",
+            json!({"script": r#"#{amount: 3000, urgent: 1}"#}),
+        )
+        .step(
+            "step_2",
+            "logic",
+            json!({
+                "config": {"value": "{{step_1.amount}}"},
+                "conditionGroup": {
+                    "combinator": "or",
+                    "conditions": [
+                        {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "5000"},
+                        {"id": "c2", "left": "{{step_1.urgent}}", "op": "==", "right": "1"}
+                    ]
+                }
+            }),
+        )
+        .step(
+            "step_3",
+            "script",
+            json!({"script": r#"
             let is_vip = step_2.branch == "true";
             let ch = if is_vip { "VIP通道" } else { "普通通道" };
             #{channel: ch, is_vip: is_vip}
-        "#}))
-        .run().await;
+        "#}),
+        )
+        .run()
+        .await;
     assert_eq!(result.output("step_2")["branch"].as_str().unwrap(), "true");
-    assert_eq!(result.output("step_3")["channel"].as_str().unwrap(), "VIP通道");
+    assert_eq!(
+        result.output("step_3")["channel"].as_str().unwrap(),
+        "VIP通道"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -785,7 +846,10 @@ async fn scenario_3_condition_or_branch() {
 async fn scenario_4_loop_collect_summary() {
     let result = TestChain::new()
         // Step 1: 准备数据
-        .step("step_1", "script", json!({"script": r#"
+        .step(
+            "step_1",
+            "script",
+            json!({"script": r#"
             let products = [
                 #{name: "键盘", price: 299, qty: 3},
                 #{name: "鼠标", price: 99, qty: 5},
@@ -793,23 +857,31 @@ async fn scenario_4_loop_collect_summary() {
                 #{name: "耳机", price: 399, qty: 2}
             ];
             #{products: products}
-        "#}))
+        "#}),
+        )
         // Step 2: 循环计算每个商品的小计
-        .step("step_2", "loop", json!({
-            "items": "{{step_1.products}}",
-            "body": [{
-                "id": "calc",
-                "type": "script",
-                "config": {"script": r#"
+        .step(
+            "step_2",
+            "loop",
+            json!({
+                "items": "{{step_1.products}}",
+                "body": [{
+                    "id": "calc",
+                    "type": "script",
+                    "config": {"script": r#"
                     let item = __item;
                     let subtotal = item.price * item.qty;
                     #{name: item.name, subtotal: subtotal}
                 "#}
-            }],
-            "collect": {"names": "calc.name", "subtotals": "calc.subtotal"}
-        }))
+                }],
+                "collect": {"names": "calc.name", "subtotals": "calc.subtotal"}
+            }),
+        )
         // Step 3: 汇总
-        .step("step_3", "script", json!({"script": r#"
+        .step(
+            "step_3",
+            "script",
+            json!({"script": r#"
             let collected = step_2.collected;
             let subtotals = collected.subtotals;
             let names = collected.names;
@@ -822,15 +894,21 @@ async fn scenario_4_loop_collect_summary() {
                 if i < count - 1 { summary += ", "; }
             }
             #{total: total, count: count, summary: summary}
-        "#}))
-        .run().await;
+        "#}),
+        )
+        .run()
+        .await;
 
     // 断言
     assert!(result.is_ok("step_1"));
     assert!(result.is_ok("step_2"));
 
     let s2 = result.output("step_2");
-    assert_eq!(s2["count"].as_i64().unwrap(), 4, "Should iterate 4 products");
+    assert_eq!(
+        s2["count"].as_i64().unwrap(),
+        4,
+        "Should iterate 4 products"
+    );
 
     assert!(result.is_ok("step_3"));
     let s3 = result.output("step_3");
@@ -853,23 +931,35 @@ async fn scenario_5_error_ignore_continue() {
         // Step 1: 正常步骤
         .step("step_1", "script", json!({"script": r#"#{value: 42}"#}))
         // Step 2: 故意失败，on_error: Ignore
-        .step("step_2", "script", json!({
-            "script": r#"throw "故意失败";"#,
-            "on_error": "ignore"
-        }))
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"throw "故意失败";"#,
+                "on_error": "ignore"
+            }),
+        )
         // Step 3: 应该继续执行
-        .step("step_3", "script", json!({"script": r#"
+        .step(
+            "step_3",
+            "script",
+            json!({"script": r#"
             let v = step_1.value;
             #{result: v * 2, continued: true}
-        "#}))
-        .run().await;
+        "#}),
+        )
+        .run()
+        .await;
 
     assert!(result.is_ok("step_1"), "step_1 should succeed");
     // step_2 失败但被忽略，输出为 Null
     let s2 = result.output("step_2");
     assert!(s2.is_null(), "step_2 output should be Null (ignored error)");
     // step_3 继续执行
-    assert!(result.is_ok("step_3"), "step_3 should continue after ignored error");
+    assert!(
+        result.is_ok("step_3"),
+        "step_3 should continue after ignored error"
+    );
     let s3 = result.output("step_3");
     assert_eq!(s3["result"].as_i64().unwrap(), 84);
     assert_eq!(s3["continued"].as_bool().unwrap(), true);
@@ -880,12 +970,21 @@ async fn scenario_5_error_default_stops() {
     // 默认 Fail 策略：失败后停止
     let result = TestChain::new()
         .step("step_1", "script", json!({"script": r#"#{value: 10}"#}))
-        .step("step_2", "script", json!({
-            "script": r#"throw "失败";"#
-            // 无 on_error → 默认 Fail
-        }))
-        .step("step_3", "script", json!({"script": r#"#{should_not: "run"}"#}))
-        .run().await;
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"throw "失败";"#
+                // 无 on_error → 默认 Fail
+            }),
+        )
+        .step(
+            "step_3",
+            "script",
+            json!({"script": r#"#{should_not: "run"}"#}),
+        )
+        .run()
+        .await;
 
     assert!(result.is_ok("step_1"));
     assert!(!result.is_ok("step_2"), "step_2 should fail");
@@ -901,37 +1000,58 @@ async fn scenario_5_error_default_stops() {
 async fn u3_eval_condition_operator_aliases() {
     // 测试 "eq" 和 "ne" 操作符（前端 UI 生成的格式）
     let result = TestChain::new()
-        .step("step_1", "script", json!({"script": r#"#{score: 90, status: "active"}"#}))
+        .step(
+            "step_1",
+            "script",
+            json!({"script": r#"#{score: 90, status: "active"}"#}),
+        )
         // 测试 "eq" 操作符
-        .step("step_2", "logic", json!({
-            "config": {"value": "{{step_1.status}}"},
-            "conditionGroup": {
-                "combinator": "and",
-                "conditions": [
-                    {"id": "c1", "left": "{{step_1.status}}", "op": "eq", "right": "active"},
-                    {"id": "c2", "left": "{{step_1.score}}", "op": "gt", "right": "80"}
-                ]
-            }
-        }))
+        .step(
+            "step_2",
+            "logic",
+            json!({
+                "config": {"value": "{{step_1.status}}"},
+                "conditionGroup": {
+                    "combinator": "and",
+                    "conditions": [
+                        {"id": "c1", "left": "{{step_1.status}}", "op": "eq", "right": "active"},
+                        {"id": "c2", "left": "{{step_1.score}}", "op": "gt", "right": "80"}
+                    ]
+                }
+            }),
+        )
         // 测试 "ne" 操作符
-        .step("step_3", "logic", json!({
-            "config": {"value": "{{step_1.status}}"},
-            "conditionGroup": {
-                "combinator": "and",
-                "conditions": [
-                    {"id": "c1", "left": "{{step_1.status}}", "op": "ne", "right": "inactive"}
-                ]
-            }
-        }))
-        .run().await;
+        .step(
+            "step_3",
+            "logic",
+            json!({
+                "config": {"value": "{{step_1.status}}"},
+                "conditionGroup": {
+                    "combinator": "and",
+                    "conditions": [
+                        {"id": "c1", "left": "{{step_1.status}}", "op": "ne", "right": "inactive"}
+                    ]
+                }
+            }),
+        )
+        .run()
+        .await;
 
     assert!(result.is_ok("step_2"));
     let s2 = result.output("step_2");
-    assert_eq!(s2["branch"].as_str().unwrap(), "true", "eq 'active' should pass");
+    assert_eq!(
+        s2["branch"].as_str().unwrap(),
+        "true",
+        "eq 'active' should pass"
+    );
 
     assert!(result.is_ok("step_3"));
     let s3 = result.output("step_3");
-    assert_eq!(s3["branch"].as_str().unwrap(), "true", "ne 'inactive' should pass");
+    assert_eq!(
+        s3["branch"].as_str().unwrap(),
+        "true",
+        "ne 'inactive' should pass"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -978,17 +1098,29 @@ async fn u2_missing_variable_returns_null() {
     let result = TestChain::new()
         .step("step_1", "script", json!({"script": r#"#{value: 42}"#}))
         // 引用不存在的字段
-        .step("step_2", "script", json!({"script": r#"
+        .step(
+            "step_2",
+            "script",
+            json!({"script": r#"
             let missing = step_1.nonexistent;
             let existing = step_1.value;
             #{missing: missing, existing: existing}
-        "#}))
-        .run().await;
+        "#}),
+        )
+        .run()
+        .await;
 
     assert!(result.is_ok("step_1"));
-    assert!(result.is_ok("step_2"), "Missing variables should return null, not error");
+    assert!(
+        result.is_ok("step_2"),
+        "Missing variables should return null, not error"
+    );
 
     let s2 = result.output("step_2");
     assert!(s2["missing"].is_null(), "step_1.nonexistent should be null");
-    assert_eq!(s2["existing"].as_i64().unwrap(), 42, "step_1.value should work");
+    assert_eq!(
+        s2["existing"].as_i64().unwrap(),
+        42,
+        "step_1.value should work"
+    );
 }

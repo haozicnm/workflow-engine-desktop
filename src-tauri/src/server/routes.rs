@@ -1,13 +1,13 @@
 // server/routes.rs — 路由定义（无状态版本，handlers 通过 state::get() 获取 App）
 use crate::server::handlers;
+use axum::extract::ws::{Message, WebSocket};
+use axum::extract::WebSocketUpgrade;
 use axum::{
     extract::Path,
     response::IntoResponse,
     routing::{delete, get, post, put},
     Router,
 };
-use axum::extract::ws::{Message, WebSocket};
-use axum::extract::WebSocketUpgrade;
 
 /// 静态测试路由：无参数
 async fn test_static() -> impl IntoResponse {
@@ -122,7 +122,10 @@ pub fn build() -> Router {
         .route("/api/plugins/upload", post(handlers::plugin_upload))
         .route("/api/plugins/uninstall", post(handlers::plugin_uninstall))
         .route("/api/pipeline/run", post(handlers::run_pipeline))
-        .route("/api/browser/pick-start", post(handlers::browser_pick_start))
+        .route(
+            "/api/browser/pick-start",
+            post(handlers::browser_pick_start),
+        )
         .route("/api/browser/pick-next", get(handlers::browser_pick_next))
         .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
         // WebBridge WebSocket endpoint
@@ -135,8 +138,8 @@ async fn ws_browser_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
 }
 
 async fn handle_ws_browser(socket: WebSocket) {
-    use futures_util::{SinkExt, StreamExt};
     use crate::nodes::webbridge;
+    use futures_util::{SinkExt, StreamExt};
 
     let state = webbridge::get_state();
     let (mut ws_tx, mut ws_rx) = socket.split();

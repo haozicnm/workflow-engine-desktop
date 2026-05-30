@@ -50,15 +50,10 @@ impl KimiBrowserNode {
 
         info!("Kimi WebBridge: {} {:?}", command, args);
 
-        let resp = client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("Kimi WebBridge 请求失败: {}", e);
-                anyhow!("Kimi WebBridge 请求失败: {}", e)
-            })?;
+        let resp = client.post(&url).json(&body).send().await.map_err(|e| {
+            error!("Kimi WebBridge 请求失败: {}", e);
+            anyhow!("Kimi WebBridge 请求失败: {}", e)
+        })?;
 
         let text = resp.text().await.map_err(|e| {
             error!("读取 Kimi WebBridge 响应失败: {}", e);
@@ -71,10 +66,7 @@ impl KimiBrowserNode {
         })?;
 
         // 检查 ok 字段（不是 success）
-        let ok = result
-            .get("ok")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let ok = result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
 
         if !ok {
             let error_msg = result
@@ -128,16 +120,16 @@ impl NodeExecutor for KimiBrowserNode {
         let timeout = Self::parse_timeout(config);
 
         // 构建 args
-        let args = config
-            .get("args")
-            .cloned()
-            .unwrap_or(serde_json::json!({}));
+        let args = config.get("args").cloned().unwrap_or(serde_json::json!({}));
 
         // 执行命令
         let result = self.send_command(action, args, port, timeout).await?;
 
         // 提取 data 字段作为输出
-        let data = result.get("data").cloned().unwrap_or(serde_json::json!(null));
+        let data = result
+            .get("data")
+            .cloned()
+            .unwrap_or(serde_json::json!(null));
 
         Ok(serde_json::json!({
             "success": true,

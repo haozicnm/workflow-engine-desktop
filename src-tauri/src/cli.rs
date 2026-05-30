@@ -1995,8 +1995,7 @@ fn cmd_skill(app: &App, file_or_id: &str, output: Option<&str>) -> Result<(), St
 async fn cmd_serve(app: Arc<App>, bind: &str, static_dir: &str) -> Result<(), String> {
     use tower_http::services::ServeDir;
 
-    let router =
-        crate::server::build_router(app).fallback_service(ServeDir::new(static_dir));
+    let router = crate::server::build_router(app).fallback_service(ServeDir::new(static_dir));
 
     tracing::info!("服务器启动: http://{}  (静态文件: {})", bind, static_dir);
 

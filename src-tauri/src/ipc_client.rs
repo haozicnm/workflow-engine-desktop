@@ -39,7 +39,10 @@ impl IpcClient {
     /// 检查 daemon 是否可用
     pub async fn is_daemon_available() -> bool {
         let url = format!("ws://127.0.0.1:{}", IPC_PORT);
-        matches!(tokio::time::timeout(Duration::from_secs(2), connect_async(&url)).await, Ok(Ok((_ws, _))))
+        matches!(
+            tokio::time::timeout(Duration::from_secs(2), connect_async(&url)).await,
+            Ok(Ok((_ws, _)))
+        )
     }
 
     /// 通过 IPC 运行工作流（流式输出到 stdout）

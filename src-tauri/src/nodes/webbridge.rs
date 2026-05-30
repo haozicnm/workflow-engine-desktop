@@ -112,7 +112,10 @@ impl WebBridgeState {
         };
 
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.pending.lock().await.insert(id.clone(), PendingCommand { sender: resp_tx });
+        self.pending
+            .lock()
+            .await
+            .insert(id.clone(), PendingCommand { sender: resp_tx });
 
         let msg = serde_json::to_string(&cmd)?;
         tx.send(msg).map_err(|_| anyhow!("发送失败"))?;
@@ -140,7 +143,9 @@ impl WebBridgeState {
                 let result = if resp.success {
                     Ok(resp.data.unwrap_or(Value::Null))
                 } else {
-                    Err(anyhow!(resp.error.unwrap_or_else(|| "未知错误".to_string())))
+                    Err(anyhow!(resp
+                        .error
+                        .unwrap_or_else(|| "未知错误".to_string())))
                 };
                 let _ = cmd.sender.send(result);
                 return;
@@ -189,7 +194,9 @@ static WEBBRIDGE: OnceLock<Arc<WebBridgeState>> = OnceLock::new();
 
 /// 获取全局 WebBridge 状态
 pub fn get_state() -> Arc<WebBridgeState> {
-    WEBBRIDGE.get_or_init(|| Arc::new(WebBridgeState::new())).clone()
+    WEBBRIDGE
+        .get_or_init(|| Arc::new(WebBridgeState::new()))
+        .clone()
 }
 
 // ═══════════════════════════════════════════════
