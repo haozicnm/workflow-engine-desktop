@@ -55,6 +55,7 @@ workflow-engine 通过 WebSocket 发送 JSON 命令：
 | `network` | 网络监听 | `action`（enable/disable） |
 | `upload` | 上传文件 | `selector`, `filePaths` |
 | `cdp` | 直接 CDP 命令 | `method`, `params?` |
+| `download` | 下载文件 | `url?`, `selector?`, `saveAs?` |
 
 ## @eN ref 系统
 

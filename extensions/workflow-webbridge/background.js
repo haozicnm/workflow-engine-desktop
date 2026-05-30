@@ -453,6 +453,37 @@ const tools = {
     await ensureAttached((await resolveTab()).id);
     return await cdpCommand(method, cdpParams || {});
   },
+
+  async download(params) {
+    const { selector, url, saveAs } = params;
+    await ensureAttached((await resolveTab()).id);
+    
+    // 设置下载行为
+    const downloadPath = saveAs || 'Downloads';
+    await cdpCommand('Page.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: downloadPath,
+    });
+    
+    if (url) {
+      // 直接通过 URL 下载
+      await cdpCommand('Page.navigate', { url });
+      await waitForLoad(activeTabId);
+      return { success: true, method: 'navigate', url };
+    }
+    
+    if (selector) {
+      // 通过点击元素触发下载
+      if (isRef(selector)) {
+        await clickByRef(selector);
+      } else {
+        await clickBySelector(selector);
+      }
+      return { success: true, method: 'click', selector };
+    }
+    
+    throw new Error('download: need url or selector');
+  },
 };
 
 // ═══════════════════════════════════════════════
