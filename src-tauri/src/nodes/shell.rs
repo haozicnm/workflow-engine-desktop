@@ -15,6 +15,7 @@
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::Step;
+use crate::nodes::error_utils;
 use crate::nodes::traits::NodeExecutor;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -41,7 +42,7 @@ impl NodeExecutor for ShellNode {
             .config
             .get("command")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Shell 节点缺少 command 参数"))?
+            .ok_or_else(|| error_utils::missing_parameter("command", "shell").to_error())?
             .to_string();
 
         let shell = step
@@ -98,8 +99,8 @@ impl NodeExecutor for ShellNode {
 
         let output = tokio::task::spawn_blocking(move || cmd.output())
             .await
-            .map_err(|e| anyhow!("Shell 命令执行失败: {}", e))?
-            .map_err(|e| anyhow!("Shell 命令启动失败: {}", e))?;
+            .map_err(|e| error_utils::execution_failed("Shell 命令执行", &e.to_string()).to_error())?
+            .map_err(|e| error_utils::execution_failed("Shell 命令启动", &e.to_string()).to_error())?;
 
         let stdout_raw = String::from_utf8_lossy(&output.stdout);
         let stdout = stdout_raw.trim().to_string();
@@ -142,15 +143,14 @@ impl NodeExecutor for ShellNode {
 
         if exit_code != 0 {
             // 返回错误让 scheduler 根据 onError 策略处理
-            Err(anyhow!(
-                "Shell 命令退出码 {}: {}",
-                exit_code,
-                if stderr.is_empty() {
-                    "(无错误输出)"
+            Err(error_utils::execution_failed(
+                "Shell 命令",
+                &format!("退出码 {}: {}", exit_code, if stderr.is_empty() {
+                    "(无错误输出)".to_string()
                 } else {
-                    &stderr
-                }
-            ))
+                    stderr.clone()
+                }),
+            ).to_error())
         } else {
             Ok(result)
         }
