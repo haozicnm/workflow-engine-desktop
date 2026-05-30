@@ -231,8 +231,8 @@ pub(crate) fn eval_condition(
     right: &serde_json::Value,
 ) -> bool {
     match op {
-        "==" | "equals" => left == right,
-        "!=" | "not_equals" => left != right,
+        "==" | "equals" | "eq" => left == right,
+        "!=" | "not_equals" | "ne" => left != right,
         ">" | "gt" | "greater_than" => compare_values(left, right) > 0,
         "<" | "lt" | "less_than" => compare_values(left, right) < 0,
         ">=" | "gte" | "greater_equal" => compare_values(left, right) >= 0,

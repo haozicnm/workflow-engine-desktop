@@ -892,3 +892,44 @@ async fn scenario_5_error_default_stops() {
     // step_3 不应该执行（但 TestChain 目前会继续跑，因为 executor 返回 Err 后 TestChain 不停止）
     // 这里验证 step_2 确实失败了
 }
+
+// ═══════════════════════════════════════════════════════════════
+// U3: eval_condition 操作符别名测试
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn u3_eval_condition_operator_aliases() {
+    // 测试 "eq" 和 "ne" 操作符（前端 UI 生成的格式）
+    let result = TestChain::new()
+        .step("step_1", "script", json!({"script": r#"#{score: 90, status: "active"}"#}))
+        // 测试 "eq" 操作符
+        .step("step_2", "logic", json!({
+            "config": {"value": "{{step_1.status}}"},
+            "conditionGroup": {
+                "combinator": "and",
+                "conditions": [
+                    {"id": "c1", "left": "{{step_1.status}}", "op": "eq", "right": "active"},
+                    {"id": "c2", "left": "{{step_1.score}}", "op": "gt", "right": "80"}
+                ]
+            }
+        }))
+        // 测试 "ne" 操作符
+        .step("step_3", "logic", json!({
+            "config": {"value": "{{step_1.status}}"},
+            "conditionGroup": {
+                "combinator": "and",
+                "conditions": [
+                    {"id": "c1", "left": "{{step_1.status}}", "op": "ne", "right": "inactive"}
+                ]
+            }
+        }))
+        .run().await;
+
+    assert!(result.is_ok("step_2"));
+    let s2 = result.output("step_2");
+    assert_eq!(s2["branch"].as_str().unwrap(), "true", "eq 'active' should pass");
+
+    assert!(result.is_ok("step_3"));
+    let s3 = result.output("step_3");
+    assert_eq!(s3["branch"].as_str().unwrap(), "true", "ne 'inactive' should pass");
+}
