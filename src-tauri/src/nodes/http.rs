@@ -6,7 +6,7 @@ use crate::nodes::traits::NodeExecutor;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Default)]
 pub struct HttpNode;
@@ -31,7 +31,17 @@ impl NodeExecutor for HttpNode {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("HTTP 节点缺少 url 参数"))?;
 
-        info!("HTTP 请求: {} {}", method, url);
+        // 重试配置
+        let max_retries = config
+            .get("retry")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32;
+        let retry_delay_ms = config
+            .get("retry_delay_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1000);
+
+        info!("HTTP 请求: {} {} (retry={})", method, url, max_retries);
 
         let connect_timeout = config
             .get("connect_timeout")
@@ -47,65 +57,82 @@ impl NodeExecutor for HttpNode {
             .timeout(std::time::Duration::from_secs(read_timeout))
             .build()
             .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
-        let mut req = match method.to_uppercase().as_str() {
-            "GET" => client.get(url),
-            "POST" => client.post(url),
-            "PUT" => client.put(url),
-            "DELETE" => client.delete(url),
-            "PATCH" => client.patch(url),
-            _ => return Err(anyhow!("不支持的 HTTP 方法: {}", method)),
-        };
 
-        // 添加 headers（兼容字符串和对象两种格式）
-        if let Some(headers) = config.get("headers") {
-            // 1. 对象格式：{"Accept": "application/json"}
-            if let Some(obj) = headers.as_object() {
-                for (k, v) in obj {
-                    if let Some(val) = v.as_str() {
-                        req = req.header(k, val);
+        let max_attempts = 1 + max_retries;
+        let mut last_err = None;
+
+        for attempt in 1..=max_attempts {
+            let mut req = match method.to_uppercase().as_str() {
+                "GET" => client.get(url),
+                "POST" => client.post(url),
+                "PUT" => client.put(url),
+                "DELETE" => client.delete(url),
+                "PATCH" => client.patch(url),
+                _ => return Err(anyhow!("不支持的 HTTP 方法: {}", method)),
+            };
+
+            // 添加 headers（兼容字符串和对象两种格式）
+            if let Some(headers) = config.get("headers") {
+                if let Some(obj) = headers.as_object() {
+                    for (k, v) in obj {
+                        if let Some(val) = v.as_str() {
+                            req = req.header(k, val);
+                        }
                     }
-                }
-            }
-            // 2. 字符串格式：解析为 JSON
-            else if let Some(s) = headers.as_str() {
-                if let Ok(obj) = serde_json::from_str::<serde_json::Value>(s) {
-                    if let Some(map) = obj.as_object() {
-                        for (k, v) in map {
-                            if let Some(val) = v.as_str() {
-                                req = req.header(k, val);
+                } else if let Some(s) = headers.as_str() {
+                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(s) {
+                        if let Some(map) = obj.as_object() {
+                            for (k, v) in map {
+                                if let Some(val) = v.as_str() {
+                                    req = req.header(k, val);
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // 添加 body (POST/PUT/PATCH)
-        if let Some(body) = config.get("body") {
-            if matches!(method.to_uppercase().as_str(), "POST" | "PUT" | "PATCH") {
-                req = req.json(body);
+            // 添加 body (POST/PUT/PATCH)
+            if let Some(body) = config.get("body") {
+                if matches!(method.to_uppercase().as_str(), "POST" | "PUT" | "PATCH") {
+                    req = req.json(body);
+                }
+            }
+
+            match req.send().await {
+                Ok(resp) => {
+                    let status = resp.status().as_u16();
+                    let text = resp.text().await.map_err(|e| {
+                        error!("读取 HTTP 响应失败 ({} {}): {}", method, url, e);
+                        anyhow!("读取响应失败: {}", e)
+                    })?;
+
+                    info!("HTTP 响应: {} {} → {}", method, url, status);
+
+                    let body = serde_json::from_str::<serde_json::Value>(&text)
+                        .unwrap_or(serde_json::Value::String(text));
+
+                    return Ok(serde_json::json!({
+                        "status": status,
+                        "body": body,
+                    }));
+                }
+                Err(e) => {
+                    last_err = Some(e);
+                    if attempt < max_attempts {
+                        warn!(
+                            "HTTP 请求失败 ({} {}) 第 {}/{} 次: {}，{}ms 后重试",
+                            method, url, attempt, max_attempts,
+                            last_err.as_ref().unwrap(), retry_delay_ms
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_millis(retry_delay_ms)).await;
+                    }
+                }
             }
         }
 
-        let resp = req.send().await.map_err(|e| {
-            error!("HTTP 请求失败 ({} {}): {}", method, url, e);
-            anyhow!("HTTP 请求失败: {}", e)
-        })?;
-        let status = resp.status().as_u16();
-        let text = resp.text().await.map_err(|e| {
-            error!("读取 HTTP 响应失败 ({} {}): {}", method, url, e);
-            anyhow!("读取响应失败: {}", e)
-        })?;
-
-        info!("HTTP 响应: {} {} → {}", method, url, status);
-
-        // 尝试解析 JSON
-        let body = serde_json::from_str::<serde_json::Value>(&text)
-            .unwrap_or(serde_json::Value::String(text));
-
-        Ok(serde_json::json!({
-            "status": status,
-            "body": body,
-        }))
+        let e = last_err.unwrap();
+        error!("HTTP 请求失败 ({} {}): {} (已重试 {} 次)", method, url, e, max_retries);
+        Err(anyhow!("HTTP 请求失败: {} (已重试 {} 次)", e, max_retries))
     }
 }
