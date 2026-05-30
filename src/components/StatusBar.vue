@@ -33,10 +33,14 @@ onUnmounted(() => { if (apiTimer) clearInterval(apiTimer) })
 
 // Sidecar health polling
 let sidecarTimer: ReturnType<typeof setInterval> | null = null
-const { refreshSidecarStatus } = useGlobalStatus()
+const { refreshSidecarStatus, refreshWebBridgeStatus } = useGlobalStatus()
 onMounted(() => {
   refreshSidecarStatus()
-  sidecarTimer = setInterval(refreshSidecarStatus, 30_000)
+  refreshWebBridgeStatus()
+  sidecarTimer = setInterval(() => {
+    refreshSidecarStatus()
+    refreshWebBridgeStatus()
+  }, 30_000)
 })
 onUnmounted(() => { if (sidecarTimer) clearInterval(sidecarTimer) })
 
@@ -95,6 +99,15 @@ function formatNextRun(iso: string | null): string {
       <span class="w-1.5 h-1.5 rounded-full" :class="state.sidecarHealthy ? 'bg-success/80' : 'bg-warning/60'"></span>
       <span class="text-muted-foreground/70">{{ state.sidecarHealthy ? '浏览器' : '浏览器未就绪' }}</span>
       <span v-if="state.sidecarHealthy" class="text-muted-foreground/40 tabular-nums">{{ state.sidecarPingMs }}ms</span>
+    </span>
+
+    <span class="text-border">│</span>
+
+    <!-- WebBridge status -->
+    <span class="flex items-center gap-1.5" :title="state.webbridgeConnected ? `WebBridge 已连接 (v${state.webbridgeVersion})` : 'WebBridge 未连接'">
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.webbridgeConnected ? 'bg-success/80' : 'bg-muted-foreground/30'"></span>
+      <span class="text-muted-foreground/70">{{ state.webbridgeConnected ? 'WebBridge' : 'WebBridge' }}</span>
+      <span v-if="state.webbridgeConnected" class="text-muted-foreground/40">✓</span>
     </span>
 
     <span class="text-border">│</span>

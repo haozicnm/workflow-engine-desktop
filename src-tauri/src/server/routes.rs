@@ -32,6 +32,7 @@ pub fn build() -> Router {
         .route("/api/events", get(handlers::events_sse))
         .route("/api/health", get(handlers::system_health))
         .route("/api/sidecar/health", get(handlers::sidecar_health))
+        .route("/api/webbridge/health", get(handlers::webbridge_health))
         .route("/api/settings", get(handlers::settings_get))
         .route("/api/settings", put(handlers::settings_update))
         .route(

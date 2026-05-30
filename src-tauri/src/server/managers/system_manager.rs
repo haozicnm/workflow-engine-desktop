@@ -59,6 +59,18 @@ pub async fn sidecar_health() -> Response {
     }))
 }
 
+pub async fn webbridge_health() -> Response {
+    let state = crate::nodes::webbridge::get_state();
+    let connected = state.is_connected().await;
+    let info = state.get_info().await;
+    ok_response(serde_json::json!({
+        "connected": connected,
+        "version": info.as_ref().map(|i| i.version.as_str()).unwrap_or(""),
+        "client": info.as_ref().map(|i| i.client.as_str()).unwrap_or(""),
+        "capabilities": info.as_ref().map(|i| &i.capabilities).unwrap(&vec![]),
+    }))
+}
+
 pub async fn node_list_types() -> Response {
     let mut types: Vec<String> = crate::nodes::registry::all_nodes()
         .into_iter()

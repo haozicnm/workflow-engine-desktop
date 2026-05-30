@@ -27,6 +27,8 @@ interface GlobalStatusState {
   apiOnline: boolean
   sidecarHealthy: boolean
   sidecarPingMs: number
+  webbridgeConnected: boolean
+  webbridgeVersion: string
 }
 
 const state = reactive<GlobalStatusState>({
@@ -37,6 +39,8 @@ const state = reactive<GlobalStatusState>({
   apiOnline: false,
   sidecarHealthy: false,
   sidecarPingMs: 0,
+  webbridgeConnected: false,
+  webbridgeVersion: '',
 })
 
 let scheduleRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -120,6 +124,23 @@ export function useGlobalStatus() {
     }
   }
 
+  async function refreshWebBridgeStatus() {
+    try {
+      const resp = await fetch('/api/webbridge/health')
+      if (resp.ok) {
+        const data = await resp.json()
+        state.webbridgeConnected = data.connected ?? false
+        state.webbridgeVersion = data.version ?? ''
+      } else {
+        state.webbridgeConnected = false
+        state.webbridgeVersion = ''
+      }
+    } catch (e) {
+      state.webbridgeConnected = false
+      state.webbridgeVersion = ''
+    }
+  }
+
   function startSchedulePolling() {
     if (scheduleRefreshTimer) return
     refreshSchedules()
@@ -142,6 +163,7 @@ export function useGlobalStatus() {
     refreshIpcStatus,
     refreshApiStatus,
     refreshSidecarStatus,
+    refreshWebBridgeStatus,
     startSchedulePolling,
     stopSchedulePolling,
   }
