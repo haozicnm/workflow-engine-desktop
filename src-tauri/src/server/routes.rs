@@ -6,6 +6,8 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+use axum::extract::ws::{Message, WebSocket};
+use axum::extract::WebSocketUpgrade;
 
 /// 静态测试路由：无参数
 async fn test_static() -> impl IntoResponse {
@@ -122,4 +124,56 @@ pub fn build() -> Router {
         .route("/api/browser/pick-start", post(handlers::browser_pick_start))
         .route("/api/browser/pick-next", get(handlers::browser_pick_next))
         .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
+        // WebBridge WebSocket endpoint
+        .route("/ws/browser", get(ws_browser_handler))
+}
+
+/// WebSocket handler for Workflow WebBridge extension
+async fn ws_browser_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(handle_ws_browser)
+}
+
+async fn handle_ws_browser(mut socket: WebSocket) {
+    use futures_util::{SinkExt, StreamExt};
+    use crate::nodes::webbridge;
+
+    let state = webbridge::get_state();
+    let (mut ws_tx, mut ws_rx) = socket.split();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+    // 设置连接状态
+    state.set_connected(tx).await;
+
+    // 发送任务：从内部通道 → WebSocket
+    let send_task = tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if ws_tx.send(Message::Text(msg.into())).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // 接收任务：从 WebSocket → 内部处理
+    let recv_state = state.clone();
+    let recv_task = tokio::spawn(async move {
+        while let Some(Ok(msg)) = ws_rx.next().await {
+            match msg {
+                Message::Text(text) => {
+                    recv_state.handle_message(&text).await;
+                }
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+    });
+
+    // 等待任一任务结束
+    tokio::select! {
+        _ = send_task => {},
+        _ = recv_task => {},
+    }
+
+    // 清理
+    state.set_disconnected().await;
+    tracing::info!("WebBridge 扩展已断开");
 }

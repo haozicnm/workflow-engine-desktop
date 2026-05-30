@@ -37,6 +37,7 @@ pub mod sub_workflow;
 pub mod text_template;
 pub mod traits;
 pub mod web_scrape;
+pub mod webbridge;
 pub mod while_node;
 #[cfg(feature = "gui")]
 pub mod window;
