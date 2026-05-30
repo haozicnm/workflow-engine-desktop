@@ -2,6 +2,7 @@
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::Step;
+use crate::nodes::error_utils::{self, NodeError};
 use crate::nodes::traits::NodeExecutor;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -29,7 +30,7 @@ impl NodeExecutor for HttpNode {
         let url = config
             .get("url")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("HTTP 节点缺少 url 参数"))?;
+            .ok_or_else(|| error_utils::missing_parameter("url", "http").to_error())?;
 
         // 重试配置
         let max_retries = config.get("retry").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
@@ -53,7 +54,7 @@ impl NodeExecutor for HttpNode {
             .connect_timeout(std::time::Duration::from_secs(connect_timeout))
             .timeout(std::time::Duration::from_secs(read_timeout))
             .build()
-            .map_err(|e| anyhow!("创建 HTTP 客户端失败: {}", e))?;
+            .map_err(|e| error_utils::execution_failed("创建 HTTP 客户端", &e.to_string()).to_error())?;
 
         let max_attempts = 1 + max_retries;
         let mut last_err = None;
@@ -65,7 +66,7 @@ impl NodeExecutor for HttpNode {
                 "PUT" => client.put(url),
                 "DELETE" => client.delete(url),
                 "PATCH" => client.patch(url),
-                _ => return Err(anyhow!("不支持的 HTTP 方法: {}", method)),
+                _ => return Err(error_utils::invalid_parameter("method", "GET/POST/PUT/DELETE/PATCH", method).to_error()),
             };
 
             // 添加 headers（兼容字符串和对象两种格式）
@@ -101,7 +102,7 @@ impl NodeExecutor for HttpNode {
                     let status = resp.status().as_u16();
                     let text = resp.text().await.map_err(|e| {
                         error!("读取 HTTP 响应失败 ({} {}): {}", method, url, e);
-                        anyhow!("读取响应失败: {}", e)
+                        error_utils::execution_failed("读取 HTTP 响应", &e.to_string()).to_error()
                     })?;
 
                     info!("HTTP 响应: {} {} → {}", method, url, status);
@@ -138,6 +139,6 @@ impl NodeExecutor for HttpNode {
             "HTTP 请求失败 ({} {}): {} (已重试 {} 次)",
             method, url, e, max_retries
         );
-        Err(anyhow!("HTTP 请求失败: {} (已重试 {} 次)", e, max_retries))
+        Err(error_utils::network_error(&format!("{} (已重试 {} 次)", e, max_retries)).to_error())
     }
 }
