@@ -65,6 +65,12 @@ pub struct WebBridgeState {
     counter: Mutex<u64>,
 }
 
+impl Default for WebBridgeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WebBridgeState {
     pub fn new() -> Self {
         Self {
