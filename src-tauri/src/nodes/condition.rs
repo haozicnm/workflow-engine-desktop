@@ -282,6 +282,13 @@ fn compare_values(left: &serde_json::Value, right: &serde_json::Value) -> i32 {
     if let (Some(l), Some(r)) = (left.as_f64(), right.as_f64()) {
         return l.partial_cmp(&r).map(|o| o as i32).unwrap_or(0);
     }
+    // 字符串可能是数字（normalize_condition_group 把 Number 转成了 String）
+    if let (Some(l), Some(r)) = (
+        left.as_str().and_then(|s| s.parse::<f64>().ok()),
+        right.as_str().and_then(|s| s.parse::<f64>().ok()),
+    ) {
+        return l.partial_cmp(&r).map(|o| o as i32).unwrap_or(0);
+    }
     if let (Some(l), Some(r)) = (left.as_bool(), right.as_bool()) {
         return (l as i32).cmp(&(r as i32)) as i32;
     }

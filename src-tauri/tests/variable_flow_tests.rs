@@ -673,3 +673,97 @@ async fn test_chain_regex_extract() {
     assert_eq!(captures[0][1].as_str().unwrap(), "123");
     assert_eq!(captures[1][1].as_str().unwrap(), "456");
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 2: 数据搬运
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_2_data_pipeline() {
+    let out_dir = tempfile::tempdir().unwrap();
+    let out_path = format!("{}/output.csv", out_dir.path().display());
+    let result = TestChain::new()
+        .step("fetch_data", "script", json!({"script": r#"
+            let items = [
+                #{id: 1, name: "Alice", age: 30, city: "Beijing"},
+                #{id: 2, name: "Bob", age: 25, city: "Shanghai"},
+                #{id: 3, name: "Charlie", age: 35, city: "Beijing"},
+                #{id: 4, name: "David", age: 28, city: "Shenzhen"},
+                #{id: 5, name: "Eve", age: 22, city: "Beijing"}
+            ];
+            #{items: items}
+        "#}))
+        .step("filter_beijing", "array_filter", json!({
+            "source": "{{fetch_data.items}}",
+            "condition": {"field": "city", "op": "==", "value": "Beijing"}
+        }))
+        .step("to_csv", "convert_to_csv", json!({"input": "{{filter_beijing.result}}"}))
+        .step("save_csv", "file_write", json!({"path": out_path, "content": "{{to_csv.result}}"}))
+        .run().await;
+    assert!(result.is_ok("fetch_data"));
+    let filtered = result.output("filter_beijing");
+    assert_eq!(filtered["result_count"].as_i64().unwrap(), 3);
+    assert!(result.is_ok("to_csv"));
+    assert!(result.is_ok("save_csv"));
+    let fc = std::fs::read_to_string(&out_path).unwrap();
+    assert!(fc.contains("Alice") && fc.contains("Charlie") && fc.contains("Eve"));
+    assert!(!fc.contains("Bob"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 3: 条件分支 AND
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_3_condition_and_branch() {
+    let result = TestChain::new()
+        .step("step_1", "script", json!({"script": r#"#{amount: 1500, level: "VIP", order_id: "ORD-001"}"#}))
+        .step("step_2", "logic", json!({
+            "config": {"value": "{{step_1.amount}}"},
+            "conditionGroup": {
+                "combinator": "and",
+                "conditions": [
+                    {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "1000"},
+                    {"id": "c2", "left": "{{step_1.level}}", "op": "==", "right": "VIP"}
+                ]
+            }
+        }))
+        .step("step_3", "script", json!({"script": r#"
+            let b = step_2.branch;
+            let msg = if b == "true" { "审批通过 " + step_1.order_id } else { "拒绝" };
+            #{branch: b, message: msg}
+        "#}))
+        .run().await;
+    assert_eq!(result.output("step_2")["branch"].as_str().unwrap(), "true");
+    let s3 = result.output("step_3");
+    assert_eq!(s3["branch"].as_str().unwrap(), "true");
+    assert!(s3["message"].as_str().unwrap().contains("ORD-001"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 3: 条件分支 OR — 用 step_ 前缀 ID
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_3_condition_or_branch() {
+    let result = TestChain::new()
+        .step("step_1", "script", json!({"script": r#"#{amount: 3000, urgent: 1}"#}))
+        .step("step_2", "logic", json!({
+            "config": {"value": "{{step_1.amount}}"},
+            "conditionGroup": {
+                "combinator": "or",
+                "conditions": [
+                    {"id": "c1", "left": "{{step_1.amount}}", "op": "gt", "right": "5000"},
+                    {"id": "c2", "left": "{{step_1.urgent}}", "op": "==", "right": "1"}
+                ]
+            }
+        }))
+        .step("step_3", "script", json!({"script": r#"
+            let is_vip = step_2.branch == "true";
+            let ch = if is_vip { "VIP通道" } else { "普通通道" };
+            #{channel: ch, is_vip: is_vip}
+        "#}))
+        .run().await;
+    assert_eq!(result.output("step_2")["branch"].as_str().unwrap(), "true");
+    assert_eq!(result.output("step_3")["channel"].as_str().unwrap(), "VIP通道");
+}
