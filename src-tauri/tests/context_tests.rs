@@ -97,19 +97,26 @@ fn resolve_var_nested_field_missing_returns_none() {
 }
 
 #[test]
-fn resolve_var_array_not_indexable_by_dot() {
+fn resolve_var_array_indexing_via_dot() {
     let ctx = new_ctx_with_vars(vec![("items", json!(["a", "b", "c"]))]);
-    // serde_json Value::get(&str) does NOT support numeric array indexing
-    // Arrays accessed via dot notation return None (only object fields work)
-    assert_eq!(ctx.resolve_var("items.0"), None);
+    // Array indexing via dot notation: items.0, items.1, etc.
+    assert_eq!(ctx.resolve_var("items.0"), Some(&json!("a")));
+    assert_eq!(ctx.resolve_var("items.1"), Some(&json!("b")));
+    assert_eq!(ctx.resolve_var("items.2"), Some(&json!("c")));
+    // Out of bounds returns None
     assert_eq!(ctx.resolve_var("items.99"), None);
-    // But object fields inside array items would work if accessed as object
+    // Negative index returns None
+    assert_eq!(ctx.resolve_var("items.-1"), None);
+    // Object fields inside array items
     let ctx2 = new_ctx_with_vars(vec![("data", json!({"items": ["a", "b", "c"]}))]);
-    // data.items doesn't work for array indexing either
     assert_eq!(
         ctx2.resolve_var("data.items"),
         Some(&json!(["a", "b", "c"]))
     );
+    // Nested array indexing
+    let ctx3 = new_ctx_with_vars(vec![("matrix", json!([[1, 2], [3, 4]]))]);
+    assert_eq!(ctx3.resolve_var("matrix.0"), Some(&json!([1, 2])));
+    assert_eq!(ctx3.resolve_var("matrix.1.0"), Some(&json!(3)));
 }
 
 #[test]
