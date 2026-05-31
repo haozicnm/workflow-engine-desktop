@@ -1643,3 +1643,56 @@ async fn scenario_14_while_loop() {
     let s3 = result.output("step_3");
     println!("While 循环: 处理了 {} 个任务", s3["count"].as_i64().unwrap_or(0));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 15: 子工作流
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_15_sub_workflow() {
+    // sub_workflow(内联步骤) → script(使用子流程输出)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "sub_workflow",
+            json!({
+                "inline_steps": [
+                    {
+                        "id": "sub_1",
+                        "name": "子步骤1",
+                        "type": "script",
+                        "config": {"script": r#"#{value: 100}"#}
+                    },
+                    {
+                        "id": "sub_2",
+                        "name": "子步骤2",
+                        "type": "script",
+                        "config": {"script": r#"let v = step_sub_1.value; #{doubled: v * 2}"#}
+                    }
+                ]
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let v = step_1.outputs.sub_1.value;
+                    let d = step_1.outputs.sub_2.doubled;
+                    let count = step_1.steps_executed;
+                    #{original: v, doubled: d, steps: count}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 15 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 15 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("子工作流: original={} doubled={}", 
+        s2["original"].as_i64().unwrap_or(0),
+        s2["doubled"].as_i64().unwrap_or(0)
+    );
+}
