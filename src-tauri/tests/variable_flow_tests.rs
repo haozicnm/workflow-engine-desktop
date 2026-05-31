@@ -1696,3 +1696,189 @@ async fn scenario_15_sub_workflow() {
         s2["doubled"].as_i64().unwrap_or(0)
     );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 16: 审批节点（自动模式）
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_16_approval_auto() {
+    // approval(require_review=false) → script(使用审批结果)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "approval",
+            json!({
+                "title": "发布审批",
+                "message": "确认发布 v7.5.0？",
+                "options": "同意,拒绝",
+                "recommended": "同意",
+                "require_review": false
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let decision = step_1.decision;
+                    let auto = step_1.auto;
+                    #{decision: decision, auto: auto}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 16 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 16 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("审批结果: {} (自动: {})", 
+        s2["decision"].as_str().unwrap_or(""),
+        s2["auto"].as_bool().unwrap_or(false)
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 17: Excel 读取
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+#[ignore] // 需要真正的 Excel 文件
+async fn scenario_17_excel_read() {
+    use std::fs;
+    use std::io::Write;
+    
+    // 创建测试 CSV 文件（模拟 Excel）
+    let test_dir = "/tmp/workflow_test_scenario17";
+    let _ = fs::create_dir_all(test_dir);
+    let csv_path = format!("{}/test.csv", test_dir);
+    
+    let mut file = fs::File::create(&csv_path).unwrap();
+    writeln!(file, "name,age,city").unwrap();
+    writeln!(file, "张三,25,北京").unwrap();
+    writeln!(file, "李四,30,上海").unwrap();
+    writeln!(file, "王五,28,广州").unwrap();
+    
+    // excel_read → script(处理数据)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "excel",
+            json!({
+                "file_path": csv_path,
+                "actions": [
+                    {
+                        "id": "read",
+                        "type": "read",
+                        "label": "读取"
+                    }
+                ]
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let rows = step_1.rows;
+                    let count = step_1.row_count;
+                    let first = rows[0].name;
+                    #{count: count, first_name: first}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    // 清理
+    let _ = fs::remove_dir_all(test_dir);
+    
+    // 调试：查看 step_1 输出
+    if result.is_ok("step_1") {
+        let s1 = result.output("step_1");
+        println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
+    }
+    
+    assert!(result.is_ok("step_1"), "场景 17 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 17 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("Excel 读取: {} 行，第一个姓名: {}", 
+        s2["count"].as_i64().unwrap_or(0),
+        s2["first_name"].as_str().unwrap_or("")
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 18: Web Scrape 本地文件
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_18_web_scrape_local() {
+    use std::fs;
+    
+    // 创建测试 HTML 文件
+    let test_dir = "/tmp/workflow_test_scenario18";
+    let _ = fs::create_dir_all(test_dir);
+    let html_path = format!("{}/test.html", test_dir);
+    
+    fs::write(&html_path, r#"
+    <html>
+    <head><title>测试页面</title></head>
+    <body>
+        <h1>产品列表</h1>
+        <ul>
+            <li class="product">手机 - 999元</li>
+            <li class="product">耳机 - 299元</li>
+            <li class="product">充电器 - 99元</li>
+        </ul>
+    </body>
+    </html>
+    "#).unwrap();
+    
+    // web_scrape → script(提取数据)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "web_scrape",
+            json!({
+                "url": format!("file://{}", html_path),
+                "extract": [
+                    {
+                        "selector": "li.product",
+                        "fields": {
+                            "text": "text()"
+                        }
+                    }
+                ]
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let items = step_1.items;
+                    let count = step_1.total_items;
+                    let first = items[0];
+                    #{count: count, first_item: first}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    // 清理
+    let _ = fs::remove_dir_all(test_dir);
+    
+    assert!(result.is_ok("step_1"), "场景 18 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 18 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("Web Scrape: {} 个产品，第一个: {}", 
+        s2["count"].as_i64().unwrap_or(0),
+        s2["first_item"].as_str().unwrap_or("")
+    );
+}
