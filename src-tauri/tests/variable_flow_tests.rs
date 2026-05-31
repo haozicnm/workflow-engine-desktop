@@ -1489,3 +1489,157 @@ async fn scenario_12_delay_notify() {
     println!("通知标题: {}", s4["notify_title"].as_str().unwrap_or(""));
     println!("发送状态: {}", s4["sent"].as_bool().unwrap_or(false));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 13: 并行执行
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_13_parallel_branches() {
+    // parallel(3个分支) → script(合并结果)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "parallel",
+            json!({
+                "branches": [
+                    [
+                        {
+                            "id": "branch_a",
+                            "name": "分支A",
+                            "type": "script",
+                            "config": {"script": r#"#{branch: "A", value: 100}"#}
+                        }
+                    ],
+                    [
+                        {
+                            "id": "branch_b",
+                            "name": "分支B",
+                            "type": "script",
+                            "config": {"script": r#"#{branch: "B", value: 200}"#}
+                        }
+                    ],
+                    [
+                        {
+                            "id": "branch_c",
+                            "name": "分支C",
+                            "type": "script",
+                            "config": {"script": r#"#{branch: "C", value: 300}"#}
+                        }
+                    ]
+                ]
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let results = step_1.results;
+                    let count = step_1.branch_count;
+                    let a = results[0].outputs.branch_a.value;
+                    let b = results[1].outputs.branch_b.value;
+                    let c = results[2].outputs.branch_c.value;
+                    let total = a + b + c;
+                    #{count: count, a: a, b: b, c: c, total: total}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    // 调试：查看 step_1 输出
+    if result.is_ok("step_1") {
+        let s1 = result.output("step_1");
+        println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
+    }
+    
+    assert!(result.is_ok("step_1"), "场景 13 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 13 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("并行结果: A={} B={} C={} 总计={}", 
+        s2["a"].as_i64().unwrap_or(0),
+        s2["b"].as_i64().unwrap_or(0),
+        s2["c"].as_i64().unwrap_or(0),
+        s2["total"].as_i64().unwrap_or(0)
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 14: While 循环
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_14_while_loop() {
+    // script(生成数据) → while(遍历) → script(汇总)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "script",
+            json!({
+                "script": r#"
+                    let items = [
+                        #{name: "任务1", status: "done"},
+                        #{name: "任务2", status: "done"},
+                        #{name: "任务3", status: "pending"}
+                    ];
+                    items
+                "#
+            }),
+        )
+        .step(
+            "step_2",
+            "while",
+            json!({
+                "items": "output.step_1",
+                "condition": {
+                    "check": "__item.status",
+                    "op": "eq",
+                    "right": "done"
+                },
+                "body": [
+                    {
+                        "id": "process",
+                        "name": "处理",
+                        "type": "script",
+                        "config": {
+                            "script": r#"let name = __item.name; #{processed: name}"#
+                        }
+                    }
+                ],
+                "collect": "process"
+            }),
+        )
+        .step(
+            "step_3",
+            "script",
+            json!({
+                "script": r#"
+                    let count = step_2.count;
+                    let results = step_2.collected;
+                    #{count: count, results: results}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 14 step_1 失败");
+    // 调试：查看 step_2 输出
+    if result.is_ok("step_2") {
+        let s2 = result.output("step_2");
+        println!("step_2 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
+    }
+    
+    // 调试：查看 step_2 状态
+    if !result.is_ok("step_2") {
+        println!("step_2 失败");
+    }
+    
+    assert!(result.is_ok("step_2"), "场景 14 step_2 失败");
+    assert!(result.is_ok("step_3"), "场景 14 step_3 失败");
+    
+    let s3 = result.output("step_3");
+    println!("While 循环: 处理了 {} 个任务", s3["count"].as_i64().unwrap_or(0));
+}
