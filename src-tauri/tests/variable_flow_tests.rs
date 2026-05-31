@@ -1124,3 +1124,368 @@ async fn u2_missing_variable_returns_null() {
         "step_1.value should work"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 6: JSON 解析 + 正则提取链
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_6_json_parse_regex_chain() {
+    // script(生成JSON) → json_parse(提取字段) → regex_extract(提取数字)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "script",
+            json!({
+                "script": r#"
+                    let data = #{
+                        order: #{
+                            id: "ORD-2024-001",
+                            total: 1599.50,
+                            items: [
+                                #{name: "手机", price: 999},
+                                #{name: "耳机", price: 599.50}
+                            ]
+                        }
+                    };
+                    to_json(data)
+                "#
+            }),
+        )
+        .step(
+            "step_2",
+            "json_parse",
+            json!({
+                "data": "{{step_1}}",
+                "expression": "$.order.id"
+            }),
+        )
+        .step(
+            "step_3",
+            "regex_extract",
+            json!({
+                "input": "{{step_2.result}}",
+                "pattern": "\\d{4}-(\\d+)"
+            }),
+        )
+        .run()
+        .await;
+
+    // 调试：查看 step_1 输出
+    let s1 = result.output("step_1");
+    println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
+    
+    assert!(result.is_ok("step_1"), "场景 6 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 6 step_2 失败");
+    assert!(result.is_ok("step_3"), "场景 6 step_3 失败");
+    
+    // 验证 json_parse 输出
+    let s2 = result.output("step_2");
+    println!("json_parse 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
+    
+    // 验证 regex_extract 输出
+    let s3 = result.output("step_3");
+    println!("regex_extract 输出: {}", serde_json::to_string_pretty(&s3).unwrap());
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 7: 文本模板 + 变量注入
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_7_text_template() {
+    // script(生成数据) → text_template(模板拼接)
+    let result = TestChain::new()
+        .var("project", json!("workflow-engine"))
+        .step(
+            "step_1",
+            "script",
+            json!({
+                "script": r#"
+                    let info = #{
+                        version: "7.5.0",
+                        author: "haozi",
+                        stars: 128
+                    };
+                    info
+                "#
+            }),
+        )
+        .step(
+            "step_2",
+            "text_template",
+            json!({
+                "template": "项目: {{project}}\n版本: {{step_1.version}}\n作者: {{step_1.author}}\nStars: {{step_1.stars}}"
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 7 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 7 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("text_template 输出:\n{}", s2["result"].as_str().unwrap());
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 8: HTTP 请求 + 错误重试
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_8_http_retry() {
+    // http(GET 公共API) → script(处理响应)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "http",
+            json!({
+                "method": "GET",
+                "url": "https://httpbin.org/get",
+                "timeout": 10,
+                "retry": {"max": 2, "delay_ms": 500}
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let status = step_1.status;
+                    let ok = step_1.success;
+                    #{status: status, success: ok}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    // HTTP 请求可能因网络问题失败，所以检查 step_1 是否成功
+    if result.is_ok("step_1") {
+        assert!(result.is_ok("step_2"), "场景 8 step_2 失败");
+        let s2 = result.output("step_2");
+        println!("HTTP 状态: {}", s2["status"].as_i64().unwrap_or(0));
+    } else {
+        println!("场景 8: HTTP 请求失败（可能是网络问题），跳过验证");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 9: Shell 命令执行
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_9_shell_command() {
+    // shell(执行命令) → script(处理输出)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "shell",
+            json!({
+                "command": "echo 'Hello from Shell'",
+                "timeout": 5
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let output = step_1.stdout;
+                    let code = step_1.exit_code;
+                    #{output: output, exit_code: code}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 9 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 9 step_2 失败");
+    
+    let s2 = result.output("step_2");
+    println!("Shell 输出: {}", s2["output"].as_str().unwrap_or(""));
+    println!("退出码: {}", s2["exit_code"].as_i64().unwrap_or(-1));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 10: Map 操作（数组映射）
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_10_map_transform() {
+    // script(生成数组) → map(转换) → script(汇总)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "script",
+            json!({
+                "script": r#"
+                    let products = [
+                        #{name: "手机", price: 999, qty: 2},
+                        #{name: "耳机", price: 299, qty: 5},
+                        #{name: "充电器", price: 99, qty: 3}
+                    ];
+                    products
+                "#
+            }),
+        )
+        .step(
+            "step_2",
+            "map",
+            json!({
+                "source": "output.step_1",
+                "template": {
+                    "product": "{{__item.name}}",
+                    "total": "{{__item.price}} x {{__item.qty}}",
+                    "index": "{{__index1}}"
+                }
+            }),
+        )
+        .step(
+            "step_3",
+            "script",
+            json!({
+                "script": r#"
+                    let count = step_2.len;
+                    let first = step_2[0].product;
+                    #{count: count, first_product: first}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 10 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 10 step_2 失败");
+    // 调试：查看 step_2 输出
+    let s2 = result.output("step_2");
+    println!("step_2 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
+    
+    assert!(result.is_ok("step_3"), "场景 10 step_3 失败");
+    
+    let s3 = result.output("step_3");
+    println!("Map 结果: {} 个商品，第一个: {}", 
+        s3["count"].as_i64().unwrap_or(0),
+        s3["first_product"].as_str().unwrap_or("")
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 11: 文件读写全链路
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_11_file_read_write() {
+    use std::fs;
+    
+    let test_dir = "/tmp/workflow_test_scenario11";
+    let _ = fs::create_dir_all(test_dir);
+    let input_path = format!("{}/input.txt", test_dir);
+    let output_path = format!("{}/output.txt", test_dir);
+    
+    // 创建测试输入文件
+    fs::write(&input_path, "Hello, Workflow Engine!\n这是文件读写测试。").unwrap();
+    
+    // file_read → script(处理) → file_write
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "file_read",
+            json!({
+                "path": input_path
+            }),
+        )
+        .step(
+            "step_2",
+            "script",
+            json!({
+                "script": r#"
+                    let content = step_1.content;
+                    let size = step_1.size;
+                    let upper = content.to_upper();
+                    #{original: content, upper: upper, size: size}
+                "#
+            }),
+        )
+        .step(
+            "step_3",
+            "file_write",
+            json!({
+                "path": output_path,
+                "content": "{{step_2.upper}}"
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 11 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 11 step_2 失败");
+    assert!(result.is_ok("step_3"), "场景 11 step_3 失败");
+    
+    // 验证输出文件
+    let output_content = fs::read_to_string(&output_path).unwrap();
+    println!("输入文件: {}", fs::read_to_string(&input_path).unwrap());
+    println!("输出文件: {}", output_content);
+    
+    // 清理
+    let _ = fs::remove_dir_all(test_dir);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 场景 12: 延迟 + 通知
+// ═══════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn scenario_12_delay_notify() {
+    // script → delay(100ms) → notify → script(验证)
+    let result = TestChain::new()
+        .step(
+            "step_1",
+            "script",
+            json!({
+                "script": r#"
+                    let msg = "任务开始处理";
+                    #{message: msg, timestamp: 1234567890}
+                "#
+            }),
+        )
+        .step(
+            "step_2",
+            "delay",
+            json!({
+                "duration_ms": 100
+            }),
+        )
+        .step(
+            "step_3",
+            "notify",
+            json!({
+                "title": "任务完成",
+                "body": "{{step_1.message}}"
+            }),
+        )
+        .step(
+            "step_4",
+            "script",
+            json!({
+                "script": r#"
+                    let title = step_3.title;
+                    let body = step_3.body;
+                    let sent = step_3.sent;
+                    #{notify_title: title, notify_body: body, sent: sent}
+                "#
+            }),
+        )
+        .run()
+        .await;
+
+    assert!(result.is_ok("step_1"), "场景 12 step_1 失败");
+    assert!(result.is_ok("step_2"), "场景 12 step_2 失败");
+    assert!(result.is_ok("step_3"), "场景 12 step_3 失败");
+    assert!(result.is_ok("step_4"), "场景 12 step_4 失败");
+    
+    let s4 = result.output("step_4");
+    println!("通知标题: {}", s4["notify_title"].as_str().unwrap_or(""));
+    println!("发送状态: {}", s4["sent"].as_bool().unwrap_or(false));
+}
