@@ -197,6 +197,8 @@ export default {
     errDescBranch: 'Jump to specified step on failure',
     outputError: '✗ Error',
     outputSuccess: '✓ Output',
+    dangerousWarning: 'This step can execute arbitrary system commands. Use with caution.',
+    dangerousBadge: '⚠ Dangerous',
   },
 
   actionRow: {
@@ -220,6 +222,12 @@ export default {
     outputLabel: 'Output:',
     entireOutput: 'Entire Output',
     sameContainerBadge: 'Same Container',
+    quickActions: 'Quick Actions (no JSON needed)',
+    hideQuickActions: 'Hide Quick Actions',
+    smartExtract: 'Smart Extract Templates',
+    hideSmartExtract: 'Hide Templates',
+    picking: 'Picking...',
+    pickFromPage: 'Pick element from page',
   },
 
   containerConfig: {

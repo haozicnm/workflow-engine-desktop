@@ -127,7 +127,7 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
         size="sm"
         class="h-8 w-8 p-0 shrink-0"
         :class="pickingElement ? 'text-warning' : ''"
-        :title="pickingElement ? '选择中...' : '从页面选择元素'"
+        :title="pickingElement ? t('actionRow.picking') : t('actionRow.pickFromPage')"
         @click="emit('pick-element')"
       ><Target class="w-4 h-4" /></Button>
     </div>

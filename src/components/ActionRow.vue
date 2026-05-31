@@ -303,7 +303,7 @@ function applyQuickAction(qa: typeof quickActions[0]) {
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
-            {{ showQuickActions ? '收起常用操作' : '常用操作（免写JSON）' }}
+            {{ showQuickActions ? t('actionRow.hideQuickActions') : t('actionRow.quickActions') }}
           </Button>
 
           <div v-if="showQuickActions" class="mt-1.5 p-2 rounded-md bg-muted/60 border border-border/40 space-y-1">
@@ -353,7 +353,7 @@ function applyQuickAction(qa: typeof quickActions[0]) {
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
-            {{ showSmartExtract ? '收起模板' : '智能提取模板' }}
+            {{ showSmartExtract ? t('actionRow.hideSmartExtract') : t('actionRow.smartExtract') }}
           </Button>
 
           <!-- Template dropdown -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Settings, Plus } from 'lucide-vue-next'
+import { Settings, Plus, Check, X, Loader2 } from 'lucide-vue-next'
 import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
@@ -121,17 +121,6 @@ function applySmartExtract(code: string) {
 }
 
 // ─── Status ───
-const statusColor: Record<string, string> = {
-  success: 'bg-success',
-  running: 'bg-warning',
-  error: 'bg-danger',
-  idle: 'bg-muted',
-}
-
-const statusBadgeColor = computed(() => {
-  const status = props.runState?.status || 'idle'
-  return statusColor[status] || 'bg-muted'
-})
 
 // ─── Output ───
 const showOutput = ref(false)
@@ -276,14 +265,18 @@ function closeAllMenus() {
         v-if="containerDef?.dangerous"
         variant="warning"
         class="text-[10px] px-1.5 py-0.5 shrink-0"
-        title="此步骤可执行任意系统命令，请谨慎使用"
-      >⚠ 高危</Badge>
+        :title="t('stepCard.dangerousWarning')"
+      >{{ t('stepCard.dangerousBadge') }}</Badge>
 
       <!-- Duration + Status -->
       <span v-if="runState?.duration" class="text-[10px] text-muted-foreground font-mono shrink-0">
         {{ formatDuration(runState.duration) }}
       </span>
-      <span :class="cn('w-2 h-2 rounded-full shrink-0', statusBadgeColor)" />
+      <!-- Status icon: success=check, error=X, running=spinner, idle=dot -->
+      <Check v-if="runState?.status === 'success'" class="w-3.5 h-3.5 text-success shrink-0" />
+      <X v-else-if="runState?.status === 'error'" class="w-3.5 h-3.5 text-danger shrink-0" />
+      <Loader2 v-else-if="runState?.status === 'running'" class="w-3.5 h-3.5 text-warning animate-spin shrink-0" />
+      <span v-else class="w-2 h-2 rounded-full bg-muted shrink-0" />
 
       <!-- ⋯ Menu button -->
       <div class="relative" @click.stop>

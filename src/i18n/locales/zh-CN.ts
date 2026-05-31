@@ -202,6 +202,8 @@ export default {
     errDescBranch: '失败时跳转到指定步骤',
     outputError: '✗ 错误',
     outputSuccess: '✓ 输出',
+    dangerousWarning: '此步骤可执行任意系统命令，请谨慎使用',
+    dangerousBadge: '⚠ 高危',
   },
 
   // ─── 动作行 ───
@@ -226,6 +228,12 @@ export default {
     outputLabel: '输出:',
     entireOutput: '整个输出',
     sameContainerBadge: '容器内',
+    quickActions: '常用操作（免写JSON）',
+    hideQuickActions: '收起常用操作',
+    smartExtract: '智能提取模板',
+    hideSmartExtract: '收起模板',
+    picking: '选择中...',
+    pickFromPage: '从页面选择元素',
   },
 
   containerConfig: {
