@@ -8,12 +8,39 @@
  */
 
 // ═══════════════════════════════════════════════
-// 配置
+// 配置（端口从 chrome.storage 读取，可配置）
 // ═══════════════════════════════════════════════
 
-const WS_URL = 'ws://127.0.0.1:19529/ws/browser';
+const DEFAULT_PORT = 19529;
+let WS_PORT = DEFAULT_PORT;
+let WS_URL = `ws://127.0.0.1:${WS_PORT}/ws/browser`;
 const RECONNECT_DELAY = 2000;
 const COMMAND_TIMEOUT = 30000;
+
+// 从 storage 加载端口配置
+async function loadPortConfig() {
+    try {
+        const result = await chrome.storage.sync.get(['wfPort']);
+        if (result.wfPort) {
+            WS_PORT = result.wfPort;
+            WS_URL = `ws://127.0.0.1:${WS_PORT}/ws/browser`;
+            console.log(`[WebBridge] 使用配置端口: ${WS_PORT}`);
+        }
+    } catch (e) {
+        console.log(`[WebBridge] 使用默认端口: ${DEFAULT_PORT}`);
+    }
+}
+
+// 监听端口配置变化
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.wfPort) {
+        WS_PORT = changes.wfPort.newValue || DEFAULT_PORT;
+        WS_URL = `ws://127.0.0.1:${WS_PORT}/ws/browser`;
+        console.log(`[WebBridge] 端口已更新: ${WS_PORT}，重连中...`);
+        if (ws) ws.close();
+        connectWebSocket();
+    }
+});
 
 // ═══════════════════════════════════════════════
 // 状态管理
@@ -710,8 +737,22 @@ chrome.tabs.onActivated.addListener((info) => {
 });
 
 // ═══════════════════════════════════════════════
+// 消息处理（popup 查询状态）
+// ═══════════════════════════════════════════════
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'getStatus') {
+        sendResponse({
+            connected: wsConnected,
+            port: WS_PORT
+        });
+    }
+    return true;
+});
+
+// ═══════════════════════════════════════════════
 // 启动
 // ═══════════════════════════════════════════════
 
 console.log('[WebBridge] Background loaded');
-connectWebSocket();
+loadPortConfig().then(() => connectWebSocket());

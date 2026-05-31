@@ -21,14 +21,24 @@ async fn main() {
     let router = workflow_engine::server::build_router(app)
         .fallback_service(tower_http::services::ServeDir::new(&static_dir));
 
-    info!(
-        "服务器启动: http://{}  (静态文件: {})",
-        bind_addr, static_dir
-    );
+    let bind_addr: std::net::SocketAddr = bind_addr.parse().expect("invalid bind address");
 
-    let listener = tokio::net::TcpListener::bind(&bind_addr)
-        .await
-        .expect("failed to bind address");
+    // SO_REUSEADDR: 允许绑定 TIME_WAIT 状态的残留端口，解决 Windows 僵尸 socket 问题
+    let socket2_socket = socket2::Socket::new(
+        if bind_addr.is_ipv4() { socket2::Domain::IPV4 } else { socket2::Domain::IPV6 },
+        socket2::Type::STREAM,
+        Some(socket2::Protocol::TCP),
+    ).expect("failed to create socket");
+    socket2_socket.set_reuse_address(true).expect("failed to set SO_REUSEADDR");
+    socket2_socket.set_nonblocking(true).expect("failed to set nonblocking");
+    socket2_socket.bind(&bind_addr.into()).expect("failed to bind socket");
+    socket2_socket.listen(1024).expect("failed to listen on socket");
+
+    let std_listener: std::net::TcpListener = socket2_socket.into();
+    let listener = tokio::net::TcpListener::from_std(std_listener)
+        .expect("failed to create tokio listener");
+
+    info!("服务器启动: http://{}  (静态文件: {})", bind_addr, static_dir);
 
     axum::serve(
         listener,
