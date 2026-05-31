@@ -11,7 +11,7 @@
 // 配置
 // ═══════════════════════════════════════════════
 
-const WS_URL = 'ws://127.0.0.1:19527/ws/browser';
+const WS_URL = 'ws://127.0.0.1:19529/ws/browser';
 const RECONNECT_DELAY = 2000;
 const COMMAND_TIMEOUT = 30000;
 

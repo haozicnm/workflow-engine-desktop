@@ -168,10 +168,16 @@ async fn execute_actions(
                     .get("wait_until")
                     .and_then(|v| v.as_str())
                     .unwrap_or("load");
+                let new_tab = action
+                    .config
+                    .get("new_tab")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
                 let params = serde_json::json!({
                     "url": url,
                     "wait_until": wait_until,
+                    "newTab": new_tab,
                 });
                 send_browser_action("navigate", &params)
                     .await

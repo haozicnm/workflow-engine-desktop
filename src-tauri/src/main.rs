@@ -15,7 +15,7 @@ async fn main() {
     // 启动浏览器 sidecar 后台心跳（30s ping，失败自动重启）
     workflow_engine::nodes::browser::start_heartbeat();
 
-    let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:19528".to_string());
+    let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:19529".to_string());
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
 
     let router = workflow_engine::server::build_router(app)
