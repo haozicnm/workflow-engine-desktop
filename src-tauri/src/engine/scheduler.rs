@@ -14,6 +14,11 @@ use std::time::Instant;
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
+/// 防止无限循环的最大步骤执行次数
+/// 一个 100 步的工作流，每个步骤最多执行 100 次（考虑循环节点），
+/// 10000 次足以覆盖绝大多数场景
+const MAX_STEP_EXECUTIONS: usize = 10_000;
+
 
 /// 运行控制标志（打包避免参数过多）
 pub struct RunControl {
@@ -89,7 +94,21 @@ pub async fn run_workflow(
         .collect();
 
     // 步骤执行循环
+    let mut step_execution_count: usize = 0;
     loop {
+        // 循环检测：防止无限循环
+        step_execution_count += 1;
+        if step_execution_count > MAX_STEP_EXECUTIONS {
+            let err_msg = format!("检测到可能的无限循环：已执行 {} 步，超过上限 {}", step_execution_count, MAX_STEP_EXECUTIONS);
+            warn!("{}", err_msg);
+            state.mark_failed();
+            if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) {
+                warn!("DB update failed: {}", e);
+            }
+            emit_run_update(app_handle, run_id, &workflow_name, "failed");
+            preview::stop_live_session(run_id, "failed");
+            return Err(anyhow::anyhow!(err_msg));
+        }
         // 检查取消（AtomicBool + CancellationToken 双重机制）
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
