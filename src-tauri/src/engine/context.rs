@@ -215,7 +215,7 @@ impl ExecutionContext {
             if let Some(root) = self.variables.get(parts[1]) {
                 let mut current = root;
                 for part in &parts[2..] {
-                    current = Self::get_field(current, *part)?;
+                    current = Self::get_field(current, part)?;
                 }
                 return Some(current);
             }
@@ -226,7 +226,7 @@ impl ExecutionContext {
             if let Some(root) = self.variables.get(parts[1]) {
                 let mut current = root;
                 for part in &parts[2..] {
-                    current = Self::get_field(current, *part)?;
+                    current = Self::get_field(current, part)?;
                 }
                 return Some(current);
             }
@@ -238,7 +238,7 @@ impl ExecutionContext {
             if let Some(root) = self.step_outputs.get(root_key) {
                 let mut current = root;
                 for part in &parts[1..] {
-                    current = Self::get_field(current, *part)?;
+                    current = Self::get_field(current, part)?;
                 }
                 return Some(current);
             }
@@ -246,7 +246,7 @@ impl ExecutionContext {
             if let Some(root) = self.step_outputs.get(step_id) {
                 let mut current = root;
                 for part in &parts[1..] {
-                    current = Self::get_field(current, *part)?;
+                    current = Self::get_field(current, part)?;
                 }
                 return Some(current);
             }
@@ -258,14 +258,14 @@ impl ExecutionContext {
         if let Some(root) = self.step_outputs.get(root_key) {
             let mut current = root;
             for part in &parts[1..] {
-                current = Self::get_field(current, *part)?;
+                current = Self::get_field(current, part)?;
             }
             return Some(current);
         }
         if let Some(root) = self.variables.get(root_key) {
             let mut current = root;
             for part in &parts[1..] {
-                current = Self::get_field(current, *part)?;
+                current = Self::get_field(current, part)?;
             }
             return Some(current);
         }
