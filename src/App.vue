@@ -52,13 +52,21 @@ let dragCounter = 0
 
 function onDragEnter(e: DragEvent) {
   e.preventDefault()
-  dragCounter++
-  isDragging.value = true
+  // Only show import overlay for file drops, not internal drags
+  const dt = e.dataTransfer
+  if (dt && dt.types.includes('Files')) {
+    dragCounter++
+    isDragging.value = true
+  }
 }
 function onDragLeave(e: DragEvent) {
   e.preventDefault()
-  dragCounter--
-  if (dragCounter <= 0) { isDragging.value = false; dragCounter = 0 }
+  // Only hide import overlay for file drops
+  const dt = e.dataTransfer
+  if (dt && dt.types.includes('Files')) {
+    dragCounter--
+    if (dragCounter <= 0) { isDragging.value = false; dragCounter = 0 }
+  }
 }
 function onDragOver(e: DragEvent) {
   e.preventDefault()
@@ -68,6 +76,13 @@ function onDrop(e: DragEvent) {
   isDragging.value = false
   dragCounter = 0
   // File import is handled by Dashboard's drop handler at the sidebar level
+  // Only handle file drops here, ignore internal drag-and-drop (e.g., step reordering)
+  const dt = e.dataTransfer
+  if (dt && dt.types.includes('Files')) {
+    // This is a file drop — let Dashboard handle it
+    // (Dashboard has its own drop zone for file imports)
+  }
+  // For internal drags (text/plain with step index), do nothing — let child handlers work
 }
 
 // Sidebar click → set selected workflow ID → Editor loads that workflow
