@@ -1,3 +1,39 @@
+## v7.5.0 (2026-05-31) — 变量系统增强 + 统一错误处理 + WebBridge 集成
+
+### 变量系统增强
+- **数组索引支持**: `items[0]` 格式变量引用，支持嵌套访问
+- **解析失败策略**: 变量解析失败返回 `Value::Null` 而非空字符串，便于问题定位
+- **数组操作测试**: 新增 19 个变量流转测试，覆盖 array_filter/sort/paginate 等场景
+
+### 统一错误处理
+- **error_utils.rs**: 集中管理 `{error, code, suggestion}` 三件套
+- **HTTP 节点**: 新增 retry/retry_delay_ms 重试支持
+- **Shell 节点**: 统一错误格式（缺少命令、执行失败、非零退出码）
+- **Condition 节点**: 修复 compare_values 字符串比较 bug + eq/ne 操作符别名
+
+### WebBridge 浏览器集成
+- **WebSocket 服务端**: `ws://localhost:19527/ws/browser` 连接扩展
+- **自动路由**: WebBridge 已连接→扩展（有登录态），未连接→Playwright sidecar
+- **前端状态**: StatusBar 显示 WebBridge 连接状态
+- **download 工具**: 新增文件下载支持
+
+### UX 改进
+- **执行状态图标化**: success→✓(绿), error→✗(红), running→⟳(黄), idle→•(灰)
+- **i18n 补全**: StepCard/ActionRow 硬编码中文提取到 zh-CN/en-US
+- **拖拽排序修复**: 区分文件拖入和内部拖拽，修复步骤排序失效
+
+### 调度器增强
+- **循环检测**: MAX_STEP_EXECUTIONS=10000 硬上限，防止无限循环
+
+### 测试覆盖
+- **34 个变量流转测试**: 覆盖 22/35 节点（63%）
+- **156 测试全绿**: 57 库测试 + 35 context + 30 scheduler + 34 variable_flow
+
+### 知识沉淀
+- **循环检测文档**: `docs/solutions/2026-05-31-scheduler-loop-detection.md`
+- **错误处理标准化**: `docs/solutions/2026-05-31-error-handling-standardization.md`
+- **开发日志**: `workflow-engine-architecture/references/u1-u5-development-log.md`
+
 # Changelog
 
 ## v7.2.0 (2026-05-27) — Schema-First 节点系统
