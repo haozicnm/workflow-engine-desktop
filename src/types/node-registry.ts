@@ -552,9 +552,19 @@ export function newStep(containerType: ContainerType, existingSteps?: Step[], t?
   const def = getContainerDef(containerType, t)
   // 从容器定义中提取默认参数
   const config: Record<string, unknown> = {}
-  for (const p of def.params) {
-    if (p.default !== undefined) {
-      config[p.key] = p.default
+  if (def.paramDefs?.length) {
+    // 新 schema-driven 格式
+    for (const pd of def.paramDefs) {
+      if (pd.default !== undefined) {
+        config[pd.name] = pd.default
+      }
+    }
+  } else {
+    // 旧 ActionParam 格式
+    for (const p of def.params) {
+      if (p.default !== undefined) {
+        config[p.key] = p.default
+      }
     }
   }
   const step: Step = {

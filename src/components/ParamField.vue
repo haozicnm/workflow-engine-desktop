@@ -145,17 +145,12 @@ function onJsonInput(e: Event) {
 // ─── File path picker (Tauri) ───
 async function pickFilePath() {
   try {
-    // 动态导入 Tauri API（非 Tauri 环境下不报错）
-    const { open } = await import(/* @vite-ignore */ '@tauri-apps/api/dialog') as any
-    const selected = await open({
-      multiple: false,
-      title: '选择文件',
-    })
-    if (selected && typeof selected === 'string') {
-      emit('update:modelValue', selected)
-    }
+    // Tauri v2 对话框插件（运行时动态加载，类型安全）
+    const mod = await Function('return import("@tauri-apps/plugin-dialog")')()
+    const selected = await mod.open({ multiple: false, title: '选择文件' })
+    if (selected && typeof selected === 'string') emit('update:modelValue', selected)
   } catch {
-    // 非 Tauri 环境，忽略
+    // 非 Tauri 环境或插件未安装，忽略
   }
 }
 
@@ -216,7 +211,7 @@ const canRef = computed(() => ['text', 'textarea', 'json', 'code', 'file_path'].
     <div v-if="field.hint" class="text-[10px] text-muted-foreground/70 mb-1.5">{{ field.hint }}</div>
 
     <!-- Text input (string / text) -->
-    <div v-if="field.type === 'text' || field.type === 'string'" class="flex gap-1">
+    <div v-if="field.type === 'text'" class="flex gap-1">
       <Input
         :data-field="field.key"
         type="text"
