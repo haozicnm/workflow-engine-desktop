@@ -486,27 +486,6 @@ pub fn file_actions() -> &'static [ActionDef] {
     ]
 }
 
-pub fn clipboard_actions() -> &'static [ActionDef] {
-    &[
-        ActionDef {
-            action_type: "read",
-            label: "Read Clipboard",
-            category: ActionCategory::DataRead,
-            description: "Read text from the clipboard",
-            params: &[],
-            output_hint: Some("{ text }"),
-        },
-        ActionDef {
-            action_type: "write",
-            label: "Write Clipboard",
-            category: ActionCategory::Clipboard,
-            description: "Write text to the clipboard",
-            params: &[text_param!("text", "Text", true)],
-            output_hint: None,
-        },
-    ]
-}
-
 // ═══════════════════════════════════════
 // TypeScript 生成
 // ═══════════════════════════════════════
@@ -534,7 +513,6 @@ pub fn generate_ts_metadata() -> String {
         ("excel", excel_actions()),
         ("word", word_actions()),
         ("file", file_actions()),
-        ("clipboard", clipboard_actions()),
     ];
 
     let mut ts = String::from(
@@ -602,7 +580,6 @@ mod tests {
         assert!(!excel_actions().is_empty());
         assert!(!word_actions().is_empty());
         assert!(!file_actions().is_empty());
-        assert!(!clipboard_actions().is_empty());
     }
 
     #[test]

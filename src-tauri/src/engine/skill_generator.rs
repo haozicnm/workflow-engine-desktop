@@ -113,7 +113,6 @@ fn step_description(step: &crate::engine::workflow::Step) -> String {
         }
         "script" => "Execute script".to_string(),
         "shell" => "Run shell command".to_string(),
-        "notify" => "Send notification".to_string(),
         "delay" => {
             let ms = step
                 .config
@@ -122,8 +121,6 @@ fn step_description(step: &crate::engine::workflow::Step) -> String {
                 .unwrap_or(0);
             format!("Delay {}ms", ms)
         }
-        "json_parse" => "Parse JSON".to_string(),
-        "text_template" => "Render text template".to_string(),
         "condition" => "Conditional branch".to_string(),
         "approval" => "Wait for approval".to_string(),
         t if t.contains("file") => "File operations".to_string(),

@@ -129,9 +129,6 @@ fn validate_required_fields(step: &Step, ctx: &str) -> ValidationResult {
         "script" if config.get("script").is_none() => {
             result.error(format!("{}: script step missing 'script' field", ctx));
         }
-        "notify" if config.get("title").is_none() => {
-            result.warn(format!("{}: notify step missing 'title' field", ctx));
-        }
         _ => {}
     }
 

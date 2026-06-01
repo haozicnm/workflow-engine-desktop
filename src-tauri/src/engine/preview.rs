@@ -108,14 +108,8 @@ fn build_preview(step: &Step, output: &Value) -> (String, Value) {
         "http" => http_preview(step, output),
         "script" => script_preview(step, output),
         "shell" => shell_preview(output),
-        "notify" => notify_preview(output),
         "delay" => delay_preview(step),
-        "clipboard" => clipboard_preview(output),
         "approval" => approval_preview(output),
-        "json_parse" => json_parse_preview(output),
-        "array_filter" => array_op_preview("filter", output),
-        "array_sort" => array_op_preview("sort", output),
-        "text_template" => text_template_preview(output),
         t if t.contains("file") => file_container_preview(step, output),
         t if t.contains("excel") => excel_container_preview(step, output),
         t if t.contains("word") => word_container_preview(step, output),
@@ -196,14 +190,6 @@ fn shell_preview(output: &Value) -> (String, Value) {
     (summary, detail)
 }
 
-fn notify_preview(output: &Value) -> (String, Value) {
-    let notify_type = output.get("type").and_then(|v| v.as_str()).unwrap_or("?");
-    let title = output.get("title").and_then(|v| v.as_str()).unwrap_or("?");
-    let summary = format!("通知 [{}] {}", notify_type, truncate_str(title, 50));
-    let detail = output.clone();
-    (summary, detail)
-}
-
 fn delay_preview(step: &Step) -> (String, Value) {
     let ms = step
         .config
@@ -212,15 +198,6 @@ fn delay_preview(step: &Step) -> (String, Value) {
         .unwrap_or(0);
     let summary = format!("延迟 {}ms", ms);
     let detail = serde_json::json!({"duration_ms": ms});
-    (summary, detail)
-}
-
-fn clipboard_preview(output: &Value) -> (String, Value) {
-    let action = output.get("action").and_then(|v| v.as_str()).unwrap_or("?");
-    let text = output.get("text").and_then(|v| v.as_str()).unwrap_or("");
-    let preview = truncate_str(text, 100);
-    let summary = format!("剪贴板 [{}] {}", action, preview);
-    let detail = output.clone();
     (summary, detail)
 }
 
@@ -241,38 +218,11 @@ fn approval_preview(output: &Value) -> (String, Value) {
     (summary, detail)
 }
 
-fn json_parse_preview(output: &Value) -> (String, Value) {
-    let count = match output {
-        Value::Array(arr) => arr.len(),
-        Value::Object(obj) => obj.len(),
-        _ => 0,
-    };
-    let summary = format!("JSON 解析 → {} 项", count);
-    let detail = serde_json::json!({"item_count": count});
-    (summary, detail)
-}
 
-fn array_op_preview(op: &str, output: &Value) -> (String, Value) {
-    let source = output
-        .get("source_count")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let result = output
-        .get("result_count")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let summary = format!("数组{} {} → {}", op, source, result);
-    let detail = serde_json::json!({"source_count": source, "result_count": result});
-    (summary, detail)
-}
 
-fn text_template_preview(output: &Value) -> (String, Value) {
-    let result = output.get("result").and_then(|v| v.as_str()).unwrap_or("");
-    let preview = truncate_str(result, 100);
-    let summary = format!("模板 → {}", preview);
-    let detail = output.clone();
-    (summary, detail)
-}
+
+
+
 
 fn file_container_preview(step: &Step, output: &Value) -> (String, Value) {
     let actions = step.actions.as_ref().map(|a| a.len()).unwrap_or(0);
@@ -566,9 +516,6 @@ pub fn bundle_step_output(run_id: &str, step: &Step, output: &Value) -> Option<P
         "http" => bundle_http(&bundle_dir, step, output),
         "shell" => bundle_shell(&bundle_dir, output),
         "script" => bundle_script(&bundle_dir, output),
-        "json_parse" => bundle_json(&bundle_dir, output),
-        "text_template" => bundle_text(&bundle_dir, output),
-        "notify" => bundle_json(&bundle_dir, output),
         t if t.contains("browser") => bundle_browser(&bundle_dir, output),
         t if t.contains("file") => bundle_file(&bundle_dir, step, output),
         t if t.contains("excel") => bundle_json(&bundle_dir, output),
@@ -658,6 +605,7 @@ fn bundle_json(dir: &Path, output: &Value) -> bool {
     bundle_script(dir, output) // same behavior: write output as pretty JSON
 }
 
+#[allow(dead_code)]
 fn bundle_text(dir: &Path, output: &Value) -> bool {
     let text = output.get("result").and_then(|v| v.as_str()).unwrap_or("");
     if let Err(e) = fs::write(dir.join("output.txt"), text) {

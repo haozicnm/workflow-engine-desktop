@@ -24,6 +24,7 @@ use serde_json::json;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{info, warn};
 
 #[derive(Default)]
@@ -61,7 +62,8 @@ impl NodeExecutor for ShellNode {
             .config
             .get("timeout_secs")
             .and_then(|v| v.as_u64())
-            .unwrap_or(300);
+            .unwrap_or(300)
+            .min(3600); // 最大 1 小时，防止意外无限阻塞
 
         // 2. 跨平台命令适配
         let command = adapt_command(&command);
@@ -97,10 +99,22 @@ impl NodeExecutor for ShellNode {
             }
         }
 
-        let output = tokio::task::spawn_blocking(move || cmd.output())
-            .await
-            .map_err(|e| error_utils::execution_failed("Shell 命令执行", &e.to_string()).to_error())?
-            .map_err(|e| error_utils::execution_failed("Shell 命令启动", &e.to_string()).to_error())?;
+        let handle = tokio::task::spawn_blocking(move || cmd.output());
+        let output = match tokio::time::timeout(Duration::from_secs(timeout_secs), handle).await {
+            Ok(Ok(inner)) => inner
+                .map_err(|e| error_utils::execution_failed("Shell 命令启动", &e.to_string()).to_error())?,
+            Ok(Err(join_err)) => {
+                return Err(error_utils::execution_failed("Shell 命令执行", &join_err.to_string()).to_error());
+            }
+            Err(_elapsed) => {
+                // 超时：任务会被 drop，但 OS 进程可能仍在运行
+                warn!("Shell 命令超时 ({}s)", timeout_secs);
+                return Err(error_utils::execution_failed(
+                    "Shell 命令",
+                    &format!("执行超时 ({}s)", timeout_secs),
+                ).to_error());
+            }
+        };
 
         let stdout_raw = String::from_utf8_lossy(&output.stdout);
         let stdout = stdout_raw.trim().to_string();
