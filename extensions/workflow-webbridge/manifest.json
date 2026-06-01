@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Workflow WebBridge",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "浏览器自动化桥接 — 为 Workflow Engine 提供 CDP 控制能力",
   "permissions": [
     "debugger",
     "tabs",
     "activeTab",
     "tabGroups",
-    "storage"
+    "storage",
+    "windows"
   ],
   "host_permissions": [
     "<all_urls>"

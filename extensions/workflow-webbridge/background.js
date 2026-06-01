@@ -52,6 +52,17 @@ let lastFocusedTabId = null;
 let ws = null;
 let wsConnected = false;
 
+// Network 捕获
+const networkCaptures = new Map(); // tabId -> Map<requestId, requestInfo>
+const activeCaptures = new Set();  // 正在捕获的 tabId
+let networkListenerAdded = false;
+
+// Tab 分组
+const sessionGroups = new Map();   // session -> groupId
+const sessionColors = new Map();   // session -> color
+const SESSION_COLORS = ['blue', 'red', 'yellow', 'green', 'cyan', 'orange', 'pink', 'purple'];
+let sessionColorIdx = 0;
+
 // @e ref 系统
 const refMap = new Map();
 let refCounter = 1;
@@ -212,11 +223,14 @@ const tools = {
     if (!url) throw new Error('navigate: url is required');
     
     const newTab = params.newTab;
+    const session = params._session;
+    const groupTitle = params.group_title;
     const tab = await resolveTab();
     
     if (newTab) {
       const created = await chrome.tabs.create({ url, active: true });
       lastFocusedTabId = created.id;
+      if (session) await assignToSession(created.id, session, groupTitle);
       await ensureAttached(created.id);
       await waitForLoad(created.id);
       return { success: true, url, tabId: created.id };
@@ -229,19 +243,29 @@ const tools = {
   },
 
   async find_tab(params) {
-    const { url, title, index } = params;
+    const { url, title, index, _session, active: wantActive } = params;
     const tabs = await chrome.tabs.query({});
     
     let target;
     if (index !== undefined) {
       target = tabs[index];
     } else if (url) {
-      target = tabs.find(t => t.url?.includes(url));
+      // 对齐 Kimi: 支持通配符匹配
+      const pattern = url.includes('*') ? url : null;
+      if (pattern) {
+        const hostname = pattern.replace(/^\*:\/\/?/, '').replace(/\/\*$/, '');
+        target = tabs.find(t => {
+          try { return new URL(t.url).hostname === hostname; } catch { return false; }
+        });
+      } else {
+        target = tabs.find(t => t.url?.includes(url));
+      }
     } else if (title) {
       target = tabs.find(t => t.title?.includes(title));
     }
     
     if (!target) throw new Error(`Tab not found: ${JSON.stringify(params)}`);
+    if (_session) await assignToSession(target.id, _session);
     lastFocusedTabId = target.id;
     await ensureAttached(target.id);
     return { success: true, tabId: target.id, url: target.url, title: target.title };
@@ -435,17 +459,63 @@ const tools = {
 
   async network(params) {
     await ensureAttached((await resolveTab()).id);
-    const action = params.action || 'enable';
-    
-    if (action === 'enable') {
-      await cdpCommand('Network.enable');
-      return { success: true, enabled: true };
+    const cmd = params.cmd || params.action || 'start';
+
+    switch (cmd) {
+      case 'start': {
+        ensureNetworkListener();
+        networkCaptures.set(activeTabId, new Map());
+        activeCaptures.add(activeTabId);
+        await cdpCommand('Network.enable');
+        return { success: true, message: 'network capture started' };
+      }
+      case 'stop': {
+        activeCaptures.delete(activeTabId);
+        try { await cdpCommand('Network.disable'); } catch {}
+        return { success: true, message: 'network capture stopped' };
+      }
+      case 'list': {
+        const captures = networkCaptures.get(activeTabId);
+        let requests = captures ? [...captures.values()] : [];
+        if (params.filter) {
+          requests = requests.filter(r => r.url.includes(params.filter));
+        }
+        return {
+          count: requests.length,
+          requests: requests.map(r => ({
+            requestId: r.requestId,
+            url: r.url,
+            method: r.method,
+            status: r.status,
+            mimeType: r.mimeType,
+            completed: r.completed ?? false,
+          })),
+        };
+      }
+      case 'detail': {
+        const reqId = params.requestId;
+        if (!reqId) throw new Error('network detail: requestId is required');
+        const captures = networkCaptures.get(activeTabId);
+        const req = captures?.get(reqId);
+        if (!req) throw new Error(`network: request "${reqId}" not found`);
+        const resp = await cdpCommand('Network.getResponseBody', { requestId: reqId });
+        let body = resp.body;
+        if (!resp.base64Encoded) {
+          try { body = JSON.parse(resp.body); } catch {}
+        }
+        return {
+          requestId: req.requestId,
+          url: req.url,
+          method: req.method,
+          status: req.status,
+          mimeType: req.mimeType,
+          base64Encoded: resp.base64Encoded,
+          body,
+        };
+      }
+      default:
+        throw new Error(`network: unknown cmd "${cmd}"`);
     }
-    if (action === 'disable') {
-      await cdpCommand('Network.disable');
-      return { success: true, enabled: false };
-    }
-    throw new Error(`network: unknown action "${action}"`);
   },
 
   async upload(params) {
@@ -519,6 +589,73 @@ const tools = {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ═══════════════════════════════════════════════
+// Tab 分组（对齐 Kimi WebBridge）
+// ═══════════════════════════════════════════════
+
+async function assignToSession(tabId, session, groupTitle) {
+  if (!session) return;
+  try {
+    const existingGroupId = sessionGroups.get(session);
+    if (existingGroupId != null) {
+      await chrome.tabs.group({ tabIds: [tabId], groupId: existingGroupId });
+      return;
+    }
+    const groupName = `agent:${session}`;
+    const existing = await chrome.tabGroups.query({ title: groupName });
+    if (existing.length > 0) {
+      await chrome.tabs.group({ tabIds: [tabId], groupId: existing[0].id });
+      sessionGroups.set(session, existing[0].id);
+      return;
+    }
+    const title = groupTitle || sessionColors.get(session) || groupName;
+    if (!sessionColors.has(session)) {
+      sessionColors.set(session, SESSION_COLORS[sessionColorIdx++ % SESSION_COLORS.length]);
+    }
+    const groupId = await chrome.tabs.group({ tabIds: [tabId] });
+    const color = sessionColors.get(session);
+    await chrome.tabGroups.update(groupId, { title, color, collapsed: false });
+    sessionGroups.set(session, groupId);
+  } catch (e) {
+    console.warn('[WebBridge] Tab group error:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// Network 捕获（对齐 Kimi WebBridge）
+// ═══════════════════════════════════════════════
+
+function ensureNetworkListener() {
+  if (networkListenerAdded) return;
+  networkListenerAdded = true;
+  chrome.debugger.onEvent.addListener((source, method, params) => {
+    const tabId = source.tabId;
+    if (!tabId || !activeCaptures.has(tabId)) return;
+    const captures = networkCaptures.get(tabId);
+    if (!captures) return;
+
+    if (method === 'Network.requestWillBeSent') {
+      captures.set(params.requestId, {
+        requestId: params.requestId,
+        url: params.request.url,
+        method: params.request.method,
+        timestamp: params.timestamp,
+      });
+    }
+    if (method === 'Network.responseReceived') {
+      const req = captures.get(params.requestId);
+      if (req) {
+        req.status = params.response.status;
+        req.mimeType = params.response.mimeType;
+      }
+    }
+    if (method === 'Network.loadingFinished') {
+      const req = captures.get(params.requestId);
+      if (req) req.completed = true;
+    }
+  });
 }
 
 async function waitForLoad(tabId, timeout = 30000) {
@@ -723,6 +860,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   attachedTabs.delete(tabId);
   if (activeTabId === tabId) activeTabId = null;
   if (lastFocusedTabId === tabId) lastFocusedTabId = null;
+  // 清理 network 捕获
+  networkCaptures.delete(tabId);
+  activeCaptures.delete(tabId);
 });
 
 chrome.debugger.onDetach.addListener((source) => {
