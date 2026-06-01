@@ -218,8 +218,16 @@ pub fn get_all_mcp_types() -> Vec<String> {
     types
 }
 
+/// 跨平台 Python 检测
+/// 优先使用 config 中配置的 python_path，否则自动检测
 fn find_python() -> String {
-    for c in &["python", "python3"] {
+    // 1. 按优先级尝试命令名
+    #[cfg(target_os = "windows")]
+    let candidates = ["python", "python3", "py"];
+    #[cfg(not(target_os = "windows"))]
+    let candidates = ["python3", "python"];
+
+    for c in &candidates {
         if Command::new(c)
             .arg("--version")
             .stdout(Stdio::null())
@@ -231,6 +239,26 @@ fn find_python() -> String {
             return c.to_string();
         }
     }
+
+    // 2. Windows: 检查常见安装路径
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let paths = [
+                format!("{}\\Programs\\Python\\Python312\\python.exe", local_app_data),
+                format!("{}\\Programs\\Python\\Python311\\python.exe", local_app_data),
+                format!("{}\\Programs\\Python\\Python310\\python.exe", local_app_data),
+                format!("{}\\Programs\\Python\\Python39\\python.exe", local_app_data),
+            ];
+            for p in &paths {
+                if std::path::Path::new(p).exists() {
+                    return p.clone();
+                }
+            }
+        }
+    }
+
+    // 3. 兜底
     "python".into()
 }
 
