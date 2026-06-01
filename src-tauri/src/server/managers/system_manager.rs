@@ -403,7 +403,7 @@ pub async fn blocks_list(Query(params): Query<std::collections::HashMap<String, 
     let category_filter = params.get("category").map(|s| s.as_str());
     let blocks: Vec<serde_json::Value> = crate::nodes::registry::all_nodes()
         .into_iter()
-        .filter(|n| category_filter.map_or(true, |cat| n.category == cat))
+        .filter(|n| category_filter.is_none_or(|cat| n.category == cat))
         .map(|n| {
             serde_json::json!({
                 "type": n.node_type,

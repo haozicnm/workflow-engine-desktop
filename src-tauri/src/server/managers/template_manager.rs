@@ -108,7 +108,7 @@ fn load_all_templates() -> Result<Vec<(String, TemplateFile)>, String> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.extension().map_or(false, |ext| ext == "yaml" || ext == "yml") {
+        if !path.extension().is_some_and(|ext| ext == "yaml" || ext == "yml") {
             continue;
         }
         let filename = path
@@ -214,13 +214,11 @@ pub async fn template_instantiate(
 
     // 检查 required 参数是否都提供了
     for param in &tmpl.params {
-        if param.required && !body.params.contains_key(&param.name) {
-            if param.default.is_none() {
-                return err_response(
-                    StatusCode::BAD_REQUEST,
-                    format!("缺少必需参数: {}", param.name),
-                );
-            }
+        if param.required && !body.params.contains_key(&param.name) && param.default.is_none() {
+            return err_response(
+                StatusCode::BAD_REQUEST,
+                format!("缺少必需参数: {}", param.name),
+            );
         }
     }
 
