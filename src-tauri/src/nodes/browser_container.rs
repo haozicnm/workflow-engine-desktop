@@ -67,13 +67,9 @@ fn require_selector(action: &ContainerAction) -> Result<&str> {
     }
 }
 
-/// 发送浏览器命令（自动路由到 WebBridge 或 Playwright sidecar）
+/// 发送浏览器命令（通过 WebBridge 扩展）
 async fn send_browser_action(action: &str, params: &Value) -> Result<Value> {
-    if crate::nodes::webbridge::is_available().await {
-        crate::nodes::webbridge::send_command(action, params.clone()).await
-    } else {
-        crate::nodes::browser::send_sidecar_action(action, params).await
-    }
+    crate::nodes::webbridge::send_command(action, params.clone()).await
 }
 
 /// 浏览器容器执行结果
@@ -119,33 +115,8 @@ async fn execute_actions(
 ) -> Result<ContainerResult> {
     let mut output_ports: HashMap<String, Value> = HashMap::new();
 
-    // ── 选择通信后端：WebBridge（优先）或 Playwright sidecar ──
-    let use_webbridge = crate::nodes::webbridge::is_available().await;
-
-    if use_webbridge {
-        tracing::info!("使用 WebBridge 扩展（WebSocket）");
-    } else {
-        tracing::info!("WebBridge 未连接，回退到 Playwright sidecar");
-        // 确保 Playwright sidecar 已启动
-        match send_browser_action(
-            "launch",
-            &serde_json::json!({
-                "headless": config.headless,
-                "browser": config.browser,
-            }),
-        )
-        .await
-        {
-            Ok(_) => tracing::debug!("浏览器已就绪"),
-            Err(e) => return Err(anyhow!("浏览器启动失败: {}", e)),
-        }
-
-        // 清理上一容器遗留的状态
-        match send_browser_action("reset_state", &serde_json::json!({})).await {
-            Ok(_) => tracing::debug!("浏览器状态已重置"),
-            Err(e) => tracing::warn!("浏览器重置失败（非致命）: {}", e),
-        }
-    }
+    // ── 使用 WebBridge 作为唯一浏览器后端 ──
+    tracing::info!("使用 WebBridge 扩展（WebSocket）");
 
     // NOTE: 当前使用 match 分发 31 个 action，模式清晰但文件较长。
     // 如果 action 数量继续增长，考虑参考 executor.rs 的注册表模式重构。

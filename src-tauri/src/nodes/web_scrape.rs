@@ -116,9 +116,7 @@ async fn scrape_url_list(
         delay_between_ms
     );
 
-    // 启动浏览器
-    let launch_params = build_launch_params(config);
-    let _ = crate::nodes::browser::send_sidecar_action("launch", &launch_params).await?;
+    // WebBridge 无需启动浏览器（扩展已在浏览器中运行）
 
     let extract_rules = config
         .get("extract")
@@ -402,9 +400,7 @@ async fn scrape_single_url_inner(
         .and_then(|p| p.get("next"))
         .and_then(|v| v.as_str());
 
-    // 启动浏览器
-    let launch_params = build_launch_params(config);
-    let _ = crate::nodes::browser::send_sidecar_action("launch", &launch_params).await?;
+    // WebBridge 无需启动浏览器（扩展已在浏览器中运行）
 
     let mut all_items: Vec<serde_json::Value> = Vec::new();
     let mut pages_scraped = 0usize;
@@ -416,7 +412,7 @@ async fn scrape_single_url_inner(
             "wait_until": "domcontentloaded",
         });
         let nav_result =
-            crate::nodes::browser::send_sidecar_action("navigate", &nav_params).await?;
+            crate::nodes::webbridge::send_command("navigate", nav_params).await?;
         if !nav_result
             .get("success")
             .and_then(|v| v.as_bool())
@@ -433,7 +429,7 @@ async fn scrape_single_url_inner(
             "selector": wait_for,
             "timeout_ms": 10000,
         });
-        let _ = crate::nodes::browser::send_sidecar_action("wait", &wait_params).await;
+        let _ = crate::nodes::webbridge::send_command("wait", wait_params).await;
 
         if scroll && scroll_times > 0 {
             let scroll_params = serde_json::json!({
@@ -441,7 +437,7 @@ async fn scrape_single_url_inner(
                 "times": scroll_times,
                 "delay_ms": delay_ms,
             });
-            let _ = crate::nodes::browser::send_sidecar_action("scroll_to", &scroll_params).await;
+            let _ = crate::nodes::webbridge::send_command("scroll_to", scroll_params).await;
         }
 
         for rule in extract_rules {
@@ -456,9 +452,9 @@ async fn scrape_single_url_inner(
                     "document.querySelectorAll({}).length",
                     serde_json::json!(item_selector)
                 );
-                let count_result = crate::nodes::browser::send_sidecar_action(
+                let count_result = crate::nodes::webbridge::send_command(
                     "evaluate",
-                    &serde_json::json!({ "script": count_script }),
+                    serde_json::json!({ "script": count_script }),
                 )
                 .await?;
                 let count = count_result
@@ -478,9 +474,9 @@ async fn scrape_single_url_inner(
                                 serde_json::json!(item_selector), i, i,
                                 serde_json::json!(base_sel), serde_json::json!(attr_name),
                             );
-                            let result = crate::nodes::browser::send_sidecar_action(
+                            let result = crate::nodes::webbridge::send_command(
                                 "evaluate",
-                                &serde_json::json!({ "script": script }),
+                                serde_json::json!({ "script": script }),
                             )
                             .await?;
                             result
@@ -494,9 +490,9 @@ async fn scrape_single_url_inner(
                                 serde_json::json!(item_selector), i, i,
                                 serde_json::json!(sel),
                             );
-                            let result = crate::nodes::browser::send_sidecar_action(
+                            let result = crate::nodes::webbridge::send_command(
                                 "evaluate",
-                                &serde_json::json!({ "script": script }),
+                                serde_json::json!({ "script": script }),
                             )
                             .await?;
                             result
@@ -510,9 +506,9 @@ async fn scrape_single_url_inner(
                     all_items.push(serde_json::Value::Object(item));
                 }
             } else {
-                let result = crate::nodes::browser::send_sidecar_action(
+                let result = crate::nodes::webbridge::send_command(
                     "extract_text",
-                    &serde_json::json!({ "selector": item_selector }),
+                    serde_json::json!({ "selector": item_selector }),
                 )
                 .await?;
                 if let Some(texts) = result
@@ -536,7 +532,7 @@ async fn scrape_single_url_inner(
                     "wait_ms": delay_ms,
                 });
                 let click_result =
-                    crate::nodes::browser::send_sidecar_action("click", &click_params).await?;
+                    crate::nodes::webbridge::send_command("click", click_params).await?;
                 if !click_result
                     .get("success")
                     .and_then(|v| v.as_bool())
@@ -545,9 +541,9 @@ async fn scrape_single_url_inner(
                     info!("翻页失败（可能已到最后一页），停止抓取");
                     break;
                 }
-                let url_result = crate::nodes::browser::send_sidecar_action(
+                let url_result = crate::nodes::webbridge::send_command(
                     "current_url",
-                    &serde_json::json!({}),
+                    serde_json::json!({}),
                 )
                 .await?;
                 if let Some(new_url) = url_result
@@ -579,28 +575,6 @@ async fn scrape_single_url_inner(
 }
 
 // ─── 工具函数 ──────────────────────────────────────────
-
-fn build_launch_params(config: &serde_json::Value) -> serde_json::Value {
-    let headless = config
-        .get("headless")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
-    let user_agent = config.get("user_agent").and_then(|v| v.as_str());
-    let proxy = config.get("proxy").and_then(|v| v.as_str());
-
-    let mut params = serde_json::json!({
-        "headless": headless,
-        "channel": "auto",
-    });
-    if let Some(ua) = user_agent {
-        params["user_agent"] = serde_json::json!(ua);
-        params["random_ua"] = serde_json::json!(false);
-    }
-    if let Some(p) = proxy {
-        params["proxy"] = serde_json::json!(p);
-    }
-    params
-}
 
 fn extract_attr_from_selector(sel: &str) -> Option<&str> {
     if let Some(start) = sel.find('[') {

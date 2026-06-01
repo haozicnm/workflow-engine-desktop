@@ -1,7 +1,6 @@
 // nodes/mod.rs — 节点系统
 pub mod approval;
 pub mod array;
-pub mod browser;
 pub mod browser_container;
 pub mod clipboard;
 pub mod clipboard_container;
@@ -18,7 +17,6 @@ pub mod file_container;
 pub mod file_save;
 pub mod http;
 pub mod json_parse;
-pub mod kimi_browser;
 pub mod loop_node;
 pub mod map;
 pub mod mcp_node;

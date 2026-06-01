@@ -12,9 +12,6 @@ async fn main() {
 
     let app = Arc::new(App::new().expect("failed to initialize application"));
 
-    // 启动浏览器 sidecar 后台心跳（30s ping，失败自动重启）
-    workflow_engine::nodes::browser::start_heartbeat();
-
     let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:19529".to_string());
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
 
@@ -23,22 +20,10 @@ async fn main() {
 
     let bind_addr: std::net::SocketAddr = bind_addr.parse().expect("invalid bind address");
 
-    // SO_REUSEADDR: 允许绑定 TIME_WAIT 状态的残留端口，解决 Windows 僵尸 socket 问题
-    let socket2_socket = socket2::Socket::new(
-        if bind_addr.is_ipv4() { socket2::Domain::IPV4 } else { socket2::Domain::IPV6 },
-        socket2::Type::STREAM,
-        Some(socket2::Protocol::TCP),
-    ).expect("failed to create socket");
-    socket2_socket.set_reuse_address(true).expect("failed to set SO_REUSEADDR");
-    socket2_socket.set_nonblocking(true).expect("failed to set nonblocking");
-    socket2_socket.bind(&bind_addr.into()).expect("failed to bind socket");
-    socket2_socket.listen(1024).expect("failed to listen on socket");
+    // 尝试绑定端口，失败时自动尝试附近端口（解决 Windows 僵尸 socket 问题）
+    let listener = try_bind(bind_addr).await;
 
-    let std_listener: std::net::TcpListener = socket2_socket.into();
-    let listener = tokio::net::TcpListener::from_std(std_listener)
-        .expect("failed to create tokio listener");
-
-    info!("服务器启动: http://{}  (静态文件: {})", bind_addr, static_dir);
+    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap(), static_dir);
 
     axum::serve(
         listener,
@@ -46,6 +31,25 @@ async fn main() {
     )
     .await
     .expect("server error");
+}
+
+/// 尝试绑定端口，失败时自动尝试附近端口（最多 10 个）
+async fn try_bind(addr: std::net::SocketAddr) -> tokio::net::TcpListener {
+    for offset in 0..10 {
+        let try_addr = std::net::SocketAddr::new(addr.ip(), addr.port() + offset);
+        match tokio::net::TcpListener::bind(try_addr).await {
+            Ok(listener) => {
+                if offset > 0 {
+                    tracing::warn!("端口 {} 被占用，已自动切换到 {}", addr.port(), try_addr.port());
+                }
+                return listener;
+            }
+            Err(e) => {
+                tracing::debug!("端口 {} 绑定失败: {}", try_addr.port(), e);
+            }
+        }
+    }
+    panic!("端口 {} 及附近端口均不可用", addr.port());
 }
 
 /// 日志持久化：同时输出到 stdout 和每日轮转的文件（保留 7 天）

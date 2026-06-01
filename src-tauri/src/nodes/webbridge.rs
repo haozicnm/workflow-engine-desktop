@@ -33,7 +33,7 @@ pub struct BridgeResponse {
 }
 
 /// 扩展注册消息
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeRegister {
     #[serde(rename = "type")]
     pub msg_type: String,

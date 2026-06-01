@@ -1,5 +1,6 @@
 // nodes/ocr.rs — OCR 文字识别节点
-// 使用 Python sidecar 进行 OCR，支持屏幕截图 + 文字识别
+// 通过 WebBridge 扩展进行截图，OCR 处理需外部完成
+// TODO: OCR 能力应后续添加到 WebBridge 扩展中
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::Step;
@@ -46,8 +47,9 @@ impl NodeExecutor for OcrNode {
                     }
                 }
 
-                let result = crate::nodes::browser::send_sidecar_action("ocr", &params).await?;
-                Ok(serde_json::json!({"action":"read","result":result}))
+                // TODO: WebBridge 应提供 OCR 能力，当前仅返回截图
+                let result = crate::nodes::webbridge::send_command("screenshot", params).await?;
+                Ok(serde_json::json!({"action":"read","result":result,"note":"OCR processing should be added to WebBridge extension"}))
             }
 
             // ─── 在屏幕上查找文字位置 ───
@@ -57,8 +59,8 @@ impl NodeExecutor for OcrNode {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("find_text 需要 text 参数"))?;
                 let params = serde_json::json!({"text": text});
-                let result =
-                    crate::nodes::browser::send_sidecar_action("find_text", &params).await?;
+                // TODO: WebBridge 应提供 find_text 能力
+                let result = crate::nodes::webbridge::send_command("find_text", params).await?;
                 Ok(serde_json::json!({"action":"find_text","text":text,"result":result}))
             }
 

@@ -117,31 +117,14 @@ pub async fn read_bundle_file(
 // ═══════════════════════════════════════════════════════════
 
 pub async fn web_scrape_preview(Json(body): Json<WebScrapePreviewBody>) -> Response {
-    use crate::nodes::browser;
-
-    let headless = body.headless.unwrap_or(true);
-
-    let mut launch_params = serde_json::json!({
-        "headless": headless,
-        "channel": "auto",
-    });
-    if let (Some(w), Some(h)) = (body.viewport_width, body.viewport_height) {
-        launch_params["viewport"] = serde_json::json!({"width": w, "height": h});
-    }
-
-    if let Err(e) = browser::send_sidecar_action("launch", &launch_params).await {
-        return err_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("启动浏览器失败: {e}. 预览需要浏览器环境"),
-        );
-    }
+    // WebBridge 无需启动浏览器（扩展已在浏览器中运行）
 
     let preview_params = serde_json::json!({
         "url": body.url,
         "wait_until": "networkidle",
     });
 
-    match browser::send_sidecar_action("preview", &preview_params).await {
+    match crate::nodes::webbridge::send_command("evaluate", preview_params).await {
         Ok(result) => ok_response(result),
         Err(e) => err_response(
             StatusCode::INTERNAL_SERVER_ERROR,

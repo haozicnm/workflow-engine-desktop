@@ -477,21 +477,7 @@ pub async fn web_scrape_preview(
     viewport_width: Option<u32>,
     viewport_height: Option<u32>,
 ) -> Result<serde_json::Value, String> {
-    use crate::nodes::browser;
-
-    let headless = headless.unwrap_or(true);
-
-    // 启动浏览器 sidecar（复用全局实例）
-    let mut launch_params = serde_json::json!({
-        "headless": headless,
-        "channel": "auto",
-    });
-    if let (Some(w), Some(h)) = (viewport_width, viewport_height) {
-        launch_params["viewport"] = serde_json::json!({"width": w, "height": h});
-    }
-
-    let _launch = browser::send_sidecar_action("launch", &launch_params).await
-        .map_err(|e| format!("启动浏览器失败: {}. 预览需要浏览器环境", e))?;
+    // WebBridge 无需启动浏览器（扩展已在浏览器中运行）
 
     // 导航到页面并获取预览数据
     let preview_params = serde_json::json!({
@@ -499,7 +485,7 @@ pub async fn web_scrape_preview(
         "wait_until": "networkidle",
     });
 
-    let result = browser::send_sidecar_action("preview", &preview_params).await
+    let result = crate::nodes::webbridge::send_command("evaluate", preview_params).await
         .map_err(|e| format!("页面预览失败: {}", e))?;
 
     Ok(result)
