@@ -20,8 +20,13 @@ async fn main() {
 
     let bind_addr: std::net::SocketAddr = bind_addr.parse().expect("invalid bind address");
 
-    // 尝试绑定端口，失败时自动尝试附近端口（解决 Windows 僵尸 socket 问题）
-    let listener = try_bind(bind_addr).await;
+    let listener = tokio::net::TcpListener::bind(bind_addr)
+        .await
+        .unwrap_or_else(|e| {
+            eprintln!("❌ 无法绑定端口 {}: {}", bind_addr.port(), e);
+            eprintln!("   请检查是否有其他 workflow-engine 实例在运行");
+            std::process::exit(1);
+        });
 
     info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap(), static_dir);
 
@@ -33,24 +38,6 @@ async fn main() {
     .expect("server error");
 }
 
-/// 尝试绑定端口，失败时自动尝试附近端口（最多 10 个）
-async fn try_bind(addr: std::net::SocketAddr) -> tokio::net::TcpListener {
-    for offset in 0..10 {
-        let try_addr = std::net::SocketAddr::new(addr.ip(), addr.port() + offset);
-        match tokio::net::TcpListener::bind(try_addr).await {
-            Ok(listener) => {
-                if offset > 0 {
-                    tracing::warn!("端口 {} 被占用，已自动切换到 {}", addr.port(), try_addr.port());
-                }
-                return listener;
-            }
-            Err(e) => {
-                tracing::debug!("端口 {} 绑定失败: {}", try_addr.port(), e);
-            }
-        }
-    }
-    panic!("端口 {} 及附近端口均不可用", addr.port());
-}
 
 /// 日志持久化：同时输出到 stdout 和每日轮转的文件（保留 7 天）
 fn setup_logging() {
