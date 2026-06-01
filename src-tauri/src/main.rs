@@ -20,13 +20,31 @@ async fn main() {
 
     let bind_addr: std::net::SocketAddr = bind_addr.parse().expect("invalid bind address");
 
-    let listener = tokio::net::TcpListener::bind(bind_addr)
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("❌ 无法绑定端口 {}: {}", bind_addr.port(), e);
-            eprintln!("   请检查是否有其他 workflow-engine 实例在运行");
-            std::process::exit(1);
-        });
+    // 固定端口，重试 3 次（处理 Windows 僵尸 socket 延迟释放）
+    let listener = {
+        let mut last_err = None;
+        let mut listener = None;
+        for attempt in 1..=3 {
+            match tokio::net::TcpListener::bind(bind_addr).await {
+                Ok(l) => { listener = Some(l); break; }
+                Err(e) => {
+                    if attempt < 3 {
+                        tracing::warn!("端口 {} 绑定失败 (尝试 {}/3)，{}秒后重试...", bind_addr.port(), attempt, attempt * 2);
+                        tokio::time::sleep(std::time::Duration::from_secs(attempt * 2)).await;
+                    }
+                    last_err = Some(e);
+                }
+            }
+        }
+        match listener {
+            Some(l) => l,
+            None => {
+                eprintln!("❌ 无法绑定端口 {}: {}", bind_addr.port(), last_err.unwrap());
+                eprintln!("   请检查是否有其他 workflow-engine 实例在运行");
+                std::process::exit(1);
+            }
+        }
+    };
 
     info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap(), static_dir);
 
