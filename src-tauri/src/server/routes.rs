@@ -131,6 +131,15 @@ pub fn build() -> Router {
         )
         .route("/api/browser/pick-next", get(handlers::browser_pick_next))
         .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
+        // 模板库
+        .route("/api/templates", get(handlers::template_list))
+        .route("/api/templates/{name}", get(handlers::template_get))
+        .route(
+            "/api/templates/{name}/instantiate",
+            post(handlers::template_instantiate),
+        )
+        // 组合助手
+        .route("/api/compose/chain", post(handlers::compose_chain))
         // WebBridge WebSocket endpoint
         .route("/ws/browser", get(ws_browser_handler))
 }

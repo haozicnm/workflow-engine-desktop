@@ -389,3 +389,9 @@ pub use crate::server::managers::system_manager::{
     sidecar_health, system_check_browser, system_health, webbridge_health, PickStartBody,
     PluginInstallBody, PluginUninstallBody, SettingsUpdateBody,
 };
+
+pub use crate::server::managers::template_manager::{
+    template_get, template_instantiate, template_list, InstantiateBody,
+};
+
+pub use crate::server::managers::compose_manager::{compose_chain, ComposeChainBody};
