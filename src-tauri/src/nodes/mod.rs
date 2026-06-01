@@ -1,11 +1,8 @@
 // nodes/mod.rs — 节点系统
 pub mod approval;
-pub mod array;
 pub mod browser_container;
 pub mod clipboard;
-pub mod clipboard_container;
 pub mod condition;
-pub mod convert;
 pub mod cursor;
 pub mod data;
 pub mod delay;
@@ -14,16 +11,13 @@ pub mod excel;
 pub mod excel_container;
 pub mod file;
 pub mod file_container;
-pub mod file_save;
 pub mod http;
-pub mod json_parse;
 pub mod loop_node;
 pub mod map;
 pub mod mcp_node;
 #[cfg(feature = "gui")]
 pub mod mouse_keyboard;
 pub mod node_registry;
-pub mod notify;
 pub mod ocr;
 pub mod parallel;
 #[cfg(feature = "gui")]
@@ -33,7 +27,6 @@ pub mod registry;
 pub mod script;
 pub mod shell;
 pub mod sub_workflow;
-pub mod text_template;
 pub mod traits;
 pub mod web_scrape;
 pub mod webbridge;

@@ -28,9 +28,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   { type: 'word', label: 'Word', icon: 'FileText', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: 'actionId: value, ...', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './document.docx' },
   ]},
-  { type: 'logic', label: '条件判断', icon: 'GitBranch', color: '#d29922', isContainer: true, description: '条件分支：满足/不满足走不同路径', outputHint: 'branch: true/false, value, result', params: [
-    { key: 'condition', label: '条件表达式', type: 'text', placeholder: '{{step1.output}} == "异常"' },
-  ]},
+
   { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: 'status, headers, body', params: [
     { key: 'method', label: '方法', type: 'select', options: [
       { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },
@@ -47,29 +45,11 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
     { key: 'max_duration_ms', label: '最大毫秒(随机)', type: 'number', default: 5000 },
   ]},
-  { type: 'notify', label: '通知', icon: 'Bell', color: '#f0883e', description: '发送通知：系统通知/Webhook', outputHint: 'sent: true', params: [
-    { key: 'notify_type', label: '渠道', type: 'select', options: [
-      { label: '系统通知', value: 'system' }, { label: 'Webhook', value: 'webhook' },
-    ], default: 'system' },
-    { key: 'title', label: '标题', type: 'text' },
-    { key: 'body', label: '内容', type: 'textarea' },
-    { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://hooks.example.com/...' },
-    { key: 'method', label: '请求方法', type: 'select', options: [
-      { label: 'POST', value: 'POST' }, { label: 'PUT', value: 'PUT' },
-      { label: 'PATCH', value: 'PATCH' },
-    ], default: 'POST' },
-    { key: 'headers', label: '请求头 (JSON)', type: 'textarea', placeholder: '{"Authorization": "Bearer xxx"}' },
-    { key: 'data', label: '自定义数据 (JSON)', type: 'textarea', placeholder: '{"text": "Hello"}' },
-  ]},
+
   { type: 'script', label: '脚本', icon: 'ScrollText', color: '#7ee787', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
     { key: 'script', label: '代码', type: 'textarea', placeholder: '// 你的 Rhai 脚本代码' },
   ]},
-  { type: 'clipboard', label: '剪贴板', icon: 'ClipboardList', color: '#8b949e', description: '读写系统剪贴板', outputHint: '剪贴板内容', params: [
-    { key: 'action', label: '操作', type: 'select', options: [
-      { label: '读取', value: 'read' }, { label: '写入', value: 'write' },
-    ], default: 'read' },
-    { key: 'text', label: '写入内容', type: 'textarea' },
-  ]},
+
   { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: 'done, item, index, total', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
   ]},
@@ -111,31 +91,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ]},
   { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: 'actionId: result, ...', isContainer: true, params: []},
 
-  // ─── Kimi WebBridge 浏览器节点 ───
-  { type: 'kimi_browser', label: 'Kimi 浏览器', icon: 'Globe', color: '#79c0ff', description: '通过 Kimi WebBridge 控制真实浏览器（有登录态），支持 17 种操作', outputHint: 'success, data', params: [
-    { key: 'action', label: '操作', type: 'select', options: [
-      { label: '导航', value: 'navigate' },
-      { label: '快照（获取元素树）', value: 'snapshot' },
-      { label: '点击元素', value: 'click' },
-      { label: '物理鼠标点击', value: 'mouse_click' },
-      { label: '填写表单', value: 'fill' },
-      { label: '键盘输入', value: 'key_type' },
-      { label: '发送按键', value: 'send_keys' },
-      { label: '执行 JavaScript', value: 'evaluate' },
-      { label: '截图', value: 'screenshot' },
-      { label: '保存为 PDF', value: 'save_as_pdf' },
-      { label: '网络拦截', value: 'network' },
-      { label: '文件上传', value: 'upload' },
-      { label: 'CDP 原始命令', value: 'cdp' },
-      { label: '查找标签页', value: 'find_tab' },
-      { label: '列出标签页', value: 'list_tabs' },
-      { label: '关闭标签页', value: 'close_tab' },
-      { label: '关闭会话', value: 'close_session' },
-    ], default: 'navigate' },
-    { key: 'args', label: '参数 (JSON)', type: 'textarea', placeholder: '{"url": "https://example.com"}' },
-    { key: 'port', label: 'WebBridge 端口', type: 'number', default: 10086 },
-    { key: 'timeout', label: '超时(秒)', type: 'number', default: 30 },
-  ]},
+
 
   // ─── MCP 扩展节点（Python sidecar 驱动）───
   { type: 'mcp_script',       label: 'MCP 脚本',        icon: 'Code',          color: '#a5d6ff', description: '通过 MCP 执行 Python 脚本',               outputHint: '脚本返回值', params: [
@@ -495,16 +451,8 @@ export const BODY_STEP_ACTIONS: ActionDef[] = [
   { type: 'delay', label: '延迟等待', icon: 'Clock', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
   ]},
-  { type: 'notify', label: '通知', icon: 'Bell', params: [
-    { key: 'title', label: '标题', type: 'text' },
-    { key: 'body', label: '内容', type: 'textarea' },
-  ]},
-  { type: 'clipboard', label: '剪贴板', icon: 'ClipboardList', params: [
-    { key: 'action', label: '操作', type: 'select', options: [
-      { label: '读取', value: 'read' }, { label: '写入', value: 'write' },
-    ], default: 'read' },
-    { key: 'text', label: '写入内容', type: 'textarea' },
-  ]},
+
+
 ]
 
 // ─── 文件容器 — 10 个动作 v6.9.0 ───
@@ -566,7 +514,7 @@ export function getActionDefs(containerType: ContainerType, t?: TFn): ActionDef[
     case 'browser': return BROWSER_ACTIONS
     case 'excel': return EXCEL_ACTIONS
     case 'word': return WORD_ACTIONS
-    case 'logic': return LOGIC_ACTIONS
+
     case 'cursor': return BODY_STEP_ACTIONS
     case 'loop': return BODY_STEP_ACTIONS
     default: return []
@@ -634,8 +582,6 @@ export function newStep(containerType: ContainerType, existingSteps?: Step[], t?
     actions: [],
     config,
   }
-  if (containerType === 'logic') {
-    step.condition = ''
-  }
+
   return step
 }

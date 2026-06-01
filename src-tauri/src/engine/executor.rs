@@ -54,25 +54,12 @@ impl StepExecutor {
         // ── 数据处理节点（v3: 独立 executor） ──
         register!(executors, "data_set", crate::nodes::data::DataSetNode);
         register!(executors, "data_get", crate::nodes::data::DataGetNode);
-        register!(executors, "data_length", crate::nodes::data::DataLengthNode);
-        register!(
-            executors,
-            "data_default",
-            crate::nodes::data::DataDefaultNode
-        );
-        register!(executors, "data_merge", crate::nodes::data::DataMergeNode);
 
         // ── 文件节点（v3: 独立 executor） ──
         register!(executors, "file_read", crate::nodes::file::FileReadNode);
         register!(executors, "file_write", crate::nodes::file::FileWriteNode);
         register!(executors, "file_list", crate::nodes::file::FileListNode);
-        register!(executors, "file_delete", crate::nodes::file::FileDeleteNode);
         register!(executors, "file_exists", crate::nodes::file::FileExistsNode);
-        register!(executors, "file_append", crate::nodes::file::FileAppendNode);
-        register!(executors, "file_mkdir", crate::nodes::file::FileMkdirNode);
-        register!(executors, "file_copy", crate::nodes::file::FileCopyNode);
-        register!(executors, "file_move", crate::nodes::file::FileMoveNode);
-        register!(executors, "file_glob", crate::nodes::file::FileGlobNode);
         register!(
             executors,
             "file_checksum",
@@ -91,8 +78,6 @@ impl StepExecutor {
             crate::nodes::clipboard::ClipboardWriteNode
         );
 
-        // ── 浏览器子节点 ──
-
         // ── 正则节点（v3: 独立 executor） ──
         register!(
             executors,
@@ -101,82 +86,8 @@ impl StepExecutor {
         );
         register!(
             executors,
-            "regex_replace",
-            crate::nodes::regex::RegexReplaceNode
-        );
-        register!(
-            executors,
             "regex_match",
             crate::nodes::regex::RegexMatchNode
-        );
-
-        // ── 数组节点（v3: 独立 executor） ──
-        register!(
-            executors,
-            "array_filter",
-            crate::nodes::array::ArrayFilterNode
-        );
-        register!(executors, "array_sort", crate::nodes::array::ArraySortNode);
-        register!(
-            executors,
-            "array_dedup",
-            crate::nodes::array::ArrayDedupNode
-        );
-        register!(
-            executors,
-            "array_paginate",
-            crate::nodes::array::ArrayPaginateNode
-        );
-        register!(executors, "array_map", crate::nodes::array::ArrayMapNode);
-        register!(executors, "array_join", crate::nodes::array::ArrayJoinNode);
-        register!(
-            executors,
-            "array_reduce",
-            crate::nodes::array::ArrayReduceNode
-        );
-
-        // ── 转换节点（v3: 独立 executor） ──
-        register!(
-            executors,
-            "convert_to_text",
-            crate::nodes::convert::ConvertToTextNode
-        );
-        register!(
-            executors,
-            "convert_to_number",
-            crate::nodes::convert::ConvertToNumberNode
-        );
-        register!(
-            executors,
-            "convert_to_json",
-            crate::nodes::convert::ConvertToJsonNode
-        );
-        register!(
-            executors,
-            "convert_to_csv",
-            crate::nodes::convert::ConvertToCsvNode
-        );
-        register!(
-            executors,
-            "convert_to_html",
-            crate::nodes::convert::ConvertToHtmlNode
-        );
-        register!(
-            executors,
-            "convert_to_base64",
-            crate::nodes::convert::ConvertToBase64Node
-        );
-
-        // ── 新增数据节点 ──
-        register!(
-            executors,
-            "json_parse",
-            crate::nodes::json_parse::JsonParseNode
-        );
-        register!(
-            executors,
-            "text_template",
-            crate::nodes::text_template::TextTemplateNode
         );
 
         // ── 容器节点（由 register_containers! 统一注册，与 registry (node-schema.json) 对应）──
@@ -184,13 +95,11 @@ impl StepExecutor {
             "browser" => crate::nodes::browser_container::BrowserContainerNode,
             "excel"   => crate::nodes::excel_container::ExcelContainerNode,
             "word"    => crate::nodes::word_container::WordContainerNode,
-            "logic"   => crate::nodes::condition::ConditionNode,
             "file"      => crate::nodes::file_container::FileContainerNode,
-            "clipboard" => crate::nodes::clipboard_container::ClipboardContainerNode,
         );
 
         // ── 其他节点 ──
-        register!(executors, "notify", crate::nodes::notify::NotifyNode);
+
         register!(executors, "approval", crate::nodes::approval::ApprovalNode);
         register!(executors, "loop", crate::nodes::loop_node::LoopNode);
         register!(executors, "while", crate::nodes::while_node::WhileNode);

@@ -105,7 +105,6 @@ export function useRegistry() {
       case 'browser': return cache!.browserActions
       case 'excel': return cache!.excelActions
       case 'word': return cache!.wordActions
-      case 'logic': return cache!.logicActions
       case 'cursor': return cache!.bodyStepActions
       case 'loop': return cache!.bodyStepActions
       default: return []

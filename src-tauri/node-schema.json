@@ -93,22 +93,6 @@
       ]
     },
     {
-      "type": "notify",
-      "label": "通知",
-      "category": "core",
-      "icon": "bell",
-      "is_container": false,
-      "desc": "发送系统通知或消息到指定渠道",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "sent",
-          "data_type": "bool",
-          "desc": "是否发送成功"
-        }
-      ]
-    },
-    {
       "type": "delay",
       "label": "延迟",
       "category": "core",
@@ -188,38 +172,6 @@
       }
     },
     {
-      "type": "json_parse",
-      "label": "JSON 解析",
-      "category": "data",
-      "icon": "braces",
-      "is_container": false,
-      "desc": "用点号路径提取 JSON 字段",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "value",
-          "data_type": "json",
-          "desc": "提取的值"
-        }
-      ]
-    },
-    {
-      "type": "text_template",
-      "label": "文本拼接",
-      "category": "data",
-      "icon": "type",
-      "is_container": false,
-      "desc": "使用 {{变量}} 占位符模板替换",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "拼接后的文本"
-        }
-      ]
-    },
-    {
       "type": "data_set",
       "label": "设置变量",
       "category": "data",
@@ -248,54 +200,6 @@
           "name": "value",
           "data_type": "json",
           "desc": "读取的值"
-        }
-      ]
-    },
-    {
-      "type": "data_length",
-      "label": "获取长度",
-      "category": "data",
-      "icon": "hash",
-      "is_container": false,
-      "desc": "获取字符串、数组、对象的长度",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "length",
-          "data_type": "number",
-          "desc": "长度值"
-        }
-      ]
-    },
-    {
-      "type": "data_default",
-      "label": "默认值",
-      "category": "data",
-      "icon": "shield",
-      "is_container": false,
-      "desc": "变量为空时设置默认值",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "value",
-          "data_type": "json",
-          "desc": "最终值（原值或默认值）"
-        }
-      ]
-    },
-    {
-      "type": "data_merge",
-      "label": "合并变量",
-      "category": "data",
-      "icon": "git-merge",
-      "is_container": false,
-      "desc": "将源对象合并到目标对象",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "merged",
-          "data_type": "json",
-          "desc": "合并后的对象"
         }
       ]
     },
@@ -358,38 +262,6 @@
       ]
     },
     {
-      "type": "file_delete",
-      "label": "删除文件",
-      "category": "file",
-      "icon": "trash-2",
-      "is_container": false,
-      "desc": "删除文件或目录",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "deleted",
-          "data_type": "bool",
-          "desc": "是否删除成功"
-        }
-      ]
-    },
-    {
-      "type": "file_append",
-      "label": "追加文件",
-      "category": "file",
-      "icon": "file-plus",
-      "is_container": false,
-      "desc": "追加内容到文件末尾",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "文件路径"
-        }
-      ]
-    },
-    {
       "type": "file_exists",
       "label": "文件存在检查",
       "category": "file",
@@ -402,75 +274,6 @@
           "name": "exists",
           "data_type": "bool",
           "desc": "是否存在"
-        }
-      ]
-    },
-    {
-      "type": "file_mkdir",
-      "label": "创建目录",
-      "category": "file",
-      "icon": "folder-plus",
-      "is_container": false,
-      "desc": "创建目录（含父目录）",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "创建的目录路径"
-        }
-      ]
-    },
-    {
-      "type": "file_copy",
-      "label": "复制文件",
-      "category": "file",
-      "icon": "copy",
-      "is_container": false,
-      "desc": "复制文件或目录",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "dest",
-          "data_type": "text",
-          "desc": "目标路径"
-        }
-      ]
-    },
-    {
-      "type": "file_move",
-      "label": "移动文件",
-      "category": "file",
-      "icon": "move",
-      "is_container": false,
-      "desc": "移动/重命名文件或目录",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "新路径"
-        }
-      ]
-    },
-    {
-      "type": "file_glob",
-      "label": "通配符查找",
-      "category": "file",
-      "icon": "search",
-      "is_container": false,
-      "desc": "用通配符模式搜索文件",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "matches",
-          "data_type": "array",
-          "desc": "匹配的文件列表"
-        },
-        {
-          "name": "count",
-          "data_type": "number",
-          "desc": "匹配数量"
         }
       ]
     },
@@ -522,22 +325,6 @@
       "outputs": []
     },
     {
-      "type": "clipboard",
-      "label": "剪贴板容器",
-      "category": "system",
-      "icon": "clipboard",
-      "is_container": true,
-      "desc": "剪贴板读写容器",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "剪贴板文本"
-        }
-      ]
-    },
-    {
       "type": "regex_extract",
       "label": "正则提取",
       "category": "data",
@@ -559,22 +346,6 @@
       ]
     },
     {
-      "type": "regex_replace",
-      "label": "正则替换",
-      "category": "data",
-      "icon": "regex",
-      "is_container": false,
-      "desc": "用正则表达式替换文本",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "替换后的文本"
-        }
-      ]
-    },
-    {
       "type": "regex_match",
       "label": "正则匹配",
       "category": "data",
@@ -587,229 +358,6 @@
           "name": "matched",
           "data_type": "bool",
           "desc": "是否匹配"
-        }
-      ]
-    },
-    {
-      "type": "array_filter",
-      "label": "数组过滤",
-      "category": "data",
-      "icon": "filter",
-      "is_container": false,
-      "desc": "按条件过滤数组元素",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "array",
-          "desc": "过滤后的数组"
-        },
-        {
-          "name": "count",
-          "data_type": "number",
-          "desc": "元素数量"
-        }
-      ]
-    },
-    {
-      "type": "array_sort",
-      "label": "数组排序",
-      "category": "data",
-      "icon": "arrow-up-down",
-      "is_container": false,
-      "desc": "对数组元素排序",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "array",
-          "desc": "排序后的数组"
-        }
-      ]
-    },
-    {
-      "type": "array_dedup",
-      "label": "数组去重",
-      "category": "data",
-      "icon": "list",
-      "is_container": false,
-      "desc": "移除数组中的重复元素",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "array",
-          "desc": "去重后的数组"
-        },
-        {
-          "name": "removed",
-          "data_type": "number",
-          "desc": "移除数量"
-        }
-      ]
-    },
-    {
-      "type": "array_paginate",
-      "label": "数组分页",
-      "category": "data",
-      "icon": "pagination",
-      "is_container": false,
-      "desc": "对数组进行分页",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "array",
-          "desc": "当前页数据"
-        },
-        {
-          "name": "total",
-          "data_type": "number",
-          "desc": "总页数"
-        }
-      ]
-    },
-    {
-      "type": "array_map",
-      "label": "数组映射",
-      "category": "data",
-      "icon": "map",
-      "is_container": false,
-      "desc": "对数组每个元素执行操作",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "array",
-          "desc": "映射后的数组"
-        }
-      ]
-    },
-    {
-      "type": "array_join",
-      "label": "数组连接",
-      "category": "data",
-      "icon": "link",
-      "is_container": false,
-      "desc": "将数组元素连接为字符串",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "连接后的字符串"
-        }
-      ]
-    },
-    {
-      "type": "array_reduce",
-      "label": "数组归约",
-      "category": "data",
-      "icon": "sigma",
-      "is_container": false,
-      "desc": "对数组元素执行累积操作",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "json",
-          "desc": "累积结果"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_text",
-      "label": "转文本",
-      "category": "convert",
-      "icon": "type",
-      "is_container": false,
-      "desc": "将值转换为文本格式",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "value",
-          "data_type": "text",
-          "desc": "文本值"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_number",
-      "label": "转数字",
-      "category": "convert",
-      "icon": "hash",
-      "is_container": false,
-      "desc": "将值转换为数字格式",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "value",
-          "data_type": "number",
-          "desc": "数值"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_json",
-      "label": "转 JSON",
-      "category": "convert",
-      "icon": "braces",
-      "is_container": false,
-      "desc": "将值转换为 JSON 格式",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "value",
-          "data_type": "json",
-          "desc": "JSON 值"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_csv",
-      "label": "转 CSV",
-      "category": "convert",
-      "icon": "file-spreadsheet",
-      "is_container": false,
-      "desc": "将值转换为 CSV 格式",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "csv",
-          "data_type": "text",
-          "desc": "CSV 文本"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_html",
-      "label": "转 HTML",
-      "category": "convert",
-      "icon": "code",
-      "is_container": false,
-      "desc": "将值转换为 HTML 格式",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "html",
-          "data_type": "text",
-          "desc": "HTML 文本"
-        }
-      ]
-    },
-    {
-      "type": "convert_to_base64",
-      "label": "转 Base64",
-      "category": "convert",
-      "icon": "binary",
-      "is_container": false,
-      "desc": "将值转换为 Base64 编码",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "encoded",
-          "data_type": "text",
-          "desc": "Base64 编码"
         }
       ]
     },
@@ -989,22 +537,6 @@
       ]
     },
     {
-      "type": "recording",
-      "label": "录制回放",
-      "category": "desktop",
-      "icon": "video",
-      "is_container": false,
-      "desc": "录制和回放桌面操作",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "result",
-          "data_type": "json",
-          "desc": "回放结果"
-        }
-      ]
-    },
-    {
       "type": "print",
       "label": "打印",
       "category": "system",
@@ -1013,49 +545,6 @@
       "desc": "打印文档或内容",
       "inputs": [],
       "outputs": []
-    },
-    {
-      "type": "browser_pdf",
-      "label": "浏览器PDF",
-      "category": "browser",
-      "icon": "file",
-      "is_container": false,
-      "desc": "将当前页面生成 PDF 文件",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "PDF 文件路径"
-        }
-      ]
-    },
-    {
-      "type": "kimi_browser",
-      "label": "Kimi 浏览器",
-      "category": "browser",
-      "icon": "globe",
-      "is_container": false,
-      "desc": "通过 Kimi WebBridge 控制真实浏览器（有登录态）。支持 17 种操作：navigate/find_tab/snapshot/click/mouse_click/fill/key_type/send_keys/evaluate/network/cdp/upload/screenshot/save_as_pdf/list_tabs/close_tab/close_session",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "success",
-          "data_type": "bool",
-          "desc": "是否成功"
-        },
-        {
-          "name": "data",
-          "data_type": "json",
-          "desc": "返回数据"
-        }
-      ],
-      "params": {
-        "action": "操作类型：navigate/find_tab/snapshot/click/mouse_click/fill/key_type/send_keys/evaluate/network/cdp/upload/screenshot/save_as_pdf/list_tabs/close_tab/close_session",
-        "args": "参数对象。navigate:{url,newTab?,group_title?} | click/mouse_click:{selector或@e ref} | fill:{selector,value} | key_type:{selector?,text} | send_keys:{keys} | evaluate:{code} | network:{url_pattern?,method?,status?} | cdp:{method,params?} | upload:{selector,file_path} | screenshot:{format?,quality?,full_page?} | save_as_pdf:{} | find_tab:{query} | close_tab:{tabId?} | list_tabs:{} | close_session:{}",
-        "port": "WebBridge 端口（默认 10086）",
-        "timeout": "超时秒数（默认 30）"
-      }
     },
     {
       "type": "browser",
@@ -1102,27 +591,6 @@
           "name": "result",
           "data_type": "json",
           "desc": "操作结果"
-        }
-      ]
-    },
-    {
-      "type": "logic",
-      "label": "逻辑判断",
-      "category": "flow",
-      "icon": "git-branch",
-      "is_container": true,
-      "desc": "逻辑判断容器，输出 true/false 分支",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "branch",
-          "data_type": "text",
-          "desc": "分支名"
-        },
-        {
-          "name": "result",
-          "data_type": "bool",
-          "desc": "判断结果"
         }
       ]
     },
@@ -1453,7 +921,6 @@
     "browser",
     "excel",
     "word",
-    "logic",
     "file",
     "cursor",
     "loop",
