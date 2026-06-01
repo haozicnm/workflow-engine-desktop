@@ -438,7 +438,6 @@ export default {
     logCleared: '日志已清空',
     logClearFailed: '清空日志失败',
     skillDownloaded: 'SKILL.md 已下载',
-    playwrightCache: '↳ Playwright 缓存',
     autoDownloadNote: '（首次使用时自动下载）',
     downloadSkill: '📥 下载 SKILL.md',
     cliComment1: '# 列出工作流（JSON 输出）',

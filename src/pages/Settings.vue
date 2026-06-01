@@ -257,30 +257,14 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
                 <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">{{ t('settingsPage.downloadLink') }}</a>
               </div>
               <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">{{ t('settingsPage.envPlaywright') }}</span>
-                <span :class="sysInfo.has_playwright_pkg ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_playwright_pkg ? t('settingsPage.envInstalled') : t('settingsPage.envAutoInstall') }}
+                <span class="text-foreground">WebBridge</span>
+                <span :class="sysInfo.webbridge_connected ? 'text-success' : 'text-muted-foreground'">
+                  {{ sysInfo.webbridge_connected ? '✓ 已连接' : '未连接（请安装浏览器扩展）' }}
                 </span>
               </div>
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">{{ t('settingsPage.envBrowser') }}</span>
-                <span :class="sysInfo.has_browser ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.has_browser ? t('settingsPage.envAvailable') : t('settingsPage.autoDownloadNote') }}
-                </span>
-              </div>
-              <div v-if="sysInfo.has_system_browser" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">{{ t('settingsPage.systemBrowser') }}</span>
-                <span class="text-success text-[11px]">
-                  {{ [sysInfo.has_edge ? 'Edge' : '', sysInfo.has_chrome ? 'Chrome' : ''].filter(Boolean).join(' + ') }}{{ t('settingsPage.preferred') }}
-                </span>
-              </div>
-              <div v-if="sysInfo.has_playwright_chromium" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">{{ t('settingsPage.envBundledChromium') }}</span>
-                <span class="text-success text-[11px]">{{ t('settingsPage.envBundled') }}</span>
-              </div>
-              <div v-if="sysInfo.has_playwright_cache" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">{{ t('settingsPage.playwrightCache') }}</span>
-                <span class="text-success text-[11px]">{{ t('settingsPage.envDownloaded') }}</span>
+              <div v-if="sysInfo.webbridge_info" class="flex justify-between items-center text-xs">
+                <span class="text-foreground pl-3">扩展版本</span>
+                <span class="text-success text-[11px]">{{ sysInfo.webbridge_info.version }}</span>
               </div>
             </div>
           </div>

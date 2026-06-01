@@ -427,7 +427,6 @@ export default {
     logCleared: 'Logs cleared',
     logClearFailed: 'Clear logs failed',
     skillDownloaded: 'SKILL.md downloaded',
-    playwrightCache: '↳ Playwright Cache',
     autoDownloadNote: '(auto-download on first use)',
     downloadSkill: '📥 Download SKILL.md',
     cliComment1: '# List workflows (JSON output)',

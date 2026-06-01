@@ -25,8 +25,6 @@ interface GlobalStatusState {
   schedulesLoaded: boolean
   ipcOnline: boolean
   apiOnline: boolean
-  sidecarHealthy: boolean
-  sidecarPingMs: number
   webbridgeConnected: boolean
   webbridgeVersion: string
 }
@@ -37,8 +35,6 @@ const state = reactive<GlobalStatusState>({
   schedulesLoaded: false,
   ipcOnline: false,
   apiOnline: false,
-  sidecarHealthy: false,
-  sidecarPingMs: 0,
   webbridgeConnected: false,
   webbridgeVersion: '',
 })
@@ -109,21 +105,6 @@ export function useGlobalStatus() {
     }
   }
 
-  async function refreshSidecarStatus() {
-    try {
-      const resp = await fetch('/api/sidecar/health')
-      if (resp.ok) {
-        const data = await resp.json()
-        state.sidecarHealthy = data.sidecar?.healthy ?? false
-        state.sidecarPingMs = data.sidecar?.last_ping_ms ?? 0
-      } else {
-        state.sidecarHealthy = false
-      }
-    } catch (e) {
-      state.sidecarHealthy = false
-    }
-  }
-
   async function refreshWebBridgeStatus() {
     try {
       const resp = await fetch('/api/webbridge/health')
@@ -162,7 +143,6 @@ export function useGlobalStatus() {
     refreshSchedules,
     refreshIpcStatus,
     refreshApiStatus,
-    refreshSidecarStatus,
     refreshWebBridgeStatus,
     startSchedulePolling,
     stopSchedulePolling,
