@@ -84,42 +84,6 @@ function onConfigParamChange(key: string, value: unknown) {
   emit('update-step-config', props.step.id, key, value)
 }
 
-// ─── Kimi Browser quick actions & smart extract ───
-const isKimiBrowser = computed(() => props.step.type === 'kimi_browser')
-
-const quickActions = [
-  { label: '🔗 打开网页', action: 'navigate', args: { url: 'https://example.com' } },
-  { label: '📸 获取快照', action: 'snapshot', args: {} },
-  { label: '📄 获取页面标题', action: 'evaluate', args: { code: 'document.title' } },
-  { label: '📋 获取页面文本', action: 'evaluate', args: { code: 'document.body.innerText.substring(0, 3000)' } },
-  { label: '🖼️ 截图', action: 'screenshot', args: {} },
-  { label: '📑 保存为 PDF', action: 'save_as_pdf', args: {} },
-  { label: '📋 列出标签页', action: 'list_tabs', args: {} },
-]
-
-const smartExtractTemplates = [
-  { label: '页面标题', code: 'document.title' },
-  { label: '所有链接', code: '[...document.querySelectorAll("a")].map(a => ({text: a.innerText.trim(), href: a.href})).filter(x => x.text)' },
-  { label: '所有图片', code: '[...document.querySelectorAll("img")].map(img => ({src: img.src, alt: img.alt})).filter(x => x.src)' },
-  { label: '表格数据', code: '[...document.querySelectorAll("table tr")].map(tr => [...tr.cells].map(td => td.innerText.trim()))' },
-  { label: '页面文本', code: 'document.body.innerText.substring(0, 5000)' },
-  { label: '自定义选择器...', code: '[...document.querySelectorAll("CSS选择器")].map(el => el.innerText.trim())' },
-]
-
-const showQuickActions = ref(false)
-const showSmartExtract = ref(false)
-
-function applyQuickAction(qa: typeof quickActions[0]) {
-  onConfigParamChange('action', qa.action)
-  onConfigParamChange('args', JSON.stringify(qa.args, null, 2))
-  showQuickActions.value = false
-}
-
-function applySmartExtract(code: string) {
-  onConfigParamChange('args', JSON.stringify({ code }, null, 2))
-  showSmartExtract.value = false
-}
-
 // ─── Status ───
 
 // ─── Output ───
@@ -400,58 +364,6 @@ function closeAllMenus() {
 
     <!-- ═══ Body (expandable) ═══ -->
     <div v-show="step.expanded" class="px-[var(--spacing-card-padding-x)] py-[var(--spacing-card-padding-y)] bg-card border-t border-border">
-      <!-- Quick actions for kimi_browser -->
-      <div v-if="isKimiBrowser" class="mb-2 space-y-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          class="h-7 text-[11px] gap-1 w-full"
-          @click="showQuickActions = !showQuickActions"
-        >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </svg>
-          {{ showQuickActions ? '收起常用操作' : '常用操作（免写JSON）' }}
-        </Button>
-
-        <div v-if="showQuickActions" class="p-2 rounded-md bg-muted/60 border border-border/40 space-y-1">
-          <div
-            v-for="qa in quickActions"
-            :key="qa.label"
-            class="flex items-center px-2 py-1.5 rounded hover:bg-accent/50 cursor-pointer text-[11px] transition-colors"
-            @click="applyQuickAction(qa)"
-          >
-            <span class="text-foreground">{{ qa.label }}</span>
-            <span class="ml-auto text-muted-foreground font-mono text-[10px]">{{ qa.action }}</span>
-          </div>
-        </div>
-
-        <Button
-          v-if="step.config?.action === 'evaluate'"
-          variant="outline"
-          size="sm"
-          class="h-7 text-[11px] gap-1 w-full"
-          @click="showSmartExtract = !showSmartExtract"
-        >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-          {{ showSmartExtract ? '收起模板' : '智能提取模板' }}
-        </Button>
-
-        <div v-if="showSmartExtract" class="p-2 rounded-md bg-muted/60 border border-border/40 space-y-1">
-          <div
-            v-for="tpl in smartExtractTemplates"
-            :key="tpl.label"
-            class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-accent/50 cursor-pointer text-[11px] transition-colors"
-            @click="applySmartExtract(tpl.code)"
-          >
-            <span class="text-foreground">{{ tpl.label }}</span>
-            <span class="text-muted-foreground font-mono truncate max-w-[180px]">{{ tpl.code.slice(0, 40) }}...</span>
-          </div>
-        </div>
-      </div>
-
       <!-- Simple step → ParamField (with variable refs!) -->
       <template v-if="!isContainer && step.type !== 'logic'">
         <ParamField

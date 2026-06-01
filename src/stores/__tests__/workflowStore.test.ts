@@ -56,7 +56,7 @@ describe('workflowStore', () => {
       steps: [
         { id: 's1', type: 'http', actions: [], label: 'S1', config: {}, expanded: false },
         { id: 's2', type: 'shell', actions: [], label: 'S2', config: {}, expanded: false },
-        { id: 's3', type: 'notify', actions: [], label: 'S3', config: {}, expanded: false },
+        { id: 's3', type: 'shell', actions: [], label: 'S3', config: {}, expanded: false },
       ],
     }
     store.moveStep(0, 2)
