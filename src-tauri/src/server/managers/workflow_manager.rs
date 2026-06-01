@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     response::{Json, Response},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::server::events;
@@ -388,6 +388,207 @@ pub async fn workflow_export(Json(body): Json<WorkflowExportBody>) -> Response {
         "step_count": body.nodes.len(),
         "edge_count": body.edges.len(),
     }))
+}
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/workflows/assemble — 从步骤定义组装工作流
+// ═══════════════════════════════════════════════════════════
+
+#[derive(Debug, Deserialize)]
+pub struct WorkflowAssembleBody {
+    pub name: String,
+    pub steps: Vec<serde_json::Value>,
+    pub description: Option<String>,
+    pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Serialize)]
+struct AssembleError {
+    step: String,
+    field: String,
+    message: String,
+}
+
+/// 校验步骤的 params，返回 required 参数缺失的错误列表
+fn validate_step_params(
+    step_type: &str,
+    step_id: &str,
+    config: &serde_json::Value,
+) -> Vec<AssembleError> {
+    let mut errors = Vec::new();
+    let manifest = match crate::nodes::registry::get_node(step_type) {
+        Some(m) => m,
+        None => return errors, // 类型不存在的错误在外层处理
+    };
+
+    for param in &manifest.params {
+        if !param.required {
+            continue;
+        }
+        let has_value = match config {
+            serde_json::Value::Object(map) => {
+                if let Some(val) = map.get(&param.name) {
+                    !(val.is_null() || (val.is_string() && val.as_str().unwrap_or("").is_empty()))
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        };
+        if !has_value {
+            errors.push(AssembleError {
+                step: step_id.to_string(),
+                field: param.name.clone(),
+                message: format!(
+                    "必需参数 '{}' 缺失（节点类型: {}）",
+                    param.name, step_type
+                ),
+            });
+        }
+    }
+    errors
+}
+
+pub async fn workflow_assemble(Json(body): Json<WorkflowAssembleBody>) -> Response {
+    let mut errors: Vec<AssembleError> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let step_ids: std::collections::HashSet<String> = body
+        .steps
+        .iter()
+        .filter_map(|s| s.get("id").and_then(|v| v.as_str()).map(String::from))
+        .collect();
+
+    for (i, step_val) in body.steps.iter().enumerate() {
+        let step_id = step_val
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let step_type = step_val
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        // 1. 检查 type 是否存在
+        if step_type.is_empty() {
+            errors.push(AssembleError {
+                step: step_id.clone(),
+                field: "type".into(),
+                message: format!("步骤 #{} 缺少 type 字段", i),
+            });
+            continue;
+        }
+        if !crate::nodes::registry::is_registered(&step_type) {
+            errors.push(AssembleError {
+                step: step_id.clone(),
+                field: "type".into(),
+                message: format!("节点类型 '{}' 未注册", step_type),
+            });
+            continue;
+        }
+
+        // 2. 检查 id 是否唯一
+        if step_id == "unknown" {
+            errors.push(AssembleError {
+                step: step_id.clone(),
+                field: "id".into(),
+                message: format!("步骤 #{} 缺少 id 字段", i),
+            });
+        }
+
+        // 3. 校验 required params
+        let config = step_val
+            .get("config")
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
+        let param_errors = validate_step_params(&step_type, &step_id, &config);
+        errors.extend(param_errors);
+
+        // 4. 检查 next 引用是否有效
+        if let Some(next) = step_val.get("next").and_then(|v| v.as_str()) {
+            if !next.is_empty() && !step_ids.contains(next) {
+                errors.push(AssembleError {
+                    step: step_id.clone(),
+                    field: "next".into(),
+                    message: format!("引用的下一步骤 '{}' 不存在", next),
+                });
+            }
+        }
+
+        // 5. 检查 runCondition.ref 引用
+        if let Some(rc_ref) = step_val
+            .get("runCondition")
+            .and_then(|rc| rc.get("ref").or_else(|| rc.get("ref_step")))
+            .and_then(|v| v.as_str())
+        {
+            if !step_ids.contains(rc_ref) {
+                errors.push(AssembleError {
+                    step: step_id.clone(),
+                    field: "runCondition.ref".into(),
+                    message: format!("引用的条件步骤 '{}' 不存在", rc_ref),
+                });
+            }
+        }
+
+        // 6. 容器类型但无 body_steps 的警告
+        if crate::nodes::registry::is_container(&step_type) {
+            let has_body = step_val
+                .get("body_steps")
+                .or_else(|| step_val.get("bodySteps"))
+                .map(|v| v.is_array() && !v.as_array().unwrap().is_empty())
+                .unwrap_or(false);
+            let has_actions = step_val
+                .get("actions")
+                .map(|v| v.is_array() && !v.as_array().unwrap().is_empty())
+                .unwrap_or(false);
+            if !has_body && !has_actions {
+                warnings.push(format!(
+                    "容器节点 '{}' ({}) 没有子步骤或动作",
+                    step_id, step_type
+                ));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        return err_response(
+            StatusCode::BAD_REQUEST,
+            serde_json::json!({ "errors": errors }).to_string(),
+        );
+    }
+
+    // 组装成功：创建工作流
+    let app = state::get();
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    match app.db.create_workflow(
+        &id,
+        &body.name,
+        body.description.as_deref().unwrap_or(""),
+        &now,
+        &now,
+    ) {
+        Ok(()) => {
+            events::emit(
+                "workflow-changed",
+                serde_json::json!({
+                    "action": "assemble",
+                    "workflow_id": &id,
+                    "workflow_name": &body.name,
+                }),
+            );
+            ok_response(serde_json::json!({
+                "workflow_id": id,
+                "warnings": warnings,
+            }))
+        }
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("创建工作流失败: {e}"),
+        ),
+    }
 }
 
 pub async fn workflow_import(Json(body): Json<WorkflowImportBody>) -> Response {

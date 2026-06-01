@@ -58,6 +58,7 @@ pub fn build() -> Router {
             post(handlers::workflow_save_yaml),
         )
         .route("/api/workflows/validate", post(handlers::workflow_validate))
+        .route("/api/workflows/assemble", post(handlers::workflow_assemble))
         .route(
             "/api/workflows/auto-order",
             post(handlers::workflow_auto_order),
