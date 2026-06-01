@@ -45,6 +45,8 @@ pub fn build() -> Router {
         .route("/api/system/check-ipc", get(handlers::check_ipc))
         .route("/api/nodes/types", get(handlers::node_list_types))
         .route("/api/nodes/schema", get(handlers::node_schema))
+        .route("/api/blocks", get(handlers::blocks_list))
+        .route("/api/blocks/{type}", get(handlers::blocks_get))
         .route("/api/workflows", get(handlers::workflow_list))
         .route("/api/workflows", post(handlers::workflow_create))
         .route("/api/workflows/{id}", get(handlers::workflow_get))

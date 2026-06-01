@@ -40,6 +40,13 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'body', label: '请求体', type: 'textarea', placeholder: '{"key": "value"}' },
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
     { key: 'connect_timeout', label: '连接超时(ms)', type: 'number', default: 10000 },
+  ], paramDefs: [
+    { name: 'method', field_type: 'select', required: true, default: 'GET', desc: 'HTTP 方法', options: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], group: 'basic' },
+    { name: 'url', field_type: 'string', required: true, desc: '请求 URL', group: 'basic' },
+    { name: 'headers', field_type: 'json', required: false, desc: '请求头 (JSON 格式)', group: 'basic' },
+    { name: 'body', field_type: 'text', required: false, desc: '请求体', group: 'basic' },
+    { name: 'timeout', field_type: 'number', required: false, default: 30000, desc: '超时(ms)', group: 'advanced' },
+    { name: 'connect_timeout', field_type: 'number', required: false, default: 10000, desc: '连接超时(ms)', group: 'advanced' },
   ]},
   { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#adbac7', description: '等待指定时间后继续', outputHint: 'waited: ms', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
@@ -48,6 +55,8 @@ export const CONTAINER_DEFS: ContainerDef[] = [
 
   { type: 'script', label: '脚本', icon: 'ScrollText', color: '#7ee787', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
     { key: 'script', label: '代码', type: 'textarea', placeholder: '// 你的 Rhai 脚本代码' },
+  ], paramDefs: [
+    { name: 'script', field_type: 'code', required: true, desc: 'Rhai 脚本代码', lang: 'rhai', group: 'basic' },
   ]},
 
   { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: 'done, item, index, total', params: [
@@ -88,9 +97,27 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     ], default: 'auto' },
     { key: 'cwd', label: '工作目录', type: 'text', placeholder: '/home/user/project' },
     { key: 'timeout_secs', label: '超时(秒)', type: 'number', default: 300 },
+  ], paramDefs: [
+    { name: 'command', field_type: 'text', required: true, desc: 'Shell 命令', group: 'basic' },
+    { name: 'shell', field_type: 'select', required: false, default: 'auto', desc: 'Shell 类型', options: ['auto', 'bash', 'powershell', 'cmd'], group: 'basic' },
+    { name: 'cwd', field_type: 'file_path', required: false, desc: '工作目录', group: 'basic' },
+    { name: 'timeout_secs', field_type: 'number', required: false, default: 300, desc: '超时(秒)', group: 'advanced' },
   ]},
   { type: 'file', label: '文件操作', icon: 'FolderOpen', color: '#d2a8ff', description: '统一文件操作：读取/写入/复制/移动/删除/列表/搜索/Glob/Grep', outputHint: 'actionId: result, ...', isContainer: true, params: []},
 
+  // ─── Schema-driven 独立节点（paramDefs 自动渲染）───
+  { type: 'file_read', label: '读取文件', icon: 'FileText', color: '#d2a8ff', category: 'file', description: '读取文件内容', outputHint: 'content, size', params: [], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: '文件路径', group: 'basic' },
+    { name: 'encoding', field_type: 'select', required: false, default: 'utf-8', desc: '文件编码', options: ['utf-8', 'gbk', 'ascii'], group: 'basic' },
+  ]},
+  { type: 'file_write', label: '写入文件', icon: 'FilePlus', color: '#d2a8ff', category: 'file', description: '写入内容到文件', outputHint: 'path', params: [], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: '文件路径', group: 'basic' },
+    { name: 'content', field_type: 'text', required: true, desc: '写入内容', group: 'basic' },
+    { name: 'append', field_type: 'boolean', required: false, default: false, desc: '追加模式', group: 'advanced' },
+  ]},
+  { type: 'condition', label: '条件判断', icon: 'GitBranch', color: '#daaa3e', category: 'core', description: '根据条件表达式选择分支', outputHint: 'branch, result', params: [], paramDefs: [
+    { name: 'expression', field_type: 'code', required: true, desc: '条件表达式', lang: 'rhai', group: 'basic' },
+  ]},
 
 
   // ─── MCP 扩展节点（Python sidecar 驱动，仅保留无原生等价的类型）───

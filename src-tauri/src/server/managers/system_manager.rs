@@ -1,5 +1,5 @@
 use axum::{
-    extract::Multipart,
+    extract::{Multipart, Path, Query},
     http::StatusCode,
     response::{Json, Response},
 };
@@ -391,4 +391,47 @@ pub async fn browser_pick_stop() -> Response {
         StatusCode::NOT_IMPLEMENTED,
         "pick_stop 已弃用，请使用 WebBridge snapshot 功能代替",
     )
+}
+
+// ═══════════════════════════════════════════════════════════
+// Blocks 自描述 API (P0)
+// ═══════════════════════════════════════════════════════════
+
+/// GET /api/blocks?category=core
+/// 列出所有 block 摘要（type, label, category, desc, icon）
+pub async fn blocks_list(Query(params): Query<std::collections::HashMap<String, String>>) -> Response {
+    let category_filter = params.get("category").map(|s| s.as_str());
+    let blocks: Vec<serde_json::Value> = crate::nodes::registry::all_nodes()
+        .into_iter()
+        .filter(|n| category_filter.map_or(true, |cat| n.category == cat))
+        .map(|n| {
+            serde_json::json!({
+                "type": n.node_type,
+                "label": n.label,
+                "category": n.category,
+                "desc": n.description,
+                "icon": n.icon,
+            })
+        })
+        .collect();
+    ok_response(serde_json::json!({ "blocks": blocks }))
+}
+
+/// GET /api/blocks/:type
+/// 获取某个 block 的完整详情（含 params schema）
+pub async fn blocks_get(Path(node_type): Path<String>) -> Response {
+    match crate::nodes::registry::get_node(&node_type) {
+        Some(manifest) => ok_response(serde_json::json!({
+            "type": manifest.node_type,
+            "label": manifest.label,
+            "category": manifest.category,
+            "desc": manifest.description,
+            "icon": manifest.icon,
+            "is_container": manifest.is_container,
+            "inputs": manifest.inputs,
+            "outputs": manifest.outputs,
+            "params": manifest.params,
+        })),
+        None => err_response(StatusCode::NOT_FOUND, format!("节点类型 '{}' 不存在", node_type)),
+    }
 }

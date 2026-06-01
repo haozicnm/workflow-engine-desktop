@@ -366,6 +366,20 @@ function closeAllMenus() {
     <div v-show="step.expanded" class="px-[var(--spacing-card-padding-x)] py-[var(--spacing-card-padding-y)] bg-card border-t border-border">
       <!-- Simple step → ParamField (with variable refs!) -->
       <template v-if="!isContainer && step.type !== 'logic'">
+        <!-- Schema-driven auto-render (paramDefs) -->
+        <template v-if="containerDef.paramDefs?.length">
+          <ParamField
+            v-for="pd in containerDef.paramDefs"
+            :key="pd.name"
+            :param-def="pd"
+            :model-value="step.config[pd.name] ?? pd.default"
+            :grouped-refs="groupedRefs"
+            class="mb-2"
+            @update:model-value="v => onConfigParamChange(pd.name, v)"
+          />
+        </template>
+        <!-- Legacy params (ActionParam[]) -->
+        <template v-else>
         <ParamField
           v-for="param in containerDef.params"
           :key="param.key"
@@ -375,6 +389,7 @@ function closeAllMenus() {
           class="mb-2"
           @update:model-value="v => onConfigParamChange(param.key, v)"
         />
+        </template>
       </template>
 
       <!-- Logic type -->

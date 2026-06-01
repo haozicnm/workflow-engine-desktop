@@ -3,7 +3,7 @@
 
 // ─── 容器类型 ───
 
-export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'cursor' | 'loop' | 'approval' | 'shell' | 'file' | 'mcp_script' | 'mcp_shell' | 'mcp_excel_read' | 'mcp_excel_write' | 'mcp_excel_create' | 'mcp_excel_filter' | 'mcp_excel_sort' | 'mcp_excel_append' | 'mcp_excel_csv' | 'mcp_word_read' | 'mcp_word_write' | 'mcp_word_create' | 'mcp_word_replace' | 'mcp_word_merge' | 'mcp_web_scrape'
+export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'cursor' | 'loop' | 'approval' | 'shell' | 'file' | 'file_read' | 'file_write' | 'condition' | 'mcp_script' | 'mcp_shell' | 'mcp_excel_read' | 'mcp_excel_write' | 'mcp_excel_create' | 'mcp_excel_filter' | 'mcp_excel_sort' | 'mcp_excel_append' | 'mcp_excel_csv' | 'mcp_word_read' | 'mcp_word_write' | 'mcp_word_create' | 'mcp_word_replace' | 'mcp_word_merge' | 'mcp_web_scrape'
 
 export interface ContainerDef {
   type: ContainerType
@@ -12,6 +12,7 @@ export interface ContainerDef {
   color: string
   description: string
   params: ActionParam[]
+  paramDefs?: ParamDef[]   // 新 schema-driven 参数定义，优先级高于 params
   isContainer?: boolean  // true = 有 actions 列表的容器，false/undefined = 简单步骤
   outputHint?: string    // 输出格式提示，显示在变量选择器中
   category?: string      // 分组: 'core' | 'data' | 'file' | 'flow' | 'browser' | 'office' | 'system' | 'mcp'
@@ -35,6 +36,19 @@ export interface ActionParam {
   default?: unknown
   options?: { label: string; value: string }[]
   hint?: string
+}
+
+// ─── 新 Schema-driven 参数定义 ───
+
+export interface ParamDef {
+  name: string
+  field_type: 'string' | 'number' | 'boolean' | 'select' | 'json' | 'code' | 'file_path' | 'text'
+  required: boolean
+  default?: any
+  desc?: string
+  options?: string[]
+  group?: 'basic' | 'advanced'
+  lang?: string
 }
 
 // ─── 逻辑条件 ───

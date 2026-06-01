@@ -27,6 +27,13 @@
           "data_type": "json",
           "desc": "响应头"
         }
+      ],
+      "params": [
+        {"name": "method", "field_type": "select", "options": ["GET","POST","PUT","DELETE"], "required": true, "default": "GET", "desc": "HTTP 方法", "group": "basic"},
+        {"name": "url", "field_type": "string", "required": true, "desc": "请求地址", "group": "basic"},
+        {"name": "headers", "field_type": "json", "required": false, "desc": "请求头（JSON 对象）", "group": "basic"},
+        {"name": "body", "field_type": "json", "required": false, "desc": "请求体（JSON 对象）", "group": "basic"},
+        {"name": "timeout", "field_type": "number", "required": false, "default": 30, "desc": "超时秒数", "group": "advanced"}
       ]
     },
     {
@@ -43,6 +50,10 @@
           "data_type": "json",
           "desc": "脚本返回值"
         }
+      ],
+      "params": [
+        {"name": "script", "field_type": "code", "required": true, "desc": "Rhai 脚本代码", "lang": "rhai", "group": "basic"},
+        {"name": "variables", "field_type": "json", "required": false, "desc": "输入变量（JSON 对象）", "group": "basic"}
       ]
     },
     {
@@ -64,6 +75,11 @@
           "data_type": "bool",
           "desc": "条件布尔值"
         }
+      ],
+      "params": [
+        {"name": "mode", "field_type": "select", "options": ["conditionGroup","expression"], "required": true, "default": "conditionGroup", "desc": "条件模式", "group": "basic"},
+        {"name": "conditionGroup", "field_type": "json", "required": false, "desc": "条件组（JSON 结构化条件）", "group": "basic"},
+        {"name": "expression", "field_type": "string", "required": false, "desc": "条件表达式（表达式模式）", "group": "basic"}
       ]
     },
     {
@@ -90,6 +106,12 @@
           "data_type": "number",
           "desc": "退出码"
         }
+      ],
+      "params": [
+        {"name": "command", "field_type": "string", "required": true, "desc": "要执行的命令", "group": "basic"},
+        {"name": "shell", "field_type": "select", "options": ["auto","bash","powershell","cmd"], "required": false, "default": "auto", "desc": "Shell 类型", "group": "basic"},
+        {"name": "cwd", "field_type": "string", "required": false, "desc": "工作目录", "group": "advanced"},
+        {"name": "timeout_secs", "field_type": "number", "required": false, "default": 300, "desc": "超时秒数", "group": "advanced"}
       ]
     },
     {
@@ -122,17 +144,17 @@
           "desc": "审批意见"
         }
       ],
-      "params": {
-        "title": "审批标题",
-        "message": "审批消息，支持 {{step_x.field}} 变量",
-        "options": "逗号分隔选项（默认：同意,拒绝）",
-        "recommended": "推荐选项，支持 {{step_x.branch}} 从条件节点读取",
-        "require_review": "true=人工审批（默认）, false=自动用 recommended 决策",
-        "timeout": "超时秒数（默认 300）",
-        "timeout_action": "超时动作：recommended/reject/approve",
-        "timeout_behavior": "auto=超时自动（默认）, manual=永不过期",
-        "data_source": "上游步骤 ID，用于 item 上下文"
-      }
+      "params": [
+        {"name": "title", "field_type": "string", "required": false, "desc": "审批标题", "group": "basic"},
+        {"name": "message", "field_type": "string", "required": false, "desc": "审批消息，支持 {{step_x.field}} 变量", "group": "basic"},
+        {"name": "options", "field_type": "string", "required": false, "default": "同意,拒绝", "desc": "逗号分隔选项", "group": "basic"},
+        {"name": "recommended", "field_type": "string", "required": false, "desc": "推荐选项，支持 {{step_x.branch}} 从条件节点读取", "group": "basic"},
+        {"name": "require_review", "field_type": "boolean", "required": false, "default": true, "desc": "true=人工审批, false=自动用 recommended 决策", "group": "basic"},
+        {"name": "timeout", "field_type": "number", "required": false, "default": 300, "desc": "超时秒数", "group": "advanced"},
+        {"name": "timeout_action", "field_type": "select", "options": ["recommended","reject","approve"], "required": false, "default": "recommended", "desc": "超时动作", "group": "advanced"},
+        {"name": "timeout_behavior", "field_type": "select", "options": ["auto","manual"], "required": false, "default": "auto", "desc": "auto=超时自动, manual=永不过期", "group": "advanced"},
+        {"name": "data_source", "field_type": "string", "required": false, "desc": "上游步骤 ID，用于 item 上下文", "group": "advanced"}
+      ]
     },
     {
       "type": "web_scrape",
@@ -159,17 +181,17 @@
           "desc": "链接列表"
         }
       ],
-      "params": {
-        "url": "单个 URL（与 urls/url_pattern 三选一）",
-        "urls": "URL 数组，批量抓取",
-        "url_pattern": "URL 模式，如 https://site.com/page/{{1..10}}",
-        "extract": "提取规则数组 [{selector, fields}]",
-        "retry": "每 URL 最大重试次数（默认 0）",
-        "retry_delay_ms": "重试间隔毫秒（默认 1000）",
-        "delay_between_ms": "URL 间延迟毫秒（默认 0，防封）",
-        "fail_fast": "单个失败是否中止全部（默认 false）",
-        "excel_output": "结果输出到 Excel 文件路径"
-      }
+      "params": [
+        {"name": "url", "field_type": "string", "required": false, "desc": "单个 URL（与 urls/url_pattern 三选一）", "group": "basic"},
+        {"name": "urls", "field_type": "json", "required": false, "desc": "URL 数组，批量抓取", "group": "basic"},
+        {"name": "url_pattern", "field_type": "string", "required": false, "desc": "URL 模式，如 https://site.com/page/{{1..10}}", "group": "basic"},
+        {"name": "extract", "field_type": "json", "required": false, "desc": "提取规则数组 [{selector, fields}]", "group": "basic"},
+        {"name": "retry", "field_type": "number", "required": false, "default": 0, "desc": "每 URL 最大重试次数", "group": "advanced"},
+        {"name": "retry_delay_ms", "field_type": "number", "required": false, "default": 1000, "desc": "重试间隔毫秒", "group": "advanced"},
+        {"name": "delay_between_ms", "field_type": "number", "required": false, "default": 0, "desc": "URL 间延迟毫秒（防封）", "group": "advanced"},
+        {"name": "fail_fast", "field_type": "boolean", "required": false, "default": false, "desc": "单个失败是否中止全部", "group": "advanced"},
+        {"name": "excel_output", "field_type": "file_path", "required": false, "desc": "结果输出到 Excel 文件路径", "group": "advanced"}
+      ]
     },
     {
       "type": "data_set",
@@ -222,6 +244,10 @@
           "data_type": "number",
           "desc": "文件大小(bytes)"
         }
+      ],
+      "params": [
+        {"name": "path", "field_type": "string", "required": true, "desc": "文件路径", "group": "basic"},
+        {"name": "encoding", "field_type": "select", "options": ["utf-8","base64"], "required": false, "default": "utf-8", "desc": "编码方式", "group": "advanced"}
       ]
     },
     {
@@ -238,6 +264,12 @@
           "data_type": "text",
           "desc": "写入的文件路径"
         }
+      ],
+      "params": [
+        {"name": "path", "field_type": "string", "required": true, "desc": "文件路径", "group": "basic"},
+        {"name": "content", "field_type": "text", "required": true, "desc": "写入内容", "group": "basic"},
+        {"name": "encoding", "field_type": "select", "options": ["utf-8","base64"], "required": false, "default": "utf-8", "desc": "编码方式", "group": "advanced"},
+        {"name": "mode", "field_type": "select", "options": ["overwrite","append"], "required": false, "default": "overwrite", "desc": "写入模式", "group": "advanced"}
       ]
     },
     {
@@ -349,12 +381,12 @@
           "desc": "是否有匹配"
         }
       ],
-      "params": {
-        "mode": "extract=提取捕获组, match=测试匹配（默认 extract）",
-        "pattern": "正则表达式",
-        "input": "输入文本",
-        "global": "是否全局匹配（默认 true）"
-      }
+      "params": [
+        {"name": "mode", "field_type": "select", "options": ["extract","match"], "required": false, "default": "extract", "desc": "extract=提取捕获组, match=测试匹配", "group": "basic"},
+        {"name": "pattern", "field_type": "string", "required": true, "desc": "正则表达式", "group": "basic"},
+        {"name": "input", "field_type": "text", "required": true, "desc": "输入文本", "group": "basic"},
+        {"name": "global", "field_type": "boolean", "required": false, "default": true, "desc": "是否全局匹配", "group": "advanced"}
+      ]
     },
     {
       "type": "loop",

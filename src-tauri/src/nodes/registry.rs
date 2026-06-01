@@ -3,13 +3,13 @@
 // 设计原则：node-schema.json 是唯一真相来源。
 // Rust 后端用 include_str! 编译期嵌入，前端也可读取同一份 JSON。
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // ─── 端口类型系统 ───
 
 /// 端口数据类型枚举
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum DataType {
     Text,
@@ -44,7 +44,7 @@ impl DataType {
 }
 
 /// 输入端口定义
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InputPortDef {
     pub name: String,
     pub data_type: DataType,
@@ -55,12 +55,35 @@ pub struct InputPortDef {
 }
 
 /// 输出端口定义
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OutputPortDef {
     pub name: String,
     pub data_type: DataType,
     #[serde(default)]
     pub desc: String,
+}
+
+/// 参数定义（用于节点自描述 params schema）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ParamDef {
+    pub name: String,
+    /// 字段类型: string, number, boolean, select, json, code, file_path, text
+    pub field_type: String,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub default: Option<Value>,
+    #[serde(default)]
+    pub desc: Option<String>,
+    /// select 类型的可选值
+    #[serde(default)]
+    pub options: Option<Vec<String>>,
+    /// basic 或 advanced
+    #[serde(default)]
+    pub group: Option<String>,
+    /// code 类型的语言标记（如 "rhai"）
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 // ─── Schema 解析 ───
@@ -83,6 +106,8 @@ struct SchemaNode {
     inputs: Vec<InputPortDef>,
     #[serde(default)]
     outputs: Vec<OutputPortDef>,
+    #[serde(default)]
+    params: Vec<ParamDef>,
 }
 
 /// schema 顶层结构
@@ -95,7 +120,7 @@ struct NodeSchema {
 }
 
 /// 节点元数据清单（公开 API）
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NodeManifest {
     pub node_type: String,
     pub label: String,
@@ -108,6 +133,8 @@ pub struct NodeManifest {
     pub inputs: Vec<InputPortDef>,
     /// 输出端口定义列表
     pub outputs: Vec<OutputPortDef>,
+    /// 参数定义列表（节点自描述 params schema）
+    pub params: Vec<ParamDef>,
 }
 
 impl NodeManifest {
@@ -122,6 +149,7 @@ impl NodeManifest {
             default_config: serde_json::json!({}),
             inputs: sn.inputs.clone(),
             outputs: sn.outputs.clone(),
+            params: sn.params.clone(),
         }
     }
 }

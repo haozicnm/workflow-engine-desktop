@@ -1,22 +1,26 @@
 <script setup lang="ts">
 // ParamField — 统一参数字段渲染组件
-// 支持 text/number/select/checkbox/textarea，text/textarea 自带变量引用下拉
+// 支持两种 schema：
+//   1. 旧 ActionParam（key/label/type）—— 向后兼容
+//   2. 新 ParamDef（name/field_type/desc）—— schema-driven 自动渲染
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Target, Link } from 'lucide-vue-next'
+import { Target, Link, FolderOpen } from 'lucide-vue-next'
 import type { StepGroup } from '../composables/useVariableRefs'
+import type { ParamDef } from '../types/types'
 import Input from './ui/input/Input.vue'
 import Label from './ui/label/Label.vue'
 import Textarea from './ui/textarea/Textarea.vue'
 import Checkbox from './ui/checkbox/Checkbox.vue'
+import Switch from './ui/switch/Switch.vue'
 import Select from './ui/select/Select.vue'
 import Button from './ui/button/Button.vue'
 
 const { t } = useI18n()
 
+// ─── 旧 ActionParam 接口（向后兼容） ───
 
-
-interface ParamDef {
+interface LegacyParamDef {
   key: string
   label: string
   type: 'text' | 'number' | 'select' | 'checkbox' | 'textarea'
@@ -27,7 +31,10 @@ interface ParamDef {
 }
 
 const props = defineProps<{
-  param: ParamDef
+  /** 旧格式参数定义 */
+  param?: LegacyParamDef
+  /** 新 schema-driven 参数定义（优先级高于 param） */
+  paramDef?: ParamDef
   modelValue: unknown
   groupedRefs?: StepGroup[]
   /** 显示元素选择器按钮（browser selector 字段） */
@@ -43,6 +50,72 @@ const emit = defineEmits<{
   'pick-element': []
 }>()
 
+// ─── 统一内部字段表示 ───
+
+interface NormalizedField {
+  key: string
+  label: string
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'textarea' | 'json' | 'code' | 'file_path' | 'boolean'
+  placeholder: string
+  default: unknown
+  options: { label: string; value: string }[]
+  hint: string
+  required: boolean
+  lang: string
+  group: string
+  isSchemaDriven: boolean
+}
+
+/** 将 ParamDef.field_type 映射到内部渲染类型 */
+function mapFieldType(ft: ParamDef['field_type']): NormalizedField['type'] {
+  const map: Record<ParamDef['field_type'], NormalizedField['type']> = {
+    string: 'text',
+    number: 'number',
+    boolean: 'boolean',
+    select: 'select',
+    json: 'json',
+    code: 'code',
+    file_path: 'file_path',
+    text: 'textarea',
+  }
+  return map[ft] || 'text'
+}
+
+const field = computed<NormalizedField>(() => {
+  // 新 schema-driven 格式优先
+  if (props.paramDef) {
+    const pd = props.paramDef
+    return {
+      key: pd.name,
+      label: pd.desc || pd.name,
+      type: mapFieldType(pd.field_type),
+      placeholder: pd.desc || '',
+      default: pd.default,
+      options: (pd.options || []).map(o => ({ label: o, value: o })),
+      hint: '',
+      required: pd.required,
+      lang: pd.lang || '',
+      group: pd.group || 'basic',
+      isSchemaDriven: true,
+    }
+  }
+  // 旧格式 fallback
+  const p = props.param!
+  return {
+    key: p.key,
+    label: p.label,
+    type: p.type,
+    placeholder: p.placeholder || '',
+    default: p.default,
+    options: p.options || [],
+    hint: p.hint || '',
+    required: false,
+    lang: '',
+    group: 'basic',
+    isSchemaDriven: false,
+  }
+})
+
 // ─── Input handlers ───
 function onTextInput(e: Event) {
   emit('update:modelValue', (e.target as HTMLInputElement).value)
@@ -56,6 +129,34 @@ function onCheckboxChange(val: boolean) {
 }
 function onTextareaInput(e: Event) {
   emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
+}
+
+// ─── JSON 验证 ───
+const jsonError = ref('')
+function onJsonInput(e: Event) {
+  const val = (e.target as HTMLTextAreaElement).value
+  jsonError.value = ''
+  if (val.trim()) {
+    try { JSON.parse(val) } catch { jsonError.value = 'JSON 格式无效' }
+  }
+  emit('update:modelValue', val)
+}
+
+// ─── File path picker (Tauri) ───
+async function pickFilePath() {
+  try {
+    // 动态导入 Tauri API（非 Tauri 环境下不报错）
+    const { open } = await import(/* @vite-ignore */ '@tauri-apps/api/dialog') as any
+    const selected = await open({
+      multiple: false,
+      title: '选择文件',
+    })
+    if (selected && typeof selected === 'string') {
+      emit('update:modelValue', selected)
+    }
+  } catch {
+    // 非 Tauri 环境，忽略
+  }
 }
 
 // ─── Variable reference dropdown ───
@@ -84,7 +185,7 @@ function selectRef(refId: string) {
 }
 
 function insertRef(refId: string) {
-  const input = document.querySelector(`[data-field="${props.param.key}"]`) as HTMLInputElement | HTMLTextAreaElement
+  const input = document.querySelector(`[data-field="${field.value.key}"]`) as HTMLInputElement | HTMLTextAreaElement
   if (!input) return
   const refText = `{{${refId}}}`
   const start = input.selectionStart ?? 0
@@ -101,23 +202,26 @@ const refTags = computed(() => {
 })
 
 const hasRefs = computed(() => (props.groupedRefs?.length ?? 0) > 0)
-const canRef = computed(() => props.param.type === 'text' || props.param.type === 'textarea')
+const canRef = computed(() => ['text', 'textarea', 'json', 'code', 'file_path'].includes(field.value.type))
 </script>
 
 <template>
   <div>
     <!-- Label -->
-    <Label class="text-[11px] text-muted-foreground block mb-1">{{ param.label }}</Label>
+    <Label class="text-[11px] text-muted-foreground block mb-1">
+      {{ field.label }}
+      <span v-if="field.required" class="text-danger ml-0.5">*</span>
+    </Label>
     <!-- Hint -->
-    <div v-if="param.hint" class="text-[10px] text-muted-foreground/70 mb-1.5">{{ param.hint }}</div>
+    <div v-if="field.hint" class="text-[10px] text-muted-foreground/70 mb-1.5">{{ field.hint }}</div>
 
-    <!-- Text input -->
-    <div v-if="param.type === 'text'" class="flex gap-1">
+    <!-- Text input (string / text) -->
+    <div v-if="field.type === 'text' || field.type === 'string'" class="flex gap-1">
       <Input
-        :data-field="param.key"
+        :data-field="field.key"
         type="text"
-        :model-value="(modelValue as string) ?? (param.default as string) ?? ''"
-        :placeholder="param.placeholder"
+        :model-value="(modelValue as string) ?? (field.default as string) ?? ''"
+        :placeholder="field.placeholder"
         class="flex-1 h-8 text-xs"
         @input="onTextInput"
       />
@@ -134,42 +238,100 @@ const canRef = computed(() => props.param.type === 'text' || props.param.type ==
 
     <!-- Number input -->
     <Input
-      v-else-if="param.type === 'number'"
+      v-else-if="field.type === 'number'"
       type="number"
-      :model-value="(modelValue as string) ?? (param.default as string) ?? ''"
-      :placeholder="param.placeholder"
+      :model-value="(modelValue as string) ?? (field.default as string) ?? ''"
+      :placeholder="field.placeholder"
       class="h-8 text-xs"
       @input="onNumberInput"
     />
 
     <!-- Select -->
     <Select
-      v-else-if="param.type === 'select'"
-      :model-value="(modelValue as string) ?? (param.default as string) ?? ''"
-      :options="param.options"
+      v-else-if="field.type === 'select'"
+      :model-value="(modelValue as string) ?? (field.default as string) ?? ''"
+      :options="field.options"
       @update:model-value="v => emit('update:modelValue', v)"
     />
 
-    <!-- Checkbox -->
-    <div v-else-if="param.type === 'checkbox'" class="flex items-center gap-2">
+    <!-- Checkbox (旧格式) -->
+    <div v-else-if="field.type === 'checkbox'" class="flex items-center gap-2">
       <Checkbox
-        :model-value="!!(modelValue ?? param.default)"
+        :model-value="!!(modelValue ?? field.default)"
         @update:model-value="onCheckboxChange"
       />
     </div>
 
-    <!-- Textarea -->
+    <!-- Boolean / Switch (新 schema-driven) -->
+    <div v-else-if="field.type === 'boolean'" class="flex items-center gap-2">
+      <Switch
+        :model-value="!!(modelValue ?? field.default)"
+        @update:model-value="onCheckboxChange"
+      />
+      <span class="text-[11px] text-muted-foreground">
+        {{ (modelValue ?? field.default) ? 'ON' : 'OFF' }}
+      </span>
+    </div>
+
+    <!-- Textarea (旧格式) -->
     <Textarea
-      v-else-if="param.type === 'textarea'"
-      :data-field="param.key"
-      :model-value="String(modelValue ?? param.default ?? '')"
-      :placeholder="param.placeholder"
+      v-else-if="field.type === 'textarea'"
+      :data-field="field.key"
+      :model-value="String(modelValue ?? field.default ?? '')"
+      :placeholder="field.placeholder"
       :rows="3"
       class="text-xs"
       @input="onTextareaInput"
     />
 
-    <!-- Variable reference (text/textarea only) -->
+    <!-- JSON textarea（带验证） -->
+    <div v-else-if="field.type === 'json'">
+      <Textarea
+        :data-field="field.key"
+        :model-value="String(modelValue ?? field.default ?? '')"
+        :placeholder="field.placeholder || '{ &quot;key&quot;: &quot;value&quot; }'"
+        :rows="4"
+        class="text-xs font-mono"
+        @input="onJsonInput"
+      />
+      <div v-if="jsonError" class="text-[10px] text-danger mt-0.5">{{ jsonError }}</div>
+    </div>
+
+    <!-- Code editor (textarea with monospace + lang badge) -->
+    <div v-else-if="field.type === 'code'">
+      <div class="flex items-center justify-between mb-1">
+        <span v-if="field.lang" class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">{{ field.lang }}</span>
+      </div>
+      <Textarea
+        :data-field="field.key"
+        :model-value="String(modelValue ?? field.default ?? '')"
+        :placeholder="field.placeholder || '// code here'"
+        :rows="8"
+        class="text-xs font-mono bg-muted/30"
+        @input="onTextareaInput"
+      />
+    </div>
+
+    <!-- File path (input + picker button) -->
+    <div v-else-if="field.type === 'file_path'" class="flex gap-1">
+      <Input
+        :data-field="field.key"
+        type="text"
+        :model-value="(modelValue as string) ?? (field.default as string) ?? ''"
+        :placeholder="field.placeholder || 'C:\\path\\to\\file'"
+        class="flex-1 h-8 text-xs font-mono"
+        @input="onTextInput"
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        class="h-8 w-8 p-0 shrink-0"
+        title="选择文件"
+        @click="pickFilePath"
+      ><FolderOpen class="w-4 h-4" /></Button>
+    </div>
+
+    <!-- Variable reference (text/textarea/json/code/file_path only) -->
     <div v-if="canRef && hasRefs" class="mt-1">
       <div class="flex items-center gap-1.5">
         <Link class="w-3 h-3 shrink-0 text-muted-foreground" />

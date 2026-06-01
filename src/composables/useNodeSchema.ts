@@ -128,6 +128,7 @@ export async function syncNodeSchema(): Promise<number> {
         description: ui?.description || node.desc,
         isContainer: node.is_container,
         params: ui?.params || [],
+        paramDefs: ui?.paramDefs,
         outputHint: ui?.outputHint || node.outputs.map(o => o.name).join(', '),
         category: node.category,
       } as ContainerDef
