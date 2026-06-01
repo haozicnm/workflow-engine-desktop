@@ -52,68 +52,12 @@ fn mcp_mappings() -> HashMap<String, McpMapping> {
             tool_name: "json_parse",
         },
     );
-    // ── 新增 ──
-    m.insert(
-        "mcp_script".into(),
-        McpMapping {
-            server_script: "mcp_script_server.py",
-            tool_name: "execute",
-        },
-    );
-    m.insert(
-        "mcp_excel_read".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_read",
-        },
-    );
-    m.insert(
-        "mcp_excel_write".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_write",
-        },
-    );
-    m.insert(
-        "mcp_excel_create".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_create",
-        },
-    );
-    m.insert(
-        "mcp_excel_filter".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_filter",
-        },
-    );
-    m.insert(
-        "mcp_excel_sort".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_sort",
-        },
-    );
-    m.insert(
-        "mcp_excel_append".into(),
-        McpMapping {
-            server_script: "mcp_excel_server.py",
-            tool_name: "excel_append",
-        },
-    );
+    // ── 仅保留无原生等价的 MCP 类型（已移除 10 个重复节点）──
     m.insert(
         "mcp_excel_csv".into(),
         McpMapping {
             server_script: "mcp_excel_server.py",
             tool_name: "excel_csv",
-        },
-    );
-    m.insert(
-        "mcp_word_read".into(),
-        McpMapping {
-            server_script: "mcp_word_server.py",
-            tool_name: "word_read",
         },
     );
     m.insert(
@@ -142,20 +86,6 @@ fn mcp_mappings() -> HashMap<String, McpMapping> {
         McpMapping {
             server_script: "mcp_word_server.py",
             tool_name: "word_merge",
-        },
-    );
-    m.insert(
-        "mcp_web_scrape".into(),
-        McpMapping {
-            server_script: "mcp_web_scrape_server.py",
-            tool_name: "web_scrape",
-        },
-    );
-    m.insert(
-        "mcp_shell".into(),
-        McpMapping {
-            server_script: "mcp_shell_server.py",
-            tool_name: "shell_exec",
         },
     );
     m

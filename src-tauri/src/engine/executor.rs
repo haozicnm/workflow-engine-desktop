@@ -78,16 +78,11 @@ impl StepExecutor {
             crate::nodes::clipboard::ClipboardWriteNode
         );
 
-        // ── 正则节点（v3: 独立 executor） ──
+        // ── 正则节点（P3: 合并为单一 regex 节点，mode 控制行为） ──
         register!(
             executors,
-            "regex_extract",
-            crate::nodes::regex::RegexExtractNode
-        );
-        register!(
-            executors,
-            "regex_match",
-            crate::nodes::regex::RegexMatchNode
+            "regex",
+            crate::nodes::regex::RegexNode
         );
 
         // ── 容器节点（由 register_containers! 统一注册，与 registry (node-schema.json) 对应）──

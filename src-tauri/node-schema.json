@@ -325,41 +325,36 @@
       "outputs": []
     },
     {
-      "type": "regex_extract",
-      "label": "正则提取",
+      "type": "regex",
+      "label": "正则处理",
       "category": "data",
       "icon": "regex",
       "is_container": false,
-      "desc": "用正则表达式提取文本",
+      "desc": "正则表达式处理：提取捕获组或测试匹配（由 mode 参数控制）",
       "inputs": [],
       "outputs": [
         {
           "name": "matches",
           "data_type": "array",
-          "desc": "匹配结果数组"
+          "desc": "匹配结果数组（extract 模式为捕获组，match 模式为匹配位置）"
         },
         {
-          "name": "first",
-          "data_type": "text",
-          "desc": "第一个匹配"
-        }
-      ]
-    },
-    {
-      "type": "regex_match",
-      "label": "正则匹配",
-      "category": "data",
-      "icon": "regex",
-      "is_container": false,
-      "desc": "测试正则表达式是否匹配",
-      "inputs": [],
-      "outputs": [
+          "name": "count",
+          "data_type": "number",
+          "desc": "匹配数量"
+        },
         {
-          "name": "matched",
+          "name": "is_match",
           "data_type": "bool",
-          "desc": "是否匹配"
+          "desc": "是否有匹配"
         }
-      ]
+      ],
+      "params": {
+        "mode": "extract=提取捕获组, match=测试匹配（默认 extract）",
+        "pattern": "正则表达式",
+        "input": "输入文本",
+        "global": "是否全局匹配（默认 true）"
+      }
     },
     {
       "type": "loop",
@@ -611,144 +606,6 @@
       ]
     },
     {
-      "type": "mcp_script",
-      "label": "MCP 脚本",
-      "category": "mcp",
-      "icon": "code",
-      "is_container": false,
-      "desc": "通过 MCP 执行 Python 脚本",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "output",
-          "data_type": "text",
-          "desc": "脚本输出"
-        }
-      ]
-    },
-    {
-      "type": "mcp_shell",
-      "label": "MCP Shell",
-      "category": "mcp",
-      "icon": "terminal",
-      "is_container": false,
-      "desc": "通过 MCP 执行 Shell 命令",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "stdout",
-          "data_type": "text",
-          "desc": "标准输出"
-        },
-        {
-          "name": "exit_code",
-          "data_type": "number",
-          "desc": "退出码"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_read",
-      "label": "MCP 读Excel",
-      "category": "mcp",
-      "icon": "file-spreadsheet",
-      "is_container": false,
-      "desc": "通过 MCP 读取 Excel 文件",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "data",
-          "data_type": "array",
-          "desc": "表格数据"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_write",
-      "label": "MCP 写Excel",
-      "category": "mcp",
-      "icon": "file-spreadsheet",
-      "is_container": false,
-      "desc": "通过 MCP 写入 Excel 文件",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "文件路径"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_create",
-      "label": "MCP 创建Excel",
-      "category": "mcp",
-      "icon": "file-spreadsheet",
-      "is_container": false,
-      "desc": "通过 MCP 创建 Excel 文件",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "文件路径"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_filter",
-      "label": "MCP 过滤Excel",
-      "category": "mcp",
-      "icon": "filter",
-      "is_container": false,
-      "desc": "通过 MCP 过滤 Excel 数据",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "data",
-          "data_type": "array",
-          "desc": "过滤结果"
-        },
-        {
-          "name": "count",
-          "data_type": "number",
-          "desc": "行数"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_sort",
-      "label": "MCP 排序Excel",
-      "category": "mcp",
-      "icon": "arrow-up-down",
-      "is_container": false,
-      "desc": "通过 MCP 排序 Excel 数据",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "data",
-          "data_type": "array",
-          "desc": "排序结果"
-        }
-      ]
-    },
-    {
-      "type": "mcp_excel_append",
-      "label": "MCP 追加Excel",
-      "category": "mcp",
-      "icon": "file-plus",
-      "is_container": false,
-      "desc": "通过 MCP 追加 Excel 数据",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "path",
-          "data_type": "text",
-          "desc": "文件路径"
-        }
-      ]
-    },
-    {
       "type": "mcp_excel_csv",
       "label": "MCP Excel转CSV",
       "category": "mcp",
@@ -761,22 +618,6 @@
           "name": "csv_path",
           "data_type": "text",
           "desc": "CSV 文件路径"
-        }
-      ]
-    },
-    {
-      "type": "mcp_word_read",
-      "label": "MCP 读Word",
-      "category": "mcp",
-      "icon": "file-text",
-      "is_container": false,
-      "desc": "通过 MCP 读取 Word 文档",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "文档文本"
         }
       ]
     },
@@ -846,27 +687,6 @@
           "name": "path",
           "data_type": "text",
           "desc": "合并后文件路径"
-        }
-      ]
-    },
-    {
-      "type": "mcp_web_scrape",
-      "label": "MCP 网页抓取",
-      "category": "mcp",
-      "icon": "globe",
-      "is_container": false,
-      "desc": "通过 MCP 提取网页内容",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "text",
-          "data_type": "text",
-          "desc": "网页文本"
-        },
-        {
-          "name": "links",
-          "data_type": "array",
-          "desc": "链接列表"
         }
       ]
     }

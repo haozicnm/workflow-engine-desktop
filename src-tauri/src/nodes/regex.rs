@@ -1,8 +1,8 @@
-// nodes/regex.rs — 正则处理节点（v3: 每个操作独立 executor）
+// nodes/regex.rs — 正则处理节点（P3: 合并为单一 regex 节点）
 //
-// regex_extract — 提取捕获组
-// regex_replace — 替换匹配
-// regex_match   — 查找匹配
+// regex — 通过 mode 参数控制行为:
+//   mode = "extract" (默认) — 提取捕获组
+//   mode = "match"           — 测试匹配
 
 use crate::engine::context::ExecutionContext;
 use crate::engine::executor::StepExecutor;
@@ -33,52 +33,15 @@ fn get_input(config: &serde_json::Value) -> Result<String> {
         .ok_or_else(|| anyhow!("缺少 input 参数"))
 }
 
-fn expand_replacement(template: &str, caps: &regex::Captures) -> String {
-    let mut result = String::new();
-    let mut chars = template.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '$' {
-            if let Some(&next) = chars.peek() {
-                if next.is_ascii_digit() {
-                    chars.next();
-                    let index = next.to_digit(10).expect("ASCII数字转换失败") as usize;
-                    if let Some(m) = caps.get(index) {
-                        result.push_str(m.as_str());
-                    }
-                    continue;
-                }
-                if next == '{' {
-                    chars.next();
-                    let mut name = String::new();
-                    while let Some(&nc) = chars.peek() {
-                        if nc == '}' {
-                            chars.next();
-                            break;
-                        }
-                        chars.next();
-                        name.push(nc);
-                    }
-                    if let Some(m) = caps.name(&name) {
-                        result.push_str(m.as_str());
-                    }
-                    continue;
-                }
-            }
-        }
-        result.push(c);
-    }
-    result
-}
-
 // ═══════════════════════════════════════
-// regex_extract — 提取捕获组
+// regex — 统一正则节点（P3 合并）
 // ═══════════════════════════════════════
 
 #[derive(Default)]
-pub struct RegexExtractNode;
+pub struct RegexNode;
 
 #[async_trait]
-impl NodeExecutor for RegexExtractNode {
+impl NodeExecutor for RegexNode {
     async fn execute(
         &self,
         step: &Step,
@@ -92,123 +55,60 @@ impl NodeExecutor for RegexExtractNode {
             .get("global")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
-
-        let mut captures: Vec<serde_json::Value> = Vec::new();
-        if global {
-            for caps in re.captures_iter(&input) {
-                let groups: Vec<String> = caps
-                    .iter()
-                    .map(|m| m.map(|m| m.as_str().to_string()).unwrap_or_default())
-                    .collect();
-                captures.push(serde_json::Value::Array(
-                    groups.into_iter().map(serde_json::Value::String).collect(),
-                ));
-            }
-        } else if let Some(caps) = re.captures(&input) {
-            let groups: Vec<String> = caps
-                .iter()
-                .map(|m| m.map(|m| m.as_str().to_string()).unwrap_or_default())
-                .collect();
-            captures.push(serde_json::Value::Array(
-                groups.into_iter().map(serde_json::Value::String).collect(),
-            ));
-        }
-
-        let count = captures.len();
-        info!("正则提取: pattern={}, {} 组", re.as_str(), count);
-        Ok(serde_json::json!({ "pattern": re.as_str(), "captures": captures, "count": count }))
-    }
-}
-
-// ═══════════════════════════════════════
-// regex_replace — 替换匹配
-// ═══════════════════════════════════════
-
-#[derive(Default)]
-pub struct RegexReplaceNode;
-
-#[async_trait]
-impl NodeExecutor for RegexReplaceNode {
-    async fn execute(
-        &self,
-        step: &Step,
-        _ctx: &mut ExecutionContext,
-        _executor: &Arc<StepExecutor>,
-    ) -> Result<serde_json::Value> {
-        let config = &step.config;
-        let re = compile_pattern(config)?;
-        let input = get_input(config)?;
-        let replacement = config
-            .get("replacement")
+        let mode = config
+            .get("mode")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("缺少 replacement 参数"))?;
-        let global = config
-            .get("global")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
+            .unwrap_or("extract");
 
-        let (result, count) = if global {
-            let mut n = 0;
-            let result = re
-                .replace_all(&input, |caps: &regex::Captures| {
-                    n += 1;
-                    expand_replacement(replacement, caps)
-                })
-                .to_string();
-            (result, n)
-        } else {
-            let result = re.replace(&input, replacement).to_string();
-            let count = if re.is_match(&input) { 1 } else { 0 };
-            (result, count)
-        };
+        match mode {
+            "match" => {
+                // ── match 模式：查找匹配位置 ──
+                let mut matches: Vec<serde_json::Value> = Vec::new();
+                if global {
+                    for m in re.find_iter(&input) {
+                        matches.push(
+                            serde_json::json!({ "text": m.as_str(), "start": m.start(), "end": m.end() }),
+                        );
+                    }
+                } else if let Some(m) = re.find(&input) {
+                    matches.push(
+                        serde_json::json!({ "text": m.as_str(), "start": m.start(), "end": m.end() }),
+                    );
+                }
 
-        info!("正则替换: pattern={}, {} 处", re.as_str(), count);
-        Ok(
-            serde_json::json!({ "pattern": re.as_str(), "replacement": replacement, "result": result, "count": count }),
-        )
-    }
-}
-
-// ═══════════════════════════════════════
-// regex_match — 查找匹配
-// ═══════════════════════════════════════
-
-#[derive(Default)]
-pub struct RegexMatchNode;
-
-#[async_trait]
-impl NodeExecutor for RegexMatchNode {
-    async fn execute(
-        &self,
-        step: &Step,
-        _ctx: &mut ExecutionContext,
-        _executor: &Arc<StepExecutor>,
-    ) -> Result<serde_json::Value> {
-        let config = &step.config;
-        let re = compile_pattern(config)?;
-        let input = get_input(config)?;
-        let global = config
-            .get("global")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(true);
-
-        let mut matches: Vec<serde_json::Value> = Vec::new();
-        if global {
-            for m in re.find_iter(&input) {
-                matches.push(
-                    serde_json::json!({ "text": m.as_str(), "start": m.start(), "end": m.end() }),
-                );
+                let count = matches.len();
+                info!("正则匹配: pattern={}, {} 处", re.as_str(), count);
+                Ok(
+                    serde_json::json!({ "pattern": re.as_str(), "mode": "match", "matches": matches, "count": count, "is_match": count > 0 }),
+                )
             }
-        } else if let Some(m) = re.find(&input) {
-            matches.push(
-                serde_json::json!({ "text": m.as_str(), "start": m.start(), "end": m.end() }),
-            );
-        }
+            _ => {
+                // ── extract 模式（默认）：提取捕获组 ──
+                let mut captures: Vec<serde_json::Value> = Vec::new();
+                if global {
+                    for caps in re.captures_iter(&input) {
+                        let groups: Vec<String> = caps
+                            .iter()
+                            .map(|m| m.map(|m| m.as_str().to_string()).unwrap_or_default())
+                            .collect();
+                        captures.push(serde_json::Value::Array(
+                            groups.into_iter().map(serde_json::Value::String).collect(),
+                        ));
+                    }
+                } else if let Some(caps) = re.captures(&input) {
+                    let groups: Vec<String> = caps
+                        .iter()
+                        .map(|m| m.map(|m| m.as_str().to_string()).unwrap_or_default())
+                        .collect();
+                    captures.push(serde_json::Value::Array(
+                        groups.into_iter().map(serde_json::Value::String).collect(),
+                    ));
+                }
 
-        let count = matches.len();
-        info!("正则匹配: pattern={}, {} 处", re.as_str(), count);
-        Ok(
-            serde_json::json!({ "pattern": re.as_str(), "matches": matches, "count": count, "is_match": count > 0 }),
-        )
+                let count = captures.len();
+                info!("正则提取: pattern={}, {} 组", re.as_str(), count);
+                Ok(serde_json::json!({ "pattern": re.as_str(), "mode": "extract", "captures": captures, "count": count, "is_match": count > 0 }))
+            }
+        }
     }
 }
