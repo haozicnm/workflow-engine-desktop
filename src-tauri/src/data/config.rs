@@ -82,10 +82,6 @@ pub struct AppConfig {
     pub auto_start: bool,
     pub log_level: String,
     pub python_path: Option<String>,
-    /// 浏览器通道: auto / msedge / chrome / chromium
-    pub browser_channel: String,
-    /// 浏览器可执行文件路径（留空=自动检测）
-    pub browser_executable_path: String,
     /// 软件工作目录（模板、导出文件等存储位置）
     pub working_dir: String,
     // ── P1 新增 ──
@@ -105,8 +101,6 @@ impl Default for AppConfig {
             auto_start: false,
             log_level: "info".to_string(),
             python_path: None,
-            browser_channel: "auto".to_string(),
-            browser_executable_path: String::new(),
             working_dir: String::new(),
             timeouts: TimeoutConfig::default(),
             logging: LogConfig::default(),

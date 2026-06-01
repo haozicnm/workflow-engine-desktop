@@ -430,7 +430,6 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         None, // CLI 模式无 Tauri AppHandle
         &app.db,
         app.approval_store.clone(),
-        "auto", // browser_channel: CLI 默认 auto
         vars,
         &ctrl,
         &timeouts,
@@ -1736,7 +1735,6 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
         None,
         &app.db,
         app.approval_store.clone(),
-        "auto",
         vars,
         &ctrl,
         &timeouts,

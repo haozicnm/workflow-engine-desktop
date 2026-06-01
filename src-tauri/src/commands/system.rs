@@ -11,10 +11,6 @@ pub struct AppSettings {
     pub auto_start: bool,
     pub log_level: String,
     pub python_path: Option<String>,
-    /// 浏览器通道: auto / msedge / chrome / chromium
-    pub browser_channel: String,
-    /// 浏览器可执行文件路径: 留空=自动检测
-    pub browser_executable_path: String,
     /// 软件工作目录
     pub working_dir: String,
     // ── P1 新增 ──
@@ -51,8 +47,6 @@ pub async fn settings_get(
         auto_start: config.auto_start,
         log_level: config.log_level.clone(),
         python_path: config.python_path.clone(),
-        browser_channel: config.browser_channel.clone(),
-        browser_executable_path: config.browser_executable_path.clone(),
         working_dir: config.working_dir.clone(),
         timeouts: Some(config.timeouts.clone()),
         logging: Some(config.logging.clone()),
@@ -71,8 +65,6 @@ pub async fn settings_update(
     config.auto_start = settings.auto_start;
     config.log_level = settings.log_level;
     config.python_path = settings.python_path;
-    config.browser_channel = settings.browser_channel;
-    config.browser_executable_path = settings.browser_executable_path;
     config.working_dir = settings.working_dir;
     // P1: 可选子配置
     if let Some(t) = settings.timeouts { config.timeouts = t; }

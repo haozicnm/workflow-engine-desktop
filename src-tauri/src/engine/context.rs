@@ -11,10 +11,6 @@ pub struct ExecutionContext {
     pub run_id: String,
     pub variables: HashMap<String, serde_json::Value>,
     pub step_outputs: HashMap<String, serde_json::Value>,
-    /// 浏览器通道设置（auto / msedge / chrome / chromium）
-    pub browser_channel: String,
-    /// 浏览器可执行文件路径（WSL 指向 Windows exe 等场景）
-    pub browser_executable_path: String,
     /// 容器节点输入端口数据（由 DAG 调度器从上游连线注入）
     pub input_ports: HashMap<String, serde_json::Value>,
     /// v4.1: 容器 session 管理 — node_id → session 信息
@@ -46,8 +42,6 @@ impl ExecutionContext {
             run_id: run_id.to_string(),
             variables,
             step_outputs: HashMap::new(),
-            browser_channel: "auto".to_string(),
-            browser_executable_path: String::new(),
             input_ports: HashMap::new(),
             sessions: HashMap::new(),
             default_timeouts: crate::data::config::TimeoutConfig::default(),

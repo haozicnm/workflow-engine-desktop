@@ -68,9 +68,8 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
         return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
     }
 
-    // 4. 读取浏览器通道设置 + 超时配置
+    // 4. 读取超时配置
     let config_guard = app.config.read().await;
-    let browser_channel = config_guard.browser_channel.clone();
     let timeouts = config_guard.timeouts.clone();
     let _max_retries = config_guard.execution.default_retries;
     let _retry_delay_ms = config_guard.execution.retry_delay_ms;
@@ -164,7 +163,6 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
                 None,
                 &db,
                 approval_store,
-                &browser_channel,
                 &[],
                 &ctrl,
                 &timeouts,

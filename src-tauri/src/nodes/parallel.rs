@@ -47,8 +47,6 @@ impl NodeExecutor for ParallelNode {
                     run_id: ctx.run_id.clone(),
                     variables: ctx.variables.clone(),
                     step_outputs: ctx.step_outputs.clone(),
-                    browser_channel: ctx.browser_channel.clone(),
-                    browser_executable_path: ctx.browser_executable_path.clone(),
                     input_ports: ctx.input_ports.clone(),
                     sessions: HashMap::new(),
                     default_timeouts: ctx.default_timeouts.clone(),

@@ -19,8 +19,6 @@ pub struct SettingsUpdateBody {
     pub auto_start: bool,
     pub log_level: String,
     pub python_path: Option<String>,
-    pub browser_channel: String,
-    pub browser_executable_path: String,
     pub working_dir: String,
     // ── P1 新增（serde default 兼容旧前端） ──
     #[serde(default)]
@@ -108,8 +106,6 @@ pub async fn settings_get() -> Response {
         "auto_start": config.auto_start,
         "log_level": config.log_level,
         "python_path": config.python_path,
-        "browser_channel": config.browser_channel,
-        "browser_executable_path": config.browser_executable_path,
         "working_dir": config.working_dir,
         "timeouts": config.timeouts,
         "logging": config.logging,
@@ -125,8 +121,6 @@ pub async fn settings_update(Json(body): Json<SettingsUpdateBody>) -> Response {
     config.auto_start = body.auto_start;
     config.log_level = body.log_level;
     config.python_path = body.python_path;
-    config.browser_channel = body.browser_channel;
-    config.browser_executable_path = body.browser_executable_path;
     config.working_dir = body.working_dir;
     // P1: 可选子配置（前端未传则保留旧值）
     if let Some(t) = body.timeouts {

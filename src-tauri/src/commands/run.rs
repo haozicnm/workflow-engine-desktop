@@ -41,9 +41,8 @@ pub async fn run_start(
     app.db.create_run(&run_id, &workflow_id, &workflow_name, &now)
         .map_err(|e| e.to_string())?;
 
-    // 4. 读取浏览器通道设置 + 超时配置
+    // 4. 读取超时配置
     let config_guard = app.config.read().await;
-    let browser_channel = config_guard.browser_channel.clone();
     let timeouts = config_guard.timeouts.clone();
     drop(config_guard);
 
@@ -111,7 +110,7 @@ pub async fn run_start(
         let result = tokio::time::timeout(
             global_timeout,
             crate::engine::scheduler::run_workflow(
-                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &browser_channel, &[], &ctrl, &timeouts,
+                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &[], &ctrl, &timeouts,
             ),
         ).await;
         let result = match result {

@@ -51,13 +51,11 @@ pub async fn run_workflow(
     app_handle: AppHandleRef<'_>,
     db: &Arc<Database>,
     approval_store: Arc<ApprovalStore>,
-    browser_channel: &str,
     initial_vars: &[(String, String)],
     ctrl: &RunControl,
     timeouts: &crate::data::config::TimeoutConfig,
 ) -> Result<RunState> {
     let mut ctx = ExecutionContext::new(run_id, workflow);
-    ctx.browser_channel = browser_channel.to_string();
     ctx.default_timeouts = timeouts.clone();
     // 注入初始变量（CLI --var 等场景）
     for (k, v) in initial_vars {
