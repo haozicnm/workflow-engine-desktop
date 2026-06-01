@@ -1,6 +1,8 @@
 // main.rs — 独立 HTTP 服务器入口
 // 启动 axum HTTP 服务器，提供 API + Vue 前端静态文件服务
 
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::prelude::*;
