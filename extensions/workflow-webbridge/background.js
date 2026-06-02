@@ -1175,11 +1175,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 console.log('[WebBridge] Background loaded');
 loadPortConfig().then(() => connectWebSocket());
-// Keepalive: 每 25s ping 一次防止 service worker 被挂起
+// Keepalive: 每 25s 检查连接状态，断线则重连
 setInterval(() => {
-  if (wsConnected && ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'ping' }));
-  } else if (!wsConnected) {
+  if (!wsConnected || ws?.readyState !== WebSocket.OPEN) {
     connectWebSocket();
   }
 }, 25000);
