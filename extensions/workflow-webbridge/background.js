@@ -53,6 +53,10 @@ let lastFocusedTabId = null;
 let ws = null;
 let wsConnected = false;
 
+// Dialog 处理状态
+let _dialogAction = 'accept';
+let _dialogPromptText = '';
+
 // Network 捕获
 const networkCaptures = new Map(); // tabId -> Map<requestId, requestInfo>
 const activeCaptures = new Set();  // 正在捕获的 tabId
@@ -1016,6 +1020,78 @@ const tools = {
     await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', buttons: 0, clickCount: 1 });
     return { success: true, from: { x: Math.round(from.x), y: Math.round(from.y) }, to: { x: Math.round(to.x), y: Math.round(to.y) } };
   },
+
+  // ─── Phase 3: 标签管理 + 网络 + 对话框 ───
+
+  async new_page(params) {
+    const { url } = params || {};
+    const tab = await chrome.tabs.create({ url: url || 'about:blank', active: true });
+    lastFocusedTabId = tab.id;
+    await ensureAttached(tab.id);
+    if (url && url !== 'about:blank') await waitForLoad(tab.id);
+    const updated = await chrome.tabs.get(tab.id);
+    return { tabId: updated.id, url: updated.url, title: updated.title };
+  },
+
+  async switch_page(params) {
+    const { index, tabId } = params || {};
+    let targetId = tabId;
+    if (targetId == null && index !== undefined) {
+      const tabs = await chrome.tabs.query({});
+      if (index >= tabs.length) throw new Error(`switch_page: index ${index} out of range (${tabs.length} tabs)`);
+      targetId = tabs[index].id;
+    }
+    if (targetId == null) throw new Error('switch_page: need index or tabId');
+    await chrome.tabs.update(targetId, { active: true });
+    lastFocusedTabId = targetId;
+    await ensureAttached(targetId);
+    const tab = await chrome.tabs.get(targetId);
+    return { tabId: tab.id, url: tab.url, title: tab.title };
+  },
+
+  async cookies(params) {
+    const { action = 'get', cookies: setCookies } = params || {};
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Network.enable');
+
+    if (action === 'get') {
+      const result = await cdpCommand('Network.getCookies');
+      return { cookies: result.cookies, count: result.cookies.length };
+    }
+    if (action === 'set') {
+      if (!setCookies?.length) throw new Error('cookies set: cookies array required');
+      for (const c of setCookies) {
+        await cdpCommand('Network.setCookie', c);
+      }
+      return { success: true, set: setCookies.length };
+    }
+    if (action === 'clear') {
+      await cdpCommand('Network.clearBrowserCookies');
+      return { success: true, message: 'all cookies cleared' };
+    }
+    throw new Error(`cookies: unknown action "${action}"`);
+  },
+
+  async set_headers(params) {
+    const { headers } = params || {};
+    if (!headers || typeof headers !== 'object') throw new Error('set_headers: headers object required');
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Network.enable');
+    await cdpCommand('Network.setExtraHTTPHeaders', { headers });
+    return { success: true, headers };
+  },
+
+  async handle_dialog(params) {
+    const { action = 'accept', prompt_text = '' } = params || {};
+    // Store dialog handler preference — actual handling is event-based
+    // This sets up the next dialog to be auto-handled
+    _dialogAction = action;
+    _dialogPromptText = prompt_text;
+    // Enable dialog handling via CDP
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Page.enable');
+    return { success: true, action, message: `Dialog handler set to "${action}"` };
+  },
 };
 
 // ═══════════════════════════════════════════════
@@ -1367,6 +1443,18 @@ chrome.tabGroups?.onRemoved?.addListener((group) => {
 chrome.alarms?.onAlarm?.addListener((alarm) => {
   if (alarm.name === 'webbridge-reconnect' && !wsConnected) {
     connectWebSocket();
+  }
+});
+
+// CDP 事件监听：自动处理 JS 对话框
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (method === 'Page.javascriptDialogOpening') {
+    const accept = _dialogAction === 'accept';
+    const promptText = _dialogPromptText || undefined;
+    chrome.debugger.sendCommand({ tabId: source.tabId }, 'Page.handleJavaScriptDialog', {
+      accept,
+      promptText,
+    }).catch(() => {});
   }
 });
 
