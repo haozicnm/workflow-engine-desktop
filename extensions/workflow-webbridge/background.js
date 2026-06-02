@@ -784,6 +784,113 @@ const tools = {
     
     throw new Error('download: need url or selector');
   },
+
+  // ─── Phase 1: 数据提取 + 元信息 ───
+
+  async extract_text(params) {
+    const { selector, ref } = params;
+    if (!selector && !ref) throw new Error('extract_text: selector or ref is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = ref ? await objectIdFromRef(ref) : await objectIdFromSelector(selector || ref);
+    const result = await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: "function() { return this.innerText || this.textContent || ''; }",
+      returnByValue: true,
+    });
+    return { selector: selector || ref, text: result.result.value };
+  },
+
+  async extract_html(params) {
+    const { selector, ref } = params;
+    if (!selector && !ref) throw new Error('extract_html: selector or ref is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = ref ? await objectIdFromRef(ref) : await objectIdFromSelector(selector || ref);
+    const result = await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: "function() { return this.outerHTML; }",
+      returnByValue: true,
+    });
+    return result.result.value;
+  },
+
+  async extract_attribute(params) {
+    const { selector, ref, attribute } = params;
+    if (!selector && !ref) throw new Error('extract_attribute: selector or ref is required');
+    if (!attribute) throw new Error('extract_attribute: attribute is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = ref ? await objectIdFromRef(ref) : await objectIdFromSelector(selector || ref);
+    const result = await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: `function() { return this.getAttribute(${JSON.stringify(attribute)}); }`,
+      returnByValue: true,
+    });
+    return { selector: selector || ref, attribute, value: result.result.value };
+  },
+
+  async extract_links(params) {
+    const { selector = 'a[href]' } = params;
+    await ensureAttached((await resolveTab()).id);
+    const result = await cdpCommand('Runtime.evaluate', {
+      expression: `JSON.stringify([...document.querySelectorAll(${JSON.stringify(selector)}).map(a => ({text: a.innerText.trim(), href: a.href}))])`,
+      returnByValue: true,
+    });
+    const items = JSON.parse(result.result.value);
+    return { count: items.length, items };
+  },
+
+  async extract_table(params) {
+    const { selector = 'table', ref } = params;
+    await ensureAttached((await resolveTab()).id);
+    const expr = ref
+      ? `(() => {
+          const el = document.querySelector('[data-ref="${ref}"]') || document.activeElement;
+          if (!el || el.tagName !== 'TABLE') return JSON.stringify({error: 'table not found'});
+          const headers = [...el.querySelectorAll('th')].map(th => th.innerText.trim());
+          const rows = [...el.querySelectorAll('tbody tr')].map(tr =>
+            [...tr.querySelectorAll('td')].map(td => td.innerText.trim())
+          );
+          return JSON.stringify({headers, rows});
+        })()`
+      : `(() => {
+          const el = document.querySelector(${JSON.stringify(selector)});
+          if (!el) return JSON.stringify({error: 'table not found'});
+          const headers = [...el.querySelectorAll('th')].map(th => th.innerText.trim());
+          const rows = [...el.querySelectorAll('tbody tr')].map(tr =>
+            [...tr.querySelectorAll('td')].map(td => td.innerText.trim())
+          );
+          return JSON.stringify({headers, rows});
+        })()`;
+    const result = await cdpCommand('Runtime.evaluate', { expression: expr, returnByValue: true });
+    return JSON.parse(result.result.value);
+  },
+
+  async get_title() {
+    await ensureAttached((await resolveTab()).id);
+    const result = await cdpCommand('Runtime.evaluate', {
+      expression: 'document.title',
+      returnByValue: true,
+    });
+    return { title: result.result.value };
+  },
+
+  async current_url() {
+    await ensureAttached((await resolveTab()).id);
+    const result = await cdpCommand('Runtime.evaluate', {
+      expression: 'location.href',
+      returnByValue: true,
+    });
+    return { url: result.result.value };
+  },
+
+  async reload(params) {
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Page.reload', { ignoreCache: params?.ignoreCache || false });
+    if (params?.waitUntil !== false) {
+      await waitForLoad(activeTabId);
+    }
+    const tab = await chrome.tabs.get(activeTabId);
+    return { success: true, url: tab.url };
+  },
 };
 
 // ═══════════════════════════════════════════════
