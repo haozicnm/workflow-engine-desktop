@@ -61,6 +61,14 @@ let networkListenerAdded = false;
 // Tab 分组
 const sessionGroups = new Map();   // session -> groupId
 const sessionColors = new Map();   // session -> color
+// 站点预定义颜色（超越 Kimi：中文站点支持）
+const SITE_COLORS = {
+  github: 'blue', 'twitter.com': 'blue', 'x.com': 'blue',
+  'xiaohongshu.com': 'red', 'xhslink.com': 'red',
+  zhihu: 'blue', bilibili: 'cyan', weibo: 'orange',
+  'google.com': 'green', baidu: 'blue',
+  jira: 'blue', linear: 'purple', notion: 'grey',
+};
 const SESSION_COLORS = ['blue', 'red', 'yellow', 'green', 'cyan', 'orange', 'pink', 'purple'];
 let sessionColorIdx = 0;
 
@@ -566,6 +574,87 @@ const tools = {
     return { success: true, key, dispatched };
   },
 
+  // ─── 超越 Kimi：新增命令 ───
+
+  async scroll(params) {
+    const { selector, x = 0, y = 500, direction } = params;
+    await ensureAttached((await resolveTab()).id);
+    let scrollX = x, scrollY = y;
+    if (direction === 'up') scrollY = -Math.abs(y);
+    else if (direction === 'down') scrollY = Math.abs(y);
+    else if (direction === 'left') scrollX = -Math.abs(x);
+    else if (direction === 'right') scrollX = Math.abs(x);
+    if (selector) {
+      const objectId = isRef(selector) ? await objectIdFromRef(selector) : await objectIdFromSelector(selector);
+      await cdpCommand('Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: `function() { this.scrollBy(${scrollX}, ${scrollY}); }`,
+      });
+    } else {
+      await cdpCommand('Runtime.evaluate', {
+        expression: `window.scrollBy(${scrollX}, ${scrollY})`,
+      });
+    }
+    return { success: true, scrolled: { x: scrollX, y: scrollY } };
+  },
+
+  async hover(params) {
+    const { selector } = params;
+    if (!selector) throw new Error('hover: selector is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = isRef(selector) ? await objectIdFromRef(selector) : await objectIdFromSelector(selector);
+    await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+    });
+    const box = await cdpCommand('DOM.getBoxModel', { objectId });
+    const c = box.model?.content;
+    if (!c || c.length < 8) throw new Error('hover: element has no layout box');
+    const cx = (c[0] + c[2] + c[4] + c[6]) / 4;
+    const cy = (c[1] + c[3] + c[5] + c[7]) / 4;
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, button: 'none', buttons: 0 });
+    return { success: true, x: Math.round(cx), y: Math.round(cy) };
+  },
+
+  async go_back() {
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Page.navigate', { historyIndex: -1, transitionType: 'typed' });
+    await sleep(1000);
+    return { success: true };
+  },
+
+  async go_forward() {
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Page.navigate', { historyIndex: 1, transitionType: 'typed' });
+    await sleep(1000);
+    return { success: true };
+  },
+
+  async wait_for(params) {
+    const { selector, text, timeout = 10000 } = params;
+    if (!selector && !text) throw new Error('wait_for: selector or text is required');
+    await ensureAttached((await resolveTab()).id);
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      if (selector) {
+        const r = await cdpCommand('Runtime.evaluate', {
+          expression: `!!document.querySelector(${JSON.stringify(selector)})`,
+          returnByValue: true,
+        });
+        if (r.result?.value === true) return { success: true, selector, elapsed: Date.now() - start };
+      }
+      if (text) {
+        const r = await cdpCommand('Runtime.evaluate', {
+          expression: `document.body?.innerText?.includes(${JSON.stringify(text)})`,
+          returnByValue: true,
+        });
+        if (r.result?.value === true) return { success: true, text, elapsed: Date.now() - start };
+      }
+      await sleep(300);
+    }
+    throw new Error(`wait_for: timeout (${timeout}ms) waiting for ${selector || JSON.stringify(text)}`);
+  },
+
   // ─── 网络 ───
 
   async network(params) {
@@ -635,23 +724,13 @@ const tools = {
     if (!filePaths?.length) throw new Error('upload: filePaths is required');
     await ensureAttached((await resolveTab()).id);
     
-    const result = await cdpCommand('Runtime.evaluate', {
-      expression: `document.querySelector(${JSON.stringify(selector)})`,
-      returnByValue: false,
+    const doc = await cdpCommand('DOM.getDocument');
+    const { nodeId } = await cdpCommand('DOM.querySelector', {
+      nodeId: doc.root.nodeId,
+      selector,
     });
-    if (result.result?.subtype === 'null') {
-      throw new Error(`upload: element not found: ${selector}`);
-    }
-    
-    const { backendNodeId } = await cdpCommand('DOM.describeNode', {
-      objectId: result.result.objectId,
-    });
-    
-    await cdpCommand('DOM.setFileInputFiles', {
-      files: filePaths,
-      backendNodeId,
-    });
-    
+    if (!nodeId) throw new Error(`upload: element not found: ${selector}`);
+    await cdpCommand('DOM.setFileInputFiles', { files: filePaths, nodeId });
     return { success: true, files: filePaths.length };
   },
 
@@ -733,7 +812,9 @@ async function assignToSession(tabId, session, groupTitle) {
     }
     const title = groupTitle || groupName;
     if (!sessionColors.has(session)) {
-      sessionColors.set(session, SESSION_COLORS[sessionColorIdx++ % SESSION_COLORS.length]);
+      // 优先用站点预定义颜色，其次轮询
+      const siteColor = SITE_COLORS[session] || Object.entries(SITE_COLORS).find(([k]) => session.includes(k))?.[1];
+      sessionColors.set(session, siteColor || SESSION_COLORS[sessionColorIdx++ % SESSION_COLORS.length]);
     }
     const groupId = await chrome.tabs.group({ tabIds: [tabId] });
     const color = sessionColors.get(session);
@@ -822,6 +903,8 @@ function buildAxTree(nodes) {
     if (name) entry.name = name;
     const value = typeof node.value === 'object' ? node.value?.value : node.value;
     if (value) entry.value = value;
+    const desc = typeof node.description === 'object' ? node.description?.value : node.description;
+    if (desc) entry.description = desc;
     
     if (REF_ROLES.has(role) && node.backendDOMNodeId != null) {
       entry.ref = `@${makeRef(node.backendDOMNodeId, role, name || '')}`;
