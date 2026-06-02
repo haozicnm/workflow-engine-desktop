@@ -2,7 +2,7 @@
  * Workflow WebBridge — background.js (WebSocket 版)
  * 
  * 通过 WebSocket 与 workflow-engine 通信，无需 Native Messaging。
- * 扩展主动连接到 ws://localhost:19527/ws/browser
+ * 扩展主动连接到 ws://localhost:19529/ws/browser
  * 
  * 优势：零配置，不需要安装 native messaging host
  */
@@ -93,7 +93,7 @@ function connectWebSocket() {
       ws.send(JSON.stringify({
         type: 'register',
         client: 'webbridge',
-        version: '1.0.0',
+        version: '1.1.0',
         capabilities: Object.keys(tools),
       }));
     };
@@ -239,7 +239,9 @@ const tools = {
     await ensureAttached(tab.id);
     await cdpCommand('Page.navigate', { url });
     await waitForLoad(tab.id);
-    return { success: true, url: tab.url, tabId: tab.id };
+    // 重新查询获取导航后的实际 URL
+    const updated = await chrome.tabs.get(tab.id);
+    return { success: true, url: updated.url || url, tabId: tab.id };
   },
 
   async find_tab(params) {
@@ -297,6 +299,9 @@ const tools = {
     }
     attachedTabs.clear();
     activeTabId = null;
+    // 清理 network 捕获
+    networkCaptures.clear();
+    activeCaptures.clear();
     return { success: true, message: 'Session closed' };
   },
 
@@ -610,7 +615,7 @@ async function assignToSession(tabId, session, groupTitle) {
       sessionGroups.set(session, existing[0].id);
       return;
     }
-    const title = groupTitle || sessionColors.get(session) || groupName;
+    const title = groupTitle || groupName;
     if (!sessionColors.has(session)) {
       sessionColors.set(session, SESSION_COLORS[sessionColorIdx++ % SESSION_COLORS.length]);
     }
@@ -772,10 +777,12 @@ async function clickByRef(ref) {
 }
 
 async function clickBySelector(selector) {
+  // 用 JSON.stringify 安全转义 selector，防止注入
   const result = await cdpCommand('Runtime.evaluate', {
     expression: `(() => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      if (!el) return { error: 'element not found: ${selector}' };
+      const sel = ${JSON.stringify(selector)};
+      const el = document.querySelector(sel);
+      if (!el) return { error: 'element not found: ' + sel };
       el.scrollIntoView({ block: 'center' });
       el.click();
       return { success: true, tag: el.tagName, text: el.textContent?.slice(0, 100) };
@@ -832,13 +839,16 @@ async function fillByRef(ref, value) {
 }
 
 async function fillBySelector(selector, value) {
+  // 用 JSON.stringify 安全转义 selector 和 value，防止注入
   const result = await cdpCommand('Runtime.evaluate', {
     expression: `(() => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      if (!el) return { error: 'element not found: ${selector}' };
+      const sel = ${JSON.stringify(selector)};
+      const val = ${JSON.stringify(value)};
+      const el = document.querySelector(sel);
+      if (!el) return { error: 'element not found: ' + sel };
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-      if (setter) setter.call(el, ${JSON.stringify(value)});
-      else el.value = ${JSON.stringify(value)};
+      if (setter) setter.call(el, val);
+      else el.value = val;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return { success: true, tag: el.tagName };
