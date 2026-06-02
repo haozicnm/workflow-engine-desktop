@@ -46,6 +46,7 @@ pub fn build() -> Router {
         .route("/api/nodes/types", get(handlers::node_list_types))
         .route("/api/nodes/schema", get(handlers::node_schema))
         .route("/api/blocks", get(handlers::blocks_list))
+        .route("/api/blocks/categories", get(handlers::blocks_categories))
         .route("/api/blocks/{type}", get(handlers::blocks_get))
         .route("/api/workflows", get(handlers::workflow_list))
         .route("/api/workflows", post(handlers::workflow_create))

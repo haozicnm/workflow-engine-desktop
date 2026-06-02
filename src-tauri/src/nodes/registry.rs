@@ -63,6 +63,45 @@ pub struct OutputPortDef {
     pub desc: String,
 }
 
+/// 参数验证约束（可选，用于 Agent 知道参数边界）
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ParamValidation {
+    #[serde(default)]
+    pub min: Option<f64>,
+    #[serde(default)]
+    pub max: Option<f64>,
+    #[serde(default, rename = "minLength")]
+    pub min_length: Option<usize>,
+    #[serde(default, rename = "maxLength")]
+    pub max_length: Option<usize>,
+    #[serde(default)]
+    pub pattern: Option<String>,
+    #[serde(default, rename = "patternDesc")]
+    pub pattern_desc: Option<String>,
+    #[serde(default)]
+    pub desc: Option<String>,
+}
+
+/// 条件可见性规则（参数仅在条件满足时显示）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VisibleWhen {
+    pub param: String,
+    /// 精确匹配值（与 op 互斥）
+    #[serde(default)]
+    pub value: Option<Value>,
+    /// 操作符: "empty" / "not_empty" / "eq" / "ne"
+    #[serde(default)]
+    pub op: Option<String>,
+}
+
+/// 参数示例
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ParamExample {
+    #[serde(default)]
+    pub desc: Option<String>,
+    pub value: Value,
+}
+
 /// 参数定义（用于节点自描述 params schema）
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ParamDef {
@@ -84,6 +123,15 @@ pub struct ParamDef {
     /// code 类型的语言标记（如 "rhai"）
     #[serde(default)]
     pub lang: Option<String>,
+    /// 验证约束（min/max/pattern 等）
+    #[serde(default)]
+    pub validation: Option<ParamValidation>,
+    /// 条件可见性（仅当其他参数满足条件时显示）
+    #[serde(default)]
+    pub visible_when: Option<VisibleWhen>,
+    /// 示例值（帮助 Agent 理解参数格式）
+    #[serde(default)]
+    pub examples: Option<Vec<ParamExample>>,
 }
 
 // ─── Schema 解析 ───
@@ -108,6 +156,9 @@ struct SchemaNode {
     outputs: Vec<OutputPortDef>,
     #[serde(default)]
     params: Vec<ParamDef>,
+    /// 节点标签（用于搜索和发现）
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 /// schema 顶层结构
@@ -135,6 +186,8 @@ pub struct NodeManifest {
     pub outputs: Vec<OutputPortDef>,
     /// 参数定义列表（节点自描述 params schema）
     pub params: Vec<ParamDef>,
+    /// 节点标签（用于搜索和发现）
+    pub tags: Vec<String>,
 }
 
 impl NodeManifest {
@@ -150,6 +203,7 @@ impl NodeManifest {
             inputs: sn.inputs.clone(),
             outputs: sn.outputs.clone(),
             params: sn.params.clone(),
+            tags: sn.tags.clone(),
         }
     }
 }
@@ -206,6 +260,33 @@ pub fn get_required_inputs(node_type: &str) -> Vec<String> {
         .filter(|p| p.required)
         .map(|p| p.name)
         .collect()
+}
+
+/// 按标签搜索节点（任意标签匹配即返回）
+pub fn search_by_tags(query: &str) -> Vec<NodeManifest> {
+    let q = query.to_lowercase();
+    SCHEMA
+        .nodes
+        .iter()
+        .filter(|n| {
+            n.tags.iter().any(|t| t.to_lowercase().contains(&q))
+                || n.label.to_lowercase().contains(&q)
+                || n.description.to_lowercase().contains(&q)
+                || n.node_type.to_lowercase().contains(&q)
+        })
+        .map(NodeManifest::from_schema)
+        .collect()
+}
+
+/// 获取所有分类及其节点数量
+pub fn categories() -> Vec<(String, usize)> {
+    let mut map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for n in SCHEMA.nodes.iter() {
+        *map.entry(n.category.clone()).or_insert(0) += 1;
+    }
+    let mut result: Vec<(String, usize)> = map.into_iter().collect();
+    result.sort_by(|a, b| a.0.cmp(&b.0));
+    result
 }
 
 // ─── 端口校验 ───

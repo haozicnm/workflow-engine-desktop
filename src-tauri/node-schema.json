@@ -12,16 +12,100 @@
       "desc": "发送 HTTP 请求，支持 GET/POST/PUT/DELETE",
       "inputs": [],
       "outputs": [
-        {"name": "status", "data_type": "number", "desc": "HTTP 状态码"},
-        {"name": "body", "data_type": "json", "desc": "响应体"},
-        {"name": "headers", "data_type": "json", "desc": "响应头"}
+        {
+          "name": "status",
+          "data_type": "number",
+          "desc": "HTTP 状态码"
+        },
+        {
+          "name": "body",
+          "data_type": "json",
+          "desc": "响应体"
+        },
+        {
+          "name": "headers",
+          "data_type": "json",
+          "desc": "响应头"
+        }
       ],
       "params": [
-        {"name": "method", "field_type": "select", "options": ["GET","POST","PUT","DELETE"], "required": true, "default": "GET", "desc": "HTTP 方法", "group": "basic"},
-        {"name": "url", "field_type": "string", "required": true, "desc": "请求地址", "group": "basic"},
-        {"name": "headers", "field_type": "json", "required": false, "desc": "请求头（JSON 对象）", "group": "basic"},
-        {"name": "body", "field_type": "json", "required": false, "desc": "请求体（JSON 对象）", "group": "basic"},
-        {"name": "timeout", "field_type": "number", "required": false, "default": 30, "desc": "超时秒数", "group": "advanced"}
+        {
+          "name": "method",
+          "field_type": "select",
+          "options": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE"
+          ],
+          "required": true,
+          "default": "GET",
+          "desc": "HTTP 方法",
+          "group": "basic"
+        },
+        {
+          "name": "url",
+          "field_type": "string",
+          "required": true,
+          "desc": "请求地址",
+          "group": "basic",
+          "validation": {
+            "pattern": "^https?://.*",
+            "pattern_desc": "必须以 http:// 或 https:// 开头"
+          },
+          "examples": [
+            {
+              "desc": "GET 请求",
+              "value": "https://api.example.com/data"
+            },
+            {
+              "desc": "带变量引用",
+              "value": "https://api.example.com/users/{{step_1.user_id}}"
+            }
+          ]
+        },
+        {
+          "name": "headers",
+          "field_type": "json",
+          "required": false,
+          "desc": "请求头（JSON 对象）",
+          "group": "basic",
+          "examples": [
+            {
+              "desc": "JSON 请求头",
+              "value": {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer {{token}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "body",
+          "field_type": "json",
+          "required": false,
+          "desc": "请求体（JSON 对象）",
+          "group": "basic"
+        },
+        {
+          "name": "timeout",
+          "field_type": "number",
+          "required": false,
+          "default": 30,
+          "desc": "超时秒数",
+          "group": "advanced",
+          "validation": {
+            "min": 1,
+            "max": 300,
+            "desc": "1-300秒"
+          }
+        }
+      ],
+      "tags": [
+        "network",
+        "api",
+        "request",
+        "web"
       ]
     },
     {
@@ -33,11 +117,44 @@
       "desc": "执行 Rhai 脚本，支持变量读写和复杂逻辑",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "脚本返回值"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "脚本返回值"
+        }
       ],
       "params": [
-        {"name": "script", "field_type": "code", "required": true, "desc": "Rhai 脚本代码", "lang": "rhai", "group": "basic"},
-        {"name": "variables", "field_type": "json", "required": false, "desc": "输入变量（JSON 对象）", "group": "basic"}
+        {
+          "name": "script",
+          "field_type": "code",
+          "required": true,
+          "desc": "Rhai 脚本代码",
+          "lang": "rhai",
+          "group": "basic",
+          "examples": [
+            {
+              "desc": "返回变量",
+              "value": "step_1.stdout.to_upper()"
+            },
+            {
+              "desc": "条件逻辑",
+              "value": "if step_1.status == 200 { step_1.body } else { #{error: \"failed\"} }"
+            }
+          ]
+        },
+        {
+          "name": "variables",
+          "field_type": "json",
+          "required": false,
+          "desc": "输入变量（JSON 对象）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "code",
+        "logic",
+        "rhai",
+        "programming"
       ]
     },
     {
@@ -49,13 +166,66 @@
       "desc": "根据条件表达式结果选择执行分支",
       "inputs": [],
       "outputs": [
-        {"name": "branch", "data_type": "text", "desc": "分支名 (true/false)"},
-        {"name": "result", "data_type": "bool", "desc": "条件布尔值"}
+        {
+          "name": "branch",
+          "data_type": "text",
+          "desc": "分支名 (true/false)"
+        },
+        {
+          "name": "result",
+          "data_type": "bool",
+          "desc": "条件布尔值"
+        }
       ],
       "params": [
-        {"name": "mode", "field_type": "select", "options": ["conditionGroup","expression"], "required": true, "default": "conditionGroup", "desc": "条件模式", "group": "basic"},
-        {"name": "conditionGroup", "field_type": "json", "required": false, "desc": "条件组（JSON 结构化条件）", "group": "basic"},
-        {"name": "expression", "field_type": "string", "required": false, "desc": "条件表达式（表达式模式）", "group": "basic"}
+        {
+          "name": "mode",
+          "field_type": "select",
+          "options": [
+            "conditionGroup",
+            "expression"
+          ],
+          "required": true,
+          "default": "conditionGroup",
+          "desc": "条件模式",
+          "group": "basic"
+        },
+        {
+          "name": "conditionGroup",
+          "field_type": "json",
+          "required": false,
+          "desc": "条件组（JSON 结构化条件）",
+          "group": "basic",
+          "visible_when": {
+            "param": "mode",
+            "value": "conditionGroup"
+          }
+        },
+        {
+          "name": "expression",
+          "field_type": "string",
+          "required": false,
+          "desc": "条件表达式（表达式模式）",
+          "group": "basic",
+          "visible_when": {
+            "param": "mode",
+            "value": "expression"
+          },
+          "examples": [
+            {
+              "value": "step_1.status == 200"
+            },
+            {
+              "value": "step_1.body.items.length() > 0"
+            }
+          ]
+        }
+      ],
+      "tags": [
+        "logic",
+        "branch",
+        "control-flow",
+        "if"
       ]
     },
     {
@@ -67,15 +237,80 @@
       "desc": "执行系统命令（bash/powershell/cmd）",
       "inputs": [],
       "outputs": [
-        {"name": "stdout", "data_type": "text", "desc": "标准输出"},
-        {"name": "stderr", "data_type": "text", "desc": "标准错误"},
-        {"name": "exit_code", "data_type": "number", "desc": "退出码"}
+        {
+          "name": "stdout",
+          "data_type": "text",
+          "desc": "标准输出"
+        },
+        {
+          "name": "stderr",
+          "data_type": "text",
+          "desc": "标准错误"
+        },
+        {
+          "name": "exit_code",
+          "data_type": "number",
+          "desc": "退出码"
+        }
       ],
       "params": [
-        {"name": "command", "field_type": "string", "required": true, "desc": "要执行的命令", "group": "basic"},
-        {"name": "shell", "field_type": "select", "options": ["auto","bash","powershell","cmd"], "required": false, "default": "auto", "desc": "Shell 类型", "group": "basic"},
-        {"name": "cwd", "field_type": "string", "required": false, "desc": "工作目录", "group": "advanced"},
-        {"name": "timeout_secs", "field_type": "number", "required": false, "default": 300, "desc": "超时秒数", "group": "advanced"}
+        {
+          "name": "command",
+          "field_type": "string",
+          "required": true,
+          "desc": "要执行的命令",
+          "group": "basic",
+          "examples": [
+            {
+              "desc": "列出文件",
+              "value": "ls -la /tmp"
+            },
+            {
+              "desc": "PowerShell 命令",
+              "value": "Get-Process | Select-Object -First 5"
+            }
+          ]
+        },
+        {
+          "name": "shell",
+          "field_type": "select",
+          "options": [
+            "auto",
+            "bash",
+            "powershell",
+            "cmd"
+          ],
+          "required": false,
+          "default": "auto",
+          "desc": "Shell 类型",
+          "group": "basic"
+        },
+        {
+          "name": "cwd",
+          "field_type": "string",
+          "required": false,
+          "desc": "工作目录",
+          "group": "advanced"
+        },
+        {
+          "name": "timeout_secs",
+          "field_type": "number",
+          "required": false,
+          "default": 300,
+          "desc": "超时秒数",
+          "group": "advanced",
+          "validation": {
+            "min": 1,
+            "max": 3600,
+            "desc": "1-3600秒"
+          }
+        }
+      ],
+      "tags": [
+        "command",
+        "terminal",
+        "system",
+        "execute"
       ]
     },
     {
@@ -88,7 +323,24 @@
       "inputs": [],
       "outputs": [],
       "params": [
-        {"name": "ms", "field_type": "number", "required": true, "default": 1000, "desc": "延迟毫秒数", "group": "basic"}
+        {
+          "name": "ms",
+          "field_type": "number",
+          "required": true,
+          "default": 1000,
+          "desc": "延迟毫秒数",
+          "group": "basic",
+          "validation": {
+            "min": 0,
+            "max": 86400000,
+            "desc": "0-86400000毫秒（最多24小时）"
+          }
+        }
+      ],
+      "tags": [
+        "timing",
+        "wait",
+        "sleep"
       ]
     },
     {
@@ -100,19 +352,113 @@
       "desc": "暂停执行等待人工审批，recommended 支持变量引用（如 {{step_check.branch}}）",
       "inputs": [],
       "outputs": [
-        {"name": "approved", "data_type": "bool", "desc": "是否通过"},
-        {"name": "comment", "data_type": "text", "desc": "审批意见"}
+        {
+          "name": "approved",
+          "data_type": "bool",
+          "desc": "是否通过"
+        },
+        {
+          "name": "comment",
+          "data_type": "text",
+          "desc": "审批意见"
+        }
       ],
       "params": [
-        {"name": "title", "field_type": "string", "required": false, "desc": "审批标题", "group": "basic"},
-        {"name": "message", "field_type": "string", "required": false, "desc": "审批消息，支持 {{step_x.field}} 变量", "group": "basic"},
-        {"name": "options", "field_type": "string", "required": false, "default": "同意,拒绝", "desc": "逗号分隔选项", "group": "basic"},
-        {"name": "recommended", "field_type": "string", "required": false, "desc": "推荐选项，支持 {{step_x.branch}} 从条件节点读取", "group": "basic"},
-        {"name": "require_review", "field_type": "boolean", "required": false, "default": true, "desc": "true=人工审批, false=自动用 recommended 决策", "group": "basic"},
-        {"name": "timeout", "field_type": "number", "required": false, "default": 300, "desc": "超时秒数", "group": "advanced"},
-        {"name": "timeout_action", "field_type": "select", "options": ["recommended","reject","approve"], "required": false, "default": "recommended", "desc": "超时动作", "group": "advanced"},
-        {"name": "timeout_behavior", "field_type": "select", "options": ["auto","manual"], "required": false, "default": "auto", "desc": "auto=超时自动, manual=永不过期", "group": "advanced"},
-        {"name": "data_source", "field_type": "string", "required": false, "desc": "上游步骤 ID，用于 item 上下文", "group": "advanced"}
+        {
+          "name": "title",
+          "field_type": "string",
+          "required": false,
+          "desc": "审批标题",
+          "group": "basic"
+        },
+        {
+          "name": "message",
+          "field_type": "string",
+          "required": false,
+          "desc": "审批消息，支持 {{step_x.field}} 变量",
+          "group": "basic"
+        },
+        {
+          "name": "options",
+          "field_type": "string",
+          "required": false,
+          "default": "同意,拒绝",
+          "desc": "逗号分隔选项",
+          "group": "basic"
+        },
+        {
+          "name": "recommended",
+          "field_type": "string",
+          "required": false,
+          "desc": "推荐选项，支持 {{step_x.branch}} 从条件节点读取",
+          "group": "basic",
+          "visible_when": {
+            "param": "require_review",
+            "value": true
+          }
+        },
+        {
+          "name": "require_review",
+          "field_type": "boolean",
+          "required": false,
+          "default": true,
+          "desc": "true=人工审批, false=自动用 recommended 决策",
+          "group": "basic"
+        },
+        {
+          "name": "timeout",
+          "field_type": "number",
+          "required": false,
+          "default": 300,
+          "desc": "超时秒数",
+          "group": "advanced",
+          "validation": {
+            "min": 10,
+            "max": 86400,
+            "desc": "10秒-24小时"
+          }
+        },
+        {
+          "name": "timeout_action",
+          "field_type": "select",
+          "options": [
+            "recommended",
+            "reject",
+            "approve"
+          ],
+          "required": false,
+          "default": "recommended",
+          "desc": "超时动作",
+          "group": "advanced",
+          "visible_when": {
+            "param": "require_review",
+            "value": true
+          }
+        },
+        {
+          "name": "timeout_behavior",
+          "field_type": "select",
+          "options": [
+            "auto",
+            "manual"
+          ],
+          "required": false,
+          "default": "auto",
+          "desc": "auto=超时自动, manual=永不过期",
+          "group": "advanced"
+        },
+        {
+          "name": "data_source",
+          "field_type": "string",
+          "required": false,
+          "desc": "上游步骤 ID，用于 item 上下文",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "human",
+        "review",
+        "decision"
       ]
     },
     {
@@ -124,20 +470,157 @@
       "desc": "提取网页内容（支持单页/批量/url_pattern/重试/限速/Excel输出）",
       "inputs": [],
       "outputs": [
-        {"name": "title", "data_type": "text", "desc": "页面标题"},
-        {"name": "text", "data_type": "text", "desc": "纯文本内容"},
-        {"name": "links", "data_type": "array", "desc": "链接列表"}
+        {
+          "name": "title",
+          "data_type": "text",
+          "desc": "页面标题"
+        },
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "纯文本内容"
+        },
+        {
+          "name": "links",
+          "data_type": "array",
+          "desc": "链接列表"
+        }
       ],
       "params": [
-        {"name": "url", "field_type": "string", "required": false, "desc": "单个 URL（与 urls/url_pattern 三选一）", "group": "basic"},
-        {"name": "urls", "field_type": "json", "required": false, "desc": "URL 数组，批量抓取", "group": "basic"},
-        {"name": "url_pattern", "field_type": "string", "required": false, "desc": "URL 模式，如 https://site.com/page/{{1..10}}", "group": "basic"},
-        {"name": "extract", "field_type": "json", "required": false, "desc": "提取规则数组 [{selector, fields}]", "group": "basic"},
-        {"name": "retry", "field_type": "number", "required": false, "default": 0, "desc": "每 URL 最大重试次数", "group": "advanced"},
-        {"name": "retry_delay_ms", "field_type": "number", "required": false, "default": 1000, "desc": "重试间隔毫秒", "group": "advanced"},
-        {"name": "delay_between_ms", "field_type": "number", "required": false, "default": 0, "desc": "URL 间延迟毫秒（防封）", "group": "advanced"},
-        {"name": "fail_fast", "field_type": "boolean", "required": false, "default": false, "desc": "单个失败是否中止全部", "group": "advanced"},
-        {"name": "excel_output", "field_type": "file_path", "required": false, "desc": "结果输出到 Excel 文件路径", "group": "advanced"}
+        {
+          "name": "url",
+          "field_type": "string",
+          "required": false,
+          "desc": "单个 URL（与 urls/url_pattern 三选一）",
+          "group": "basic",
+          "examples": [
+            {
+              "value": "https://example.com/page"
+            }
+          ]
+        },
+        {
+          "name": "urls",
+          "field_type": "json",
+          "required": false,
+          "desc": "URL 数组，批量抓取",
+          "group": "basic",
+          "visible_when": {
+            "param": "url",
+            "op": "empty"
+          },
+          "examples": [
+            {
+              "value": [
+                "https://example.com/page1",
+                "https://example.com/page2"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "url_pattern",
+          "field_type": "string",
+          "required": false,
+          "desc": "URL 模式，如 https://site.com/page/{{1..10}}",
+          "group": "basic",
+          "visible_when": {
+            "param": "url",
+            "op": "empty"
+          },
+          "examples": [
+            {
+              "desc": "批量页码",
+              "value": "https://example.com/page/{{1..10}}"
+            }
+          ]
+        },
+        {
+          "name": "extract",
+          "field_type": "json",
+          "required": false,
+          "desc": "提取规则数组 [{selector, fields}]",
+          "group": "basic",
+          "examples": [
+            {
+              "desc": "CSS 选择器提取",
+              "value": [
+                {
+                  "selector": ".article-title",
+                  "fields": {
+                    "title": "text"
+                  }
+                },
+                {
+                  "selector": ".price",
+                  "fields": {
+                    "price": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "retry",
+          "field_type": "number",
+          "required": false,
+          "default": 0,
+          "desc": "每 URL 最大重试次数",
+          "group": "advanced",
+          "validation": {
+            "min": 0,
+            "max": 10,
+            "desc": "0-10次"
+          }
+        },
+        {
+          "name": "retry_delay_ms",
+          "field_type": "number",
+          "required": false,
+          "default": 1000,
+          "desc": "重试间隔毫秒",
+          "group": "advanced",
+          "validation": {
+            "min": 0,
+            "max": 60000,
+            "desc": "0-60秒"
+          }
+        },
+        {
+          "name": "delay_between_ms",
+          "field_type": "number",
+          "required": false,
+          "default": 0,
+          "desc": "URL 间延迟毫秒（防封）",
+          "group": "advanced",
+          "validation": {
+            "min": 0,
+            "max": 60000,
+            "desc": "0-60秒"
+          }
+        },
+        {
+          "name": "fail_fast",
+          "field_type": "boolean",
+          "required": false,
+          "default": false,
+          "desc": "单个失败是否中止全部",
+          "group": "advanced"
+        },
+        {
+          "name": "excel_output",
+          "field_type": "file_path",
+          "required": false,
+          "desc": "结果输出到 Excel 文件路径",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "web",
+        "scrape",
+        "extract",
+        "data"
       ]
     },
     {
@@ -149,11 +632,49 @@
       "desc": "写入或覆盖上下文变量",
       "inputs": [],
       "outputs": [
-        {"name": "value", "data_type": "json", "desc": "写入的值"}
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "写入的值"
+        }
       ],
       "params": [
-        {"name": "name", "field_type": "string", "required": true, "desc": "变量名", "group": "basic"},
-        {"name": "value", "field_type": "json", "required": true, "desc": "变量值（支持 {{step_x.field}} 引用）", "group": "basic"}
+        {
+          "name": "name",
+          "field_type": "string",
+          "required": true,
+          "desc": "变量名",
+          "group": "basic",
+          "validation": {
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "pattern_desc": "变量名：字母/下划线开头，只含字母数字下划线"
+          },
+          "examples": [
+            {
+              "value": "user_count"
+            }
+          ]
+        },
+        {
+          "name": "value",
+          "field_type": "json",
+          "required": true,
+          "desc": "变量值（支持 {{step_x.field}} 引用）",
+          "group": "basic",
+          "examples": [
+            {
+              "value": "{{step_1.body.total}}"
+            },
+            {
+              "value": 42
+            }
+          ]
+        }
+      ],
+      "tags": [
+        "variable",
+        "storage",
+        "write"
       ]
     },
     {
@@ -165,10 +686,29 @@
       "desc": "从上下文读取指定变量的值",
       "inputs": [],
       "outputs": [
-        {"name": "value", "data_type": "json", "desc": "读取的值"}
+        {
+          "name": "value",
+          "data_type": "json",
+          "desc": "读取的值"
+        }
       ],
       "params": [
-        {"name": "name", "field_type": "string", "required": true, "desc": "变量名", "group": "basic"}
+        {
+          "name": "name",
+          "field_type": "string",
+          "required": true,
+          "desc": "变量名",
+          "group": "basic",
+          "validation": {
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "pattern_desc": "变量名：字母/下划线开头，只含字母数字下划线"
+          }
+        }
+      ],
+      "tags": [
+        "variable",
+        "storage",
+        "read"
       ]
     },
     {
@@ -180,12 +720,46 @@
       "desc": "读取文件内容",
       "inputs": [],
       "outputs": [
-        {"name": "content", "data_type": "text", "desc": "文件内容"},
-        {"name": "size", "data_type": "number", "desc": "文件大小(bytes)"}
+        {
+          "name": "content",
+          "data_type": "text",
+          "desc": "文件内容"
+        },
+        {
+          "name": "size",
+          "data_type": "number",
+          "desc": "文件大小(bytes)"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "文件路径", "group": "basic"},
-        {"name": "encoding", "field_type": "select", "options": ["utf-8","base64"], "required": false, "default": "utf-8", "desc": "编码方式", "group": "advanced"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "文件路径",
+          "group": "basic",
+          "validation": {
+            "min_length": 1,
+            "desc": "非空路径"
+          }
+        },
+        {
+          "name": "encoding",
+          "field_type": "select",
+          "options": [
+            "utf-8",
+            "base64"
+          ],
+          "required": false,
+          "default": "utf-8",
+          "desc": "编码方式",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "file",
+        "read",
+        "io"
       ]
     },
     {
@@ -197,13 +771,60 @@
       "desc": "写入内容到文件",
       "inputs": [],
       "outputs": [
-        {"name": "path", "data_type": "text", "desc": "写入的文件路径"}
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "写入的文件路径"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "文件路径", "group": "basic"},
-        {"name": "content", "field_type": "text", "required": true, "desc": "写入内容", "group": "basic"},
-        {"name": "encoding", "field_type": "select", "options": ["utf-8","base64"], "required": false, "default": "utf-8", "desc": "编码方式", "group": "advanced"},
-        {"name": "mode", "field_type": "select", "options": ["overwrite","append"], "required": false, "default": "overwrite", "desc": "写入模式", "group": "advanced"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "文件路径",
+          "group": "basic",
+          "validation": {
+            "min_length": 1,
+            "desc": "非空路径"
+          }
+        },
+        {
+          "name": "content",
+          "field_type": "text",
+          "required": true,
+          "desc": "写入内容",
+          "group": "basic"
+        },
+        {
+          "name": "encoding",
+          "field_type": "select",
+          "options": [
+            "utf-8",
+            "base64"
+          ],
+          "required": false,
+          "default": "utf-8",
+          "desc": "编码方式",
+          "group": "advanced"
+        },
+        {
+          "name": "mode",
+          "field_type": "select",
+          "options": [
+            "overwrite",
+            "append"
+          ],
+          "required": false,
+          "default": "overwrite",
+          "desc": "写入模式",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "file",
+        "write",
+        "io"
       ]
     },
     {
@@ -215,13 +836,46 @@
       "desc": "列出目录内容",
       "inputs": [],
       "outputs": [
-        {"name": "files", "data_type": "array", "desc": "文件列表"},
-        {"name": "count", "data_type": "number", "desc": "文件数量"}
+        {
+          "name": "files",
+          "data_type": "array",
+          "desc": "文件列表"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "文件数量"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "目录路径", "group": "basic"},
-        {"name": "recursive", "field_type": "boolean", "required": false, "default": false, "desc": "是否递归子目录", "group": "basic"},
-        {"name": "filter", "field_type": "string", "required": false, "desc": "文件名通配符过滤（如 *.txt）", "group": "basic"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "目录路径",
+          "group": "basic"
+        },
+        {
+          "name": "recursive",
+          "field_type": "boolean",
+          "required": false,
+          "default": false,
+          "desc": "是否递归子目录",
+          "group": "basic"
+        },
+        {
+          "name": "filter",
+          "field_type": "string",
+          "required": false,
+          "desc": "文件名通配符过滤（如 *.txt）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "file",
+        "directory",
+        "list",
+        "io"
       ]
     },
     {
@@ -233,10 +887,25 @@
       "desc": "检查文件或目录是否存在",
       "inputs": [],
       "outputs": [
-        {"name": "exists", "data_type": "bool", "desc": "是否存在"}
+        {
+          "name": "exists",
+          "data_type": "bool",
+          "desc": "是否存在"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "文件或目录路径", "group": "basic"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "文件或目录路径",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "file",
+        "check",
+        "io"
       ]
     },
     {
@@ -248,11 +917,31 @@
       "desc": "计算文件 MD5/SHA256 校验和",
       "inputs": [],
       "outputs": [
-        {"name": "md5", "data_type": "text", "desc": "MD5 哈希"},
-        {"name": "sha256", "data_type": "text", "desc": "SHA256 哈希"}
+        {
+          "name": "md5",
+          "data_type": "text",
+          "desc": "MD5 哈希"
+        },
+        {
+          "name": "sha256",
+          "data_type": "text",
+          "desc": "SHA256 哈希"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "文件路径", "group": "basic"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "文件路径",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "file",
+        "hash",
+        "verify",
+        "io"
       ]
     },
     {
@@ -264,9 +953,18 @@
       "desc": "读取系统剪贴板内容",
       "inputs": [],
       "outputs": [
-        {"name": "text", "data_type": "text", "desc": "剪贴板文本"}
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "剪贴板文本"
+        }
       ],
-      "params": []
+      "params": [],
+      "tags": [
+        "system",
+        "clipboard",
+        "paste"
+      ]
     },
     {
       "type": "clipboard_write",
@@ -278,7 +976,18 @@
       "inputs": [],
       "outputs": [],
       "params": [
-        {"name": "content", "field_type": "text", "required": true, "desc": "要写入剪贴板的内容", "group": "basic"}
+        {
+          "name": "content",
+          "field_type": "text",
+          "required": true,
+          "desc": "要写入剪贴板的内容",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "system",
+        "clipboard",
+        "copy"
       ]
     },
     {
@@ -290,15 +999,63 @@
       "desc": "正则表达式处理：提取捕获组或测试匹配（由 mode 参数控制）",
       "inputs": [],
       "outputs": [
-        {"name": "matches", "data_type": "array", "desc": "匹配结果数组（extract 模式为捕获组，match 模式为匹配位置）"},
-        {"name": "count", "data_type": "number", "desc": "匹配数量"},
-        {"name": "is_match", "data_type": "bool", "desc": "是否有匹配"}
+        {
+          "name": "matches",
+          "data_type": "array",
+          "desc": "匹配结果数组（extract 模式为捕获组，match 模式为匹配位置）"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "匹配数量"
+        },
+        {
+          "name": "is_match",
+          "data_type": "bool",
+          "desc": "是否有匹配"
+        }
       ],
       "params": [
-        {"name": "mode", "field_type": "select", "options": ["extract","match"], "required": false, "default": "extract", "desc": "extract=提取捕获组, match=测试匹配", "group": "basic"},
-        {"name": "pattern", "field_type": "string", "required": true, "desc": "正则表达式", "group": "basic"},
-        {"name": "input", "field_type": "text", "required": true, "desc": "输入文本", "group": "basic"},
-        {"name": "global", "field_type": "boolean", "required": false, "default": true, "desc": "是否全局匹配", "group": "advanced"}
+        {
+          "name": "mode",
+          "field_type": "select",
+          "options": [
+            "extract",
+            "match"
+          ],
+          "required": false,
+          "default": "extract",
+          "desc": "extract=提取捕获组, match=测试匹配",
+          "group": "basic"
+        },
+        {
+          "name": "pattern",
+          "field_type": "string",
+          "required": true,
+          "desc": "正则表达式",
+          "group": "basic"
+        },
+        {
+          "name": "input",
+          "field_type": "text",
+          "required": true,
+          "desc": "输入文本",
+          "group": "basic"
+        },
+        {
+          "name": "global",
+          "field_type": "boolean",
+          "required": false,
+          "default": true,
+          "desc": "是否全局匹配",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "text",
+        "pattern",
+        "match",
+        "extract"
       ]
     },
     {
@@ -309,15 +1066,59 @@
       "is_container": true,
       "desc": "遍历数组，对每个元素执行子步骤",
       "inputs": [
-        {"name": "array", "data_type": "array", "required": true, "desc": "要遍历的数组"}
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "要遍历的数组"
+        }
       ],
       "outputs": [
-        {"name": "results", "data_type": "array", "desc": "每次迭代的结果数组"},
-        {"name": "count", "data_type": "number", "desc": "迭代次数"}
+        {
+          "name": "results",
+          "data_type": "array",
+          "desc": "每次迭代的结果数组"
+        },
+        {
+          "name": "count",
+          "data_type": "number",
+          "desc": "迭代次数"
+        }
       ],
       "params": [
-        {"name": "items", "field_type": "string", "required": true, "desc": "数组表达式（如 {{step_load.result}}）", "group": "basic"},
-        {"name": "item_var", "field_type": "string", "required": false, "default": "item", "desc": "当前迭代变量名", "group": "basic"}
+        {
+          "name": "items",
+          "field_type": "string",
+          "required": true,
+          "desc": "数组表达式（如 {{step_load.result}}）",
+          "group": "basic",
+          "examples": [
+            {
+              "value": "{{step_1.body.items}}"
+            },
+            {
+              "value": [
+                1,
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "name": "item_var",
+          "field_type": "string",
+          "required": false,
+          "default": "item",
+          "desc": "当前迭代变量名",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "flow",
+        "iteration",
+        "repeat",
+        "control"
       ]
     },
     {
@@ -329,11 +1130,34 @@
       "desc": "条件循环，满足条件时重复执行子步骤",
       "inputs": [],
       "outputs": [
-        {"name": "iterations", "data_type": "number", "desc": "迭代次数"}
+        {
+          "name": "iterations",
+          "data_type": "number",
+          "desc": "迭代次数"
+        }
       ],
       "params": [
-        {"name": "condition", "field_type": "string", "required": true, "desc": "循环条件表达式（如 index < 10）", "group": "basic"},
-        {"name": "max_iterations", "field_type": "number", "required": false, "default": 1000, "desc": "最大迭代次数（防止死循环）", "group": "advanced"}
+        {
+          "name": "condition",
+          "field_type": "string",
+          "required": true,
+          "desc": "循环条件表达式（如 index < 10）",
+          "group": "basic"
+        },
+        {
+          "name": "max_iterations",
+          "field_type": "number",
+          "required": false,
+          "default": 1000,
+          "desc": "最大迭代次数（防止死循环）",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "flow",
+        "condition",
+        "repeat",
+        "control"
       ]
     },
     {
@@ -344,16 +1168,54 @@
       "is_container": true,
       "desc": "一次处理一项，跨次持久化游标",
       "inputs": [
-        {"name": "array", "data_type": "array", "required": true, "desc": "要遍历的数组"}
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "要遍历的数组"
+        }
       ],
       "outputs": [
-        {"name": "current", "data_type": "json", "desc": "当前项"},
-        {"name": "index", "data_type": "number", "desc": "当前索引"}
+        {
+          "name": "current",
+          "data_type": "json",
+          "desc": "当前项"
+        },
+        {
+          "name": "index",
+          "data_type": "number",
+          "desc": "当前索引"
+        }
       ],
       "params": [
-        {"name": "items", "field_type": "string", "required": true, "desc": "数据源表达式（如 {{step_load.result}}）", "group": "basic"},
-        {"name": "batch_size", "field_type": "number", "required": false, "default": 1, "desc": "每批处理数量", "group": "basic"},
-        {"name": "cursor_key", "field_type": "string", "required": false, "desc": "持久化游标键名（跨次执行恢复位置）", "group": "advanced"}
+        {
+          "name": "items",
+          "field_type": "string",
+          "required": true,
+          "desc": "数据源表达式（如 {{step_load.result}}）",
+          "group": "basic"
+        },
+        {
+          "name": "batch_size",
+          "field_type": "number",
+          "required": false,
+          "default": 1,
+          "desc": "每批处理数量",
+          "group": "basic"
+        },
+        {
+          "name": "cursor_key",
+          "field_type": "string",
+          "required": false,
+          "desc": "持久化游标键名（跨次执行恢复位置）",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "flow",
+        "pagination",
+        "iterate",
+        "control"
       ]
     },
     {
@@ -365,12 +1227,41 @@
       "desc": "并行执行多个子步骤",
       "inputs": [],
       "outputs": [
-        {"name": "results", "data_type": "array", "desc": "各分支结果"}
+        {
+          "name": "results",
+          "data_type": "array",
+          "desc": "各分支结果"
+        }
       ],
       "params": [
-        {"name": "branches", "field_type": "json", "required": true, "desc": "分支配置数组 [{name, steps}]", "group": "basic"},
-        {"name": "fail_fast", "field_type": "boolean", "required": false, "default": false, "desc": "任一分支失败是否中止全部", "group": "advanced"},
-        {"name": "max_concurrency", "field_type": "number", "required": false, "desc": "最大并发数", "group": "advanced"}
+        {
+          "name": "branches",
+          "field_type": "json",
+          "required": true,
+          "desc": "分支配置数组 [{name, steps}]",
+          "group": "basic"
+        },
+        {
+          "name": "fail_fast",
+          "field_type": "boolean",
+          "required": false,
+          "default": false,
+          "desc": "任一分支失败是否中止全部",
+          "group": "advanced"
+        },
+        {
+          "name": "max_concurrency",
+          "field_type": "number",
+          "required": false,
+          "desc": "最大并发数",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "flow",
+        "concurrent",
+        "parallel",
+        "control"
       ]
     },
     {
@@ -381,15 +1272,49 @@
       "is_container": false,
       "desc": "对每个输入元素应用映射函数",
       "inputs": [
-        {"name": "array", "data_type": "array", "required": true, "desc": "输入数组"}
+        {
+          "name": "array",
+          "data_type": "array",
+          "required": true,
+          "desc": "输入数组"
+        }
       ],
       "outputs": [
-        {"name": "result", "data_type": "array", "desc": "映射结果"}
+        {
+          "name": "result",
+          "data_type": "array",
+          "desc": "映射结果"
+        }
       ],
       "params": [
-        {"name": "items", "field_type": "string", "required": true, "desc": "输入数组表达式", "group": "basic"},
-        {"name": "body_steps", "field_type": "json", "required": true, "desc": "子步骤数组（对每个元素执行）", "group": "basic"},
-        {"name": "item_var", "field_type": "string", "required": false, "default": "item", "desc": "当前元素变量名", "group": "basic"}
+        {
+          "name": "items",
+          "field_type": "string",
+          "required": true,
+          "desc": "输入数组表达式",
+          "group": "basic"
+        },
+        {
+          "name": "body_steps",
+          "field_type": "json",
+          "required": true,
+          "desc": "子步骤数组（对每个元素执行）",
+          "group": "basic"
+        },
+        {
+          "name": "item_var",
+          "field_type": "string",
+          "required": false,
+          "default": "item",
+          "desc": "当前元素变量名",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "flow",
+        "transform",
+        "array",
+        "control"
       ]
     },
     {
@@ -401,12 +1326,41 @@
       "desc": "调用另一个工作流作为子流程",
       "inputs": [],
       "outputs": [
-        {"name": "output", "data_type": "json", "desc": "子工作流输出"}
+        {
+          "name": "output",
+          "data_type": "json",
+          "desc": "子工作流输出"
+        }
       ],
       "params": [
-        {"name": "workflow_id", "field_type": "string", "required": true, "desc": "子工作流 ID", "group": "basic"},
-        {"name": "input_vars", "field_type": "json", "required": false, "desc": "传入子工作流的变量（JSON 对象）", "group": "basic"},
-        {"name": "wait", "field_type": "boolean", "required": false, "default": true, "desc": "是否等待子工作流完成", "group": "advanced"}
+        {
+          "name": "workflow_id",
+          "field_type": "string",
+          "required": true,
+          "desc": "子工作流 ID",
+          "group": "basic"
+        },
+        {
+          "name": "input_vars",
+          "field_type": "json",
+          "required": false,
+          "desc": "传入子工作流的变量（JSON 对象）",
+          "group": "basic"
+        },
+        {
+          "name": "wait",
+          "field_type": "boolean",
+          "required": false,
+          "default": true,
+          "desc": "是否等待子工作流完成",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "flow",
+        "compose",
+        "nested",
+        "control"
       ]
     },
     {
@@ -418,11 +1372,34 @@
       "desc": "模拟鼠标和键盘操作",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "操作结果"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
       ],
       "params": [
-        {"name": "actions", "field_type": "json", "required": true, "desc": "操作序列 [{action, params}]（click/type/key/move/scroll）", "group": "basic"},
-        {"name": "interval_ms", "field_type": "number", "required": false, "default": 50, "desc": "操作间隔毫秒", "group": "advanced"}
+        {
+          "name": "actions",
+          "field_type": "json",
+          "required": true,
+          "desc": "操作序列 [{action, params}]（click/type/key/move/scroll）",
+          "group": "basic"
+        },
+        {
+          "name": "interval_ms",
+          "field_type": "number",
+          "required": false,
+          "default": 50,
+          "desc": "操作间隔毫秒",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "input",
+        "mouse",
+        "keyboard",
+        "desktop"
       ]
     },
     {
@@ -434,14 +1411,62 @@
       "desc": "管理桌面窗口",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "窗口信息"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "窗口信息"
+        }
       ],
       "params": [
-        {"name": "action", "field_type": "select", "options": ["focus","close","minimize","maximize","resize","move","find"], "required": true, "desc": "窗口操作类型", "group": "basic"},
-        {"name": "title", "field_type": "string", "required": false, "desc": "窗口标题（模糊匹配）", "group": "basic"},
-        {"name": "process", "field_type": "string", "required": false, "desc": "进程名过滤", "group": "basic"},
-        {"name": "position", "field_type": "json", "required": false, "desc": "位置 {x, y}（move 操作）", "group": "advanced"},
-        {"name": "size", "field_type": "json", "required": false, "desc": "尺寸 {width, height}（resize 操作）", "group": "advanced"}
+        {
+          "name": "action",
+          "field_type": "select",
+          "options": [
+            "focus",
+            "close",
+            "minimize",
+            "maximize",
+            "resize",
+            "move",
+            "find"
+          ],
+          "required": true,
+          "desc": "窗口操作类型",
+          "group": "basic"
+        },
+        {
+          "name": "title",
+          "field_type": "string",
+          "required": false,
+          "desc": "窗口标题（模糊匹配）",
+          "group": "basic"
+        },
+        {
+          "name": "process",
+          "field_type": "string",
+          "required": false,
+          "desc": "进程名过滤",
+          "group": "basic"
+        },
+        {
+          "name": "position",
+          "field_type": "json",
+          "required": false,
+          "desc": "位置 {x, y}（move 操作）",
+          "group": "advanced"
+        },
+        {
+          "name": "size",
+          "field_type": "json",
+          "required": false,
+          "desc": "尺寸 {width, height}（resize 操作）",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "desktop",
+        "window",
+        "gui"
       ]
     },
     {
@@ -453,11 +1478,41 @@
       "desc": "从图片中识别文字",
       "inputs": [],
       "outputs": [
-        {"name": "text", "data_type": "text", "desc": "识别的文本"}
+        {
+          "name": "text",
+          "data_type": "text",
+          "desc": "识别的文本"
+        }
       ],
       "params": [
-        {"name": "source", "field_type": "string", "required": true, "desc": "图片路径或截图区域描述", "group": "basic"},
-        {"name": "language", "field_type": "select", "options": ["zh","en","ja","ko","auto"], "required": false, "default": "auto", "desc": "识别语言", "group": "basic"}
+        {
+          "name": "source",
+          "field_type": "string",
+          "required": true,
+          "desc": "图片路径或截图区域描述",
+          "group": "basic"
+        },
+        {
+          "name": "language",
+          "field_type": "select",
+          "options": [
+            "zh",
+            "en",
+            "ja",
+            "ko",
+            "auto"
+          ],
+          "required": false,
+          "default": "auto",
+          "desc": "识别语言",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "image",
+        "text",
+        "recognition",
+        "ai"
       ]
     },
     {
@@ -470,8 +1525,32 @@
       "inputs": [],
       "outputs": [],
       "params": [
-        {"name": "message", "field_type": "text", "required": true, "desc": "打印内容（支持 {{step_x.field}} 变量）", "group": "basic"},
-        {"name": "level", "field_type": "select", "options": ["info","warn","error","debug"], "required": false, "default": "info", "desc": "日志级别", "group": "basic"}
+        {
+          "name": "message",
+          "field_type": "text",
+          "required": true,
+          "desc": "打印内容（支持 {{step_x.field}} 变量）",
+          "group": "basic"
+        },
+        {
+          "name": "level",
+          "field_type": "select",
+          "options": [
+            "info",
+            "warn",
+            "error",
+            "debug"
+          ],
+          "required": false,
+          "default": "info",
+          "desc": "日志级别",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "system",
+        "output",
+        "debug"
       ]
     },
     {
@@ -483,11 +1562,34 @@
       "desc": "在一个浏览器窗口内按顺序执行多个操作",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "最后操作结果"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "最后操作结果"
+        }
       ],
       "params": [
-        {"name": "actions", "field_type": "json", "required": true, "desc": "浏览器操作序列 [{action, params}]（navigate/click/type/screenshot/wait）", "group": "basic"},
-        {"name": "headless", "field_type": "boolean", "required": false, "default": true, "desc": "是否无头模式", "group": "advanced"}
+        {
+          "name": "actions",
+          "field_type": "json",
+          "required": true,
+          "desc": "浏览器操作序列 [{action, params}]（navigate/click/type/screenshot/wait）",
+          "group": "basic"
+        },
+        {
+          "name": "headless",
+          "field_type": "boolean",
+          "required": false,
+          "default": true,
+          "desc": "是否无头模式",
+          "group": "advanced"
+        }
+      ],
+      "tags": [
+        "web",
+        "browser",
+        "automation",
+        "ui"
       ]
     },
     {
@@ -499,10 +1601,26 @@
       "desc": "在一个 Excel 文件内按顺序执行多个操作",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "操作结果"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
       ],
       "params": [
-        {"name": "actions", "field_type": "json", "required": true, "desc": "Excel 操作序列 [{action, params}]（open/read/write/sheet/cell/chart）", "group": "basic"}
+        {
+          "name": "actions",
+          "field_type": "json",
+          "required": true,
+          "desc": "Excel 操作序列 [{action, params}]（open/read/write/sheet/cell/chart）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "office",
+        "spreadsheet",
+        "excel",
+        "data"
       ]
     },
     {
@@ -514,10 +1632,26 @@
       "desc": "在一个 Word 文件内按顺序执行多个操作",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "操作结果"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
       ],
       "params": [
-        {"name": "actions", "field_type": "json", "required": true, "desc": "Word 操作序列 [{action, params}]（open/read/write/replace/merge）", "group": "basic"}
+        {
+          "name": "actions",
+          "field_type": "json",
+          "required": true,
+          "desc": "Word 操作序列 [{action, params}]（open/read/write/replace/merge）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "office",
+        "document",
+        "word",
+        "report"
       ]
     },
     {
@@ -529,10 +1663,26 @@
       "desc": "在一个目录内按顺序执行多个文件操作",
       "inputs": [],
       "outputs": [
-        {"name": "result", "data_type": "json", "desc": "操作结果"}
+        {
+          "name": "result",
+          "data_type": "json",
+          "desc": "操作结果"
+        }
       ],
       "params": [
-        {"name": "actions", "field_type": "json", "required": true, "desc": "文件操作序列 [{action, params}]（copy/move/delete/rename/mkdir）", "group": "basic"}
+        {
+          "name": "actions",
+          "field_type": "json",
+          "required": true,
+          "desc": "文件操作序列 [{action, params}]（copy/move/delete/rename/mkdir）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "file",
+        "container",
+        "batch",
+        "io"
       ]
     },
     {
@@ -544,11 +1694,33 @@
       "desc": "通过 MCP 将 Excel 转为 CSV",
       "inputs": [],
       "outputs": [
-        {"name": "csv_path", "data_type": "text", "desc": "CSV 文件路径"}
+        {
+          "name": "csv_path",
+          "data_type": "text",
+          "desc": "CSV 文件路径"
+        }
       ],
       "params": [
-        {"name": "input_path", "field_type": "string", "required": true, "desc": "Excel 文件路径", "group": "basic"},
-        {"name": "output_path", "field_type": "string", "required": false, "desc": "CSV 输出路径（默认自动生成）", "group": "basic"}
+        {
+          "name": "input_path",
+          "field_type": "string",
+          "required": true,
+          "desc": "Excel 文件路径",
+          "group": "basic"
+        },
+        {
+          "name": "output_path",
+          "field_type": "string",
+          "required": false,
+          "desc": "CSV 输出路径（默认自动生成）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "excel",
+        "csv",
+        "data"
       ]
     },
     {
@@ -560,12 +1732,46 @@
       "desc": "通过 MCP 写入 Word 文档",
       "inputs": [],
       "outputs": [
-        {"name": "path", "data_type": "text", "desc": "文件路径"}
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "Word 文件路径", "group": "basic"},
-        {"name": "content", "field_type": "text", "required": true, "desc": "写入内容", "group": "basic"},
-        {"name": "position", "field_type": "select", "options": ["append","prepend","replace_all"], "required": false, "default": "append", "desc": "写入位置", "group": "basic"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "Word 文件路径",
+          "group": "basic"
+        },
+        {
+          "name": "content",
+          "field_type": "text",
+          "required": true,
+          "desc": "写入内容",
+          "group": "basic"
+        },
+        {
+          "name": "position",
+          "field_type": "select",
+          "options": [
+            "append",
+            "prepend",
+            "replace_all"
+          ],
+          "required": false,
+          "default": "append",
+          "desc": "写入位置",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "word",
+        "write",
+        "office"
       ]
     },
     {
@@ -577,11 +1783,33 @@
       "desc": "通过 MCP 创建 Word 文档",
       "inputs": [],
       "outputs": [
-        {"name": "path", "data_type": "text", "desc": "文件路径"}
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        }
       ],
       "params": [
-        {"name": "template", "field_type": "string", "required": false, "desc": "模板文件路径（为空则创建空白文档）", "group": "basic"},
-        {"name": "output_path", "field_type": "string", "required": false, "desc": "输出路径（默认自动生成）", "group": "basic"}
+        {
+          "name": "template",
+          "field_type": "string",
+          "required": false,
+          "desc": "模板文件路径（为空则创建空白文档）",
+          "group": "basic"
+        },
+        {
+          "name": "output_path",
+          "field_type": "string",
+          "required": false,
+          "desc": "输出路径（默认自动生成）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "word",
+        "create",
+        "office"
       ]
     },
     {
@@ -593,13 +1821,45 @@
       "desc": "通过 MCP 替换 Word 文本",
       "inputs": [],
       "outputs": [
-        {"name": "path", "data_type": "text", "desc": "文件路径"},
-        {"name": "replacements", "data_type": "number", "desc": "替换次数"}
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "文件路径"
+        },
+        {
+          "name": "replacements",
+          "data_type": "number",
+          "desc": "替换次数"
+        }
       ],
       "params": [
-        {"name": "path", "field_type": "string", "required": true, "desc": "Word 文件路径", "group": "basic"},
-        {"name": "find", "field_type": "string", "required": true, "desc": "查找文本", "group": "basic"},
-        {"name": "replace", "field_type": "string", "required": true, "desc": "替换文本", "group": "basic"}
+        {
+          "name": "path",
+          "field_type": "string",
+          "required": true,
+          "desc": "Word 文件路径",
+          "group": "basic"
+        },
+        {
+          "name": "find",
+          "field_type": "string",
+          "required": true,
+          "desc": "查找文本",
+          "group": "basic"
+        },
+        {
+          "name": "replace",
+          "field_type": "string",
+          "required": true,
+          "desc": "替换文本",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "word",
+        "replace",
+        "office"
       ]
     },
     {
@@ -611,26 +1871,81 @@
       "desc": "通过 MCP 合并 Word 文档",
       "inputs": [],
       "outputs": [
-        {"name": "path", "data_type": "text", "desc": "合并后文件路径"}
+        {
+          "name": "path",
+          "data_type": "text",
+          "desc": "合并后文件路径"
+        }
       ],
       "params": [
-        {"name": "paths", "field_type": "json", "required": true, "desc": "要合并的文件路径数组", "group": "basic"},
-        {"name": "output_path", "field_type": "string", "required": false, "desc": "合并后输出路径（默认自动生成）", "group": "basic"}
+        {
+          "name": "paths",
+          "field_type": "json",
+          "required": true,
+          "desc": "要合并的文件路径数组",
+          "group": "basic"
+        },
+        {
+          "name": "output_path",
+          "field_type": "string",
+          "required": false,
+          "desc": "合并后输出路径（默认自动生成）",
+          "group": "basic"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "word",
+        "merge",
+        "office"
       ]
     }
   ],
   "categories": {
-    "core": {"label": "核心", "order": 1},
-    "data": {"label": "数据", "order": 2},
-    "file": {"label": "文件", "order": 3},
-    "convert": {"label": "转换", "order": 4},
-    "system": {"label": "系统", "order": 5},
-    "flow": {"label": "流程控制", "order": 6},
-    "browser": {"label": "浏览器", "order": 7},
-    "office": {"label": "办公", "order": 8},
-    "desktop": {"label": "桌面", "order": 9},
-    "ai": {"label": "AI", "order": 10},
-    "mcp": {"label": "MCP 扩展", "order": 11}
+    "core": {
+      "label": "核心",
+      "order": 1
+    },
+    "data": {
+      "label": "数据",
+      "order": 2
+    },
+    "file": {
+      "label": "文件",
+      "order": 3
+    },
+    "convert": {
+      "label": "转换",
+      "order": 4
+    },
+    "system": {
+      "label": "系统",
+      "order": 5
+    },
+    "flow": {
+      "label": "流程控制",
+      "order": 6
+    },
+    "browser": {
+      "label": "浏览器",
+      "order": 7
+    },
+    "office": {
+      "label": "办公",
+      "order": 8
+    },
+    "desktop": {
+      "label": "桌面",
+      "order": 9
+    },
+    "ai": {
+      "label": "AI",
+      "order": 10
+    },
+    "mcp": {
+      "label": "MCP 扩展",
+      "order": 11
+    }
   },
   "container_types": [
     "browser",
