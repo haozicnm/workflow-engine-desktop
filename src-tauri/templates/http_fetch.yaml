@@ -1,0 +1,41 @@
+meta:
+  name: "HTTP 数据抓取"
+  desc: "发送 HTTP 请求并提取响应数据，支持重试和超时"
+  tags: [http, api, fetch, data]
+  category: "data"
+params:
+  - name: url
+    desc: "目标 URL"
+    required: true
+  - name: method
+    desc: "HTTP 方法"
+    required: false
+    default: "GET"
+  - name: timeout
+    desc: "超时秒数"
+    required: false
+    default: "30"
+workflow:
+  version: "1.0"
+  name: "HTTP 数据抓取"
+  description: "发送 HTTP 请求并提取响应数据"
+  meta:
+    author: "template"
+    tags: [http, api]
+  steps:
+    - id: fetch
+      type: http
+      name: "发送请求"
+      config:
+        method: "{{method}}"
+        url: "{{url}}"
+        timeout: "{{timeout}}"
+    - id: check
+      type: condition
+      name: "检查状态"
+      config:
+        mode: "expression"
+        expression: "step_fetch.status == 200"
+      run_condition:
+        ref: fetch
+        when: "true"

@@ -391,7 +391,8 @@ pub use crate::server::managers::system_manager::{
 };
 
 pub use crate::server::managers::template_manager::{
-    template_get, template_instantiate, template_list, InstantiateBody,
+    template_categories, template_get, template_import, template_instantiate, template_list,
+    workflow_save_as_template, InstantiateBody, SaveAsTemplateBody,
 };
 
 pub use crate::server::managers::compose_manager::{compose_chain, ComposeChainBody};

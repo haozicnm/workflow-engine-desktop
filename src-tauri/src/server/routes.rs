@@ -138,10 +138,17 @@ pub fn build() -> Router {
         .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
         // 模板库
         .route("/api/templates", get(handlers::template_list))
+        .route("/api/templates/categories", get(handlers::template_categories))
+        .route("/api/templates/import", post(handlers::template_import))
         .route("/api/templates/{name}", get(handlers::template_get))
         .route(
             "/api/templates/{name}/instantiate",
             post(handlers::template_instantiate),
+        )
+        // 保存为模板
+        .route(
+            "/api/workflows/{id}/save-as-template",
+            post(handlers::workflow_save_as_template),
         )
         // 组合助手
         .route("/api/compose/chain", post(handlers::compose_chain))

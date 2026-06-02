@@ -123,6 +123,15 @@ pub async fn workflow_update(
     Json(body): Json<WorkflowUpdateBody>,
 ) -> Response {
     let app = state::get();
+    // 锁定检查：锁定的工作流不可修改
+    match app.db.get_workflow(&id) {
+        Ok(Some(wf)) if wf.locked => {
+            return err_response(StatusCode::CONFLICT, "工作流已锁定，无法修改。请先解锁。")
+        }
+        Ok(None) => return err_response(StatusCode::NOT_FOUND, "工作流不存在"),
+        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        _ => {}
+    }
     let now = chrono::Utc::now().to_rfc3339();
     match app.db.update_workflow(
         &id,
@@ -204,6 +213,15 @@ pub async fn workflow_save_yaml(
     Json(body): Json<WorkflowSaveYamlBody>,
 ) -> Response {
     let app = state::get();
+    // 锁定检查：锁定的工作流不可修改
+    match app.db.get_workflow(&id) {
+        Ok(Some(wf)) if wf.locked => {
+            return err_response(StatusCode::CONFLICT, "工作流已锁定，无法修改。请先解锁。")
+        }
+        Ok(None) => return err_response(StatusCode::NOT_FOUND, "工作流不存在"),
+        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        _ => {}
+    }
     let wf = match crate::engine::parser::parse_workflow(&body.yaml) {
         Ok(wf) => wf,
         Err(e) => {

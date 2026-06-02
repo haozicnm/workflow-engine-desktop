@@ -1,0 +1,31 @@
+meta:
+  name: "Shell 脚本执行"
+  desc: "执行 Shell 命令并捕获输出"
+  tags: [shell, command, script, system]
+  category: "automation"
+params:
+  - name: command
+    desc: "要执行的命令"
+    required: true
+  - name: cwd
+    desc: "工作目录"
+    required: false
+    default: "."
+  - name: timeout
+    desc: "超时秒数"
+    required: false
+    default: "300"
+workflow:
+  version: "1.0"
+  name: "Shell 脚本执行"
+  meta:
+    author: "template"
+    tags: [shell, script]
+  steps:
+    - id: exec
+      type: shell
+      name: "执行命令"
+      config:
+        command: "{{command}}"
+        cwd: "{{cwd}}"
+        timeout_secs: "{{timeout}}"

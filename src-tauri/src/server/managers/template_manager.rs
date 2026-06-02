@@ -25,6 +25,13 @@ pub struct TemplateMeta {
     pub desc: String,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// 模板分类（data, web, file, automation 等）
+    #[serde(default = "default_category")]
+    pub category: String,
+}
+
+fn default_category() -> String {
+    "general".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +59,7 @@ pub struct TemplateListItem {
     pub name: String,
     pub desc: String,
     pub tags: Vec<String>,
+    pub category: String,
     pub params: Vec<TemplateParam>,
 }
 
@@ -62,6 +70,7 @@ pub struct TemplateDetail {
     pub name: String,
     pub desc: String,
     pub tags: Vec<String>,
+    pub category: String,
     pub params: Vec<TemplateParam>,
     pub workflow: serde_json::Value,
 }
@@ -157,21 +166,45 @@ fn load_template(name: &str) -> Result<Option<(String, TemplateFile)>, String> {
 // Handler 函数
 // ═══════════════════════════════════════════════════════════
 
-/// GET /api/templates — 列出所有模板
-pub async fn template_list() -> Response {
+/// GET /api/templates?q=xxx&category=data — 列出所有模板（支持搜索和分类过滤）
+pub async fn template_list(
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let query = params.get("q").map(|s| s.to_lowercase());
+    let category_filter = params.get("category").map(|s| s.as_str());
+
     match load_all_templates() {
         Ok(templates) => {
             let items: Vec<TemplateListItem> = templates
                 .into_iter()
+                .filter(|(_, tmpl)| {
+                    // 分类过滤
+                    if let Some(cat) = category_filter {
+                        if tmpl.meta.category != cat {
+                            return false;
+                        }
+                    }
+                    // 搜索过滤
+                    if let Some(ref q) = query {
+                        let q = q.as_str();
+                        tmpl.meta.name.to_lowercase().contains(q)
+                            || tmpl.meta.desc.to_lowercase().contains(q)
+                            || tmpl.meta.tags.iter().any(|t| t.to_lowercase().contains(q))
+                            || tmpl.meta.category.to_lowercase().contains(q)
+                    } else {
+                        true
+                    }
+                })
                 .map(|(filename, tmpl)| TemplateListItem {
                     filename,
                     name: tmpl.meta.name,
                     desc: tmpl.meta.desc,
                     tags: tmpl.meta.tags,
+                    category: tmpl.meta.category,
                     params: tmpl.params,
                 })
                 .collect();
-            ok_response(items)
+            ok_response(serde_json::json!({ "templates": items, "count": items.len() }))
         }
         Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
@@ -185,6 +218,7 @@ pub async fn template_get(Path(name): Path<String>) -> Response {
             name: tmpl.meta.name,
             desc: tmpl.meta.desc,
             tags: tmpl.meta.tags,
+            category: tmpl.meta.category,
             params: tmpl.params,
             workflow: tmpl.workflow,
         }),
@@ -319,6 +353,174 @@ pub async fn template_instantiate(
             StatusCode::BAD_REQUEST,
             format!("模板实例化后验证失败: {e}"),
         ),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 保存为模板 + 导入导出
+// ═══════════════════════════════════════════════════════════
+
+#[derive(Debug, Deserialize)]
+pub struct SaveAsTemplateBody {
+    /// 模板名称
+    pub name: String,
+    /// 模板描述
+    pub desc: String,
+    /// 标签
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// 分类
+    #[serde(default = "default_category")]
+    pub category: String,
+    /// 模板参数定义（可选，从工作流变量推导）
+    #[serde(default)]
+    pub params: Vec<TemplateParam>,
+}
+
+/// POST /api/workflows/{id}/save-as-template — 将工作流保存为模板
+pub async fn workflow_save_as_template(
+    Path(id): Path<String>,
+    Json(body): Json<SaveAsTemplateBody>,
+) -> Response {
+    let app = state::get();
+
+    // 加载工作流
+    let wf_record = match app.db.get_workflow(&id) {
+        Ok(Some(wf)) => wf,
+        Ok(None) => return err_response(StatusCode::NOT_FOUND, "工作流不存在"),
+        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    // 构建 workflow JSON（从 YAML 或 nodes）
+    let workflow_json = if let Some(ref yaml) = wf_record.yaml {
+        match serde_yaml::from_str::<serde_json::Value>(yaml) {
+            Ok(v) => v,
+            Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("YAML 解析失败: {e}")),
+        }
+    } else {
+        serde_json::json!({
+            "name": wf_record.name,
+            "description": wf_record.description,
+            "steps": serde_json::Value::Array(wf_record.nodes.clone()),
+        })
+    };
+
+    // 构建模板文件
+    let tmpl = TemplateFile {
+        meta: TemplateMeta {
+            name: body.name.clone(),
+            desc: body.desc.clone(),
+            tags: body.tags.clone(),
+            category: body.category.clone(),
+        },
+        params: body.params.clone(),
+        workflow: workflow_json,
+    };
+
+    // 序列化为 YAML
+    let yaml_str = match serde_yaml::to_string(&tmpl) {
+        Ok(s) => s,
+        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("序列化失败: {e}")),
+    };
+
+    // 保存到模板目录
+    let dir = template_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("创建目录失败: {e}"));
+    }
+
+    let sanitized: String = body
+        .name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c.is_ascii_whitespace() {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .replace(' ', "_")
+        .to_lowercase();
+
+    let path = dir.join(format!("{sanitized}.yaml"));
+    if let Err(e) = std::fs::write(&path, &yaml_str) {
+        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("写入失败: {e}"));
+    }
+
+    ok_response(serde_json::json!({
+        "success": true,
+        "template_name": sanitized,
+        "path": path.to_string_lossy(),
+        "name": body.name,
+        "category": body.category,
+    }))
+}
+
+/// POST /api/templates/import — 导入模板（从 YAML 字符串）
+pub async fn template_import(
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let yaml_content = body
+        .get("yaml")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    // 验证模板格式
+    let tmpl: TemplateFile = match serde_yaml::from_str(yaml_content) {
+        Ok(t) => t,
+        Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("模板 YAML 解析失败: {e}")),
+    };
+
+    // 保存
+    let dir = template_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("创建目录失败: {e}"));
+    }
+
+    let sanitized: String = tmpl
+        .meta
+        .name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c.is_ascii_whitespace() { c } else { '_' })
+        .collect::<String>()
+        .replace(' ', "_")
+        .to_lowercase();
+
+    let path = dir.join(format!("{sanitized}.yaml"));
+    if let Err(e) = std::fs::write(&path, yaml_content) {
+        return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("写入失败: {e}"));
+    }
+
+    ok_response(serde_json::json!({
+        "success": true,
+        "template_name": sanitized,
+        "name": tmpl.meta.name,
+        "category": tmpl.meta.category,
+    }))
+}
+
+/// GET /api/templates/categories — 列出所有模板分类
+pub async fn template_categories() -> Response {
+    match load_all_templates() {
+        Ok(templates) => {
+            let mut cats: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+            for (_, tmpl) in &templates {
+                *cats.entry(tmpl.meta.category.clone()).or_insert(0) += 1;
+            }
+            let mut result: Vec<serde_json::Value> = cats
+                .into_iter()
+                .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
+                .collect();
+            result.sort_by(|a, b| {
+                a.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .cmp(b.get("name").and_then(|v| v.as_str()).unwrap_or(""))
+            });
+            ok_response(serde_json::json!({ "categories": result }))
+        }
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, e),
     }
 }
 

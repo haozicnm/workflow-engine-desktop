@@ -1,0 +1,26 @@
+meta:
+  name: "文件批处理"
+  desc: "遍历目录中的文件并执行处理操作"
+  tags: [file, batch, loop, process]
+  category: "file"
+params:
+  - name: dir_path
+    desc: "目标目录路径"
+    required: true
+  - name: pattern
+    desc: "文件匹配模式（如 *.txt）"
+    required: false
+    default: "*"
+workflow:
+  version: "1.0"
+  name: "文件批处理"
+  meta:
+    author: "template"
+    tags: [file, batch]
+  steps:
+    - id: list
+      type: file_list
+      name: "列出文件"
+      config:
+        path: "{{dir_path}}"
+        pattern: "{{pattern}}"

@@ -1,0 +1,29 @@
+meta:
+  name: "网页抓取到 Excel"
+  desc: "抓取网页内容并保存到 Excel 文件"
+  tags: [scrape, excel, web, data]
+  category: "data"
+params:
+  - name: url
+    desc: "目标网页 URL"
+    required: true
+  - name: selector
+    desc: "CSS 选择器"
+    required: true
+  - name: output_path
+    desc: "输出 Excel 路径"
+    required: false
+    default: "output.xlsx"
+workflow:
+  version: "1.0"
+  name: "网页抓取到 Excel"
+  meta:
+    author: "template"
+    tags: [scrape, excel]
+  steps:
+    - id: scrape
+      type: web_scrape
+      name: "抓取网页"
+      config:
+        url: "{{url}}"
+        extract: [{"selector": "{{selector}}", "fields": {"text": "text"}}]
