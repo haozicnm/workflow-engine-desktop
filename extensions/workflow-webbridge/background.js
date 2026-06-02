@@ -891,6 +891,131 @@ const tools = {
     const tab = await chrome.tabs.get(activeTabId);
     return { success: true, url: tab.url };
   },
+
+  // ─── Phase 2: 表单 + 鼠标交互 ───
+
+  async select(params) {
+    const { selector, value } = params;
+    if (!selector) throw new Error('select: selector is required');
+    if (value == null) throw new Error('select: value is required');
+    await ensureAttached((await resolveTab()).id);
+    const result = await cdpCommand('Runtime.evaluate', {
+      expression: `(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return { error: 'element not found: ' + ${JSON.stringify(selector)} };
+        if (el.tagName !== 'SELECT') return { error: 'not a select element: ' + el.tagName };
+        el.value = ${JSON.stringify(value)};
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return { success: true, selector: ${JSON.stringify(selector)}, value: ${JSON.stringify(value)} };
+      })()`,
+      returnByValue: true,
+    });
+    if (result.exceptionDetails) throw new Error(`select: ${result.exceptionDetails.text}`);
+    const val = result.result.value;
+    if (val?.error) throw new Error(val.error);
+    return val;
+  },
+
+  async check(params) {
+    const { selector, checked = true } = params;
+    if (!selector) throw new Error('check: selector is required');
+    await ensureAttached((await resolveTab()).id);
+    const result = await cdpCommand('Runtime.evaluate', {
+      expression: `(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return { error: 'element not found: ' + ${JSON.stringify(selector)} };
+        const target = ${JSON.stringify(checked)};
+        if (el.checked !== target) el.click();
+        return { success: true, selector: ${JSON.stringify(selector)}, checked: el.checked };
+      })()`,
+      returnByValue: true,
+    });
+    if (result.exceptionDetails) throw new Error(`check: ${result.exceptionDetails.text}`);
+    const val = result.result.value;
+    if (val?.error) throw new Error(val.error);
+    return val;
+  },
+
+  async double_click(params) {
+    const { selector } = params;
+    if (!selector) throw new Error('double_click: selector is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = isRef(selector) ? await objectIdFromRef(selector) : await objectIdFromSelector(selector);
+    await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+    });
+    const box = await cdpCommand('DOM.getBoxModel', { objectId });
+    const c = box.model?.content;
+    if (!c || c.length < 8) throw new Error('double_click: element has no layout box');
+    const cx = (c[0] + c[2] + c[4] + c[6]) / 4;
+    const cy = (c[1] + c[3] + c[5] + c[7]) / 4;
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, button: 'none', buttons: 0 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', buttons: 1, clickCount: 1 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', buttons: 0, clickCount: 1 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', buttons: 1, clickCount: 2 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', buttons: 0, clickCount: 2 });
+    return { success: true, selector, x: Math.round(cx), y: Math.round(cy) };
+  },
+
+  async context_menu(params) {
+    const { selector } = params;
+    if (!selector) throw new Error('context_menu: selector is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = isRef(selector) ? await objectIdFromRef(selector) : await objectIdFromSelector(selector);
+    await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+    });
+    const box = await cdpCommand('DOM.getBoxModel', { objectId });
+    const c = box.model?.content;
+    if (!c || c.length < 8) throw new Error('context_menu: element has no layout box');
+    const cx = (c[0] + c[2] + c[4] + c[6]) / 4;
+    const cy = (c[1] + c[3] + c[5] + c[7]) / 4;
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy, button: 'none', buttons: 0 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'right', buttons: 2, clickCount: 1 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'right', buttons: 0, clickCount: 1 });
+    return { success: true, selector, x: Math.round(cx), y: Math.round(cy) };
+  },
+
+  async drag_to(params) {
+    const { source, target, source_position, target_position } = params;
+    if (!source) throw new Error('drag_to: source is required');
+    if (!target) throw new Error('drag_to: target is required');
+    await ensureAttached((await resolveTab()).id);
+
+    async function getCenter(selector, pos) {
+      if (pos?.x !== undefined && pos?.y !== undefined) return { x: pos.x, y: pos.y };
+      const objectId = isRef(selector) ? await objectIdFromRef(selector) : await objectIdFromSelector(selector);
+      await cdpCommand('Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+      });
+      const box = await cdpCommand('DOM.getBoxModel', { objectId });
+      const c = box.model?.content;
+      if (!c || c.length < 8) throw new Error(`drag_to: element "${selector}" has no layout box`);
+      return {
+        x: (c[0] + c[2] + c[4] + c[6]) / 4,
+        y: (c[1] + c[3] + c[5] + c[7]) / 4,
+      };
+    }
+
+    const from = await getCenter(source, source_position);
+    const to = await getCenter(target, target_position);
+
+    // Drag sequence: move to source → press → move to target → release
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x, y: from.y, button: 'none', buttons: 0 });
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button: 'left', buttons: 1, clickCount: 1 });
+    // Move in steps for smooth drag
+    const steps = 5;
+    for (let i = 1; i <= steps; i++) {
+      const x = from.x + (to.x - from.x) * (i / steps);
+      const y = from.y + (to.y - from.y) * (i / steps);
+      await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'left', buttons: 1 });
+    }
+    await cdpCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x: to.x, y: to.y, button: 'left', buttons: 0, clickCount: 1 });
+    return { success: true, from: { x: Math.round(from.x), y: Math.round(from.y) }, to: { x: Math.round(to.x), y: Math.round(to.y) } };
+  },
 };
 
 // ═══════════════════════════════════════════════
