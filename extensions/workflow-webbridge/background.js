@@ -52,8 +52,6 @@ let activeTabId = null;
 let lastFocusedTabId = null;
 let ws = null;
 let wsConnected = false;
-let _handshakeAcked = false;
-let _handshakeTimer = null;
 
 // Network 捕获
 const networkCaptures = new Map(); // tabId -> Map<requestId, requestInfo>
@@ -107,24 +105,11 @@ function connectWebSocket() {
         version: '1.3.0',
         capabilities: Object.keys(tools),
       }));
-      // 握手超时：5s 内没收到 ack 则断开
-      _handshakeTimer = setTimeout(() => {
-        if (!_handshakeAcked) {
-          console.warn('[WebBridge] Handshake timeout, disconnecting');
-          ws?.close();
-        }
-      }, 5000);
     };
     
     ws.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
-        // 握手确认
-        if (msg.type === 'welcome' || msg.type === 'ack') {
-          _handshakeAcked = true;
-          clearTimeout(_handshakeTimer);
-          return;
-        }
         await handleCommand(msg);
       } catch (e) {
         console.error('[WebBridge] Failed to handle message:', e);
@@ -133,8 +118,6 @@ function connectWebSocket() {
     
     ws.onclose = () => {
       wsConnected = false;
-      _handshakeAcked = false;
-      clearTimeout(_handshakeTimer);
       console.log('[WebBridge] Disconnected, reconnecting...');
       setTimeout(connectWebSocket, RECONNECT_DELAY);
       // alarms 兜底（service worker 被挂起后 setTimeout 不执行）
