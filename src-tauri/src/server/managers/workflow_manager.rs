@@ -316,6 +316,7 @@ pub async fn workflow_export(Json(body): Json<WorkflowExportBody>) -> Response {
         description: body.description.clone(),
         steps,
         variables: vars,
+        ..Default::default()
     };
 
     let mut yaml_value = match serde_yaml::to_value(&wf) {
@@ -631,4 +632,80 @@ pub async fn workflow_import(Json(body): Json<WorkflowImportBody>) -> Response {
         "variables": variables_json,
         "step_count": wf.steps.len(),
     }))
+}
+
+// ═══════════════════════════════════════════════════════════
+// GET /api/workflows/{id}/yaml — 导出标准 YAML 格式
+// ═══════════════════════════════════════════════════════════
+
+/// GET /api/workflows/{id}/yaml
+/// 导出工作流为标准 YAML 格式（带版本号、metadata、干净格式）
+pub async fn workflow_export_yaml(Path(id): Path<String>) -> Response {
+    let app = state::get();
+
+    // 从 DB 加载工作流
+    let wf = match app.db.get_workflow(&id) {
+        Ok(Some(wf)) => wf,
+        Ok(None) => return err_response(StatusCode::NOT_FOUND, format!("工作流 '{}' 不存在", id)),
+        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("加载工作流失败: {e}")),
+    };
+
+    // 解析为 Workflow 结构
+    let yaml_str = match &wf.yaml {
+        Some(y) => y.clone(),
+        None => {
+            // 没有 YAML，从 JSON 构建
+            let json_str = serde_json::to_string(&serde_json::json!({
+                "name": wf.name,
+                "description": wf.description,
+                "steps": serde_json::Value::Array(wf.nodes.clone()),
+            }))
+            .unwrap_or_default();
+            json_str
+        }
+    };
+
+    let parsed_wf = match crate::engine::parser::parse_workflow(&yaml_str) {
+        Ok(wf) => wf,
+        Err(e) => {
+            // 解析失败，尝试直接从 DB 记录构建
+            let steps: Vec<crate::engine::workflow::Step> = wf
+                .nodes
+                .iter()
+                .map(|n| {
+                    let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+                    let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
+                    crate::engine::workflow::Step {
+                        id: id.to_string(),
+                        name: label.to_string(),
+                        step_type: node_type.to_string(),
+                        config,
+                        ..Default::default()
+                    }
+                })
+                .collect();
+
+            crate::engine::workflow::Workflow {
+                name: wf.name.clone(),
+                description: wf.description.clone(),
+                steps,
+                variables: None,
+                ..Default::default()
+            }
+        }
+    };
+
+    match crate::engine::yaml_format::export_workflow_yaml(&parsed_wf) {
+        Ok(yaml) => ok_response(serde_json::json!({
+            "success": true,
+            "yaml": yaml,
+            "format_version": crate::engine::workflow::FORMAT_VERSION,
+        })),
+        Err(e) => err_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("YAML 导出失败: {e}"),
+        ),
+    }
 }

@@ -31,6 +31,9 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
         return Err(anyhow!("工作流至少需要一个步骤"));
     }
 
+    // 版本兼容性检查
+    crate::engine::yaml_format::check_version_compatibility(&wf)?;
+
     // 转换每个步骤
     let mut converted_steps = Vec::new();
     for step in &wf.steps {

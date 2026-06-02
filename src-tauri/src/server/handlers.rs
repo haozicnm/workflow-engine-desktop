@@ -362,10 +362,10 @@ pub use crate::server::managers::preview_manager::{
 
 pub use crate::server::managers::workflow_manager::{
     workflow_assemble, workflow_auto_order, workflow_create, workflow_delete, workflow_export,
-    workflow_get, workflow_import, workflow_list, workflow_lock, workflow_save_yaml,
-    workflow_update, workflow_validate, WorkflowAssembleBody, WorkflowAutoOrderBody,
-    WorkflowCreateBody, WorkflowExportBody, WorkflowImportBody, WorkflowLockBody,
-    WorkflowSaveYamlBody, WorkflowUpdateBody, WorkflowValidateBody,
+    workflow_export_yaml, workflow_get, workflow_import, workflow_list, workflow_lock,
+    workflow_save_yaml, workflow_update, workflow_validate, WorkflowAssembleBody,
+    WorkflowAutoOrderBody, WorkflowCreateBody, WorkflowExportBody, WorkflowImportBody,
+    WorkflowLockBody, WorkflowSaveYamlBody, WorkflowUpdateBody, WorkflowValidateBody,
 };
 
 pub use crate::server::managers::run_manager::{

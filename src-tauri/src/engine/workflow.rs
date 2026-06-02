@@ -1,6 +1,9 @@
 // engine/workflow.rs — 工作流数据结构
 use serde::{Deserialize, Serialize};
 
+/// 工作流格式版本
+pub const FORMAT_VERSION: &str = "1.0";
+
 /// 步骤失败时的处理策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -15,10 +18,33 @@ pub enum ErrorStrategy {
     Branch { step_id: String },
 }
 
+/// 工作流元数据
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WorkflowMeta {
+    /// 创建者（agent / user / import）
+    #[serde(default)]
+    pub author: Option<String>,
+    /// 标签
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// 创建时间
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// 最后修改时间
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Workflow {
+    /// 工作流格式版本（用于兼容性检查）
+    #[serde(default)]
+    pub version: Option<String>,
     pub name: String,
     pub description: Option<String>,
+    /// 元数据
+    #[serde(default)]
+    pub meta: Option<WorkflowMeta>,
     pub steps: Vec<Step>,
     #[serde(alias = "params")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,

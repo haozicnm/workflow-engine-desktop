@@ -58,6 +58,10 @@ pub fn build() -> Router {
             "/api/workflows/{id}/yaml",
             post(handlers::workflow_save_yaml),
         )
+        .route(
+            "/api/workflows/{id}/export-yaml",
+            get(handlers::workflow_export_yaml),
+        )
         .route("/api/workflows/validate", post(handlers::workflow_validate))
         .route("/api/workflows/assemble", post(handlers::workflow_assemble))
         .route(
