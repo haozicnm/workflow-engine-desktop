@@ -52,6 +52,8 @@ let activeTabId = null;
 let lastFocusedTabId = null;
 let ws = null;
 let wsConnected = false;
+let _handshakeAcked = false;
+let _handshakeTimer = null;
 
 // Network 捕获
 const networkCaptures = new Map(); // tabId -> Map<requestId, requestInfo>
@@ -102,14 +104,27 @@ function connectWebSocket() {
       ws.send(JSON.stringify({
         type: 'register',
         client: 'webbridge',
-        version: '1.2.0',
+        version: '1.3.0',
         capabilities: Object.keys(tools),
       }));
+      // 握手超时：5s 内没收到 ack 则断开
+      _handshakeTimer = setTimeout(() => {
+        if (!_handshakeAcked) {
+          console.warn('[WebBridge] Handshake timeout, disconnecting');
+          ws?.close();
+        }
+      }, 5000);
     };
     
     ws.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
+        // 握手确认
+        if (msg.type === 'welcome' || msg.type === 'ack') {
+          _handshakeAcked = true;
+          clearTimeout(_handshakeTimer);
+          return;
+        }
         await handleCommand(msg);
       } catch (e) {
         console.error('[WebBridge] Failed to handle message:', e);
@@ -118,6 +133,8 @@ function connectWebSocket() {
     
     ws.onclose = () => {
       wsConnected = false;
+      _handshakeAcked = false;
+      clearTimeout(_handshakeTimer);
       console.log('[WebBridge] Disconnected, reconnecting...');
       setTimeout(connectWebSocket, RECONNECT_DELAY);
       // alarms 兜底（service worker 被挂起后 setTimeout 不执行）
@@ -167,6 +184,16 @@ async function ensureAttached(tabId) {
     activeTabId = tabId;
     return;
   }
+  // 尝试获取调试版本来判断是否已 attach（避免闪弹窗）
+  try {
+    const targets = await chrome.debugger.getTargets?.() || [];
+    const alreadyAttached = targets.some(t => t.tabId === tabId && t.attached);
+    if (alreadyAttached) {
+      attachedTabs.add(tabId);
+      activeTabId = tabId;
+      return;
+    }
+  } catch {}
   try {
     await chrome.debugger.detach({ tabId });
   } catch {}
@@ -267,7 +294,8 @@ const tools = {
 
     await ensureAttached(tab.id);
     // 同 URL 则刷新而非重新导航（对齐 Kimi）
-    const isSameUrl = tab.url === url || tab.url === url + '/';
+    const normalizeUrl = (u) => u?.replace(/\/+$/, '').replace(/\?$/, '') || '';
+    const isSameUrl = normalizeUrl(tab.url) === normalizeUrl(url);
     let frameId;
     if (isSameUrl) {
       await cdpCommand('Page.reload', { ignoreCache: true });
@@ -561,7 +589,7 @@ const tools = {
         windowsVirtualKeyCode: spec.vkc,
       });
       // 释放修饰键（逆序）
-      for (const mod of (spec.modKeys || []).reverse()) {
+      for (const mod of (spec.modKeys || []).slice().reverse()) {
         activeBits &= ~mod.bit;
         await cdpCommand('Input.dispatchKeyEvent', {
           type: 'keyUp', modifiers: activeBits,
@@ -618,16 +646,18 @@ const tools = {
 
   async go_back() {
     await ensureAttached((await resolveTab()).id);
-    await cdpCommand('Page.navigate', { historyIndex: -1, transitionType: 'typed' });
-    await sleep(1000);
-    return { success: true };
+    await cdpCommand('Runtime.evaluate', { expression: 'history.back()' });
+    await sleep(500);
+    const tab = await chrome.tabs.get(activeTabId);
+    return { success: true, url: tab.url };
   },
 
   async go_forward() {
     await ensureAttached((await resolveTab()).id);
-    await cdpCommand('Page.navigate', { historyIndex: 1, transitionType: 'typed' });
-    await sleep(1000);
-    return { success: true };
+    await cdpCommand('Runtime.evaluate', { expression: 'history.forward()' });
+    await sleep(500);
+    const tab = await chrome.tabs.get(activeTabId);
+    return { success: true, url: tab.url };
   },
 
   async wait_for(params) {
@@ -839,6 +869,11 @@ function ensureNetworkListener() {
     if (!captures) return;
 
     if (method === 'Network.requestWillBeSent') {
+      // 防止内存泄漏：每 tab 最多 1000 条
+      if (captures.size >= 1000) {
+        const oldest = captures.keys().next().value;
+        captures.delete(oldest);
+      }
       captures.set(params.requestId, {
         requestId: params.requestId,
         url: params.request.url,
@@ -1045,12 +1080,30 @@ async function fillBySelector(selector, value) {
       const val = ${JSON.stringify(value)};
       const el = document.querySelector(sel);
       if (!el) return { error: 'element not found: ' + sel };
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      if (el.isContentEditable) {
+        el.focus();
+        const sel2 = window.getSelection();
+        if (sel2) {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          sel2.removeAllRanges();
+          sel2.addRange(range);
+        }
+        let ok = false;
+        try { ok = document.execCommand('insertText', false, val); } catch(_e) { ok = false; }
+        if (!ok) {
+          el.textContent = val;
+          el.dispatchEvent(new InputEvent('input', {inputType:'insertText', data:val, bubbles:true}));
+        }
+        return { success: true, tag: el.tagName, mode: 'contenteditable' };
+      }
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+        || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
       if (setter) setter.call(el, val);
       else el.value = val;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
-      return { success: true, tag: el.tagName };
+      return { success: true, tag: el.tagName, mode: 'value' };
     })()`,
     returnByValue: true,
     awaitPromise: false,
@@ -1122,3 +1175,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 console.log('[WebBridge] Background loaded');
 loadPortConfig().then(() => connectWebSocket());
+// Keepalive: 每 25s ping 一次防止 service worker 被挂起
+setInterval(() => {
+  if (wsConnected && ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'ping' }));
+  } else if (!wsConnected) {
+    connectWebSocket();
+  }
+}, 25000);
