@@ -16,6 +16,7 @@ let WS_PORT = DEFAULT_PORT;
 let WS_URL = `ws://127.0.0.1:${WS_PORT}/ws/browser`;
 const RECONNECT_DELAY = 2000;
 const COMMAND_TIMEOUT = 30000;
+const PAPER_SIZES = { letter: [8.5, 11], legal: [8.5, 14], a4: [8.27, 11.69], a3: [11.69, 16.54], tabloid: [11, 17] };
 
 // 从 storage 加载端口配置
 async function loadPortConfig() {
@@ -93,7 +94,7 @@ function connectWebSocket() {
       ws.send(JSON.stringify({
         type: 'register',
         client: 'webbridge',
-        version: '1.1.0',
+        version: '1.2.0',
         capabilities: Object.keys(tools),
       }));
     };
@@ -111,6 +112,8 @@ function connectWebSocket() {
       wsConnected = false;
       console.log('[WebBridge] Disconnected, reconnecting...');
       setTimeout(connectWebSocket, RECONNECT_DELAY);
+      // alarms 兜底（service worker 被挂起后 setTimeout 不执行）
+      chrome.alarms?.create('webbridge-reconnect', { delayInMinutes: 1 });
     };
     
     ws.onerror = (e) => {
@@ -132,6 +135,14 @@ async function handleCommand(msg) {
       throw new Error(`Unknown action: ${action}`);
     }
     
+    // _tabId 全局路由：任何命令可带 _tabId 指定目标 tab（对齐 Kimi）
+    const tabId = params._tabId;
+    if (tabId != null && action !== 'close_tab' && action !== 'list_tabs' && action !== 'close_session') {
+      await ensureAttached(tabId);
+      lastFocusedTabId = tabId;
+      delete params._tabId;
+    }
+
     const result = await tools[action](params);
     ws?.send(JSON.stringify({ id, success: true, data: result }));
   } catch (e) {
@@ -236,12 +247,32 @@ const tools = {
       return { success: true, url, tabId: created.id };
     }
     
+    // chrome:// / edge:// 协议不能 CDP 导航，必须开新 tab
+    if (tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://')) {
+      const created = await chrome.tabs.create({ url, active: true });
+      lastFocusedTabId = created.id;
+      if (session) await assignToSession(created.id, session, groupTitle);
+      await ensureAttached(created.id);
+      await waitForLoad(created.id);
+      return { success: true, url, tabId: created.id };
+    }
+
     await ensureAttached(tab.id);
-    await cdpCommand('Page.navigate', { url });
+    // 同 URL 则刷新而非重新导航（对齐 Kimi）
+    const isSameUrl = tab.url === url || tab.url === url + '/';
+    let frameId;
+    if (isSameUrl) {
+      await cdpCommand('Page.reload', { ignoreCache: true });
+    } else {
+      const navResult = await cdpCommand('Page.navigate', { url });
+      frameId = navResult.frameId;
+    }
     await waitForLoad(tab.id);
     // 重新查询获取导航后的实际 URL
     const updated = await chrome.tabs.get(tab.id);
-    return { success: true, url: updated.url || url, tabId: tab.id };
+    const result = { success: true, url: updated.url || url, tabId: tab.id };
+    if (frameId) result.frameId = frameId;
+    return result;
   },
 
   async find_tab(params) {
@@ -252,16 +283,17 @@ const tools = {
     if (index !== undefined) {
       target = tabs[index];
     } else if (url) {
-      // 对齐 Kimi: 支持通配符匹配
-      const pattern = url.includes('*') ? url : null;
-      if (pattern) {
-        const hostname = pattern.replace(/^\*:\/\/?/, '').replace(/\/\*$/, '');
-        target = tabs.find(t => {
-          try { return new URL(t.url).hostname === hostname; } catch { return false; }
-        });
-      } else {
-        target = tabs.find(t => t.url?.includes(url));
+      // 对齐 Kimi: URL 自动转 glob pattern 用 chrome.tabs.query 高效查找
+      const pattern = urlToGlobPattern(url);
+      const matched = await chrome.tabs.query({ url: pattern });
+      if (wantActive) {
+        // 优先找活跃 tab
+        const activeMatched = matched.find(t => t.active);
+        target = activeMatched || matched[0];
       }
+      target = target || matched[0];
+      // fallback: 遍历匹配
+      if (!target) target = tabs.find(t => t.url?.includes(url));
     } else if (title) {
       target = tabs.find(t => t.title?.includes(title));
     }
@@ -275,13 +307,24 @@ const tools = {
 
   async list_tabs() {
     const tabs = await chrome.tabs.query({});
-    return tabs.map((t, i) => ({
-      index: i,
-      tabId: t.id,
-      url: t.url,
-      title: t.title,
-      active: t.active,
-    }));
+    const result = [];
+    for (const t of tabs) {
+      let groupTitle;
+      if (t.groupId != null && t.groupId !== chrome.tabGroups?.TAB_GROUP_ID_NONE) {
+        try {
+          const group = await chrome.tabGroups.get(t.groupId);
+          groupTitle = group.title;
+        } catch {}
+      }
+      result.push({
+        tabId: t.id,
+        url: t.url,
+        title: t.title,
+        active: t.active,
+        groupTitle,
+      });
+    }
+    return result;
   },
 
   async close_tab(params) {
@@ -362,7 +405,8 @@ const tools = {
     });
     
     if (result.exceptionDetails) {
-      throw new Error(`evaluate error: ${result.exceptionDetails.text}`);
+      const desc = result.exceptionDetails.exception?.description || result.exceptionDetails.text;
+      throw new Error(`evaluate: ${desc}`);
     }
     return { type: typeof result.result.value, value: result.result.value };
   },
@@ -371,19 +415,46 @@ const tools = {
     await ensureAttached((await resolveTab()).id);
     const format = params.format || 'png';
     const quality = params.quality;
+    const selector = params.selector;
     
     const opts = { format };
     if (quality && format === 'jpeg') opts.quality = quality;
     
+    // 元素级截图（对齐 Kimi）
+    if (selector) {
+      const objectId = isRef(selector)
+        ? await objectIdFromRef(selector)
+        : await objectIdFromSelector(selector);
+      await cdpCommand('Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: "function() { this.scrollIntoView({block:'center',inline:'center'}); }",
+      });
+      const box = await cdpCommand('DOM.getBoxModel', { objectId });
+      const border = box.model?.border;
+      if (!border || border.length < 8) throw new Error('Element has no layout box');
+      const xs = [border[0], border[2], border[4], border[6]];
+      const ys = [border[1], border[3], border[5], border[7]];
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+      if (w <= 0 || h <= 0) throw new Error(`Element has zero-size box (${w}x${h})`);
+      opts.clip = { x, y, width: w, height: h, scale: 1 };
+    }
+
     const result = await cdpCommand('Page.captureScreenshot', opts);
     return { data: result.data, format };
   },
 
   async save_as_pdf(params) {
     await ensureAttached((await resolveTab()).id);
+    const [paperW, paperH] = PAPER_SIZES[(params.paper_format || 'letter').toLowerCase()] || PAPER_SIZES.letter;
+    const scale = typeof params.scale === 'number' ? Math.max(0.1, Math.min(2, params.scale)) : 1;
     const result = await cdpCommand('Page.printToPDF', {
       printBackground: true,
       preferCSSPageSize: true,
+      landscape: !!params.landscape,
+      scale,
+      paperWidth: paperW,
+      paperHeight: paperH,
     });
     return { data: result.data };
   },
@@ -409,7 +480,7 @@ const tools = {
       
       const box = await cdpCommand('DOM.getBoxModel', { objectId });
       const c = box.model?.content;
-      if (!c || c.length < 8) throw new Error('Element has no layout box');
+      if (!c || c.length < 8) throw new Error('mouse_click: element has no layout box (display:none/detached/zero-size). Use click for DOM-level fallback.');
       cx = (c[0] + c[2] + c[4] + c[6]) / 4;
       cy = (c[1] + c[3] + c[5] + c[7]) / 4;
     } else {
@@ -428,14 +499,20 @@ const tools = {
     if (!text) throw new Error('key_type: text is required');
     await ensureAttached((await resolveTab()).id);
     
-    for (const char of text) {
-      await cdpCommand('Input.dispatchKeyEvent', {
-        type: 'keyDown', text: char, key: char,
-      });
-      await cdpCommand('Input.dispatchKeyEvent', {
-        type: 'keyUp', key: char,
-      });
-      if (delay) await sleep(delay);
+    if (delay) {
+      // 逐字符模式（需要延迟控制时）
+      for (const char of text) {
+        await cdpCommand('Input.dispatchKeyEvent', {
+          type: 'keyDown', text: char, key: char,
+        });
+        await cdpCommand('Input.dispatchKeyEvent', {
+          type: 'keyUp', key: char,
+        });
+        await sleep(delay);
+      }
+    } else {
+      // 高效模式：一次调用插入全部文本（对齐 Kimi）
+      await cdpCommand('Input.insertText', { text });
     }
     return { success: true, typed: text.length };
   },
@@ -445,19 +522,48 @@ const tools = {
     if (!key) throw new Error('send_keys: key is required');
     await ensureAttached((await resolveTab()).id);
     
-    const mods = {};
-    if (modifiers?.includes('ctrl')) mods.ctrl = true;
-    if (modifiers?.includes('shift')) mods.shift = true;
-    if (modifiers?.includes('alt')) mods.alt = true;
-    if (modifiers?.includes('meta')) mods.meta = true;
+    const repeat = Math.min(Math.max(params.repeat || 1, 1), 100);
+    const spec = resolveKeySpec(key);
+    const modBits = resolveModifiers(modifiers || []);
     
-    await cdpCommand('Input.dispatchKeyEvent', {
-      type: 'keyDown', key, ...mods,
-    });
-    await cdpCommand('Input.dispatchKeyEvent', {
-      type: 'keyUp', key, ...mods,
-    });
-    return { success: true, key, modifiers };
+    let dispatched = 0;
+    for (let r = 0; r < repeat; r++) {
+      // 按下修饰键
+      let activeBits = 0;
+      for (const mod of spec.modKeys || []) {
+        activeBits |= mod.bit;
+        await cdpCommand('Input.dispatchKeyEvent', {
+          type: 'keyDown', modifiers: activeBits,
+          key: mod.key, code: mod.code,
+          windowsVirtualKeyCode: mod.vkc,
+        });
+      }
+      // 按下主键
+      const mainMods = modBits | (spec.modKeys || []).reduce((a, m) => a | m.bit, 0);
+      const keyDownParams = {
+        type: 'keyDown', modifiers: mainMods,
+        key: spec.key, code: spec.code,
+        windowsVirtualKeyCode: spec.vkc,
+      };
+      if (spec.text !== undefined && mainMods === 0) keyDownParams.text = spec.text;
+      await cdpCommand('Input.dispatchKeyEvent', keyDownParams);
+      await cdpCommand('Input.dispatchKeyEvent', {
+        type: 'keyUp', modifiers: mainMods,
+        key: spec.key, code: spec.code,
+        windowsVirtualKeyCode: spec.vkc,
+      });
+      // 释放修饰键（逆序）
+      for (const mod of (spec.modKeys || []).reverse()) {
+        activeBits &= ~mod.bit;
+        await cdpCommand('Input.dispatchKeyEvent', {
+          type: 'keyUp', modifiers: activeBits,
+          key: mod.key, code: mod.code,
+          windowsVirtualKeyCode: mod.vkc,
+        });
+      }
+      dispatched++;
+    }
+    return { success: true, key, dispatched };
   },
 
   // ─── 网络 ───
@@ -594,6 +700,16 @@ const tools = {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// URL 转 glob pattern（对齐 Kimi 的 find_tab 效率优化）
+function urlToGlobPattern(url) {
+  if (url.includes('*')) return url;
+  try {
+    return `*://${new URL(url).hostname}/*`;
+  } catch {
+    return `*://${url.replace(/^\.+/, '')}/*`;
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -884,6 +1000,23 @@ chrome.debugger.onDetach.addListener((source) => {
 
 chrome.tabs.onActivated.addListener((info) => {
   lastFocusedTabId = info.tabId;
+});
+
+// Tab 分组清理（对齐 Kimi）
+chrome.tabGroups?.onRemoved?.addListener((group) => {
+  for (const [session, gid] of sessionGroups) {
+    if (gid === group.id) {
+      sessionGroups.delete(session);
+      break;
+    }
+  }
+});
+
+// Alarms 兜底重连（对齐 Kimi）
+chrome.alarms?.onAlarm?.addListener((alarm) => {
+  if (alarm.name === 'webbridge-reconnect' && !wsConnected) {
+    connectWebSocket();
+  }
 });
 
 // ═══════════════════════════════════════════════
