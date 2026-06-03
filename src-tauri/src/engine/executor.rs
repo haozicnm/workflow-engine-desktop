@@ -218,9 +218,11 @@ impl StepExecutor {
         });
         let condition_group = if let Some(ref cg) = condition_group_raw {
             let mut cg_value = serde_json::to_value(cg).unwrap_or(serde_json::Value::Null);
-            if let Some(ref ph) = placeholder_map {
-                let _ = ph.resolve_value(&mut cg_value, ctx);
-            }
+            // 为 condition_group 创建独立的 placeholder_map 进行扫描和解析
+            // 这样无论是否有全局 placeholder_map，condition_group 都能正确处理变量
+            let mut cg_ph = crate::engine::placeholder::PlaceholderMap::new();
+            let _ = cg_ph.scan_and_replace(&mut cg_value);
+            let _ = cg_ph.resolve_value(&mut cg_value, ctx);
             serde_json::from_value(cg_value).ok()
         } else {
             None
