@@ -63,7 +63,6 @@ const loading = ref(true)
 const changelog = changelogData as { version: string; desc: string }[]
 const showChangelog = ref(false)
 
-const browserOptions = computed(() => [
 const logLevelOptions = computed(() => [
   { value: 'debug', label: t('settingsPage.logDebug') },
   { value: 'info', label: t('settingsPage.logInfo') },
