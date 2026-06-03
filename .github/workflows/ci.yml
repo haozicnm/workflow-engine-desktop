@@ -1,22 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src-tauri/**'
-      - 'src/**'
-      - 'library/**'
-      - 'package.json'
-      - 'package-lock.json'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src-tauri/**'
-      - 'src/**'
-      - 'library/**'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       run_tests:
