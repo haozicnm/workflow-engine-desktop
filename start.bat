@@ -11,7 +11,8 @@ echo   Visual Workflow Automation
 echo.
 echo   Starting server on %BIND% ...
 
-start "" "%~dp0workflow-engine.exe"
+REM 后台启动服务器（隐藏窗口）
+start /MIN "" "%~dp0workflow-engine.exe"
 
 echo   Waiting for server...
 REM Windows 10+ built-in curl; fallback to fixed 4s sleep
@@ -24,7 +25,6 @@ ping 127.0.0.1 -n 5 >nul
 start %URL%
 
 echo.
-echo   Server ready: %URL%
-echo   Tip: Click the address bar icon to install as PWA.
+echo   Server running in background: %URL%
+echo   To stop: Task Manager → workflow-engine.exe
 echo.
-pause
