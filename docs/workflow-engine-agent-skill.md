@@ -254,7 +254,60 @@ POST /api/workflows/{id}/save-as-template
 }
 ```
 
-## 5. 注意事项
+## 5. 浏览器自动化
+
+浏览器操作通过 `browser` 容器节点执行。Agent 调 `/api/blocks/browser` 获取完整 action_definitions。
+
+### 获取浏览器操作列表
+```
+GET /api/blocks/browser
+→ { "action_definitions": [
+    { "action": "navigate", "desc": "导航到 URL", "params": [...], "output": {...} },
+    { "action": "snapshot", "desc": "获取页面元素树 + @eN ref", ... },
+    { "action": "click", "desc": "点击元素（CSS 或 @eN ref）", ... },
+    ...
+  ] }
+```
+
+### 常用浏览器操作
+
+| 操作 | 说明 | 关键参数 |
+|------|------|----------|
+| `navigate` | 导航到 URL | `url`(必填), `newTab?` |
+| `snapshot` | 获取页面元素树 | 无参数，返回 `refs`（@eN 系统） |
+| `click` | 点击元素 | `selector`（CSS 或 `@e1`） |
+| `fill` | 填写表单 | `selector`, `value` |
+| `evaluate` | 执行 JS | `expression` |
+| `screenshot` | 截图 | `format?`, `selector?` |
+| `find_tab` | 查找标签页 | `url?`, `title?`, `index?` |
+| `upload` | 上传文件 | `selector`, `filePaths` |
+| `download` | 下载文件 | `url?`, `selector?`, `saveAs?` |
+| `cdp` | 直接 CDP 命令 | `method`, `params?` |
+
+### @eN ref 系统
+
+1. 调 `snapshot` → 返回 `refs: {"e1": {role: "link", name: "Learn more"}, ...}`
+2. 用 `@e1` 作为 selector 操作元素：`click({selector: "@e1"})`
+3. 每次 `snapshot` 后 ref 重新生成
+
+### 浏览器工作流示例
+```yaml
+- id: browse
+  type: browser
+  actions:
+    - type: navigate
+      params: { url: "https://example.com" }
+    - type: snapshot
+      params: {}
+    - type: fill
+      params: { selector: "@e3", value: "搜索关键词" }
+    - type: click
+      params: { selector: "@e5" }
+    - type: screenshot
+      params: { format: "png" }
+```
+
+## 6. 注意事项
 
 ### Agent 必须做的
 - ✅ 生成 YAML 前先调 `/api/blocks/{type}` 确认参数 schema
