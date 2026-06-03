@@ -1,5 +1,45 @@
 # Changelog
 
+## v7.7.0 (2026-06-03)
+
+### ✨ New Features
+
+- **积木自描述标准化 (Step 1)**
+  - node-schema.json: 36 节点全部添加 `tags`，12 参数添加 `validation`（min/max/pattern），6 参数添加 `visible_when`（条件可见性），12 参数添加 `examples`
+  - 新增结构体：`ParamValidation`、`VisibleWhen`、`ParamExample`
+  - 新增 API：`GET /api/blocks?q=xxx` 按标签搜索，`GET /api/blocks/categories` 分类列表
+  - `blocks_list` 返回 `tags`，`blocks_get` 返回完整自描述（含 validation/visible_when/examples）
+
+- **YAML 标准化格式 (Step 2)**
+  - `workflow.rs`: 新增 `FORMAT_VERSION="1.0"`、`WorkflowMeta`（author/tags/created_at）、`Workflow.version`
+  - `yaml_format.rs`: 标准 YAML 导出器（干净可读格式，带注释头），版本兼容性检查，`ensure_defaults()`
+  - `parser.rs`: 解析时自动检查版本兼容性（高版本拒绝，低版本兼容）
+  - 新增 API：`GET /api/workflows/{id}/export-yaml` 导出标准 YAML
+
+- **模板库增强 + 锁定强制 (Step 3)**
+  - 锁定强制：`workflow_update` 和 `workflow_save_yaml` 新增 locked 检查（409 Conflict），三个写操作全部受保护
+  - `TemplateMeta` 新增 `category` 字段（data/automation/file/general）
+  - 新增 API：`GET /api/templates?q=xxx&category=data` 搜索+分类过滤，`GET /api/templates/categories`，`POST /api/templates/import`，`POST /api/workflows/{id}/save-as-template`
+  - 5 个种子模板：http_fetch、web_scrape_excel、shell_script、file_processor、data_pipeline
+
+- **Agent 集成 (Step 4)**
+  - `workflow-engine-agent` Skill：发现积木→参考模板→生成 YAML→用户确认→保存执行
+  - `skill_generator.rs` v2：利用 schema 生成富 Skill 文档（输出端口、必需参数、验证约束、变量引用速查表）
+
+- **浏览器节点 action_definitions**
+  - browser 节点新增 `action_definitions`（18 个操作：navigate/snapshot/click/fill/evaluate/screenshot/save_as_pdf/mouse_click/key_type/send_keys/find_tab/list_tabs/close_tab/close_session/network/upload/download/cdp）
+  - 每个 action 有：params（含 required/type/validation）+ output fields
+  - 新增结构体：`ActionDefinition`、`ActionParamDef`、`ActionOutputDef`
+  - `blocks_get` API 返回 `action_definitions`
+
+### 📦 Version Bumps
+
+- tauri.conf.json: 7.6.0 → 7.7.0
+- Cargo.toml: 7.6.0 → 7.7.0
+- node-schema.json: 8.2 → 8.3
+- package.json: 7.5.0 → 7.7.0
+- node-io-spec.md: v1.0 → v1.1
+
 ## v7.6.0 (2026-06-01)
 
 ### ⚠️ Breaking Changes
