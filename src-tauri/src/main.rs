@@ -54,7 +54,7 @@ async fn main() {
         }
     };
 
-    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap_or_else(|_| bind_addr), static_dir);
+    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap_or(bind_addr), static_dir);
 
     if let Err(e) = axum::serve(
         listener,
