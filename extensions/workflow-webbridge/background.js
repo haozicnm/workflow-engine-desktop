@@ -106,7 +106,7 @@ function connectWebSocket() {
       ws.send(JSON.stringify({
         type: 'register',
         client: 'webbridge',
-        version: '1.3.0',
+        version: '1.4.0',
         capabilities: Object.keys(tools),
       }));
     };
@@ -1468,6 +1468,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             connected: wsConnected,
             port: WS_PORT
         });
+    }
+    if (msg.type === 'getDetailedStatus') {
+        (async () => {
+            const tabs = await chrome.tabs.query({});
+            const result = {
+                connected: wsConnected,
+                port: WS_PORT,
+                version: '1.4.0',
+                activeTabId,
+                attachedTabs: [...attachedTabs],
+                sessions: [...sessionGroups.keys()],
+                tabCount: tabs.length,
+                tabs: tabs.slice(0, 20).map(t => ({
+                    id: t.id,
+                    url: (t.url || '').slice(0, 60),
+                    title: (t.title || '').slice(0, 40),
+                    active: t.active,
+                })),
+            };
+            sendResponse(result);
+        })();
+        return true; // async response
     }
     return true;
 });

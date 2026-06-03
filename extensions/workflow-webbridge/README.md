@@ -34,7 +34,7 @@ workflow-engine 通过 WebSocket 发送 JSON 命令：
 {"id": "1", "success": true, "data": {"success": true, "url": "https://example.com", "tabId": 123}}
 ```
 
-## 可用工具（17 个，与 Kimi WebBridge 完全兼容）
+## 可用工具（18 个，与 Kimi WebBridge 完全兼容）
 
 | 工具 | 说明 | 参数 |
 |------|------|------|
@@ -56,6 +56,14 @@ workflow-engine 通过 WebSocket 发送 JSON 命令：
 | `upload` | 上传文件 | `selector`, `filePaths` |
 | `cdp` | 直接 CDP 命令 | `method`, `params?` |
 | `download` | 下载文件 | `url?`, `selector?`, `saveAs?` |
+
+## Popup 面板
+
+点击扩展图标查看：
+- **连接状态** — 绿色圆点 = 已连接，红色 = 未连接
+- **运行状态** — 版本号、活跃标签 ID、CDP 附加数、会话列表
+- **标签页列表** — 当前浏览器打开的标签页概览
+- **端口配置** — 可修改 WebSocket 端口（默认 19529）
 
 ## @eN ref 系统
 
