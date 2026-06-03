@@ -63,6 +63,43 @@ pub struct OutputPortDef {
     pub desc: String,
 }
 
+/// 容器节点的 action 定义（描述单个浏览器/文件/Excel 操作）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ActionDefinition {
+    pub action: String,
+    pub desc: String,
+    #[serde(default)]
+    pub params: Vec<ActionParamDef>,
+    #[serde(default)]
+    pub output: Option<ActionOutputDef>,
+}
+
+/// action 参数定义
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ActionParamDef {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub param_type: String,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub default: Option<Value>,
+    #[serde(default)]
+    pub desc: Option<String>,
+    #[serde(default)]
+    pub options: Option<Vec<String>>,
+    #[serde(default)]
+    pub validation: Option<ParamValidation>,
+}
+
+/// action 输出定义
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ActionOutputDef {
+    pub desc: String,
+    #[serde(default)]
+    pub fields: Option<std::collections::HashMap<String, String>>,
+}
+
 /// 参数验证约束（可选，用于 Agent 知道参数边界）
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ParamValidation {
@@ -159,6 +196,9 @@ struct SchemaNode {
     /// 节点标签（用于搜索和发现）
     #[serde(default)]
     tags: Vec<String>,
+    /// 容器节点的 action 定义列表（浏览器/文件/Excel 操作）
+    #[serde(default)]
+    action_definitions: Vec<ActionDefinition>,
 }
 
 /// schema 顶层结构
@@ -188,6 +228,8 @@ pub struct NodeManifest {
     pub params: Vec<ParamDef>,
     /// 节点标签（用于搜索和发现）
     pub tags: Vec<String>,
+    /// 容器节点的 action 定义列表
+    pub action_definitions: Vec<ActionDefinition>,
 }
 
 impl NodeManifest {
@@ -204,6 +246,7 @@ impl NodeManifest {
             outputs: sn.outputs.clone(),
             params: sn.params.clone(),
             tags: sn.tags.clone(),
+            action_definitions: sn.action_definitions.clone(),
         }
     }
 }

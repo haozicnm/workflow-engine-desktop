@@ -1573,7 +1573,7 @@
           "name": "actions",
           "field_type": "json",
           "required": true,
-          "desc": "浏览器操作序列 [{action, params}]（navigate/click/type/screenshot/wait）",
+          "desc": "浏览器操作序列 [{action, params}]。可用 action 见下方 action_definitions",
           "group": "basic"
         },
         {
@@ -1590,6 +1590,445 @@
         "browser",
         "automation",
         "ui"
+      ],
+      "action_definitions": [
+        {
+          "action": "navigate",
+          "desc": "导航到 URL",
+          "params": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": true,
+              "desc": "目标 URL"
+            },
+            {
+              "name": "newTab",
+              "type": "boolean",
+              "required": false,
+              "desc": "是否在新标签页打开"
+            }
+          ],
+          "output": {
+            "desc": "导航结果",
+            "fields": {
+              "url": "text",
+              "title": "text",
+              "tabId": "number"
+            }
+          }
+        },
+        {
+          "action": "snapshot",
+          "desc": "获取页面元素树 + @eN ref（用于后续 @eN 操作）",
+          "params": [],
+          "output": {
+            "desc": "页面快照",
+            "fields": {
+              "url": "text",
+              "title": "text",
+              "tree": "json",
+              "refs": "json"
+            }
+          }
+        },
+        {
+          "action": "click",
+          "desc": "点击元素（CSS 选择器或 @eN ref）",
+          "params": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": true,
+              "desc": "CSS 选择器或 @eN ref（如 @e1）"
+            }
+          ],
+          "output": {
+            "desc": "点击结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "fill",
+          "desc": "填写表单输入框",
+          "params": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": true,
+              "desc": "CSS 选择器或 @eN ref"
+            },
+            {
+              "name": "value",
+              "type": "string",
+              "required": true,
+              "desc": "要填写的值"
+            }
+          ],
+          "output": {
+            "desc": "填写结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "evaluate",
+          "desc": "执行 JavaScript 代码",
+          "params": [
+            {
+              "name": "expression",
+              "type": "string",
+              "required": true,
+              "desc": "JS 表达式或代码"
+            }
+          ],
+          "output": {
+            "desc": "执行结果",
+            "fields": {
+              "type": "text",
+              "value": "json"
+            }
+          }
+        },
+        {
+          "action": "screenshot",
+          "desc": "页面或元素截图",
+          "params": [
+            {
+              "name": "format",
+              "type": "select",
+              "options": [
+                "png",
+                "jpeg"
+              ],
+              "required": false,
+              "default": "png",
+              "desc": "图片格式"
+            },
+            {
+              "name": "quality",
+              "type": "number",
+              "required": false,
+              "desc": "JPEG 质量 (1-100)"
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "desc": "元素选择器（截取特定元素）"
+            }
+          ],
+          "output": {
+            "desc": "截图数据",
+            "fields": {
+              "data": "text",
+              "format": "text"
+            }
+          }
+        },
+        {
+          "action": "save_as_pdf",
+          "desc": "将页面保存为 PDF",
+          "params": [
+            {
+              "name": "paper_format",
+              "type": "select",
+              "options": [
+                "letter",
+                "legal",
+                "a4",
+                "a3",
+                "tabloid"
+              ],
+              "required": false,
+              "default": "letter",
+              "desc": "纸张格式"
+            },
+            {
+              "name": "landscape",
+              "type": "boolean",
+              "required": false,
+              "default": false,
+              "desc": "是否横向"
+            },
+            {
+              "name": "scale",
+              "type": "number",
+              "required": false,
+              "default": 1,
+              "desc": "缩放比例 (0.1-2.0)",
+              "validation": {
+                "min": 0.1,
+                "max": 2.0
+              }
+            }
+          ],
+          "output": {
+            "desc": "PDF 数据",
+            "fields": {
+              "data": "text"
+            }
+          }
+        },
+        {
+          "action": "mouse_click",
+          "desc": "鼠标点击（坐标或元素）",
+          "params": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "desc": "CSS 选择器或 @eN ref"
+            },
+            {
+              "name": "x",
+              "type": "number",
+              "required": false,
+              "desc": "X 坐标"
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "required": false,
+              "desc": "Y 坐标"
+            }
+          ],
+          "output": {
+            "desc": "点击结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "key_type",
+          "desc": "键盘逐字输入",
+          "params": [
+            {
+              "name": "text",
+              "type": "string",
+              "required": true,
+              "desc": "要输入的文本"
+            },
+            {
+              "name": "delay",
+              "type": "number",
+              "required": false,
+              "default": 50,
+              "desc": "按键间隔毫秒",
+              "validation": {
+                "min": 0,
+                "max": 5000
+              }
+            }
+          ],
+          "output": {
+            "desc": "输入结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "send_keys",
+          "desc": "发送键盘按键（如 Enter、Tab、Escape）",
+          "params": [
+            {
+              "name": "key",
+              "type": "string",
+              "required": true,
+              "desc": "按键名（Enter/Tab/Escape/ArrowDown 等）"
+            },
+            {
+              "name": "modifiers",
+              "type": "json",
+              "required": false,
+              "desc": "修饰键 {ctrl, shift, alt, meta}"
+            }
+          ],
+          "output": {
+            "desc": "按键结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "find_tab",
+          "desc": "查找标签页",
+          "params": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": false,
+              "desc": "按 URL 查找（支持 glob）"
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "desc": "按标题查找"
+            },
+            {
+              "name": "index",
+              "type": "number",
+              "required": false,
+              "desc": "按索引查找"
+            }
+          ],
+          "output": {
+            "desc": "标签页信息",
+            "fields": {
+              "tabId": "number",
+              "url": "text",
+              "title": "text"
+            }
+          }
+        },
+        {
+          "action": "list_tabs",
+          "desc": "列出所有标签页",
+          "params": [],
+          "output": {
+            "desc": "标签页列表",
+            "fields": {
+              "tabs": "array"
+            }
+          }
+        },
+        {
+          "action": "close_tab",
+          "desc": "关闭标签页",
+          "params": [
+            {
+              "name": "tabId",
+              "type": "number",
+              "required": false,
+              "desc": "标签页 ID（默认当前）"
+            }
+          ],
+          "output": {
+            "desc": "关闭结果",
+            "fields": {
+              "closed": "number"
+            }
+          }
+        },
+        {
+          "action": "close_session",
+          "desc": "关闭浏览器会话（释放所有 CDP 连接）",
+          "params": [],
+          "output": {
+            "desc": "关闭结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "network",
+          "desc": "网络请求监听",
+          "params": [
+            {
+              "name": "action",
+              "type": "select",
+              "options": [
+                "enable",
+                "disable"
+              ],
+              "required": true,
+              "desc": "启用/禁用网络监听"
+            }
+          ],
+          "output": {
+            "desc": "操作结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "upload",
+          "desc": "上传文件到文件输入框",
+          "params": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": true,
+              "desc": "文件输入框的 CSS 选择器或 @eN ref"
+            },
+            {
+              "name": "filePaths",
+              "type": "json",
+              "required": true,
+              "desc": "文件路径数组"
+            }
+          ],
+          "output": {
+            "desc": "上传结果",
+            "fields": {
+              "success": "bool"
+            }
+          }
+        },
+        {
+          "action": "download",
+          "desc": "下载文件",
+          "params": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": false,
+              "desc": "下载 URL"
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "desc": "触发下载的元素选择器"
+            },
+            {
+              "name": "saveAs",
+              "type": "string",
+              "required": false,
+              "desc": "保存路径"
+            }
+          ],
+          "output": {
+            "desc": "下载结果",
+            "fields": {
+              "success": "bool",
+              "path": "text"
+            }
+          }
+        },
+        {
+          "action": "cdp",
+          "desc": "直接发送 CDP（Chrome DevTools Protocol）命令",
+          "params": [
+            {
+              "name": "method",
+              "type": "string",
+              "required": true,
+              "desc": "CDP 方法名（如 Runtime.evaluate）"
+            },
+            {
+              "name": "params",
+              "type": "json",
+              "required": false,
+              "desc": "CDP 参数"
+            }
+          ],
+          "output": {
+            "desc": "CDP 响应",
+            "fields": {
+              "result": "json"
+            }
+          }
+        }
       ]
     },
     {

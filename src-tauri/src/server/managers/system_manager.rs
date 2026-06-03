@@ -450,7 +450,7 @@ pub async fn blocks_categories() -> Response {
 }
 
 /// GET /api/blocks/:type
-/// 获取某个 block 的完整详情（含 params schema、tags、validation、visible_when、examples）
+/// 获取某个 block 的完整详情（含 params schema、tags、validation、visible_when、examples、action_definitions）
 pub async fn blocks_get(Path(node_type): Path<String>) -> Response {
     match crate::nodes::registry::get_node(&node_type) {
         Some(manifest) => ok_response(serde_json::json!({
@@ -464,6 +464,7 @@ pub async fn blocks_get(Path(node_type): Path<String>) -> Response {
             "outputs": manifest.outputs,
             "params": manifest.params,
             "tags": manifest.tags,
+            "action_definitions": manifest.action_definitions,
         })),
         None => err_response(StatusCode::NOT_FOUND, format!("节点类型 '{}' 不存在", node_type)),
     }
