@@ -17,6 +17,8 @@ pub struct ExecutionContext {
     pub sessions: HashMap<String, ContainerSession>,
     /// 全局默认超时配置（节点可从这里获取回退值）
     pub default_timeouts: crate::data::config::TimeoutConfig,
+    /// Shell 命令白名单（glob 模式），空=允许所有
+    pub shell_allowed_commands: Vec<String>,
 }
 
 /// 容器 session 状态
@@ -45,6 +47,7 @@ impl ExecutionContext {
             input_ports: HashMap::new(),
             sessions: HashMap::new(),
             default_timeouts: crate::data::config::TimeoutConfig::default(),
+            shell_allowed_commands: Vec::new(),
         }
     }
 

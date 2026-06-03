@@ -25,63 +25,37 @@ pub async fn run_start(
     app_handle: AppHandle,
     workflow_id: String,
 ) -> Result<String, String> {
-    // 1. 获取工作流 YAML
-    let yaml = app.db.get_workflow_yaml(&workflow_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "工作流不存在".to_string())?;
+    use crate::engine::scheduler;
 
-    // 2. 解析工作流
-    let workflow = crate::engine::parser::parse_workflow(&yaml)
-        .map_err(|e| format!("YAML 解析失败: {}", e))?;
+    // 共享准备阶段（消除与 managers/run_manager.rs 的重复）
+    let prep = scheduler::prepare_run(
+        &app.db,
+        &app.config,
+        &app.run_semaphore,
+        &app.cancel_flags,
+        &app.cancel_tokens,
+        &app.pause_flags,
+        &app.breakpoint_flags,
+        &app.step_mode_flags,
+        &workflow_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    // 3. 创建 run 记录
-    let run_id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    let workflow_name = workflow.name.clone();
-    app.db.create_run(&run_id, &workflow_id, &workflow_name, &now)
-        .map_err(|e| e.to_string())?;
-
-    // 4. 读取超时配置
-    let config_guard = app.config.read().await;
-    let timeouts = config_guard.timeouts.clone();
-    drop(config_guard);
-
-    // 5. 创建取消令牌（支持结构化取消 + AtomicBool 兼容）
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let pause_flag = Arc::new(AtomicBool::new(false));
-    let breakpoint_flag = Arc::new(AtomicBool::new(false));
-    let step_mode_flag = Arc::new(AtomicBool::new(false));
-
-    // 5.5 获取并发信号量（限制同时运行的工作流数，默认 10）
-    let semaphore = app.run_semaphore.clone();
-    let permit = match semaphore.clone().try_acquire_owned() {
-        Ok(p) => p,
-        Err(_) => {
-            return Err("已达到最大并发工作流数限制，请等待其他工作流完成后再试".to_string());
-        }
-    };
-    app.cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
-    app.cancel_tokens.write().await.insert(run_id.clone(), cancel_token.clone());
-    app.pause_flags.write().await.insert(run_id.clone(), pause_flag.clone());
-    app.breakpoint_flags.write().await.insert(run_id.clone(), breakpoint_flag.clone());
-    app.step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
-
-    // 6. 发射 run 启动事件（workflow_name 已在步骤 3 获取）
+    // 发射 Tauri 启动事件
     if let Err(e) = app_handle.emit("run-update", serde_json::json!({
-        "run_id": run_id,
-        "workflow_id": workflow_id,
-        "workflow_name": workflow_name,
+        "run_id": prep.run_id,
+        "workflow_id": &workflow_id,
+        "workflow_name": &prep.workflow_name,
         "status": "running",
     })) {
         warn!("发送 run-update 事件失败: {}", e);
     }
 
-    // 8. 后台异步执行
+    // 后台异步执行
     let db = app.db.clone();
     let approval_store = app.approval_store.clone();
-    let run_id_clone = run_id.clone();
-    let _wf_name = workflow_name.clone();
+    let run_id_clone = prep.run_id.clone();
     let cancel_flags = app.cancel_flags.clone();
     let cancel_tokens = app.cancel_tokens.clone();
     let pause_flags = app.pause_flags.clone();
@@ -89,18 +63,20 @@ pub async fn run_start(
     let step_mode_flags = app.step_mode_flags.clone();
     let debug_snapshots = app.debug_snapshots.clone();
     let debug_snapshots_cleanup = debug_snapshots.clone();
+    let timeouts = prep.timeouts;
+    let shell_allowed = prep.shell_allowed_commands;
+    let workflow = prep.workflow;
+
     tauri::async_runtime::spawn(async move {
-        // permit 在此持有，任务结束时自动释放
-        let _permit = permit;
-        let ctrl = crate::engine::scheduler::RunControl {
-            cancel_flag,
-            cancel_token,
-            pause_flag,
-            breakpoint_flag,
-            step_mode_flag,
+        let _permit = prep.permit;
+        let ctrl = scheduler::RunControl {
+            cancel_flag: prep.cancel_flag,
+            cancel_token: prep.cancel_token,
+            pause_flag: prep.pause_flag,
+            breakpoint_flag: prep.breakpoint_flag,
+            step_mode_flag: prep.step_mode_flag,
             debug_snapshots,
         };
-        // 全局超时（从配置读取，默认 10 分钟，0=不限）
         let global_timeout_ms = timeouts.workflow_total_ms;
         let global_timeout = if global_timeout_ms == 0 {
             std::time::Duration::from_secs(365 * 24 * 3600)
@@ -109,8 +85,8 @@ pub async fn run_start(
         };
         let result = tokio::time::timeout(
             global_timeout,
-            crate::engine::scheduler::run_workflow(
-                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &[], &ctrl, &timeouts,
+            scheduler::run_workflow(
+                &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &[], &ctrl, &timeouts, &shell_allowed,
             ),
         ).await;
         let result = match result {
@@ -121,7 +97,6 @@ pub async fn run_start(
             }
         };
 
-        // 清理标志和令牌
         cancel_flags.write().await.remove(&run_id_clone);
         cancel_tokens.write().await.remove(&run_id_clone);
         pause_flags.write().await.remove(&run_id_clone);
@@ -137,12 +112,11 @@ pub async fn run_start(
                 let err_msg = e.to_string();
                 let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
-                // run_workflow 内部已发射 run-update 事件，此处不再重复
             }
         }
     });
 
-    Ok(run_id)
+    Ok(prep.run_id)
 }
 
 /// 取消运行

@@ -124,6 +124,7 @@ async fn start_scheduled_run(
     use tauri::Manager;
     let config_guard = app_handle.state::<crate::App>().config.read().await;
     let timeouts = config_guard.timeouts.clone();
+    let shell_allowed = config_guard.execution.shell_allowed_commands.clone();
     drop(config_guard);
 
     let run_id_clone = run_id.clone();
@@ -155,6 +156,7 @@ async fn start_scheduled_run(
             &[],
             &ctrl,
             &timeouts,
+            &shell_allowed,
         )
         .await
         {

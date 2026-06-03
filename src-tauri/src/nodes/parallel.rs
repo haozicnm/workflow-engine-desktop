@@ -50,6 +50,7 @@ impl NodeExecutor for ParallelNode {
                     input_ports: ctx.input_ports.clone(),
                     sessions: HashMap::new(),
                     default_timeouts: ctx.default_timeouts.clone(),
+                    shell_allowed_commands: ctx.shell_allowed_commands.clone(),
                 };
                 let executor = Arc::clone(executor);
                 let failed = Arc::clone(&failed);

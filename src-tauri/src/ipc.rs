@@ -473,17 +473,20 @@ impl IpcServer {
         let vars_vec: Vec<(String, String)> = vars.unwrap_or_default().into_iter().collect();
 
         let start = std::time::Instant::now();
-        let timeouts = self.app.config.read().await.timeouts.clone();
+        let cfg = self.app.config.read().await;
+        let timeouts = cfg.timeouts.clone();
+        let shell_allowed = cfg.execution.shell_allowed_commands.clone();
+        drop(cfg);
         let result = scheduler::run_workflow(
             &workflow,
             &run_id,
             Some(&app_handle),
             &db,
             approval_store,
-            "auto",
             &vars_vec,
             &ctrl,
             &timeouts,
+            &shell_allowed,
         )
         .await;
 

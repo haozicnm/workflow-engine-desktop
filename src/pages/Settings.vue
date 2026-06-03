@@ -46,8 +46,6 @@ const settings = ref({
   auto_start: false,
   log_level: 'info',
   python_path: '',
-  browser_channel: 'auto',
-  browser_executable_path: '',
   working_dir: '',
   timeouts: { http_request_ms: 30000, browser_page_ms: 60000, workflow_total_ms: 600000, node_exec_ms: 120000 } as TimeoutCfg,
   logging: { max_size_mb: 50, max_files: 10, auto_clean_days: 30 } as LogCfg,
@@ -66,12 +64,6 @@ const changelog = changelogData as { version: string; desc: string }[]
 const showChangelog = ref(false)
 
 const browserOptions = computed(() => [
-  { value: 'auto', label: t('settingsPage.browserAuto'), desc: t('settingsPage.browserAutoDesc') },
-  { value: 'msedge', label: t('settingsPage.browserEdge'), desc: t('settingsPage.browserEdgeDesc') },
-  { value: 'chrome', label: t('settingsPage.browserChrome'), desc: t('settingsPage.browserChromeDesc') },
-  { value: 'chromium', label: t('settingsPage.browserChromium'), desc: t('settingsPage.browserChromiumDesc') },
-])
-
 const logLevelOptions = computed(() => [
   { value: 'debug', label: t('settingsPage.logDebug') },
   { value: 'info', label: t('settingsPage.logInfo') },
@@ -199,40 +191,6 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           </div>
         </CardHeader>
         <CardContent class="px-4 pb-4 pt-0 space-y-4">
-          <!-- Channel selection -->
-          <div class="space-y-2">
-            <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserNode') }}</Label>
-            <div class="flex flex-col gap-2" role="radiogroup" aria-label="Browser channel">
-              <button
-                v-for="(opt, idx) in browserOptions" :key="opt.value"
-                role="radio" :aria-checked="settings.browser_channel === opt.value"
-                :tabindex="settings.browser_channel === opt.value ? 0 : -1"
-                :class="cn(
-                  'flex items-start gap-2.5 px-3 py-2.5 border rounded-md cursor-pointer transition-colors text-left',
-                  settings.browser_channel === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary',
-                )"
-                @click="settings.browser_channel = opt.value"
-                @keydown.up.prevent="browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value !== opt.value && (settings.browser_channel = browserOptions[(idx - 1 + browserOptions.length) % browserOptions.length].value)"
-                @keydown.down.prevent="browserOptions[(idx + 1) % browserOptions.length].value !== opt.value && (settings.browser_channel = browserOptions[(idx + 1) % browserOptions.length].value)"
-              >
-                <div :class="cn('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0', settings.browser_channel === opt.value ? 'border-primary bg-primary' : 'border-muted-foreground/40')">
-                  <div v-if="settings.browser_channel === opt.value" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
-                </div>
-                <div class="flex flex-col gap-0.5">
-                  <span class="text-sm text-foreground font-semibold">{{ opt.label }}</span>
-                  <span class="text-[11px] text-muted-foreground">{{ opt.desc }}</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <!-- Browser executable path -->
-          <div class="space-y-1.5">
-            <Label class="text-xs text-muted-foreground font-semibold">{{ t('settingsPage.browserExecPath') }}</Label>
-            <Input v-model="settings.browser_executable_path" :placeholder="t('settingsPage.browserExecPathPlaceholder')" class="h-8 text-xs" />
-            <p class="text-[11px] text-muted-foreground/60">{{ t('settingsPage.browserExecPathHint') }}</p>
-          </div>
-
           <!-- System check -->
           <div v-if="sysInfo" class="p-3 bg-muted/50 rounded-md space-y-1.5">
             <h3 class="text-xs text-muted-foreground flex items-center gap-2">

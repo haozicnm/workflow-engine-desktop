@@ -234,7 +234,7 @@
       "category": "core",
       "icon": "terminal",
       "is_container": false,
-      "desc": "执行系统命令（bash/powershell/cmd）",
+      "desc": "⚠️ 安全警告：执行任意系统命令，等同于直接操作终端，无沙箱隔离。请仅在受信任的环境中使用。可配置 allowed_commands 白名单限制可执行命令。",
       "inputs": [],
       "outputs": [
         {
@@ -310,7 +310,8 @@
         "command",
         "terminal",
         "system",
-        "execute"
+        "execute",
+        "⚠️-security-risk"
       ]
     },
     {

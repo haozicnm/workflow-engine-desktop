@@ -12,15 +12,21 @@ use workflow_engine::App;
 async fn main() {
     setup_logging();
 
-    let app = Arc::new(App::new().expect("failed to initialize application"));
+    let app = Arc::new(App::new().unwrap_or_else(|e| {
+        eprintln!("❌ 应用初始化失败: {}", e);
+        std::process::exit(1);
+    }));
 
-    let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0:19529".to_string());
+    let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:19529".to_string());
     let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
 
     let router = workflow_engine::server::build_router(app)
         .fallback_service(tower_http::services::ServeDir::new(&static_dir));
 
-    let bind_addr: std::net::SocketAddr = bind_addr.parse().expect("invalid bind address");
+    let bind_addr: std::net::SocketAddr = bind_addr.parse().unwrap_or_else(|e| {
+        eprintln!("❌ 无效的绑定地址 '{}': {}", bind_addr, e);
+        std::process::exit(1);
+    });
 
     // 固定端口，重试 3 次（处理 Windows 僵尸 socket 延迟释放）
     let listener = {
@@ -48,14 +54,17 @@ async fn main() {
         }
     };
 
-    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap(), static_dir);
+    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap_or_else(|_| bind_addr), static_dir);
 
-    axum::serve(
+    if let Err(e) = axum::serve(
         listener,
         router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .await
-    .expect("server error");
+    {
+        eprintln!("❌ 服务器错误: {}", e);
+        std::process::exit(1);
+    }
 }
 
 

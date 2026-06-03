@@ -115,8 +115,8 @@ pub enum Commands {
     },
     /// 启动 HTTP 服务器（提供 API + 前端静态文件）
     Serve {
-        /// 监听地址 (默认: 0.0.0.0:3000)
-        #[arg(long, default_value = "0.0.0.0:3000")]
+        /// 监听地址 (默认: 127.0.0.1:3000)
+        #[arg(long, default_value = "127.0.0.1:3000")]
         bind: String,
         /// 静态文件目录 (默认: dist)
         #[arg(long, default_value = "dist")]
@@ -421,7 +421,10 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
     let total = workflow.steps.len();
     println!("▶ {} (共 {} 步)", workflow_name, total);
     let start = std::time::Instant::now();
-    let timeouts = app.config.read().await.timeouts.clone();
+    let cfg = app.config.read().await;
+    let timeouts = cfg.timeouts.clone();
+    let shell_allowed = cfg.execution.shell_allowed_commands.clone();
+    drop(cfg);
 
     // 委托 scheduler::run_workflow 执行（CLI 模式不传 app_handle → 无 Tauri 事件推送）
     let result = scheduler::run_workflow(
@@ -433,6 +436,7 @@ async fn cmd_run(app: &App, workflow_id: &str, vars: &[(String, String)]) -> Res
         vars,
         &ctrl,
         &timeouts,
+        &shell_allowed,
     )
     .await;
 
@@ -1727,7 +1731,10 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
     let total = workflow.steps.len();
     println!("  {} (共 {} 步)", workflow_name, total);
     let start = std::time::Instant::now();
-    let timeouts = app.config.read().await.timeouts.clone();
+    let cfg = app.config.read().await;
+    let timeouts = cfg.timeouts.clone();
+    let shell_allowed = cfg.execution.shell_allowed_commands.clone();
+    drop(cfg);
 
     let result = scheduler::run_workflow(
         &workflow,
@@ -1738,6 +1745,7 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
         vars,
         &ctrl,
         &timeouts,
+        &shell_allowed,
     )
     .await;
 

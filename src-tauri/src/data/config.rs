@@ -58,6 +58,9 @@ pub struct ExecutionConfig {
     pub default_retries: u32,
     /// 默认重试间隔 (ms)
     pub retry_delay_ms: u64,
+    /// Shell 节点允许的命令白名单（glob 模式，空=允许所有）
+    #[serde(default)]
+    pub shell_allowed_commands: Vec<String>,
 }
 
 impl Default for ExecutionConfig {
@@ -66,6 +69,7 @@ impl Default for ExecutionConfig {
             max_concurrent_runs: 3,
             default_retries: 0,
             retry_delay_ms: 1_000,
+            shell_allowed_commands: Vec::new(),
         }
     }
 }

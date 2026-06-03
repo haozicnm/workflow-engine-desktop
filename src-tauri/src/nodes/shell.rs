@@ -46,6 +46,24 @@ impl NodeExecutor for ShellNode {
             .ok_or_else(|| error_utils::missing_parameter("command", "shell").to_error())?
             .to_string();
 
+        // 2. 白名单检查（如配置了 shell_allowed_commands，则仅允许匹配的命令）
+        if !_ctx.shell_allowed_commands.is_empty() {
+            let allowed = &_ctx.shell_allowed_commands;
+            let command_name = command.split_whitespace().next().unwrap_or(&command);
+            let matched = allowed.iter().any(|pattern| {
+                glob::Pattern::new(pattern)
+                    .map(|p| p.matches(command_name))
+                    .unwrap_or(false)
+            });
+            if !matched {
+                return Err(anyhow::anyhow!(
+                    "Shell 命令 '{}' 不在白名单中。允许的命令: {:?}",
+                    command_name,
+                    allowed
+                ));
+            }
+        }
+
         let shell = step
             .config
             .get("shell")
@@ -65,10 +83,10 @@ impl NodeExecutor for ShellNode {
             .unwrap_or(300)
             .min(3600); // 最大 1 小时，防止意外无限阻塞
 
-        // 2. 跨平台命令适配
+        // 3. 跨平台命令适配
         let command = adapt_command(&command);
 
-        // 3. 解析 shell
+        // 4. 解析 shell
         let (shell_cmd, shell_arg) = resolve_shell(shell);
 
         info!(
@@ -83,7 +101,7 @@ impl NodeExecutor for ShellNode {
             timeout_secs
         );
 
-        // 3. 执行命令
+        // 5. 执行命令
         let mut cmd = Command::new(&shell_cmd);
         #[cfg(target_os = "windows")]
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW — 不弹命令行窗口
@@ -129,7 +147,7 @@ impl NodeExecutor for ShellNode {
         );
         let exit_code = output.status.code().unwrap_or(-1);
 
-        // 4. 记录并返回
+        // 6. 记录并返回
         if exit_code != 0 {
             warn!(
                 "Shell 命令非零退出: exit_code={}, stderr={}",
@@ -141,6 +159,7 @@ impl NodeExecutor for ShellNode {
                 }
             );
             // 非零退出码仍然返回结果，由上层 onError 策略决定是否继续
+            // 已移至下方统一处理
         }
 
         let result = json!({

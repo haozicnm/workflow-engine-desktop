@@ -47,9 +47,11 @@ impl NodeExecutor for OcrNode {
                     }
                 }
 
-                // TODO: WebBridge 应提供 OCR 能力，当前仅返回截图
+                // OCR 能力需 WebBridge 扩展支持，当前截图仅返回原始图像
+                // 如需文字识别，请使用 shell 节点调用 tesseract CLI：
+                //   tesseract screenshot.png stdout
                 let result = crate::nodes::webbridge::send_command("screenshot", params).await?;
-                Ok(serde_json::json!({"action":"read","result":result,"note":"OCR processing should be added to WebBridge extension"}))
+                Ok(serde_json::json!({"action":"read","result":result,"warning":"OCR 文字识别尚未实现，仅返回截图。可通过 shell 节点调用 tesseract"}))
             }
 
             // ─── 在屏幕上查找文字位置 ───
@@ -59,9 +61,9 @@ impl NodeExecutor for OcrNode {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow!("find_text 需要 text 参数"))?;
                 let params = serde_json::json!({"text": text});
-                // TODO: WebBridge 应提供 find_text 能力
+                // find_text 能力需 WebBridge 扩展支持
                 let result = crate::nodes::webbridge::send_command("find_text", params).await?;
-                Ok(serde_json::json!({"action":"find_text","text":text,"result":result}))
+                Ok(serde_json::json!({"action":"find_text","result":result,"warning":"find_text 尚未完全实现"}))
             }
 
             _ => Err(anyhow!("未知 OCR 操作: {}", action)),

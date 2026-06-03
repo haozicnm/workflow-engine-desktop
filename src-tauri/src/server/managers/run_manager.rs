@@ -4,7 +4,6 @@ use axum::{
     response::{Json, Response},
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::server::events;
@@ -44,93 +43,49 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
     let app = crate::server::state::get();
     let workflow_id = body.workflow_id;
 
-    // 1. 获取工作流 YAML
-    let yaml = match app.db.get_workflow_yaml(&workflow_id) {
-        Ok(Some(y)) => y,
-        Ok(None) => return err_response(StatusCode::NOT_FOUND, "工作流不存在"),
-        Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
-
-    // 2. 解析工作流
-    let workflow = match crate::engine::parser::parse_workflow(&yaml) {
-        Ok(wf) => wf,
-        Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("YAML 解析失败: {e}")),
-    };
-
-    // 3. 创建 run 记录
-    let run_id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    let workflow_name = workflow.name.clone();
-    if let Err(e) = app
-        .db
-        .create_run(&run_id, &workflow_id, &workflow_name, &now)
+    // 共享准备阶段（消除与 commands/run.rs 的重复）
+    use crate::engine::scheduler;
+    let prep = match scheduler::prepare_run(
+        &app.db,
+        &app.config,
+        &app.run_semaphore,
+        &app.cancel_flags,
+        &app.cancel_tokens,
+        &app.pause_flags,
+        &app.breakpoint_flags,
+        &app.step_mode_flags,
+        &workflow_id,
+    )
+    .await
     {
-        return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
-    }
-
-    // 4. 读取超时配置
-    let config_guard = app.config.read().await;
-    let timeouts = config_guard.timeouts.clone();
-    let _max_retries = config_guard.execution.default_retries;
-    let _retry_delay_ms = config_guard.execution.retry_delay_ms;
-    drop(config_guard);
-
-    // 5. 创建取消/暂停/断点/单步标志
-    use std::sync::atomic::AtomicBool;
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let pause_flag = Arc::new(AtomicBool::new(false));
-    let breakpoint_flag = Arc::new(AtomicBool::new(false));
-    let step_mode_flag = Arc::new(AtomicBool::new(false));
-
-    // 5.5 获取并发信号量
-    let semaphore = app.run_semaphore.clone();
-    let permit = match semaphore.clone().try_acquire_owned() {
         Ok(p) => p,
-        Err(_) => {
-            return err_response(
-                StatusCode::TOO_MANY_REQUESTS,
-                "已达到最大并发工作流数限制，请等待其他工作流完成后再试",
-            );
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("工作流不存在") {
+                return err_response(StatusCode::NOT_FOUND, msg);
+            }
+            if msg.contains("并发") || msg.contains("限制") {
+                return err_response(StatusCode::TOO_MANY_REQUESTS, msg);
+            }
+            return err_response(StatusCode::INTERNAL_SERVER_ERROR, msg);
         }
     };
 
-    app.cancel_flags
-        .write()
-        .await
-        .insert(run_id.clone(), cancel_flag.clone());
-    app.cancel_tokens
-        .write()
-        .await
-        .insert(run_id.clone(), cancel_token.clone());
-    app.pause_flags
-        .write()
-        .await
-        .insert(run_id.clone(), pause_flag.clone());
-    app.breakpoint_flags
-        .write()
-        .await
-        .insert(run_id.clone(), breakpoint_flag.clone());
-    app.step_mode_flags
-        .write()
-        .await
-        .insert(run_id.clone(), step_mode_flag.clone());
-
-    // 6. 发射 run 启动事件
+    // 发射 SSE 启动事件
     events::emit(
         "run-update",
         serde_json::json!({
-            "run_id": &run_id,
+            "run_id": prep.run_id,
             "workflow_id": &workflow_id,
-            "workflow_name": &workflow_name,
+            "workflow_name": &prep.workflow_name,
             "status": "running",
         }),
     );
 
-    // 7. 后台异步执行
+    // 后台异步执行
     let db = app.db.clone();
     let approval_store = app.approval_store.clone();
-    let run_id_clone = run_id.clone();
+    let run_id_clone = prep.run_id.clone();
     let cancel_flags = app.cancel_flags.clone();
     let cancel_tokens = app.cancel_tokens.clone();
     let pause_flags = app.pause_flags.clone();
@@ -138,26 +93,29 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
     let step_mode_flags = app.step_mode_flags.clone();
     let debug_snapshots = app.debug_snapshots.clone();
     let debug_snapshots_cleanup = debug_snapshots.clone();
+    let timeouts = prep.timeouts;
+    let shell_allowed = prep.shell_allowed_commands;
+    let workflow = prep.workflow;
 
     tokio::spawn(async move {
-        let _permit = permit;
-        let ctrl = crate::engine::scheduler::RunControl {
-            cancel_flag,
-            cancel_token,
-            pause_flag,
-            breakpoint_flag,
-            step_mode_flag,
+        let _permit = prep.permit;
+        let ctrl = scheduler::RunControl {
+            cancel_flag: prep.cancel_flag,
+            cancel_token: prep.cancel_token,
+            pause_flag: prep.pause_flag,
+            breakpoint_flag: prep.breakpoint_flag,
+            step_mode_flag: prep.step_mode_flag,
             debug_snapshots,
         };
         let global_timeout_ms = timeouts.workflow_total_ms;
         let global_timeout = if global_timeout_ms == 0 {
-            std::time::Duration::from_secs(365 * 24 * 3600) // effectively unlimited
+            std::time::Duration::from_secs(365 * 24 * 3600)
         } else {
             std::time::Duration::from_millis(global_timeout_ms)
         };
         let result = tokio::time::timeout(
             global_timeout,
-            crate::engine::scheduler::run_workflow(
+            scheduler::run_workflow(
                 &workflow,
                 &run_id_clone,
                 None,
@@ -166,6 +124,7 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
                 &[],
                 &ctrl,
                 &timeouts,
+                &shell_allowed,
             ),
         )
         .await;
@@ -173,9 +132,7 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
             Ok(r) => r,
             Err(_elapsed) => {
                 warn!("Workflow global timeout (30min): {}", run_id_clone);
-                Err(anyhow::anyhow!(
-                    "Workflow execution timeout (exceeded 30 minutes)"
-                ))
+                Err(anyhow::anyhow!("Workflow execution timeout (exceeded 30 minutes)"))
             }
         };
 
@@ -187,31 +144,16 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
         debug_snapshots_cleanup.write().await.remove(&run_id_clone);
 
         match result {
-            Ok(_state) => {
-                info!("工作流执行完成: {}", run_id_clone);
-            }
+            Ok(_state) => info!("工作流执行完成: {}", run_id_clone),
             Err(e) => {
                 let err_msg = e.to_string();
-                let status = if err_msg.contains("cancelled") {
-                    "cancelled"
-                } else {
-                    "failed"
-                };
-                error!(
-                    "工作流{}: {} - {}",
-                    if status == "cancelled" {
-                        "已取消"
-                    } else {
-                        "执行失败"
-                    },
-                    run_id_clone,
-                    err_msg
-                );
+                let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
+                error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
             }
         }
     });
 
-    ok_response(serde_json::json!({ "run_id": run_id }))
+    ok_response(serde_json::json!({ "run_id": prep.run_id }))
 }
 
 pub async fn run_cancel(Path(run_id): Path<String>) -> Response {

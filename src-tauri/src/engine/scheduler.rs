@@ -19,6 +19,88 @@ use tracing::{info, warn};
 /// 10000 次足以覆盖绝大多数场景
 const MAX_STEP_EXECUTIONS: usize = 10_000;
 
+/// run_start 的共享准备结果：将 commands/run.rs 和 managers/run_manager.rs
+/// 中完全重复的 6 步准备逻辑提取为单一函数，消除 ~60 行代码重复。
+pub struct RunPreparation {
+    pub run_id: String,
+    pub workflow: Workflow,
+    pub workflow_name: String,
+    pub timeouts: crate::data::config::TimeoutConfig,
+    pub shell_allowed_commands: Vec<String>,
+    pub cancel_flag: Arc<AtomicBool>,
+    pub cancel_token: CancellationToken,
+    pub pause_flag: Arc<AtomicBool>,
+    pub breakpoint_flag: Arc<AtomicBool>,
+    pub step_mode_flag: Arc<AtomicBool>,
+    pub permit: tokio::sync::OwnedSemaphorePermit,
+}
+
+/// 执行 run_start 前的通用准备工作（消除 commands/ 和 managers/ 间的代码重复）
+pub async fn prepare_run(
+    db: &Arc<Database>,
+    config: &tokio::sync::RwLock<crate::data::config::AppConfig>,
+    semaphore: &Arc<tokio::sync::Semaphore>,
+    cancel_flags: &crate::RunFlags,
+    cancel_tokens: &crate::CancelTokens,
+    pause_flags: &crate::RunFlags,
+    breakpoint_flags: &crate::RunFlags,
+    step_mode_flags: &crate::RunFlags,
+    workflow_id: &str,
+) -> anyhow::Result<RunPreparation> {
+    // 1. 获取工作流 YAML
+    let yaml = db
+        .get_workflow_yaml(workflow_id)?
+        .ok_or_else(|| anyhow::anyhow!("工作流不存在"))?;
+
+    // 2. 解析工作流
+    let workflow = crate::engine::parser::parse_workflow(&yaml)?;
+
+    // 3. 创建 run 记录
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let workflow_name = workflow.name.clone();
+    db.create_run(&run_id, workflow_id, &workflow_name, &now)?;
+
+    // 4. 读取配置
+    let config_guard = config.read().await;
+    let timeouts = config_guard.timeouts.clone();
+    let shell_allowed = config_guard.execution.shell_allowed_commands.clone();
+    drop(config_guard);
+
+    // 5. 创建控制标志
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    let cancel_token = CancellationToken::new();
+    let pause_flag = Arc::new(AtomicBool::new(false));
+    let breakpoint_flag = Arc::new(AtomicBool::new(false));
+    let step_mode_flag = Arc::new(AtomicBool::new(false));
+
+    // 5.5 获取并发信号量
+    let permit = semaphore
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| anyhow::anyhow!("已达到最大并发工作流数限制，请等待其他工作流完成后再试"))?;
+
+    cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
+    cancel_tokens.write().await.insert(run_id.clone(), cancel_token.clone());
+    pause_flags.write().await.insert(run_id.clone(), pause_flag.clone());
+    breakpoint_flags.write().await.insert(run_id.clone(), breakpoint_flag.clone());
+    step_mode_flags.write().await.insert(run_id.clone(), step_mode_flag.clone());
+
+    Ok(RunPreparation {
+        run_id,
+        workflow,
+        workflow_name,
+        timeouts,
+        shell_allowed_commands: shell_allowed,
+        cancel_flag,
+        cancel_token,
+        pause_flag,
+        breakpoint_flag,
+        step_mode_flag,
+        permit,
+    })
+}
+
 
 /// 运行控制标志（打包避免参数过多）
 pub struct RunControl {
@@ -54,9 +136,11 @@ pub async fn run_workflow(
     initial_vars: &[(String, String)],
     ctrl: &RunControl,
     timeouts: &crate::data::config::TimeoutConfig,
+    shell_allowed_commands: &[String],
 ) -> Result<RunState> {
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.default_timeouts = timeouts.clone();
+    ctx.shell_allowed_commands = shell_allowed_commands.to_vec();
     // 注入初始变量（CLI --var 等场景）
     for (k, v) in initial_vars {
         ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
