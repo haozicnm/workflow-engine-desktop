@@ -54,7 +54,13 @@ async fn main() {
         }
     };
 
-    info!("服务器启动: http://{}  (静态文件: {})", listener.local_addr().unwrap_or(bind_addr), static_dir);
+    let url = format!("http://{}", listener.local_addr().unwrap_or(bind_addr));
+    info!("服务器启动: {}  (静态文件: {})", url, static_dir);
+
+    // 自动在默认浏览器中打开主页面
+    if open::that(&url).is_err() {
+        tracing::warn!("无法自动打开浏览器，请手动访问: {}", url);
+    }
 
     if let Err(e) = axum::serve(
         listener,
