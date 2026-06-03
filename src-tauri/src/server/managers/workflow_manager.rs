@@ -669,49 +669,16 @@ pub async fn workflow_export_yaml(Path(id): Path<String>) -> Response {
     };
 
     // 解析为 Workflow 结构
-    let yaml_str = match &wf.yaml {
-        Some(y) => y.clone(),
-        None => {
-            // 没有 YAML，从 JSON 构建
-            let json_str = serde_json::to_string(&serde_json::json!({
-                "name": wf.name,
-                "description": wf.description,
-                "steps": serde_json::Value::Array(wf.nodes.clone()),
-            }))
-            .unwrap_or_default();
-            json_str
-        }
-    };
+    let yaml_str = &wf.yaml;
 
-    let parsed_wf = match crate::engine::parser::parse_workflow(&yaml_str) {
+    let parsed_wf = match crate::engine::parser::parse_workflow(yaml_str) {
         Ok(wf) => wf,
-        Err(e) => {
-            // 解析失败，尝试直接从 DB 记录构建
-            let steps: Vec<crate::engine::workflow::Step> = wf
-                .nodes
-                .iter()
-                .map(|n| {
-                    let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-                    let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
-                    let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-                    let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
-                    crate::engine::workflow::Step {
-                        id: id.to_string(),
-                        name: label.to_string(),
-                        step_type: node_type.to_string(),
-                        config,
-                        ..Default::default()
-                    }
-                })
-                .collect();
-
-            crate::engine::workflow::Workflow {
-                name: wf.name.clone(),
-                description: wf.description.clone(),
-                steps,
-                variables: None,
-                ..Default::default()
-            }
+        Err(_) => {
+            // 解析失败，返回错误
+            return err_response(
+                StatusCode::BAD_REQUEST,
+                "工作流 YAML 解析失败".to_string(),
+            );
         }
     };
 

@@ -174,10 +174,7 @@ pub fn generate_skill(workflow: &Workflow) -> String {
     // Usage section
     md.push_str("## 执行\n\n");
     md.push_str("```bash\n");
-    md.push_str(&format!("# 通过 API 执行\n"));
-    md.push_str(&format!("curl -X POST http://localhost:9700/api/runs \\\n"));
-    md.push_str(&format!("  -H 'Content-Type: application/json' \\\n"));
-    md.push_str(&format!("  -d '{{\"workflow_id\": \"<id>\"}}'\n"));
+    md.push_str("# 通过 API 执行\ncurl -X POST http://localhost:9700/api/runs \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"workflow_id\": \"<id>\"}'\n");
     md.push_str("```\n");
 
     md

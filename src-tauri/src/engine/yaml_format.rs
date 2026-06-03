@@ -60,7 +60,7 @@ pub fn export_workflow_yaml(wf: &Workflow) -> Result<String> {
     // meta
     if let Some(ref meta) = wf.meta {
         let meta_yaml = export_meta(meta);
-        if !meta_yaml.as_mapping().map_or(true, |m| m.is_empty()) {
+        if meta_yaml.as_mapping().is_some_and(|m| !m.is_empty()) {
             doc.insert(
                 serde_yaml::Value::String("meta".to_string()),
                 meta_yaml,

@@ -391,18 +391,10 @@ pub async fn workflow_save_as_template(
         Err(e) => return err_response(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
 
-    // 构建 workflow JSON（从 YAML 或 nodes）
-    let workflow_json = if let Some(ref yaml) = wf_record.yaml {
-        match serde_yaml::from_str::<serde_json::Value>(yaml) {
-            Ok(v) => v,
-            Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("YAML 解析失败: {e}")),
-        }
-    } else {
-        serde_json::json!({
-            "name": wf_record.name,
-            "description": wf_record.description,
-            "steps": serde_json::Value::Array(wf_record.nodes.clone()),
-        })
+    // 构建 workflow JSON（从 YAML）
+    let workflow_json = match serde_yaml::from_str::<serde_json::Value>(&wf_record.yaml) {
+        Ok(v) => v,
+        Err(e) => return err_response(StatusCode::BAD_REQUEST, format!("YAML 解析失败: {e}")),
     };
 
     // 构建模板文件

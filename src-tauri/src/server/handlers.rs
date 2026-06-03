@@ -126,6 +126,7 @@ pub async fn step_test(Json(body): Json<StepTestBody>) -> Response {
         description: None,
         steps: vec![],
         variables: body.variables,
+        ..Default::default()
     };
     let mut ctx = ExecutionContext::new("test", &wf);
 

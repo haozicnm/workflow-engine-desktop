@@ -78,6 +78,7 @@ impl NodeExecutor for SubWorkflowNode {
             description: None,
             steps: steps.clone(),
             variables: None,
+            ..Default::default()
         };
 
         // ── 变量隔离：创建子上下文，继承父上下文变量 ──
