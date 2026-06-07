@@ -189,6 +189,12 @@ export function getContainerColorVar(type: string): string {
 export const BROWSER_ACTIONS: ActionDef[] = [
   { type: 'navigate', label: '打开页面', icon: 'Link', params: [
     { key: 'url', label: '网址', type: 'text', placeholder: 'https://example.com' },
+    { key: 'wait_until', label: '等待条件', type: 'select', options: [
+      { label: '页面加载完成', value: 'load' },
+      { label: 'DOM 就绪', value: 'domcontentloaded' },
+      { label: '网络空闲', value: 'networkidle' },
+    ], default: 'load' },
+    { key: 'new_tab', label: '新标签页打开', type: 'checkbox', default: false },
   ]},
   { type: 'click', label: '点击元素', icon: 'MousePointerClick', params: [
     { key: 'selector', label: '选择器', type: 'text', placeholder: '#btn 或 .class' },
@@ -199,16 +205,17 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   ]},
   { type: 'wait', label: '等待', icon: 'Clock', params: [
     { key: 'ms', label: '毫秒', type: 'number', default: 1000 },
+    { key: 'selector', label: '等待元素选择器', type: 'text', placeholder: '留空则按时间等待' },
+    { key: 'timeout', label: '选择器超时(ms)', type: 'number', default: 5000 },
   ]},
   { type: 'screenshot', label: '截图', icon: 'Camera', params: [
-    { key: 'path', label: '保存路径', type: 'text', placeholder: './screenshot.png' },
+    { key: 'full_page', label: '整页截图', type: 'checkbox', default: false },
   ]},
   { type: 'evaluate', label: '执行 JS', icon: 'Zap', params: [
     { key: 'script', label: '脚本', type: 'textarea' },
   ]},
   { type: 'scroll', label: '滚动页面', icon: 'ScrollText', params: [
-    { key: 'x', label: '横向像素', type: 'number', default: 0 },
-    { key: 'y', label: '纵向像素', type: 'number', default: 500 },
+    { key: 'y', label: '纵向像素', type: 'number', default: 500, placeholder: '正数向下，0=滚到底部' },
   ]},
   { type: 'extract', label: '提取数据', icon: 'ClipboardList', params: [
     { key: 'selector', label: '选择器', type: 'text', placeholder: 'body', default: 'body' },
@@ -216,6 +223,7 @@ export const BROWSER_ACTIONS: ActionDef[] = [
       { label: '文本', value: 'text' }, { label: 'HTML', value: 'html' },
       { label: '属性', value: 'attr' },
     ], default: 'text' },
+    { key: 'attribute', label: '属性名', type: 'text', placeholder: 'href（attr 模式用）' },
   ]},
   { type: 'get_title', label: '获取标题', icon: 'Tag', params: [] },
   // ─── v1.1+ 扩展动作 ───
@@ -298,7 +306,7 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   ]},
   { type: 'double_click', label: '双击元素', icon: 'MousePointerClick', params: [
     { key: 'selector', label: '选择器', type: 'text' },
-    { key: 'timeout_ms', label: '超时(ms)', type: 'number', default: 10000 },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 5000 },
   ]},
   { type: 'drag_to', label: '拖拽元素', icon: 'MoveHorizontal', params: [
     { key: 'source', label: '源选择器', type: 'text' },
@@ -308,7 +316,7 @@ export const BROWSER_ACTIONS: ActionDef[] = [
   ]},
   { type: 'context_menu', label: '右键菜单', icon: 'ClipboardList', params: [
     { key: 'selector', label: '选择器', type: 'text' },
-    { key: 'timeout_ms', label: '超时(ms)', type: 'number', default: 10000 },
+    { key: 'timeout', label: '超时(ms)', type: 'number', default: 5000 },
   ]},
   { type: 'switch_frame', label: '切换 iframe', icon: 'Frame', params: [
     { key: 'selector', label: 'iframe选择器', type: 'text', placeholder: '留空=回主文档' },
@@ -328,6 +336,15 @@ export const BROWSER_ACTIONS: ActionDef[] = [
       { label: '居中', value: 'center' }, { label: '起始', value: 'start' },
       { label: '结束', value: 'end' }, { label: '最近', value: 'nearest' },
     ], default: 'center' },
+  ]},
+  // ─── v1.8 snapshot + @e ref 操作 ───
+  { type: 'snapshot', label: '页面快照', icon: 'Eye', params: [] },
+  { type: 'click_by_ref', label: '按 ref 点击', icon: 'MousePointerClick', params: [
+    { key: 'ref', label: '元素引用', type: 'text', placeholder: '@e1' },
+  ]},
+  { type: 'fill_by_ref', label: '按 ref 填写', icon: 'Keyboard', params: [
+    { key: 'ref', label: '元素引用', type: 'text', placeholder: '@e1' },
+    { key: 'value', label: '内容', type: 'text' },
   ]},
 ]
 

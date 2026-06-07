@@ -90,6 +90,16 @@ pub async fn execute_browser_container(
     config: &BrowserContainerConfig,
     input_ports: &HashMap<String, Value>,
 ) -> Result<ContainerResult> {
+    // ── WebBridge 预检 ──
+    if !crate::nodes::webbridge::is_available().await {
+        return Err(anyhow!(
+            "浏览器容器不可用：WebBridge 扩展未连接。\n\
+             请确保已安装 Workflow WebBridge 浏览器扩展，\n\
+             然后刷新页面或重启浏览器以建立连接。\n\
+             (Chrome/Edge: chrome://extensions → 启用 Workflow WebBridge)"
+        ));
+    }
+
     // 整体超时保护：默认 120s，可通过 config.timeout 配置（秒）
     let overall_timeout = if config.timeout > 1000 {
         // 兼容旧配置：毫秒 → 秒
