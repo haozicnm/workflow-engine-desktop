@@ -616,7 +616,7 @@ fn cmd_steps() -> Result<(), String> {
 
 fn build_step_manifest() -> serde_json::Value {
     serde_json::json!({
-        "version": "6.7.0",
+        "version": env!("CARGO_PKG_VERSION"),
         "total_types": 14,
         "types": [
             // ═══ 容器节点 (isContainer: true) ═══
