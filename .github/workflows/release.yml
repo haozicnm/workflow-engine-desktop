@@ -295,10 +295,10 @@ jobs:
             'echo Waiting for Workflow Engine to start...'
             ':wait'
             'ping 127.0.0.1 -n 2 > nul'
-            'curl -s http://localhost:19528/api/health >nul 2>&1'
+            'curl -s http://localhost:19529/api/health >nul 2>&1'
             'if errorlevel 1 goto wait'
-            'echo Workflow Engine started on http://localhost:19528'
-            'start http://localhost:19528'
+            'echo Workflow Engine started on http://localhost:19529'
+            'start http://localhost:19529'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
           Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
