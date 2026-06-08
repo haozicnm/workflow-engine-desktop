@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
 
 const { t } = useI18n()
-const toast = useToast()
 import { getActionDef, getActionLabel, getContainerDef } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
 import { useVariableRefs } from '../composables/useVariableRefs'
-import { useToast } from '../composables/useToast'
-import { safeInvoke } from '../utils/tauri'
 import { cn } from '@/lib/utils'
 import Button from './ui/button/Button.vue'
 
 import ParamField from './ParamField.vue'
+import ElementPicker from './ElementPicker.vue'
 
 
 
@@ -85,60 +83,30 @@ function onParamChange(key: string, value: unknown) {
   emit('update-params', { ...localParams.value })
 }
 
-// ─── Element picker (continuous mode) ───
-// pick_start/pick_next/pick_stop 已弃用，隐藏拾取按钮
+// ─── Element picker (snapshot mode) ───
 const pickingElement = ref(false)
-const canPick = false // 后端已弃用 pick 功能，等 WebBridge snapshot 替代方案
+const canPick = true
+const showElementPicker = ref(false)
+const pickTargetField = ref('')
 
-function getStepUrl(): string | undefined {
-  if (!props.steps?.length) return undefined
-  const browserStep = props.steps.find(s => s.type === 'browser')
-  const cfg = browserStep?.config as Record<string, unknown> | undefined
-  const url = cfg?.url as string | undefined
-  const paramsUrl = (cfg?.params as Record<string, unknown> | undefined)?.url as string | undefined
-  return url || paramsUrl
+function onPickElement(fieldKey: string) {
+  pickTargetField.value = fieldKey
+  showElementPicker.value = true
 }
 
-async function onPickElement(fieldKey: string) {
-  pickingElement.value = true
-  try {
-    // 如果没有活跃的拾取会话，先启动
-    if (!pickSessionActive) {
-      const url = getStepUrl()
-      const startResult = await safeInvoke<{ success: boolean; error?: string }>('browser_pick_session_start', { url: url || null })
-      if (!startResult?.success) {
-        toast.error('Failed to start pick session' + (startResult?.error ? ': ' + startResult.error : ''))
-        return
-      }
-      pickSessionActive = true
-    }
-    // 等待用户点选下一个元素
-    const result = await safeInvoke<{ success?: boolean; data?: { selector: string; element?: Record<string, unknown> }; selector?: string }>('browser_pick_next')
-    const selector = result?.data?.selector ?? result?.selector
-    const elementInfo = result?.data?.element
-    if (selector) {
-      localParams.value[fieldKey] = selector
-      emit('update-params', { ...localParams.value })
-    }
-    if (elementInfo && elementInfo.tag) {
-      pickedElementInfo.value = elementInfo as Record<string, unknown>
-    }
-  } catch (e) {
-    const errMsg = e instanceof Error ? e.message : (typeof e === 'string' ? e : String(e || ''))
-    toast.error('Element selection failed: ' + errMsg)
-    pickSessionActive = false
-  } finally {
-    pickingElement.value = false
+function onElementPickerSelect(ref: string) {
+  if (pickTargetField.value) {
+    localParams.value[pickTargetField.value] = ref
+    emit('update-params', { ...localParams.value })
   }
+  showElementPicker.value = false
+  pickTargetField.value = ''
 }
 
-// 组件卸载时清理拾取会话
-onUnmounted(async () => {
-  if (pickSessionActive) {
-    try { await safeInvoke('browser_pick_session_stop') } catch {}
-    pickSessionActive = false
-  }
-})
+function onElementPickerClose() {
+  showElementPicker.value = false
+  pickTargetField.value = ''
+}
 
 // ─── Double-click rename ───
 const editing = ref(false)
@@ -277,32 +245,15 @@ function isSelectorField(key: string): boolean {
           @pick-element="onPickElement(param.key)"
         />
 
-        <!-- Element preview (shown after picking an element) -->
-        <div
-          v-if="pickedElementInfo"
-          class="mt-1 px-2.5 py-2 rounded-md bg-muted/60 border border-border/40 text-[11px] space-y-1.5"
-        >
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-semibold text-primary">&lt;{{ pickedElementInfo.tag }}&gt;</span>
-            <span v-if="pickedElementInfo.id" class="font-mono text-purple-500 dark:text-purple-400">#{{ pickedElementInfo.id }}</span>
-            <span
-              v-for="cls in (pickedElementInfo.classes as string[] || []).slice(0, 3)"
-              :key="cls"
-              class="font-mono text-green-600 dark:text-green-400 bg-green-500/10 px-1 rounded"
-            >.{{ cls }}</span>
-            <span v-if="pickedElementInfo.text" class="text-muted-foreground italic truncate max-w-[200px]">
-              "{{ (pickedElementInfo.text as string).slice(0, 80) }}"
-            </span>
-          </div>
-          <details class="group/html">
-            <summary class="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-              HTML preview
-            </summary>
-            <pre class="mt-1 p-2 rounded bg-background/80 text-[10px] font-mono overflow-x-auto max-h-32 text-muted-foreground whitespace-pre-wrap break-all">{{ pickedElementInfo.html_preview }}</pre>
-          </details>
-        </div>
       </div>
     </Transition>
+
+    <!-- Element Picker Modal -->
+    <ElementPicker
+      v-if="showElementPicker"
+      @select="onElementPickerSelect"
+      @close="onElementPickerClose"
+    />
   </div>
 </template>
 

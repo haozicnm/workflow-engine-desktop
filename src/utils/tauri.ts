@@ -55,6 +55,7 @@ const DYNAMIC_ROUTES: Record<string, RouteEntry> = {
   browser_pick_session_start: { method: 'POST', path: '/api/browser/pick-start' },
   browser_pick_next:  { method: 'GET',    path: '/api/browser/pick-next' },
   browser_pick_session_stop:  { method: 'POST', path: '/api/browser/pick-stop' },
+  browser_snapshot:   { method: 'POST',   path: '/api/browser/snapshot' },
 }
 
 /** Browser-only commands — now available via HTTP */

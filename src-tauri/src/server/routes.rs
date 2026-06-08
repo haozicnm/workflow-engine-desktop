@@ -136,6 +136,10 @@ pub fn build() -> Router {
         )
         .route("/api/browser/pick-next", get(handlers::browser_pick_next))
         .route("/api/browser/pick-stop", post(handlers::browser_pick_stop))
+        .route(
+            "/api/browser/snapshot",
+            post(handlers::browser_snapshot),
+        )
         // 模板库
         .route("/api/templates", get(handlers::template_list))
         .route("/api/templates/categories", get(handlers::template_categories))

@@ -393,6 +393,21 @@ pub async fn browser_pick_stop() -> Response {
     )
 }
 
+/// POST /api/browser/snapshot — 获取页面无障碍树快照（带 @eN ref）
+pub async fn browser_snapshot() -> Response {
+    // 检查 WebBridge 是否可用
+    if !crate::nodes::webbridge::is_available().await {
+        return err_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "WebBridge 扩展未连接，请安装并刷新页面",
+        );
+    }
+    match crate::nodes::webbridge::send_command("snapshot", serde_json::json!({})).await {
+        Ok(val) => ok_response(val),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("snapshot 失败: {}", e)),
+    }
+}
+
 // ═══════════════════════════════════════════════════════════
 // Blocks 自描述 API (P0)
 // ═══════════════════════════════════════════════════════════
