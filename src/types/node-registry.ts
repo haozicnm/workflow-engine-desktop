@@ -67,6 +67,13 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { key: 'collect', label: '结果聚合 (JSON)', type: 'textarea', placeholder: '{"field": "id", "method": "concat"}' },
     { key: 'table', label: '表格输出 (JSON)', type: 'textarea', placeholder: '{"columns": ["name","value"]}' },
   ]},
+  { type: 'while', label: 'While 循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, category: 'flow', description: '条件循环，满足条件时重复执行子步骤', outputHint: 'iterations', params: [
+    { key: 'condition', label: '循环条件', type: 'text', placeholder: 'index < 10' },
+    { key: 'max_iterations', label: '最大迭代次数', type: 'number', default: 1000 },
+  ], paramDefs: [
+    { name: 'condition', field_type: 'string', required: true, desc: '循环条件表达式（如 index < 10）', group: 'basic' },
+    { name: 'max_iterations', field_type: 'number', required: false, default: 1000, desc: '最大迭代次数（防止死循环）', group: 'advanced' },
+  ]},
   { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: 'decision: 选项名, comment, item, auto?, recommendation_reason?', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
     { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step_1.action_1_1.订单号}}' },
@@ -121,26 +128,185 @@ export const CONTAINER_DEFS: ContainerDef[] = [
 
 
   // ─── MCP 扩展节点（Python sidecar 驱动，仅保留无原生等价的类型）───
-  { type: 'mcp_excel_csv',    label: 'MCP Excel↔CSV',    icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 转换 Excel 与 CSV',              outputHint: 'path, rows', params: [
-    { key: 'file_path', label: '文件路径', type: 'text' },
-    { key: 'direction', label: '方向', type: 'select', options: [{ label: 'CSV→Excel', value: 'csv_to_xlsx' }, { label: 'Excel→CSV', value: 'xlsx_to_csv' }], default: 'csv_to_xlsx' },
+  { type: 'mcp_excel_csv',    label: 'MCP Excel↔CSV',    icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 转换 Excel 与 CSV',              outputHint: 'csv_path', params: [
+    { key: 'input_path', label: '输入路径', type: 'text', placeholder: './data.xlsx' },
+    { key: 'output_path', label: '输出路径', type: 'text', placeholder: './data.csv' },
+  ], paramDefs: [
+    { name: 'input_path', field_type: 'file_path', required: true, desc: '输入文件路径', group: 'basic' },
+    { name: 'output_path', field_type: 'file_path', required: false, desc: '输出文件路径', group: 'basic' },
   ]},
-  { type: 'mcp_word_write',   label: 'MCP 写入Word',     icon: 'Pencil',        color: '#a5d6ff', description: '通过 MCP 写入 Word 文档',                outputHint: 'saved: true', params: [
-    { key: 'file_path', label: '文件路径', type: 'text' },
-    { key: 'content', label: '内容', type: 'textarea' },
+  { type: 'mcp_word_write',   label: 'MCP 写入Word',     icon: 'Pencil',        color: '#a5d6ff', description: '通过 MCP 写入 Word 文档',                outputHint: 'path', params: [
+    { key: 'path', label: '文件路径', type: 'text', placeholder: './document.docx' },
+    { key: 'content', label: '内容', type: 'textarea', placeholder: '要写入的内容' },
+    { key: 'position', label: '写入位置', type: 'text', placeholder: 'end' },
+  ], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: 'Word 文件路径', group: 'basic' },
+    { name: 'content', field_type: 'text', required: true, desc: '写入内容', group: 'basic' },
+    { name: 'position', field_type: 'string', required: false, default: 'end', desc: '写入位置（start/end/书签名）', group: 'advanced' },
   ]},
-  { type: 'mcp_word_create',  label: 'MCP 创建Word',     icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 创建 Word 文档',                outputHint: 'created: true', params: [
-    { key: 'file_path', label: '文件路径', type: 'text' },
-    { key: 'title', label: '标题', type: 'text', placeholder: '文档标题' },
+  { type: 'mcp_word_create',  label: 'MCP 创建Word',     icon: 'FileText',      color: '#a5d6ff', description: '通过 MCP 创建 Word 文档',                outputHint: 'path', params: [
+    { key: 'template', label: '模板路径', type: 'text', placeholder: './template.docx' },
+    { key: 'output_path', label: '输出路径', type: 'text', placeholder: './new_doc.docx' },
+  ], paramDefs: [
+    { name: 'template', field_type: 'file_path', required: false, desc: '模板文件路径', group: 'basic' },
+    { name: 'output_path', field_type: 'file_path', required: true, desc: '输出文件路径', group: 'basic' },
   ]},
-  { type: 'mcp_word_replace', label: 'MCP 替换Word',     icon: 'Replace',        color: '#a5d6ff', description: '通过 MCP 查找替换 Word 文本',            outputHint: 'replaced_count', params: [
-    { key: 'file_path', label: '文件路径', type: 'text' },
-    { key: 'old_text', label: '查找', type: 'text' },
-    { key: 'new_text', label: '替换为', type: 'text' },
+  { type: 'mcp_word_replace', label: 'MCP 替换Word',     icon: 'Replace',        color: '#a5d6ff', description: '通过 MCP 查找替换 Word 文本',            outputHint: 'path, replacements', params: [
+    { key: 'path', label: '文件路径', type: 'text', placeholder: './document.docx' },
+    { key: 'find', label: '查找文本', type: 'text', placeholder: '要替换的文本' },
+    { key: 'replace', label: '替换为', type: 'text', placeholder: '新文本' },
+  ], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: 'Word 文件路径', group: 'basic' },
+    { name: 'find', field_type: 'string', required: true, desc: '查找文本', group: 'basic' },
+    { name: 'replace', field_type: 'string', required: true, desc: '替换文本', group: 'basic' },
   ]},
-  { type: 'mcp_word_merge',   label: 'MCP 合并Word',     icon: 'GitMerge',      color: '#a5d6ff', description: '通过 MCP 合并多个 Word 文档',            outputHint: 'merged: true', params: [
-    { key: 'output', label: '输出路径', type: 'text' },
-    { key: 'files', label: '文件列表 (JSON)', type: 'textarea', placeholder: '["a.docx","b.docx"]' },
+  { type: 'mcp_word_merge',   label: 'MCP 合并Word',     icon: 'GitMerge',      color: '#a5d6ff', description: '通过 MCP 合并多个 Word 文档',            outputHint: 'path', params: [
+    { key: 'paths', label: '文件列表 (JSON)', type: 'textarea', placeholder: '["a.docx","b.docx"]' },
+    { key: 'output_path', label: '输出路径', type: 'text', placeholder: './merged.docx' },
+  ], paramDefs: [
+    { name: 'paths', field_type: 'json', required: true, desc: '要合并的文件列表', group: 'basic' },
+    { name: 'output_path', field_type: 'file_path', required: true, desc: '输出文件路径', group: 'basic' },
+  ]},
+
+  // ─── 后端独有节点（与 node-schema.json 对齐）───
+  { type: 'web_scrape', label: '网页抓取', icon: 'Globe', color: '#539bf5', category: 'data', description: '提取网页内容（支持单页/批量/url_pattern/重试/限速/Excel输出）', outputHint: 'title, text, links', params: [
+    { key: 'url', label: 'URL', type: 'text', placeholder: 'https://example.com' },
+    { key: 'urls', label: 'URL 列表 (JSON)', type: 'textarea', placeholder: '["https://a.com", "https://b.com"]' },
+    { key: 'url_pattern', label: 'URL 模式', type: 'text', placeholder: 'https://example.com/page/{id}' },
+    { key: 'extract', label: '提取规则 (JSON)', type: 'textarea', placeholder: '{"title": "h1", "text": "body"}' },
+    { key: 'retry', label: '重试次数', type: 'number', default: 3 },
+    { key: 'retry_delay_ms', label: '重试延迟(ms)', type: 'number', default: 1000 },
+    { key: 'delay_between_ms', label: '请求间隔(ms)', type: 'number', default: 500 },
+    { key: 'fail_fast', label: '快速失败', type: 'checkbox', default: true },
+    { key: 'excel_output', label: '输出到 Excel', type: 'text', placeholder: './output.xlsx' },
+  ], paramDefs: [
+    { name: 'url', field_type: 'string', required: false, desc: '单个 URL', group: 'basic' },
+    { name: 'urls', field_type: 'json', required: false, desc: 'URL 列表', group: 'basic' },
+    { name: 'url_pattern', field_type: 'string', required: false, desc: 'URL 模式（批量抓取）', group: 'basic' },
+    { name: 'extract', field_type: 'json', required: false, desc: '提取规则', group: 'basic' },
+    { name: 'retry', field_type: 'number', required: false, default: 3, desc: '重试次数', group: 'advanced' },
+    { name: 'retry_delay_ms', field_type: 'number', required: false, default: 1000, desc: '重试延迟(ms)', group: 'advanced' },
+    { name: 'delay_between_ms', field_type: 'number', required: false, default: 500, desc: '请求间隔(ms)', group: 'advanced' },
+    { name: 'fail_fast', field_type: 'boolean', required: false, default: true, desc: '快速失败', group: 'advanced' },
+    { name: 'excel_output', field_type: 'string', required: false, desc: '输出到 Excel 文件', group: 'advanced' },
+  ]},
+  { type: 'data_set', label: '设置变量', icon: 'Database', color: '#daaa3e', category: 'data', description: '写入或覆盖上下文变量', outputHint: 'value', params: [
+    { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
+    { key: 'value', label: '变量值', type: 'textarea', placeholder: 'Hello {{name}}' },
+  ], paramDefs: [
+    { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
+    { name: 'value', field_type: 'text', required: true, desc: '变量值', group: 'basic' },
+  ]},
+  { type: 'data_get', label: '读取变量', icon: 'Database', color: '#daaa3e', category: 'data', description: '从上下文读取指定变量的值', outputHint: 'value', params: [
+    { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
+  ], paramDefs: [
+    { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
+  ]},
+  { type: 'file_list', label: '列出文件', icon: 'FolderOpen', color: '#d2a8ff', category: 'file', description: '列出目录内容', outputHint: 'files, count', params: [
+    { key: 'path', label: '目录路径', type: 'text', placeholder: './data' },
+    { key: 'recursive', label: '递归子目录', type: 'checkbox', default: false },
+    { key: 'filter', label: '过滤模式', type: 'text', placeholder: '*.txt' },
+  ], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: '目录路径', group: 'basic' },
+    { name: 'recursive', field_type: 'boolean', required: false, default: false, desc: '递归子目录', group: 'basic' },
+    { name: 'filter', field_type: 'string', required: false, desc: '过滤模式（glob）', group: 'advanced' },
+  ]},
+  { type: 'file_exists', label: '文件存在检查', icon: 'Search', color: '#d2a8ff', category: 'file', description: '检查文件或目录是否存在', outputHint: 'exists', params: [
+    { key: 'path', label: '文件路径', type: 'text', placeholder: './data.txt' },
+  ], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: '文件路径', group: 'basic' },
+  ]},
+  { type: 'file_checksum', label: '文件校验', icon: 'ShieldCheck', color: '#d2a8ff', category: 'file', description: '计算文件 MD5/SHA256 校验和', outputHint: 'md5, sha256', params: [
+    { key: 'path', label: '文件路径', type: 'text', placeholder: './data.txt' },
+  ], paramDefs: [
+    { name: 'path', field_type: 'file_path', required: true, desc: '文件路径', group: 'basic' },
+  ]},
+  { type: 'clipboard_read', label: '读取剪贴板', icon: 'Clipboard', color: '#768390', category: 'system', description: '读取系统剪贴板内容', outputHint: 'text', params: [], paramDefs: [] },
+  { type: 'clipboard_write', label: '写入剪贴板', icon: 'Clipboard', color: '#768390', category: 'system', description: '写入内容到系统剪贴板', outputHint: '', params: [
+    { key: 'content', label: '内容', type: 'textarea', placeholder: '要写入剪贴板的文本' },
+  ], paramDefs: [
+    { name: 'content', field_type: 'text', required: true, desc: '写入内容', group: 'basic' },
+  ]},
+  { type: 'regex', label: '正则处理', icon: 'Regex', color: '#daaa3e', category: 'data', description: '正则表达式处理：提取捕获组或测试匹配', outputHint: 'matches, count, is_match', params: [
+    { key: 'mode', label: '模式', type: 'select', options: [
+      { label: '提取', value: 'extract' }, { label: '测试', value: 'test' },
+    ], default: 'extract' },
+    { key: 'pattern', label: '正则表达式', type: 'text', placeholder: '(\\d+)-(\\d+)' },
+    { key: 'input', label: '输入文本', type: 'textarea', placeholder: '2024-01-15' },
+    { key: 'global', label: '全局匹配', type: 'checkbox', default: false },
+  ], paramDefs: [
+    { name: 'mode', field_type: 'select', required: true, default: 'extract', desc: '处理模式', options: ['extract', 'test'], group: 'basic' },
+    { name: 'pattern', field_type: 'string', required: true, desc: '正则表达式', group: 'basic' },
+    { name: 'input', field_type: 'text', required: true, desc: '输入文本', group: 'basic' },
+    { name: 'global', field_type: 'boolean', required: false, default: false, desc: '全局匹配', group: 'advanced' },
+  ]},
+  { type: 'parallel', label: '并行执行', icon: 'LayoutPanelTop', color: '#e85d75', category: 'flow', description: '并行执行多个子步骤', outputHint: 'results', params: [
+    { key: 'branches', label: '分支数', type: 'number', default: 2 },
+    { key: 'fail_fast', label: '快速失败', type: 'checkbox', default: true },
+    { key: 'max_concurrency', label: '最大并发数', type: 'number', default: 4 },
+  ], paramDefs: [
+    { name: 'branches', field_type: 'number', required: true, default: 2, desc: '分支数', group: 'basic' },
+    { name: 'fail_fast', field_type: 'boolean', required: false, default: true, desc: '快速失败', group: 'advanced' },
+    { name: 'max_concurrency', field_type: 'number', required: false, default: 4, desc: '最大并发数', group: 'advanced' },
+  ]},
+  { type: 'map', label: 'Map 映射', icon: 'MapPin', color: '#e85d75', category: 'flow', description: '对每个输入元素应用映射函数', outputHint: 'result', params: [
+    { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}}' },
+    { key: 'body_steps', label: '映射步骤 (JSON)', type: 'textarea', placeholder: '[{"type": "http", ...}]' },
+    { key: 'item_var', label: '元素变量名', type: 'text', default: 'item' },
+  ], paramDefs: [
+    { name: 'items', field_type: 'string', required: true, desc: '数据源', group: 'basic' },
+    { name: 'body_steps', field_type: 'json', required: true, desc: '映射步骤', group: 'basic' },
+    { name: 'item_var', field_type: 'string', required: false, default: 'item', desc: '元素变量名', group: 'advanced' },
+  ]},
+  { type: 'sub_workflow', label: '子工作流', icon: 'Workflow', color: '#e85d75', category: 'flow', description: '调用另一个工作流作为子流程', outputHint: 'output', params: [
+    { key: 'workflow_id', label: '工作流 ID', type: 'text', placeholder: 'wf_abc123' },
+    { key: 'input_vars', label: '输入变量 (JSON)', type: 'textarea', placeholder: '{"key": "value"}' },
+    { key: 'wait', label: '等待完成', type: 'checkbox', default: true },
+  ], paramDefs: [
+    { name: 'workflow_id', field_type: 'string', required: true, desc: '工作流 ID', group: 'basic' },
+    { name: 'input_vars', field_type: 'json', required: false, desc: '输入变量', group: 'basic' },
+    { name: 'wait', field_type: 'boolean', required: false, default: true, desc: '等待完成', group: 'advanced' },
+  ]},
+  { type: 'mouse_keyboard', label: '键鼠操作', icon: 'MousePointerClick', color: '#768390', category: 'desktop', description: '模拟鼠标和键盘操作', outputHint: 'result', params: [
+    { key: 'actions', label: '操作序列 (JSON)', type: 'textarea', placeholder: '[{"type": "click", "x": 100, "y": 200}]' },
+    { key: 'interval_ms', label: '操作间隔(ms)', type: 'number', default: 100 },
+  ], paramDefs: [
+    { name: 'actions', field_type: 'json', required: true, desc: '操作序列', group: 'basic' },
+    { name: 'interval_ms', field_type: 'number', required: false, default: 100, desc: '操作间隔(ms)', group: 'advanced' },
+  ]},
+  { type: 'window', label: '窗口管理', icon: 'Monitor', color: '#768390', category: 'desktop', description: '管理桌面窗口', outputHint: 'result', params: [
+    { key: 'action', label: '操作', type: 'select', options: [
+      { label: '查找', value: 'find' }, { label: '激活', value: 'activate' }, { label: '关闭', value: 'close' },
+      { label: '移动', value: 'move' }, { label: '调整大小', value: 'resize' },
+    ], default: 'find' },
+    { key: 'title', label: '窗口标题', type: 'text', placeholder: '记事本' },
+    { key: 'process', label: '进程名', type: 'text', placeholder: 'notepad.exe' },
+    { key: 'position', label: '位置 (JSON)', type: 'textarea', placeholder: '{"x": 100, "y": 200}' },
+    { key: 'size', label: '大小 (JSON)', type: 'textarea', placeholder: '{"width": 800, "height": 600}' },
+  ], paramDefs: [
+    { name: 'action', field_type: 'select', required: true, default: 'find', desc: '操作类型', options: ['find', 'activate', 'close', 'move', 'resize'], group: 'basic' },
+    { name: 'title', field_type: 'string', required: false, desc: '窗口标题', group: 'basic' },
+    { name: 'process', field_type: 'string', required: false, desc: '进程名', group: 'basic' },
+    { name: 'position', field_type: 'json', required: false, desc: '位置', group: 'advanced' },
+    { name: 'size', field_type: 'json', required: false, desc: '大小', group: 'advanced' },
+  ]},
+  { type: 'ocr', label: 'OCR 识别', icon: 'ScanText', color: '#a5d6ff', category: 'ai', description: '从图片中识别文字', outputHint: 'text', params: [
+    { key: 'source', label: '图片源', type: 'text', placeholder: './screenshot.png' },
+    { key: 'language', label: '语言', type: 'select', options: [
+      { label: '中文', value: 'chi' }, { label: '英文', value: 'eng' }, { label: '中英混合', value: 'chi+eng' },
+    ], default: 'chi+eng' },
+  ], paramDefs: [
+    { name: 'source', field_type: 'file_path', required: true, desc: '图片路径', group: 'basic' },
+    { name: 'language', field_type: 'select', required: false, default: 'chi+eng', desc: '识别语言', options: ['chi', 'eng', 'chi+eng'], group: 'basic' },
+  ]},
+  { type: 'print', label: '打印', icon: 'Printer', color: '#768390', category: 'system', description: '打印文档或内容', outputHint: '', params: [
+    { key: 'message', label: '消息', type: 'textarea', placeholder: '要打印的内容' },
+    { key: 'level', label: '日志级别', type: 'select', options: [
+      { label: '信息', value: 'info' }, { label: '警告', value: 'warn' }, { label: '错误', value: 'error' },
+    ], default: 'info' },
+  ], paramDefs: [
+    { name: 'message', field_type: 'text', required: true, desc: '打印内容', group: 'basic' },
+    { name: 'level', field_type: 'select', required: false, default: 'info', desc: '日志级别', options: ['info', 'warn', 'error'], group: 'advanced' },
   ]},
 ]
 

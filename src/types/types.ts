@@ -4,6 +4,9 @@
 // ─── 容器类型 ───
 
 export type ContainerType = 'browser' | 'excel' | 'word' | 'logic' | 'http' | 'delay' | 'notify' | 'script' | 'cursor' | 'loop' | 'approval' | 'shell' | 'file' | 'file_read' | 'file_write' | 'condition' | 'mcp_script' | 'mcp_shell' | 'mcp_excel_read' | 'mcp_excel_write' | 'mcp_excel_create' | 'mcp_excel_filter' | 'mcp_excel_sort' | 'mcp_excel_append' | 'mcp_excel_csv' | 'mcp_word_read' | 'mcp_word_write' | 'mcp_word_create' | 'mcp_word_replace' | 'mcp_word_merge' | 'mcp_web_scrape'
+  | 'web_scrape' | 'data_set' | 'data_get' | 'file_list' | 'file_exists' | 'file_checksum'
+  | 'clipboard_read' | 'clipboard_write' | 'regex' | 'parallel' | 'map' | 'sub_workflow'
+  | 'mouse_keyboard' | 'window' | 'ocr' | 'print' | 'while'
 
 export interface ContainerDef {
   type: ContainerType
