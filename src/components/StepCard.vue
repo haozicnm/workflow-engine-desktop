@@ -102,11 +102,14 @@ const menuPosStyle = ref<Record<string, string>>({})
 
 function toggleMenu() {
   showMenu.value = !showMenu.value
-  if (showMenu.value && menuBtnRef.value?.$el) {
-    const rect = (menuBtnRef.value.$el as HTMLElement).getBoundingClientRect()
-    menuPosStyle.value = {
-      top: `${rect.bottom + 4}px`,
-      left: `${rect.right - 208}px`, // 208px = w-52
+  if (showMenu.value) {
+    const el = menuBtnRef.value?.$el as HTMLElement | undefined
+    if (el && typeof el.getBoundingClientRect === 'function') {
+      const rect = el.getBoundingClientRect()
+      menuPosStyle.value = {
+        top: `${rect.bottom + 4}px`,
+        left: `${rect.right - 208}px`,
+      }
     }
   }
 }

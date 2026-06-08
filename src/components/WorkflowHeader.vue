@@ -40,7 +40,7 @@ const cardMenuPosStyle = ref<Record<string, string>>({})
 
 function toggleCardMenu() {
   showCardMenu.value = !showCardMenu.value
-  if (showCardMenu.value && cardMenuBtnRef.value) {
+  if (showCardMenu.value && cardMenuBtnRef.value && typeof cardMenuBtnRef.value.getBoundingClientRect === 'function') {
     const rect = cardMenuBtnRef.value.getBoundingClientRect()
     cardMenuPosStyle.value = {
       top: `${rect.bottom + 4}px`,
