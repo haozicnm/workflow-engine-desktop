@@ -86,9 +86,9 @@ function onParamChange(key: string, value: unknown) {
 }
 
 // ─── Element picker (continuous mode) ───
+// pick_start/pick_next/pick_stop 已弃用，隐藏拾取按钮
 const pickingElement = ref(false)
-let pickSessionActive = false
-const pickedElementInfo = ref<Record<string, unknown> | null>(null)
+const canPick = false // 后端已弃用 pick 功能，等 WebBridge snapshot 替代方案
 
 function getStepUrl(): string | undefined {
   if (!props.steps?.length) return undefined
@@ -271,7 +271,7 @@ function isSelectorField(key: string): boolean {
           :param="param"
           :model-value="localParams[param.key] ?? param.default"
           :grouped-refs="groupedRefs"
-          :show-element-picker="isSelectorField(param.key)"
+          :show-element-picker="canPick && isSelectorField(param.key)"
           :picking-element="pickingElement"
           @update:model-value="v => onParamChange(param.key, v)"
           @pick-element="onPickElement(param.key)"
