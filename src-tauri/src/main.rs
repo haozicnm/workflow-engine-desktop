@@ -18,7 +18,25 @@ async fn main() {
     }));
 
     let bind_addr = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:19529".to_string());
-    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| {
+        // 自动定位 dist/ 目录：优先 exe 同目录，然后父目录，然后 CWD
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                let beside = dir.join("dist");
+                if beside.is_dir() {
+                    return beside.to_string_lossy().to_string();
+                }
+                // 开发模式: target/debug/ → ../../dist 或 target/release/ → ../../dist
+                if let Some(grandparent) = dir.parent().and_then(|p| p.parent()) {
+                    let relative = grandparent.join("dist");
+                    if relative.is_dir() {
+                        return relative.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+        "dist".to_string()
+    });
 
     let router = workflow_engine::server::build_router(app)
         .fallback_service(tower_http::services::ServeDir::new(&static_dir));

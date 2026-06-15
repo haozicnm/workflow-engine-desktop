@@ -47,7 +47,23 @@ fn main() {
     // Clone for HTTP server (runs alongside Tauri)
     let app_for_http = app.clone();
     let http_bind = std::env::var("BIND").unwrap_or_else(|_| "127.0.0.1:19529".to_string());
-    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "dist".to_string());
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| {
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                let beside = dir.join("dist");
+                if beside.is_dir() {
+                    return beside.to_string_lossy().to_string();
+                }
+                if let Some(grandparent) = dir.parent().and_then(|p| p.parent()) {
+                    let relative = grandparent.join("dist");
+                    if relative.is_dir() {
+                        return relative.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+        "dist".to_string()
+    });
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
