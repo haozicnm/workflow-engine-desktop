@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 工作流格式版本
-pub const FORMAT_VERSION: &str = "1.0";
+pub const FORMAT_VERSION: &str = "2.0";
 
 /// 步骤失败时的处理策略
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +35,27 @@ pub struct WorkflowMeta {
     pub updated_at: Option<String>,
 }
 
+/// 节点位置（用于 Canvas 编辑器）
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Position {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// 图中的边：连接两个节点的端口
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
+pub struct Edge {
+    /// 源节点 ID
+    pub from: String,
+    /// 源端口标签
+    pub from_port: String,
+    /// 目标节点 ID
+    pub to: String,
+    /// 目标端口标签
+    pub to_port: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Workflow {
     /// 工作流格式版本（用于兼容性检查）
@@ -48,6 +69,9 @@ pub struct Workflow {
     pub steps: Vec<Step>,
     #[serde(alias = "params")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
+    /// v8: 图的边（可选，兼容线性模式）
+    #[serde(default)]
+    pub edges: Vec<Edge>,
 }
 
 /// 可视化条件（单个条件）

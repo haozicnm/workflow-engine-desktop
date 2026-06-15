@@ -386,6 +386,7 @@ mod tests {
                     ..Default::default()
                 },
             ],
+            edges: vec![],
             variables: Some(vars),
         }
     }

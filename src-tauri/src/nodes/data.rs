@@ -53,6 +53,17 @@ pub struct DataSetNode;
 
 #[async_trait]
 impl NodeExecutor for DataSetNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "data_set".into(), version: "1.0".into(),
+            display_name: "设置变量".into(), description: "设置工作流变量键值对".into(),
+            category: "数据".into(), inputs: vec![],
+            outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
+            config_schema: serde_json::json!({"type": "object", "required": ["key"], "properties": {"key": {"type": "string"}, "value": {"type": "string"}}}),
+        }
+    }
+
+
     async fn execute(
         &self,
         step: &Step,
@@ -79,6 +90,16 @@ pub struct DataGetNode;
 
 #[async_trait]
 impl NodeExecutor for DataGetNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "data_get".into(), version: "1.0".into(),
+            display_name: "读取变量".into(), description: "读取工作流变量的值".into(),
+            category: "数据".into(), inputs: vec![],
+            outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
+            config_schema: serde_json::json!({"type": "object", "required": ["key"], "properties": {"key": {"type": "string"}}}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -107,6 +128,16 @@ pub struct DataLengthNode;
 
 #[async_trait]
 impl NodeExecutor for DataLengthNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "data_length".into(), version: "1.0".into(),
+            display_name: "数据长度".into(), description: "获取字符串或数组的长度".into(),
+            category: "数据".into(), inputs: vec![],
+            outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "number".into(), required: false }],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -143,6 +174,16 @@ pub struct DataDefaultNode;
 
 #[async_trait]
 impl NodeExecutor for DataDefaultNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "data_default".into(), version: "1.0".into(),
+            display_name: "默认值".into(), description: "变量不存在时设置默认值".into(),
+            category: "数据".into(), inputs: vec![],
+            outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -179,6 +220,16 @@ pub struct DataMergeNode;
 
 #[async_trait]
 impl NodeExecutor for DataMergeNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "data_merge".into(), version: "1.0".into(),
+            display_name: "合并数据".into(), description: "合并多个数据源".into(),
+            category: "数据".into(), inputs: vec![],
+            outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "object".into(), required: false }],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

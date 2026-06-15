@@ -1,5 +1,46 @@
 # Changelog
 
+## v8.0.0 (2026-06-15)
+
+### 🚀 图执行引擎
+
+- **拓扑分层执行**: 基于 Kahn 算法的拓扑排序，自动识别并行节点
+- **同层并行**: 使用 `tokio::task::JoinSet`，独立节点自动并行执行（实测 3× 加速）
+- **循环检测**: 执行前检测循环依赖，即时报错而非死锁
+- **双模自适应**: 有 `edges` 字段走图模式，无 `edges` 自动回退线性链（完全向后兼容）
+- **CLI 集成**: `wf-cli run-file` 自动识别图/线性模式，图模式显示 `[图引擎·并行]`
+
+### 📋 节点类型元数据
+
+- **NodeTypeDef**: 每个节点现在有 `type_name`、`version`、`display_name`、`description`、`category` 元数据
+- **PortDef**: 输入/输出端口定义（label + data_type + required）
+- **validate_config()**: 执行前配置校验钩子（默认通过，节点可按需覆盖）
+- **18 个核心节点** 已完成 type_def 实现: http, script, condition, data_set/get/length/default/merge, file_read/write/list/delete/exists/append, shell, delay, loop
+
+### 🔍 变量引用预校验
+
+- 执行前检查所有 `{{nodeId.port}}` 模板引用是否指向存在的节点
+- 支持 `{{params.xxx}}` 和 `{{__item}}` 内置变量豁免
+- 错误信息明确指向具体步骤和引用
+
+### 📡 执行事件流
+
+- `ExecutionEvent` 枚举: WorkflowStarted / NodeStarted / NodeCompleted / NodeFailed / WorkflowCompleted
+- `run_workflow_with_events()`: 可选 `mpsc::Sender` 参数，实时推送执行状态
+- 用于 WebSocket/SSE 前端实时更新
+
+### 📐 数据模型扩展
+
+- **Edge**: 新增图边类型（from/from_port/to/to_port），支持显式端口连接
+- **Position**: Canvas 节点位置（x/y）
+- **Workflow.edges**: 工作流级边集合
+- **FORMAT_VERSION**: `1.0` → `2.0`
+
+### ⚠️ 破坏性变更
+
+- **无** — 34 个节点零改动编译通过，线性链完全兼容
+
+
 ## v7.7.0 (2026-06-03)
 
 ### ✨ New Features

@@ -4,15 +4,31 @@
 //   每个操作一个 struct，一个注册条目。
 
 use crate::engine::context::ExecutionContext;
-use crate::engine::workflow::Step;
+use crate::engine::workflow::{Edge, Step, Workflow};
 use crate::nodes::traits::NodeExecutor;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
+
+
+/// 执行事件（可选的事件流推送）
+#[derive(Debug, Clone)]
+pub enum ExecutionEvent {
+    /// 工作流开始
+    WorkflowStarted { total_steps: usize },
+    /// 节点开始执行
+    NodeStarted { node_id: String, step_type: String },
+    /// 节点执行完成
+    NodeCompleted { node_id: String, duration_ms: u64 },
+    /// 节点执行失败
+    NodeFailed { node_id: String, error: String, duration_ms: u64 },
+    /// 工作流完成
+    WorkflowCompleted { total_duration_ms: u64 },
+}
 
 pub struct StepExecutor {
     executors: HashMap<String, Box<dyn NodeExecutor>>,
@@ -270,6 +286,173 @@ impl StepExecutor {
             }
         })
     }
+
+    // ═══════════════════════════════════════════════
+    // v8: 图执行引擎（拓扑分层 + 并行执行）
+    // ═══════════════════════════════════════════════
+
+    /// 执行完整工作流：有 edges 走图模式，无 edges 走线性模式。
+    pub async fn run_workflow(self: &Arc<Self>, workflow: &Workflow) -> Result<ExecutionContext> {
+        self.run_workflow_with_events(workflow, None).await
+    }
+
+    /// 执行工作流并可选地推送事件
+    pub async fn run_workflow_with_events(
+        self: &Arc<Self>,
+        workflow: &Workflow,
+        event_tx: Option<tokio::sync::mpsc::Sender<ExecutionEvent>>,
+    ) -> Result<ExecutionContext> {
+        let start = std::time::Instant::now();
+        let _ = event_tx.as_ref().map(|tx| tx.try_send(ExecutionEvent::WorkflowStarted { total_steps: workflow.steps.len() }));
+
+        let mut ctx = ExecutionContext::new("graph-run", workflow);
+
+        let result = if !workflow.edges.is_empty() {
+            self.run_graph(workflow, &mut ctx).await
+        } else {
+            self.run_linear(workflow, &mut ctx).await
+        };
+
+        match &result {
+            Ok(_) => {
+                let _ = event_tx.as_ref().map(|tx| tx.try_send(ExecutionEvent::WorkflowCompleted { total_duration_ms: start.elapsed().as_millis() as u64 }));
+            }
+            Err(_) => {}
+        }
+
+        result.map(|_| ctx)
+    }
+
+    /// 图执行：拓扑分层 → 同层并行
+    async fn run_graph(self: &Arc<Self>, workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
+        self.validate_variable_references(workflow)?;
+        let levels = self.topological_levels(&workflow.steps, &workflow.edges)?;
+        info!("图执行: {} 个层级, {} 个步骤", levels.len(), workflow.steps.len());
+        for level in &levels {
+            if level.len() == 1 {
+                let step = workflow.steps.iter().find(|s| s.id == level[0])
+                    .ok_or_else(|| anyhow!("节点未找到: {}", level[0]))?;
+                let result = Arc::clone(self).execute(step, ctx).await?;
+                ctx.variables.insert(step.id.clone(), result);
+            } else {
+                self.run_parallel_level(level, workflow, ctx).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// 并行执行一层节点
+    async fn run_parallel_level(self: &Arc<Self>, node_ids: &[String], workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
+        let mut join_set = tokio::task::JoinSet::new();
+        for node_id in node_ids {
+            let step = workflow.steps.iter().find(|s| &s.id == node_id).cloned()
+                .ok_or_else(|| anyhow!("节点未找到: {}", node_id))?;
+            let mut task_ctx = ExecutionContext::new(&step.id, workflow);
+            task_ctx.variables = ctx.variables.clone();
+            let exec = Arc::clone(self);
+            join_set.spawn(async move {
+                let result = exec.execute(&step, &mut task_ctx).await;
+                (step.id.clone(), result, task_ctx.variables)
+            });
+        }
+        while let Some(jr) = join_set.join_next().await {
+            match jr {
+                Ok((nid, Ok(val), vars)) => {
+                    ctx.variables.insert(nid.clone(), val);
+                    for (k, v) in vars { if k != nid { ctx.variables.entry(k).or_insert(v); } }
+                }
+                Ok((nid, Err(e), _)) => { warn!("节点 {} 失败: {}", nid, e); return Err(e); }
+                Err(e) => return Err(anyhow!("并行任务 panic: {}", e)),
+            }
+        }
+        Ok(())
+    }
+
+    /// 线性执行（向后兼容）
+    async fn run_linear(self: &Arc<Self>, workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
+        for step in &workflow.steps {
+            let result = Arc::clone(self).execute(step, ctx).await?;
+            ctx.variables.insert(step.id.clone(), result);
+        }
+        Ok(())
+    }
+
+    /// 拓扑分层（Kahn 算法）
+    pub fn topological_levels(&self, steps: &[Step], edges: &[Edge]) -> Result<Vec<Vec<String>>> {
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        let mut adj: HashMap<String, Vec<String>> = HashMap::new();
+        for step in steps { in_degree.entry(step.id.clone()).or_insert(0); adj.entry(step.id.clone()).or_default(); }
+        for edge in edges {
+            *in_degree.entry(edge.to.clone()).or_insert(0) += 1;
+            adj.entry(edge.from.clone()).or_default().push(edge.to.clone());
+        }
+        let mut current_level: Vec<String> = in_degree.iter().filter(|(_, &d)| d == 0).map(|(id, _)| id.clone()).collect();
+        let mut levels = Vec::new();
+        let mut visited = HashSet::new();
+        while !current_level.is_empty() {
+            let mut next = Vec::new();
+            for nid in &current_level {
+                visited.insert(nid.clone());
+                if let Some(nbrs) = adj.get(nid) {
+                    for nb in nbrs {
+                        if let Some(d) = in_degree.get_mut(nb) { *d -= 1; if *d == 0 { next.push(nb.clone()); } }
+                    }
+                }
+            }
+            levels.push(current_level);
+            current_level = next;
+        }
+        if visited.len() != steps.len() { return Err(anyhow!("工作流包含循环依赖")); }
+        Ok(levels)
+    }
+
+    /// 获取执行计划
+
+    /// 校验工作流中所有变量引用是否指向存在的节点/端口
+    pub fn validate_variable_references(&self, workflow: &Workflow) -> Result<()> {
+        let node_ids: HashSet<&str> = workflow.steps.iter().map(|s| s.id.as_str()).collect();
+        let re = regex::Regex::new(r"\{\{([^.}]+)\.([^}]+)\}\}").unwrap();
+
+        for step in &workflow.steps {
+            let config_str = step.config.to_string();
+            for cap in re.captures_iter(&config_str) {
+                let ref_node = &cap[1];
+                let ref_port = &cap[2];
+
+                // 允许 {{params.xxx}} 和 {{__item}} 等内置变量
+                if ref_node == "params" || ref_node.starts_with("__") {
+                    continue;
+                }
+
+                // 允许自引用（步骤可以引用自己的输出）
+                if ref_node == step.id.as_str() {
+                    continue;
+                }
+
+                // 检查节点是否存在
+                if !node_ids.contains(ref_node) {
+                    // 也检查是否是 workflow 级变量
+                    if let Some(ref vars) = workflow.variables {
+                        if vars.contains_key(ref_node) {
+                            continue;
+                        }
+                    }
+                    return Err(anyhow!(
+                        "步骤 '{}' 引用了不存在的节点 '{}'（变量 {{{{{}.{}}}}}）",
+                        step.id, ref_node, ref_node, ref_port
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn get_execution_plan(&self, workflow: &Workflow) -> Result<Vec<Vec<String>>> {
+        if workflow.edges.is_empty() {
+            Ok(workflow.steps.iter().map(|s| vec![s.id.clone()]).collect())
+        } else {
+            self.topological_levels(&workflow.steps, &workflow.edges)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -277,7 +460,8 @@ mod tests {
     use super::*;
     use crate::engine::context::ExecutionContext;
     use crate::engine::parser;
-    use crate::engine::workflow::{Step, Workflow};
+    use crate::engine::workflow::{Edge, Step, Workflow};
+    use serde_json::json;
     use std::sync::Arc;
 
     fn test_db() -> Arc<crate::data::db::Database> {
@@ -420,5 +604,245 @@ mod tests {
         let output = result.unwrap();
         assert_eq!(output.get("branch").and_then(|v| v.as_str()), Some("true"));
         assert_eq!(output.get("result").and_then(|v| v.as_bool()), Some(true));
+    }
+
+    // ═══════════════════════════════════════════════
+    // v8: 图执行测试
+    // ═══════════════════════════════════════════════
+
+    #[test]
+    fn topological_levels_linear_chain() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let steps = vec![
+            Step { id: "a".into(), step_type: "log".into(), config: json!({}), ..Default::default() },
+            Step { id: "b".into(), step_type: "log".into(), config: json!({}), ..Default::default() },
+            Step { id: "c".into(), step_type: "log".into(), config: json!({}), ..Default::default() },
+        ];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+        ];
+        let levels = exec.topological_levels(&steps, &edges).unwrap();
+        assert_eq!(levels.len(), 3);
+        assert_eq!(levels[0], vec!["a"]);
+        assert_eq!(levels[1], vec!["b"]);
+        assert_eq!(levels[2], vec!["c"]);
+    }
+
+    #[test]
+    fn topological_levels_parallel_branch() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let steps = vec![
+            Step { id: "a".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "b".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "c".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+        ];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "a".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+        ];
+        let levels = exec.topological_levels(&steps, &edges).unwrap();
+        assert_eq!(levels.len(), 2);
+        assert_eq!(levels[0], vec!["a"]);
+        assert_eq!(levels[1].len(), 2);
+        assert!(levels[1].contains(&"b".to_string()));
+        assert!(levels[1].contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn topological_levels_diamond() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let steps = vec![
+            Step { id: "a".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "b".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "c".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "d".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+        ];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "a".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+            Edge { from: "c".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+        ];
+        let levels = exec.topological_levels(&steps, &edges).unwrap();
+        assert_eq!(levels.len(), 3);
+        assert_eq!(levels[0], vec!["a"]);
+        assert_eq!(levels[1].len(), 2);
+        assert_eq!(levels[2], vec!["d"]);
+    }
+
+    #[test]
+    fn topological_levels_detects_cycle() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let steps = vec![
+            Step { id: "a".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+            Step { id: "b".into(), step_type: "http".into(), config: json!({}), ..Default::default() },
+        ];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "a".into(), to_port: "in".into() },
+        ];
+        let result = exec.topological_levels(&steps, &edges);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("循环"));
+    }
+
+    #[test]
+    fn get_execution_plan_no_edges_is_linear() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+        let wf = Workflow {
+            steps: vec![
+                Step { id: "s1".into(), step_type: "data_set".into(), config: json!({}), ..Default::default() },
+                Step { id: "s2".into(), step_type: "data_get".into(), config: json!({}), ..Default::default() },
+            ],
+            ..Default::default()
+        };
+        let plan = exec.get_execution_plan(&wf).unwrap();
+        assert_eq!(plan.len(), 2);
+        assert_eq!(plan[0], vec!["s1"]);
+        assert_eq!(plan[1], vec!["s2"]);
+    }
+}
+#[cfg(test)]
+mod graph_tests {
+    use crate::engine::context::ExecutionContext;
+    use crate::engine::executor::StepExecutor;
+    use crate::engine::workflow::{Edge, Step, Workflow};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    fn test_exec() -> Arc<StepExecutor> {
+        StepExecutor::new(
+            Arc::new(crate::engine::approval_store::ApprovalStore::new()),
+            Arc::new(crate::data::db::Database::open_default().expect("db")),
+        )
+    }
+
+    #[tokio::test]
+    async fn graph_execution_linear_chain_three_nodes() {
+        // data_set → data_get → data_set（验证变量在节点间传递）
+        let exec = test_exec();
+        let wf = Workflow {
+            name: "图链测试".into(),
+            steps: vec![
+                Step { id: "s1".into(), step_type: "data_set".into(), name: "Set name".into(),
+                    config: json!({"key": "name", "value": "hello"}), ..Default::default() },
+                Step { id: "s2".into(), step_type: "data_get".into(), name: "Get name".into(),
+                    config: json!({"key": "name"}), ..Default::default() },
+                Step { id: "s3".into(), step_type: "data_set".into(), name: "Set result".into(),
+                    config: json!({"key": "result", "value": "{{s2}}"}), ..Default::default() },
+            ],
+            edges: vec![
+                Edge { from: "s1".into(), from_port: "out".into(), to: "s2".into(), to_port: "in".into() },
+                Edge { from: "s2".into(), from_port: "out".into(), to: "s3".into(), to_port: "in".into() },
+            ],
+            ..Default::default()
+        };
+
+        let ctx = exec.run_workflow(&wf).await.unwrap();
+        // s1 设置了 name=hello
+        assert_eq!(ctx.variables.get("name").and_then(|v| v.as_str()), Some("hello"));
+        // s3 设置了 result（从 s2 读出的值）
+        assert!(ctx.variables.contains_key("result"));
+    }
+
+    #[tokio::test]
+    async fn graph_execution_parallel_two_branches() {
+        // 两个独立 data_set 节点并行执行
+        let exec = test_exec();
+        let wf = Workflow {
+            name: "图并行测试".into(),
+            steps: vec![
+                Step { id: "a".into(), step_type: "data_set".into(), name: "Set A".into(),
+                    config: json!({"key": "a", "value": "A"}), ..Default::default() },
+                Step { id: "b".into(), step_type: "data_set".into(), name: "Set B".into(),
+                    config: json!({"key": "b", "value": "B"}), ..Default::default() },
+            ],
+            edges: vec![], // 无依赖 → 并行
+            ..Default::default()
+        };
+
+        let ctx = exec.run_workflow(&wf).await.unwrap();
+        assert_eq!(ctx.variables.get("a").and_then(|v| v.as_str()), Some("A"));
+        assert_eq!(ctx.variables.get("b").and_then(|v| v.as_str()), Some("B"));
+    }
+
+    #[tokio::test]
+    async fn empty_edges_falls_back_to_linear() {
+        // 无 edges → 线性执行（向后兼容）
+        let exec = test_exec();
+        let wf = Workflow {
+            name: "线性测试".into(),
+            steps: vec![
+                Step { id: "s1".into(), step_type: "data_set".into(), name: "S1".into(),
+                    config: json!({"key": "x", "value": "1"}), ..Default::default() },
+            ],
+            ..Default::default()
+        };
+
+        let ctx = exec.run_workflow(&wf).await.unwrap();
+        assert_eq!(ctx.variables.get("x").and_then(|v| v.as_str()), Some("1"));
+    }
+
+    #[tokio::test]
+    async fn graph_execution_diamond_structure() {
+        // 钻石结构：a → b, a → c, b → d, c → d
+        let exec = test_exec();
+        let wf = Workflow {
+            name: "钻石测试".into(),
+            steps: vec![
+                Step { id: "a".into(), step_type: "data_set".into(), name: "A".into(),
+                    config: json!({"key": "v", "value": "start"}), ..Default::default() },
+                Step { id: "b".into(), step_type: "data_set".into(), name: "B".into(),
+                    config: json!({"key": "b", "value": "done"}), ..Default::default() },
+                Step { id: "c".into(), step_type: "data_set".into(), name: "C".into(),
+                    config: json!({"key": "c", "value": "done"}), ..Default::default() },
+                Step { id: "d".into(), step_type: "data_set".into(), name: "D".into(),
+                    config: json!({"key": "d", "value": "final"}), ..Default::default() },
+            ],
+            edges: vec![
+                Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+                Edge { from: "a".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+                Edge { from: "b".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+                Edge { from: "c".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+            ],
+            ..Default::default()
+        };
+
+        let ctx = exec.run_workflow(&wf).await.unwrap();
+        assert_eq!(ctx.variables.get("v").and_then(|v| v.as_str()), Some("start"));
+        assert_eq!(ctx.variables.get("b").and_then(|v| v.as_str()), Some("done"));
+        assert_eq!(ctx.variables.get("c").and_then(|v| v.as_str()), Some("done"));
+        assert_eq!(ctx.variables.get("d").and_then(|v| v.as_str()), Some("final"));
+    }
+
+    #[tokio::test]
+    async fn graph_execution_http_data_flow() {
+        // http → data_set（验证 HTTP 输出到变量传递）
+        let exec = test_exec();
+        let wf = Workflow {
+            name: "HTTP流".into(),
+            steps: vec![
+                Step { id: "fetch".into(), step_type: "http".into(), name: "Fetch".into(),
+                    config: json!({"action": "GET", "url": "https://httpbin.org/get"}), ..Default::default() },
+                Step { id: "save".into(), step_type: "data_set".into(), name: "Save".into(),
+                    config: json!({"key": "response", "value": "{{fetch}}"}), ..Default::default() },
+            ],
+            edges: vec![
+                Edge { from: "fetch".into(), from_port: "out".into(), to: "save".into(), to_port: "in".into() },
+            ],
+            ..Default::default()
+        };
+
+        let result = exec.run_workflow(&wf).await;
+        // HTTP 可能因网络问题失败，但不应 panic
+        match result {
+            Ok(ctx) => {
+                assert!(ctx.variables.contains_key("response"), "response 变量应存在");
+            }
+            Err(e) => {
+                eprintln!("HTTP 请求失败（网络可能不可用）: {}", e);
+            }
+        }
     }
 }

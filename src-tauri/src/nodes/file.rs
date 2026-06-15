@@ -38,6 +38,21 @@ pub struct FileReadNode;
 
 #[async_trait]
 impl NodeExecutor for FileReadNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_read".into(),
+            version: "1.0".into(),
+            display_name: "读取文件".into(),
+            description: "读取文件内容为文本".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -91,6 +106,21 @@ pub struct FileWriteNode;
 
 #[async_trait]
 impl NodeExecutor for FileWriteNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_write".into(),
+            version: "1.0".into(),
+            display_name: "写入文件".into(),
+            description: "写入文本内容到文件".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -148,6 +178,21 @@ pub struct FileListNode;
 
 #[async_trait]
 impl NodeExecutor for FileListNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_list".into(),
+            version: "1.0".into(),
+            display_name: "列出文件".into(),
+            description: "列出目录中的文件".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -244,6 +289,21 @@ pub struct FileDeleteNode;
 
 #[async_trait]
 impl NodeExecutor for FileDeleteNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_delete".into(),
+            version: "1.0".into(),
+            display_name: "删除文件".into(),
+            description: "删除指定文件".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -288,6 +348,21 @@ pub struct FileExistsNode;
 
 #[async_trait]
 impl NodeExecutor for FileExistsNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_exists".into(),
+            version: "1.0".into(),
+            display_name: "文件存在".into(),
+            description: "检查文件是否存在".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -320,6 +395,21 @@ pub struct FileAppendNode;
 
 #[async_trait]
 impl NodeExecutor for FileAppendNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_append".into(),
+            version: "1.0".into(),
+            display_name: "追加文件".into(),
+            description: "追加内容到文件末尾".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

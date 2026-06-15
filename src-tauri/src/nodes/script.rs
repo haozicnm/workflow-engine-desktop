@@ -25,6 +25,21 @@ pub struct ScriptNode;
 
 #[async_trait]
 impl NodeExecutor for ScriptNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "script".into(),
+            version: "1.0".into(),
+            display_name: "脚本".into(),
+            description: "执行 Rhai 脚本，支持变量读写和逻辑处理".into(),
+            category: "逻辑".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({"type": "object", "properties": {"script": {"type": "string"}}}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

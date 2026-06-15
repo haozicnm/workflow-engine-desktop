@@ -24,6 +24,22 @@ pub struct ConditionNode;
 
 #[async_trait]
 impl NodeExecutor for ConditionNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "condition".into(),
+            version: "1.0".into(),
+            display_name: "条件判断".into(),
+            description: "根据条件比较结果分支执行，支持 AND/OR 组合".into(),
+            category: "逻辑".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "branch".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "boolean".into(), required: false },
+            ],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

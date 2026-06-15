@@ -30,6 +30,21 @@ fn parse_body_steps(step: &Step) -> Result<Vec<Step>> {
 
 #[async_trait]
 impl NodeExecutor for LoopNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "loop".into(),
+            version: "1.0".into(),
+            display_name: "循环".into(),
+            description: "遍历数组或重复执行子步骤".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object" }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

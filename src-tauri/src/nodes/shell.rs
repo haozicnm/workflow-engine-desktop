@@ -32,6 +32,21 @@ pub struct ShellNode;
 
 #[async_trait]
 impl NodeExecutor for ShellNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "shell".into(),
+            version: "1.0".into(),
+            display_name: "执行命令".into(),
+            description: "执行 Shell 命令并返回输出".into(),
+            category: "系统".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object" }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

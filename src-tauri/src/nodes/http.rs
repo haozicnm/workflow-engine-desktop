@@ -14,6 +14,32 @@ pub struct HttpNode;
 
 #[async_trait]
 impl NodeExecutor for HttpNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "http".into(),
+            version: "1.0".into(),
+            display_name: "HTTP 请求".into(),
+            description: "发送 HTTP 请求，支持 GET/POST/PUT/DELETE 等方法".into(),
+            category: "网络".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "body".into(), data_type: "object".into(), required: false },
+                crate::nodes::traits::PortDef { label: "status".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "headers".into(), data_type: "object".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                    "url": {"type": "string", "description": "请求 URL"},
+                    "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+                    "headers": {"type": "object"},
+                    "body": {"type": "string"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

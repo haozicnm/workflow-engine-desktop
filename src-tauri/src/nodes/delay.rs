@@ -14,6 +14,21 @@ pub struct DelayNode;
 
 #[async_trait]
 impl NodeExecutor for DelayNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "delay".into(),
+            version: "1.0".into(),
+            display_name: "延时".into(),
+            description: "等待指定毫秒数后继续执行".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object" }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
