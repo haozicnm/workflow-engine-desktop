@@ -14,6 +14,7 @@ import TabsList from '../components/ui/tabs/TabsList.vue'
 import TabsTrigger from '../components/ui/tabs/TabsTrigger.vue'
 import TabsContent from '../components/ui/tabs/TabsContent.vue'
 import Dialog from '../components/ui/dialog/Dialog.vue'
+import { GripVertical } from 'lucide-vue-next'
 import DialogContent from '../components/ui/dialog/DialogContent.vue'
 import DialogTitle from '../components/ui/dialog/DialogTitle.vue'
 import DialogDescription from '../components/ui/dialog/DialogDescription.vue'
@@ -221,7 +222,7 @@ onUnmounted(() => {
             >
               <!-- Drag handle -->
               <div class="w-6 flex items-center justify-center text-border cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-muted-foreground hover:bg-card active:cursor-grabbing">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+                <GripVertical class="w-3 h-3 text-border shrink-0" />
               </div>
 
               <StepCard

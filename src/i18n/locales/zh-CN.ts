@@ -237,7 +237,14 @@ export default {
   },
 
   containerConfig: {
+    title: '容器参数',
     noParams: '此容器没有可配置的参数',
+  },
+
+  // ─── 插件管理 ───
+  plugins: {
+    uninstallTitle: '确认卸载',
+    uninstallConfirm: '确定要删除插件「{name}」吗？此操作将移除所有关联的 MCP 节点和模板。',
   },
 
   // ─── 逻辑分支/条件构建器 ───

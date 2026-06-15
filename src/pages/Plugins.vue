@@ -3,9 +3,13 @@
 // 独立服务器模式：使用 HTTP API + multipart 文件上传
 import { ref, onMounted } from 'vue'
 import { useToast } from '@/composables/useToast'
+import { useI18n } from 'vue-i18n'
 import ActionIcon from '@/components/ActionIcon.vue'
 import Button from '@/components/ui/button/Button.vue'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
+const { t } = useI18n()
 const { show: toast } = useToast()
 
 interface PluginInfo {
@@ -71,8 +75,18 @@ async function onFileSelected(e: Event) {
   }
 }
 
-async function uninstallPlugin(plugin: PluginInfo) {
-  if (!confirm(`确定要删除插件「${plugin.title}」吗？\n此操作将移除所有 MCP 节点和模板。`)) return
+const uninstallTarget = ref<PluginInfo | null>(null)
+const alertOpen = ref(false)
+
+async function confirmUninstall(plugin: PluginInfo) {
+  uninstallTarget.value = plugin
+  alertOpen.value = true
+}
+
+async function doUninstall() {
+  const plugin = uninstallTarget.value
+  if (!plugin) return
+  alertOpen.value = false
 
   try {
     const res = await fetch('/api/plugins/uninstall', {
@@ -133,8 +147,10 @@ onMounted(loadPlugins)
     <!-- Plugin list -->
     <div class="flex-1 overflow-y-auto p-4">
       <!-- Loading -->
-      <div v-if="loading" class="flex items-center justify-center py-12">
-        <span class="text-sm text-muted-foreground">加载中...</span>
+      <div v-if="loading" class="space-y-3 p-4">
+        <Skeleton class="h-16 w-full" />
+        <Skeleton class="h-16 w-full" />
+        <Skeleton class="h-16 w-full" />
       </div>
 
       <!-- Empty -->
@@ -180,7 +196,7 @@ onMounted(loadPlugins)
               variant="destructive"
               size="sm"
               class="shrink-0 text-[11px]"
-              @click="uninstallPlugin(p)"
+              @click="confirmUninstall(p)"
             >
               删除
             </Button>
@@ -197,4 +213,20 @@ onMounted(loadPlugins)
       </p>
     </div>
   </div>
+
+  <!-- Uninstall confirmation dialog -->
+  <AlertDialog v-model:open="alertOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('plugins.uninstallTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{ t('plugins.uninstallConfirm', { name: uninstallTarget?.title ?? '' }) }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('common.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction @click="doUninstall">{{ t('common.delete') }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

@@ -231,7 +231,14 @@ export default {
   },
 
   containerConfig: {
+    title: 'Container Settings',
     noParams: 'This container has no configurable parameters',
+  },
+
+  // ─── Plugins ───
+  plugins: {
+    uninstallTitle: 'Confirm Uninstall',
+    uninstallConfirm: 'Are you sure you want to delete "{name}"? This will remove all associated MCP nodes and templates.',
   },
 
   logic: {

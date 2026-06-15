@@ -15,6 +15,7 @@ import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
 import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 import ActionIcon from '../components/ActionIcon.vue'
+import { Package, History, Download } from 'lucide-vue-next'
 import { inject, type Ref } from 'vue'
 
 const { t } = useI18n()
@@ -232,12 +233,7 @@ defineExpose({ loadList })
     <SidebarMenuItem>
       <SidebarMenuButton :tooltip="t('nav.plugins')" @click="onPlugins">
         <template #icon>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-            <path d="M12 18v-6" />
-            <path d="M9 15l3-3 3 3" />
-          </svg>
+          <Package class="w-4 h-4" />
         </template>
         {{ t('nav.plugins') }}
       </SidebarMenuButton>
@@ -253,11 +249,7 @@ defineExpose({ loadList })
     <SidebarMenuItem>
       <SidebarMenuButton :tooltip="t('nav.history')" @click="onHistory">
         <template #icon>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-            <path d="M3 3v5h5" />
-            <path d="M12 7v5l4 2" />
-          </svg>
+          <History class="w-4 h-4" />
         </template>
         {{ t('nav.history') }}
       </SidebarMenuButton>
@@ -265,11 +257,7 @@ defineExpose({ loadList })
     <SidebarMenuItem>
       <SidebarMenuButton :tooltip="t('common.import')" @click="onImportFile">
         <template #icon>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
+          <Download class="w-4 h-4" />
         </template>
         {{ t('common.import') }}
       </SidebarMenuButton>

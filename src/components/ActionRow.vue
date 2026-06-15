@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import type { Action, ContainerType, ActionStatus, Step } from '../types/types'
 
 const { t } = useI18n()
+import { X } from 'lucide-vue-next'
 import { getActionDef, getActionLabel, getContainerDef } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
 import { useVariableRefs } from '../composables/useVariableRefs'
@@ -208,9 +209,7 @@ function isSelectorField(key: string): boolean {
         :aria-label="t('actionRow.deleteActionAria')"
         @click.stop="emit('remove')"
       >
-        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
+        <X class="w-3 h-3" />
       </Button>
     </div>
 
