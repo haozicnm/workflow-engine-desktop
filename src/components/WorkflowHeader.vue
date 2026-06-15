@@ -40,11 +40,15 @@ const cardMenuPosStyle = ref<Record<string, string>>({})
 
 function toggleCardMenu() {
   showCardMenu.value = !showCardMenu.value
-  if (showCardMenu.value && cardMenuBtnRef.value && typeof cardMenuBtnRef.value.getBoundingClientRect === 'function') {
-    const rect = cardMenuBtnRef.value.getBoundingClientRect()
-    cardMenuPosStyle.value = {
-      top: `${rect.bottom + 4}px`,
-      left: `${rect.right - 176}px`,
+  if (showCardMenu.value && cardMenuBtnRef.value) {
+    // ref 指向 Button 组件实例，通过 $el 获取真实 DOM 元素
+    const el = (cardMenuBtnRef.value as any).$el as HTMLElement | undefined
+    if (el && typeof el.getBoundingClientRect === 'function') {
+      const rect = el.getBoundingClientRect()
+      cardMenuPosStyle.value = {
+        top: `${rect.bottom + 4}px`,
+        left: `${rect.right - 176}px`,
+      }
     }
   }
 }
