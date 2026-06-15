@@ -5,7 +5,8 @@ import Button from '../components/ui/button/Button.vue'
 import Input from '../components/ui/input/Input.vue'
 import Card from '../components/ui/card/Card.vue'
 import type { Workflow } from '../types/types'
-import { Lock, Unlock } from 'lucide-vue-next'
+import { Lock, Unlock, Ellipsis, Save, FileDown, FileOutput, Clock, Trash } from 'lucide-vue-next'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../components/ui/dropdown-menu'
 
 const { t } = useI18n()
 
@@ -35,23 +36,6 @@ const emit = defineEmits<{
 }>()
 
 const showCardMenu = ref(false)
-const cardMenuBtnRef = ref<HTMLElement | null>(null)
-const cardMenuPosStyle = ref<Record<string, string>>({})
-
-function toggleCardMenu() {
-  showCardMenu.value = !showCardMenu.value
-  if (showCardMenu.value && cardMenuBtnRef.value) {
-    // ref 指向 Button 组件实例，通过 $el 获取真实 DOM 元素
-    const el = (cardMenuBtnRef.value as any).$el as HTMLElement | undefined
-    if (el && typeof el.getBoundingClientRect === 'function') {
-      const rect = el.getBoundingClientRect()
-      cardMenuPosStyle.value = {
-        top: `${rect.bottom + 4}px`,
-        left: `${rect.right - 176}px`,
-      }
-    }
-  }
-}
 </script>
 
 <template>
@@ -102,10 +86,20 @@ function toggleCardMenu() {
         <Button v-if="!isRunning" variant="default" size="sm" class="h-8 bg-success hover:bg-success/90 text-success-foreground shrink-0" @click="emit('run')">{{ t('editor.run') }}</Button>
         <Button v-else variant="destructive" size="sm" class="h-8 shrink-0" @click="emit('stop')">{{ t('editor.stop') }}</Button>
 
-        <!-- ⋯ Menu -->
-        <div class="relative shrink-0" @click.stop>
-          <Button ref="cardMenuBtnRef" variant="ghost" size="icon" class="h-8 w-8 opacity-50 hover:opacity-100" @click="toggleCardMenu">⋯</Button>
-        </div>
+        <!-- ⋯ Menu → DropdownMenu -->
+        <DropdownMenu v-model:open="showCardMenu">
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon" class="h-8 w-8 opacity-50 hover:opacity-100"><Ellipsis class="w-4 h-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent class="w-44" align="end">
+            <DropdownMenuItem @click="emit('save'); showCardMenu = false"><Save class="w-4 h-4 mr-2" /> {{ t('common.save') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="emit('save-as'); showCardMenu = false"><FileOutput class="w-4 h-4 mr-2" /> {{ t('editor.saveAs') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="emit('export'); showCardMenu = false"><FileDown class="w-4 h-4 mr-2" /> {{ t('common.export') }}</DropdownMenuItem>
+            <DropdownMenuItem @click="emit('schedule'); showCardMenu = false"><Clock class="w-4 h-4 mr-2" /> {{ t('editor.schedule') }}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem class="text-destructive focus:bg-destructive/10 focus:text-destructive" @click="emit('delete'); showCardMenu = false"><Trash class="w-4 h-4 mr-2" /> {{ t('common.delete') }}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <!-- Row 2: Description -->
@@ -121,16 +115,4 @@ function toggleCardMenu() {
     </div>
   </Card>
 
-  <!-- Card ⋯ Dropdown (teleported) -->
-  <Teleport to="body">
-    <div v-if="showCardMenu" class="fixed inset-0 z-40" @click="showCardMenu = false" @keydown.escape="showCardMenu = false" />
-    <div v-if="showCardMenu" class="fixed z-50 w-44 bg-background border border-border rounded-md shadow-lg py-1" :style="cardMenuPosStyle">
-      <Button variant="ghost" class="w-full justify-start px-3 py-2 text-sm" @click="emit('save'); showCardMenu = false">{{ t('common.save') }}</Button>
-      <Button variant="ghost" class="w-full justify-start px-3 py-2 text-sm" @click="emit('save-as'); showCardMenu = false">{{ t('editor.saveAs') }}</Button>
-      <Button variant="ghost" class="w-full justify-start px-3 py-2 text-sm" @click="emit('export'); showCardMenu = false">{{ t('common.export') }}</Button>
-      <Button variant="ghost" class="w-full justify-start px-3 py-2 text-sm" @click="emit('schedule'); showCardMenu = false">{{ t('editor.schedule') }}</Button>
-      <div class="border-t border-border my-1" />
-      <Button variant="ghost" class="w-full justify-start px-3 py-2 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive" @click="emit('delete'); showCardMenu = false">{{ t('common.delete') }}</Button>
-    </div>
-  </Teleport>
 </template>

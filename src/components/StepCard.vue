@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Settings, Plus, Check, X, Loader2 } from 'lucide-vue-next'
+import { Settings, Plus, Check, X, Loader2, Ellipsis } from 'lucide-vue-next'
 import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
@@ -12,6 +12,7 @@ import ParamField from './ParamField.vue'
 import Card from './ui/card/Card.vue'
 import Button from './ui/button/Button.vue'
 import Badge from './ui/badge/Badge.vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 const { t } = useI18n()
@@ -96,26 +97,9 @@ const formattedOutput = computed(() => {
 })
 
 // ─── ⋯ Menu ───
-const showMenu = ref(false)
-const menuBtnRef = ref<InstanceType<typeof Button> | null>(null)
-const menuPosStyle = ref<Record<string, string>>({})
-
-function toggleMenu() {
-  showMenu.value = !showMenu.value
-  if (showMenu.value) {
-    const el = menuBtnRef.value?.$el as HTMLElement | undefined
-    if (el && typeof el.getBoundingClientRect === 'function') {
-      const rect = el.getBoundingClientRect()
-      menuPosStyle.value = {
-        top: `${rect.bottom + 4}px`,
-        left: `${rect.right - 208}px`,
-      }
-    }
-  }
-}
+const menuOpen = ref(false)
 
 // ─── Error strategy ───
-const showErrMenu = ref(false)
 const errStrategyLabel = computed(() => {
   const s = props.step.onError
   if (!s || s === 'fail') return t('editor.errorFail')
@@ -126,12 +110,10 @@ const errStrategyLabel = computed(() => {
 
 function setErrStrategy(s: ErrorStrategy) {
   emit('update-error-strategy', props.step.id, s)
-  showErrMenu.value = false
-  showMenu.value = false
+  menuOpen.value = false
 }
 
 // ─── Condition (条件执行) ───
-const showConditionMenu = ref(false)
 const logicSteps = computed(() => (props.steps || []).filter(s => s.type === 'logic'))
 const conditionLabel = computed(() => {
   const rc = props.step.runCondition
@@ -148,12 +130,11 @@ function setCondition(ref: string, when: 'true' | 'false' | 'both' | 'merge') {
   } else {
     emit('update-run-condition', props.step.id, { ref, when })
   }
-  showConditionMenu.value = false
+  menuOpen.value = false
 }
 function removeCondition() {
   emit('update-run-condition', props.step.id, null)
-  showConditionMenu.value = false
-  showMenu.value = false
+  menuOpen.value = false
 }
 
 function formatDuration(ms?: number): string {
@@ -167,13 +148,6 @@ function colorAt15(colorVar: string): string {
 }
 
 const containerColorVar = computed(() => getContainerColorVar(props.step.type))
-
-// Close all sub-menus when ⋯ closes
-function closeAllMenus() {
-  showMenu.value = false
-  showErrMenu.value = false
-  showConditionMenu.value = false
-}
 </script>
 
 <template>
@@ -245,67 +219,31 @@ function closeAllMenus() {
       <Loader2 v-else-if="runState?.status === 'running'" class="w-3.5 h-3.5 text-warning animate-spin shrink-0" />
       <span v-else class="w-2 h-2 rounded-full bg-muted shrink-0" />
 
-      <!-- ⋯ Menu button -->
-      <div class="relative" @click.stop>
-        <Button
-          ref="menuBtnRef"
-          variant="ghost"
-          size="icon"
-          class="text-muted-foreground hover:text-foreground opacity-40 group-hover:opacity-100 transition-opacity"
-          :title="t('stepCard.moreActions')"
-          :aria-label="t('stepCard.moreActions')"
-          @click="toggleMenu"
-        >⋯</Button>
-      </div>
-
-      <!-- Collapse toggle -->
-      <span class="text-[11px] text-muted-foreground shrink-0 w-4 text-center">
-        {{ step.expanded ? '▼' : '▶' }}
-      </span>
-
-      <!-- Remove button -->
-      <Button
-        variant="ghost"
-        size="icon"
-        class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-40 group-hover:opacity-100 transition-opacity"
-        :aria-label="t('stepCard.deleteStepAria')"
-        @click.stop="emit('remove-step', step.id)"
-      >×</Button>
-    </div>
-
-    <!-- ⋯ Dropdown (teleported to body) -->
-    <Teleport to="body">
-      <div
-        v-if="showMenu"
-        class="fixed inset-0 z-40"
-        @click="closeAllMenus"
-      />
-      <div
-        v-if="showMenu"
-        class="fixed z-[60] w-52 bg-background border border-border rounded-md shadow-lg py-1"
-        :style="menuPosStyle"
-      >
-          <!-- 容器设置 -->
+      <!-- ⋯ Menu button → DropdownMenu -->
+      <DropdownMenu v-model:open="menuOpen">
+        <DropdownMenuTrigger as-child>
           <Button
             variant="ghost"
-            class="w-full justify-start px-3 py-2 text-sm"
-            @click="emit('open-config', step.id); closeAllMenus()"
-          >
-            <Settings class="w-4 h-4 inline" /> {{ t('stepCard.containerSettings') }}
-          </Button>
+            size="icon"
+            class="text-muted-foreground hover:text-foreground opacity-40 group-hover:opacity-100 transition-opacity"
+            :aria-label="t('stepCard.moreActions')"
+          ><Ellipsis class="w-4 h-4" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent class="w-52" align="end" :side-offset="4">
+          <!-- 容器设置 -->
+          <DropdownMenuItem @click="emit('open-config', step.id); menuOpen = false">
+            <Settings class="w-4 h-4 mr-2" /> {{ t('stepCard.containerSettings') }}
+          </DropdownMenuItem>
 
           <!-- 条件执行 -->
-          <div v-if="step.type !== 'logic' && logicSteps.length > 0" class="border-t border-border mt-1 pt-1">
-            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.runCondition') }}</div>
-            <div
-              v-for="ls in logicSteps"
-              :key="ls.id"
-              class="border-b border-border/50 last:border-b-0"
-            >
-              <div class="px-3 py-1 text-[11px] text-muted-foreground bg-muted/30">
+          <template v-if="step.type !== 'logic' && logicSteps.length > 0">
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ t('editor.runCondition') }}</DropdownMenuLabel>
+            <div v-for="ls in logicSteps" :key="ls.id">
+              <div class="px-2 py-0.5 text-[11px] text-muted-foreground">
                 <ActionIcon :name="getContainerDef(ls.type, t).icon" cls="w-3.5 h-3.5 inline" /> {{ ls.label }}
               </div>
-              <Button
+              <DropdownMenuItem
                 v-for="opt in [
                   { value: 'true', icon: 'CheckCircle', label: 'True' },
                   { value: 'false', icon: 'XCircle', label: 'False' },
@@ -313,52 +251,42 @@ function closeAllMenus() {
                   { value: 'merge', icon: 'Merge', label: t('editor.errorBranch') },
                 ]"
                 :key="opt.value"
-                variant="ghost"
-                :class="cn(
-                  'w-full justify-start px-3 py-1.5 text-sm',
-                  step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value ? 'bg-accent' : '',
-                )"
+                :class="step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value ? 'bg-accent' : ''"
                 @click="setCondition(ls.id, opt.value as 'true' | 'false' | 'both' | 'merge')"
               >
-                <ActionIcon :name="opt.icon" cls="w-3.5 h-3.5 inline" /> {{ opt.label }}
-              </Button>
+                <ActionIcon :name="opt.icon" cls="w-3.5 h-3.5 mr-2" /> {{ opt.label }}
+              </DropdownMenuItem>
             </div>
-            <Button
+            <DropdownMenuItem
               v-if="step.runCondition"
-              variant="ghost"
-              class="w-full justify-start px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+              class="text-destructive focus:bg-destructive/10 focus:text-destructive"
               @click="removeCondition"
             >
               {{ t('stepCard.removeCondition') }}
-            </Button>
-          </div>
+            </DropdownMenuItem>
+          </template>
 
           <!-- 错误策略 -->
-          <div class="border-t border-border mt-1 pt-1">
-            <div class="px-3 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">{{ t('editor.errorStrategy') }}</div>
-            <Button
-              v-for="(opt, key) in {
-                fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: t('stepCard.errDescFail') },
-                ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: t('stepCard.errDescIgnore') },
-                branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: t('stepCard.errDescBranch') },
-              }"
-              :key="key"
-              variant="ghost"
-              :class="cn(
-                'w-full justify-start px-3 py-1.5 text-sm',
-                ((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError)) ? 'bg-accent' : '',
-              )"
-              @click="key === 'fail' ? setErrStrategy('fail') : key === 'ignore' ? setErrStrategy('ignore') : setErrStrategy({ branch: '' })"
-            >
-              <ActionIcon :name="opt.icon" cls="w-4 h-4" />
-              <div class="flex flex-col">
-                <span>{{ opt.label }}</span>
-                <span class="text-[10px] text-muted-foreground">{{ opt.desc }}</span>
-              </div>
-            </Button>
-          </div>
-        </div>
-      </Teleport>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ t('editor.errorStrategy') }}</DropdownMenuLabel>
+          <DropdownMenuItem
+            v-for="(opt, key) in {
+              fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: t('stepCard.errDescFail') },
+              ignore: { icon: 'CircleAlert', label: t('editor.errorIgnore'), desc: t('stepCard.errDescIgnore') },
+              branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: t('stepCard.errDescBranch') },
+            }"
+            :key="key"
+            :class="((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError)) ? 'bg-accent' : ''"
+            @click="key === 'fail' ? setErrStrategy('fail') : key === 'ignore' ? setErrStrategy('ignore') : setErrStrategy({ branch: '' })"
+          >
+            <ActionIcon :name="opt.icon" cls="w-4 h-4 mr-2" />
+            <div class="flex flex-col">
+              <span>{{ opt.label }}</span>
+              <span class="text-[10px] text-muted-foreground">{{ opt.desc }}</span>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
     <!-- Progress bar (running) -->
     <div v-if="runState?.status === 'running'" class="h-0.5 bg-secondary overflow-hidden">
