@@ -3,6 +3,7 @@
 // 典型场景：读取 Excel A 列，有数据就继续，无数据就停
 use crate::engine::collect;
 use crate::engine::context::ExecutionContext;
+use tracing::warn;
 use crate::engine::executor::StepExecutor;
 use crate::engine::workflow::Step;
 use crate::nodes::traits::NodeExecutor;
@@ -98,7 +99,10 @@ fn check_condition(check_val: &Value, cond_op: &str, cond_right: Option<&Value>)
             .zip(cond_right.and_then(|r| r.as_str()))
             .map(|(haystack, needle)| !haystack.contains(needle))
             .unwrap_or(false),
-        _ => true, // 未知操作符默认继续
+        _ => {
+            warn!("while 节点: 未知条件操作符 '{}', 默认停止循环（安全回退）", cond_op);
+            false
+        },
     }
 }
 

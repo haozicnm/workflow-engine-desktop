@@ -303,9 +303,19 @@ pub(crate) fn eval_condition(
             _ => true,
         },
         "regex" => match (left, right) {
-            (serde_json::Value::String(l), serde_json::Value::String(r)) => regex::Regex::new(r)
-                .map(|re| re.is_match(l))
-                .unwrap_or(false),
+            (serde_json::Value::String(l), serde_json::Value::String(r)) => {
+                // 缓存已编译的正则表达式（避免循环中重复编译）
+                use std::sync::Mutex;
+                static REGEX_CACHE: std::sync::LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
+                    std::sync::LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
+                let mut cache = REGEX_CACHE.lock().unwrap();
+                if !cache.contains_key(r) {
+                    if let Ok(re) = regex::Regex::new(r) {
+                        cache.insert(r.to_string(), re);
+                    }
+                }
+                cache.get(r).map(|re| re.is_match(l)).unwrap_or(false)
+            }
             _ => false,
         },
         _ => false,

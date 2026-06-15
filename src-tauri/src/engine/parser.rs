@@ -102,11 +102,13 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
             }
         }
 
-        // 校验变量引用：{{step_xxx}} 中的 step ID 必须存在
+        // 校验变量引用：{{step_xxx}} / {{step_xxx.y}} 中的 step ID 必须存在
         let config_str = serde_json::to_string(&step.config).unwrap_or_default();
         for ref_id in extract_step_refs(&config_str) {
             let full_id = format!("step_{}", ref_id);
-            if !step_ids.contains(full_id.as_str()) {
+            // 同时检查带 "step_" 前缀和原始 ID（兼容 step.id == "1" 等非 step_ 前缀命名）
+            let stripped = full_id.strip_prefix("step_").unwrap_or(&full_id);
+            if !step_ids.contains(full_id.as_str()) && !step_ids.contains(stripped) {
                 return Err(anyhow!(
                     "步骤 '{}' 中引用了不存在的步骤 '{}'（{{{{step_{}}}}} 指向的步骤不存在）",
                     step.id,
@@ -330,12 +332,18 @@ pub fn normalize_actions(actions: &[Value]) -> Vec<Value> {
         .collect()
 }
 
-/// 递归收集所有步骤（包括子步骤）
+/// 递归收集所有步骤（包括 body_steps 子步骤）
 fn flatten_all_steps(steps: &[Step]) -> Vec<&Step> {
     let mut result = Vec::new();
-    for step in steps {
-        result.push(step);
+    fn recurse<'a>(steps: &'a [Step], out: &mut Vec<&'a Step>) {
+        for step in steps {
+            out.push(step);
+            if let Some(ref body) = step.body_steps {
+                recurse(body, out);
+            }
+        }
     }
+    recurse(steps, &mut result);
     result
 }
 
@@ -389,11 +397,13 @@ pub fn auto_order_steps(steps: &[Step]) -> Vec<usize> {
     }
 
     if order.len() < n {
-        for i in 0..n {
-            if !order.contains(&i) {
-                order.push(i);
-            }
-        }
+        let mut remaining: Vec<usize> = (0..n).filter(|i| !order.contains(i)).collect();
+        tracing::warn!(
+            "auto_order_steps: 检测到循环依赖，{} 个步骤无法排序 (索引: {:?})，追加到末尾",
+            remaining.len(),
+            remaining
+        );
+        order.append(&mut remaining);
     }
 
     order

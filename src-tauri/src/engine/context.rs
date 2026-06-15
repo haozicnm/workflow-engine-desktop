@@ -166,6 +166,10 @@ impl ExecutionContext {
         let trimmed = s.trim();
         if trimmed.starts_with("{{") && trimmed.ends_with("}}") && trimmed.len() > 4 {
             let inner = trimmed[2..trimmed.len() - 2].trim();
+            if inner.is_empty() {
+                warn!("空的模板变量引用 '{{{{}}}}' → 返回 null");
+                return serde_json::Value::Null;
+            }
             if !inner.contains("{{") {
                 if let Some(val) = self.resolve_var(inner) {
                     return val.clone();
@@ -183,24 +187,31 @@ impl ExecutionContext {
         }
         serde_json::Value::String(self.interpolate(s))
     }
-    /// 访问 JSON 值的字段，支持对象字段和数组索引
-    /// "name" → obj.name, "0" → arr[0], "items[0]" → obj.items[0]
+    /// 访问 JSON 值的字段，支持对象字段、数组索引和嵌套括号
+    /// "name" → obj.name, "0" → arr[0], "items[0]" → obj.items[0], "items[0][1]" → obj.items[0][1]
     fn get_field<'a>(value: &'a serde_json::Value, field: &str) -> Option<&'a serde_json::Value> {
-        // 处理 "items[0]" 格式
-        if let Some(bracket_pos) = field.find('[') {
-            let key = &field[..bracket_pos];
-            let index_str = &field[bracket_pos + 1..field.len() - 1]; // 去掉 [ 和 ]
-            let obj = value.as_object()?;
-            let arr = obj.get(key)?.as_array()?;
-            let index = index_str.parse::<usize>().ok()?;
-            arr.get(index)
-        } else if let Some(obj) = value.as_object() {
-            obj.get(field)
-        } else if let Some(arr) = value.as_array() {
-            field.parse::<usize>().ok().and_then(|i| arr.get(i))
-        } else {
-            None
+        let mut current = value;
+        let mut remaining = field;
+        while !remaining.is_empty() {
+            if let Some(bracket_pos) = remaining.find('[') {
+                let key = &remaining[..bracket_pos];
+                if !key.is_empty() {
+                    current = current.as_object()?.get(key)?;
+                }
+                remaining = &remaining[bracket_pos + 1..];
+                let close = remaining.find(']')?;
+                let idx: usize = remaining[..close].parse().ok()?;
+                current = current.as_array()?.get(idx)?;
+                remaining = &remaining[close + 1..];
+            } else if let Some(obj) = current.as_object() {
+                return obj.get(remaining);
+            } else if let Some(arr) = current.as_array() {
+                return remaining.parse::<usize>().ok().and_then(|i| arr.get(i));
+            } else {
+                return None;
+            }
         }
+        Some(current)
     }
 
     pub fn resolve_var(&self, key: &str) -> Option<&serde_json::Value> {
@@ -283,7 +294,11 @@ impl ExecutionContext {
                         other => result.push_str(&other.to_string()),
                     }
                 } else {
-                    warn!("variable not found: '{}' → replaced with empty string", key);
+                    // 保留未解析的模板原文，让用户能看到哪里出了问题
+                    warn!("variable not found: '{}' → kept as-is", key);
+                    result.push_str("{{");
+                    result.push_str(key);
+                    result.push_str("}}");
                 }
                 remaining = &remaining[start + 2 + end + 2..];
             } else {

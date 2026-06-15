@@ -57,10 +57,14 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   // ─── Load ───
 
+  let loadSeq = 0 // 防止竞态：后到的旧请求不覆盖先到的新数据
+
   async function loadWorkflow(id: string) {
+    const seq = ++loadSeq
     loading.value = true
     try {
       const wf = await safeInvoke<WorkflowFull | null>('workflow_get', { id })
+      if (seq !== loadSeq) return // 更新的请求已发起，丢弃过期响应
       if (wf) {
         let parsed: Workflow
         try {
@@ -107,18 +111,19 @@ export const useWorkflowStore = defineStore('workflow', () => {
         if (!id) return false
         current.value.id = id
       }
+      // 先保存内容（YAML），再更新元数据
+      // 避免元数据更新成功但内容失败导致的不一致状态
+      const yaml = serializeWorkflow(current.value)
+      await safeInvoke('workflow_save_yaml', {
+        id: current.value.id,
+        yaml,
+      })
       // Update metadata
       await safeInvoke('workflow_update', {
         id: current.value.id,
         name: current.value.name,
         description: current.value.description || '',
         enabled: true,
-      })
-      // Save workflow in new format (backend v5 parser handles it)
-      const yaml = serializeWorkflow(current.value)
-      await safeInvoke('workflow_save_yaml', {
-        id: current.value.id,
-        yaml,
       })
       dirty.value = false
       return true

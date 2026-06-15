@@ -313,11 +313,8 @@ impl StepExecutor {
             self.run_linear(workflow, &mut ctx).await
         };
 
-        match &result {
-            Ok(_) => {
-                let _ = event_tx.as_ref().map(|tx| tx.try_send(ExecutionEvent::WorkflowCompleted { total_duration_ms: start.elapsed().as_millis() as u64 }));
-            }
-            Err(_) => {}
+        if result.is_ok() {
+            let _ = event_tx.as_ref().map(|tx| tx.try_send(ExecutionEvent::WorkflowCompleted { total_duration_ms: start.elapsed().as_millis() as u64 }));
         }
 
         result.map(|_| ctx)
@@ -344,26 +341,54 @@ impl StepExecutor {
     /// 并行执行一层节点
     async fn run_parallel_level(self: &Arc<Self>, node_ids: &[String], workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
         let mut join_set = tokio::task::JoinSet::new();
+        let cancel = tokio_util::sync::CancellationToken::new();
         for node_id in node_ids {
             let step = workflow.steps.iter().find(|s| &s.id == node_id).cloned()
                 .ok_or_else(|| anyhow!("节点未找到: {}", node_id))?;
             let mut task_ctx = ExecutionContext::new(&step.id, workflow);
             task_ctx.variables = ctx.variables.clone();
             let exec = Arc::clone(self);
+            let task_cancel = cancel.clone();
             join_set.spawn(async move {
+                // 快速失败：如果已有兄弟任务报错，直接跳过
+                if task_cancel.is_cancelled() {
+                    return (step.id.clone(), Err(anyhow!("已取消（兄弟节点失败）")), task_ctx.variables);
+                }
                 let result = exec.execute(&step, &mut task_ctx).await;
                 (step.id.clone(), result, task_ctx.variables)
             });
         }
+        let mut first_error: Option<anyhow::Error> = None;
         while let Some(jr) = join_set.join_next().await {
             match jr {
                 Ok((nid, Ok(val), vars)) => {
                     ctx.variables.insert(nid.clone(), val);
-                    for (k, v) in vars { if k != nid { ctx.variables.entry(k).or_insert(v); } }
+                    for (k, v) in vars {
+                        if k != nid {
+                            match ctx.variables.entry(k.clone()) {
+                                std::collections::hash_map::Entry::Vacant(e) => { e.insert(v); }
+                                std::collections::hash_map::Entry::Occupied(_e) => {
+                                    warn!("并行变量冲突: {} (已有值，忽略 {} 的新值)", k, nid);
+                                }
+                            }
+                        }
+                    }
                 }
-                Ok((nid, Err(e), _)) => { warn!("节点 {} 失败: {}", nid, e); return Err(e); }
-                Err(e) => return Err(anyhow!("并行任务 panic: {}", e)),
+                Ok((nid, Err(e), _)) => {
+                    warn!("节点 {} 失败: {}", nid, e);
+                    cancel.cancel(); // 通知其他任务停止
+                    first_error = Some(e);
+                }
+                Err(e) => {
+                    cancel.cancel();
+                    if first_error.is_none() {
+                        first_error = Some(anyhow!("并行任务 panic: {}", e));
+                    }
+                }
             }
+        }
+        if let Some(e) = first_error {
+            return Err(e);
         }
         Ok(())
     }
@@ -379,6 +404,16 @@ impl StepExecutor {
 
     /// 拓扑分层（Kahn 算法）
     pub fn topological_levels(&self, steps: &[Step], edges: &[Edge]) -> Result<Vec<Vec<String>>> {
+        // 验证 edge 引用的节点都存在
+        let step_ids: HashSet<&str> = steps.iter().map(|s| s.id.as_str()).collect();
+        for edge in edges {
+            if !step_ids.contains(edge.from.as_str()) {
+                return Err(anyhow!("边引用了不存在的源节点 '{}'（from）", edge.from));
+            }
+            if !step_ids.contains(edge.to.as_str()) {
+                return Err(anyhow!("边引用了不存在的目标节点 '{}'（to）", edge.to));
+            }
+        }
         let mut in_degree: HashMap<String, usize> = HashMap::new();
         let mut adj: HashMap<String, Vec<String>> = HashMap::new();
         for step in steps { in_degree.entry(step.id.clone()).or_insert(0); adj.entry(step.id.clone()).or_default(); }
@@ -406,41 +441,46 @@ impl StepExecutor {
         Ok(levels)
     }
 
-    /// 获取执行计划
-
     /// 校验工作流中所有变量引用是否指向存在的节点/端口
     pub fn validate_variable_references(&self, workflow: &Workflow) -> Result<()> {
         let node_ids: HashSet<&str> = workflow.steps.iter().map(|s| s.id.as_str()).collect();
-        let re = regex::Regex::new(r"\{\{([^.}]+)\.([^}]+)\}\}").unwrap();
+        // 匹配 {{xxx}} / {{xxx.y}} / {{xxx.y.z}} — 支持无点号和多级路径
+        let re = regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap();
 
         for step in &workflow.steps {
-            let config_str = step.config.to_string();
-            for cap in re.captures_iter(&config_str) {
-                let ref_node = &cap[1];
-                let ref_port = &cap[2];
-
-                // 允许 {{params.xxx}} 和 {{__item}} 等内置变量
-                if ref_node == "params" || ref_node.starts_with("__") {
-                    continue;
-                }
-
-                // 允许自引用（步骤可以引用自己的输出）
-                if ref_node == step.id.as_str() {
-                    continue;
-                }
-
-                // 检查节点是否存在
-                if !node_ids.contains(ref_node) {
-                    // 也检查是否是 workflow 级变量
-                    if let Some(ref vars) = workflow.variables {
-                        if vars.contains_key(ref_node) {
-                            continue;
+            // 收集所有需要检查的字符串：config + actions + condition_group
+            let mut configs_to_check: Vec<String> = vec![step.config.to_string()];
+            if let Some(ref actions) = step.actions {
+                configs_to_check.push(serde_json::to_string(actions).unwrap_or_default());
+            }
+            if let Some(ref cg) = step.condition_group {
+                configs_to_check.push(serde_json::to_string(cg).unwrap_or_default());
+            }
+            for config_str in &configs_to_check {
+                for cap in re.captures_iter(config_str) {
+                    let ref_expr = cap[1].trim(); // e.g. "step_1.result" or "params.x" or "step_1"
+                    if ref_expr.is_empty() { continue; }
+                    let root = ref_expr.split('.').next().unwrap_or(ref_expr);
+                    // 允许 {{params.xxx}} 内置变量
+                    if root == "params" { continue; }
+                    // 允许 {{__…}} 巫术变量
+                    if root.starts_with("__") { continue; }
+                    // 去掉 step_ 前缀后查找（兼容 {{step_1}} 和直接引用 ID "1"）
+                    let root_clean = root.strip_prefix("step_").unwrap_or(root);
+                    // 允许自引用
+                    if root_clean == step.id.as_str() { continue; }
+                    if !node_ids.contains(root) && !node_ids.contains(root_clean) {
+                        // 也检查是否是 workflow 级变量
+                        if let Some(ref vars) = workflow.variables {
+                            if vars.contains_key(root) || vars.contains_key(root_clean) {
+                                continue;
+                            }
                         }
+                        return Err(anyhow!(
+                            "步骤 '{}' 中引用了不存在的节点 '{}'（变量标记: {}）",
+                            step.id, root, ref_expr
+                        ));
                     }
-                    return Err(anyhow!(
-                        "步骤 '{}' 引用了不存在的节点 '{}'（变量 {{{{{}.{}}}}}）",
-                        step.id, ref_node, ref_node, ref_port
-                    ));
                 }
             }
         }
