@@ -18,6 +18,7 @@ import CardTitle from '../components/ui/card/CardTitle.vue'
 import CardDescription from '../components/ui/card/CardDescription.vue'
 import CardContent from '../components/ui/card/CardContent.vue'
 import Separator from '../components/ui/separator/Separator.vue'
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group'
 import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
 import { cn } from '@/lib/utils'
@@ -168,15 +169,12 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           <CardTitle class="flex-1 text-sm">{{ t('settingsPage.language') }}</CardTitle>
         </CardHeader>
         <CardContent class="px-4 pb-4 pt-0">
-          <div class="flex gap-2">
-            <Button
-              v-for="opt in localeOptions" :key="opt.value"
-              variant="outline" size="sm"
-              :aria-pressed="locale === opt.value"
-              :class="cn('px-4', locale === opt.value ? 'border-primary bg-primary/5 text-primary' : 'border-border')"
-              @click="setLocale(opt.value)"
-            >{{ opt.label }}</Button>
-          </div>
+          <RadioGroup v-model="locale" class="flex gap-2" @update:model-value="setLocale($event as Locale)">
+            <div v-for="opt in localeOptions" :key="opt.value" class="flex items-center gap-2">
+              <RadioGroupItem :value="opt.value" :id="`lang-${opt.value}`" />
+              <Label :for="`lang-${opt.value}`" class="text-sm cursor-pointer">{{ opt.label }}</Label>
+            </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
