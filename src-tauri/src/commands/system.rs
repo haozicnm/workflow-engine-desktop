@@ -84,7 +84,7 @@ pub fn get_log_path() -> Result<String, String> {
 pub fn open_log_dir() -> Result<(), String> {
     let log_dir = crate::data::paths::resolve_log_dir();
     std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
-    opener::open(&log_dir).map_err(|e| format!("打开日志目录失败: {}", e))
+    open::that(&log_dir).map_err(|e| format!("打开日志目录失败: {}", e))
 }
 
 #[tauri::command]

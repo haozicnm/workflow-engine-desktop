@@ -5,6 +5,7 @@ title Workflow Engine
 set "BIND=127.0.0.1:19529"
 set "URL=http://%BIND%"
 set "EXE=%~dp0workflow-engine.exe"
+set "GUI_EXE=%~dp0workflow-engine-gui.exe"
 
 :: ── colored banner (PowerShell) ──
 powershell -NoProfile -Command ^
@@ -14,6 +15,17 @@ powershell -NoProfile -Command ^
    Write-Host '       Visual Workflow Automation            ' -ForegroundColor Gray; ^
    Write-Host '  ═══════════════════════════════════════════' -ForegroundColor Cyan; ^
    Write-Host ''"
+
+:: ── choose mode: GUI (desktop window) or Server (browser) ──
+if exist "%GUI_EXE%" (
+    echo   [GUI] 启动桌面应用模式...
+    start "" "%GUI_EXE%"
+    echo   Workflow Engine 已启动（桌面窗口）
+    echo   浏览器访问: %URL%
+    exit /b 0
+)
+
+:: ── fallback: server mode (browser) ──
 
 :: ── check exe ──
 if not exist "%EXE%" (

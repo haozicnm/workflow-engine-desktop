@@ -122,7 +122,8 @@ async fn start_scheduled_run(
 
     // 读取超时配置
     use tauri::Manager;
-    let config_guard = app_handle.state::<crate::App>().config.read().await;
+    let app_state = app_handle.state::<crate::App>();
+    let config_guard = app_state.config.read().await;
     let timeouts = config_guard.timeouts.clone();
     let shell_allowed = config_guard.execution.shell_allowed_commands.clone();
     drop(config_guard);

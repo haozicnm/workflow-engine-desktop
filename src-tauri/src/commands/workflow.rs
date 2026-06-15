@@ -1,20 +1,9 @@
 // commands/workflow.rs — 工作流 CRUD 命令
 use tauri::{State, AppHandle, Emitter};
-use serde::Serialize;
 use crate::App;
 use crate::data::models::WorkflowMeta;
+use crate::data::models::WorkflowListItem;
 use std::sync::Arc;
-
-#[derive(Debug, Serialize)]
-pub struct WorkflowListItem {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub enabled: bool,
-    pub locked: bool,
-    pub created_at: String,
-    pub updated_at: String,
-}
 
 #[tauri::command]
 pub async fn workflow_list(
@@ -202,6 +191,7 @@ pub async fn step_test(
         description: None,
         steps: vec![],
         variables,
+        ..Default::default()
     };
     let mut ctx = ExecutionContext::new("test", &wf);
 
@@ -280,6 +270,7 @@ pub async fn export_workflow(
         description: description.clone(),
         steps,
         variables: vars,
+        ..Default::default()
     };
 
     // 序列化同时包含 edges 元数据

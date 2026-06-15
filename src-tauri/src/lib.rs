@@ -4,6 +4,8 @@ pub mod cli;
 pub mod data;
 pub mod engine;
 #[cfg(feature = "gui")]
+pub mod commands;
+#[cfg(feature = "gui")]
 pub mod ipc;
 pub mod ipc_client;
 pub mod nodes;
@@ -79,6 +81,7 @@ fn seed_builtin_workflows(db: &data::db::Database) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone)]
 pub struct App {
     pub db: Arc<data::db::Database>,
     pub config: Arc<tokio::sync::RwLock<data::config::AppConfig>>,
