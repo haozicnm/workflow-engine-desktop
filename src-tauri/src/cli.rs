@@ -1742,7 +1742,7 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
             app.approval_store.clone(),
             app.db.clone(),
         );
-        let ctx = executor.run_workflow(&workflow).await
+        let _ctx = executor.run_workflow(&workflow).await
             .map_err(|e| format!("图执行失败: {e}"))?;
         app.db.update_run_status(&run_id, "completed", None).map_err(|e| e.to_string())?;
         println!("  完成 ({:.1}s) [图引擎·并行]", start.elapsed().as_secs_f64());
