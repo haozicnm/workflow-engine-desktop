@@ -5,7 +5,7 @@
 #define MyAppVersion GetEnv("APP_VERSION")
 #define MyAppPublisher "Workflow Engine"
 #define MyAppURL "https://github.com/haozicnm/workflow-engine-desktop"
-#define MyAppExeName "gui.exe"
+#define MyAppExeName "workflow-engine-gui.exe"
 
 [Setup]
 AppId={{4A8F3D2E-1B5C-4D9A-8E2F-7C6B5A3D1E0F}}
@@ -38,7 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executables
-Source: "{#src}\gui.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\workflow-engine-gui.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#src}\workflow-engine.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#src}\wf-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 

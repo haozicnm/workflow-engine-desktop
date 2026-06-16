@@ -261,7 +261,7 @@ jobs:
 
       - name: Build backend (GUI + HTTP server + CLI)
         working-directory: src-tauri
-        run: cargo build --release --bin gui --bin workflow-engine --bin wf-cli
+        run: cargo build --release --bin workflow-engine-gui --features gui --bin workflow-engine --bin wf-cli
 
       - name: Create python-runtime placeholder
         shell: pwsh
@@ -281,7 +281,7 @@ jobs:
           $version = "${{ github.ref_name }}" -replace '^v','' 
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
-          Copy-Item src-tauri/target/release/gui.exe $pkgDir/
+          Copy-Item src-tauri/target/release/workflow-engine-gui.exe $pkgDir/
           Copy-Item src-tauri/target/release/workflow-engine.exe $pkgDir/
           Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
           Copy-Item -Recurse dist $pkgDir/
@@ -292,7 +292,7 @@ jobs:
             '@echo off',
             'title Workflow Engine',
             'cd /d "%~dp0"',
-            'start "" "gui.exe"',
+            'start "" "workflow-engine-gui.exe"',
             'echo Workflow Engine desktop started'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
@@ -340,7 +340,7 @@ jobs:
           # Create staging directory
           $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
-          Copy-Item src-tauri/target/release/gui.exe $staging/
+          Copy-Item src-tauri/target/release/workflow-engine-gui.exe $staging/
           Copy-Item src-tauri/target/release/workflow-engine.exe $staging/
           Copy-Item src-tauri/target/release/wf-cli.exe $staging/
           Copy-Item -Recurse dist $staging/dist
@@ -353,7 +353,7 @@ jobs:
             '@echo off',
             'title Workflow Engine',
             'cd /d "%~dp0"',
-            'start "" "gui.exe"',
+            'start "" "workflow-engine-gui.exe"',
             'echo Workflow Engine desktop started'
           ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
           
