@@ -5,7 +5,7 @@
 #define MyAppVersion GetEnv("APP_VERSION")
 #define MyAppPublisher "Workflow Engine"
 #define MyAppURL "https://github.com/haozicnm/workflow-engine-desktop"
-#define MyAppExeName "workflow-engine.exe"
+#define MyAppExeName "gui.exe"
 
 [Setup]
 AppId={{4A8F3D2E-1B5C-4D9A-8E2F-7C6B5A3D1E0F}}
@@ -38,6 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executables
+Source: "{#src}\gui.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#src}\workflow-engine.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#src}\wf-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -53,14 +54,16 @@ Source: "{#src}\node-schema.json"; DestDir: "{app}"; Flags: ignoreversion
 ; Python runtime
 Source: "{#src}\python-runtime\*"; DestDir: "{app}\python-runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Start script
+; Start scripts
 Source: "{#src}\start.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\server-start.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\{#MyAppName} (HTTP Server)"; Filename: "{app}\server-start.bat"; WorkingDir: "{app}"
 Name: "{group}\{cm:ProgramOnTheWeb,{#MyAppName}}"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\start.bat"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

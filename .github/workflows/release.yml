@@ -259,9 +259,9 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build backend
+      - name: Build backend (GUI + HTTP server + CLI)
         working-directory: src-tauri
-        run: cargo build --release --bin workflow-engine --bin wf-cli
+        run: cargo build --release --bin gui --bin workflow-engine --bin wf-cli
 
       - name: Create python-runtime placeholder
         shell: pwsh
@@ -281,6 +281,7 @@ jobs:
           $version = "${{ github.ref_name }}" -replace '^v','' 
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
+          Copy-Item src-tauri/target/release/gui.exe $pkgDir/
           Copy-Item src-tauri/target/release/workflow-engine.exe $pkgDir/
           Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
           Copy-Item -Recurse dist $pkgDir/
@@ -288,19 +289,28 @@ jobs:
           Copy-Item src-tauri/node-schema.json $pkgDir/
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
           $lines = @(
-            '@echo off'
-            'title Workflow Engine'
-            'cd /d "%~dp0"'
-            'start /MIN "" "workflow-engine.exe"'
-            'echo Waiting for Workflow Engine to start...'
-            ':wait'
-            'ping 127.0.0.1 -n 2 > nul'
-            'curl -s http://localhost:19529/api/health >nul 2>&1'
-            'if errorlevel 1 goto wait'
-            'echo Workflow Engine started on http://localhost:19529'
-            'start http://localhost:19529'
+            '@echo off',
+            'title Workflow Engine',
+            'cd /d "%~dp0"',
+            'start "" "gui.exe"',
+            'echo Workflow Engine desktop started'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
+          # Also create server-start.bat for HTTP mode
+          $serverLines = @(
+            '@echo off',
+            'title Workflow Engine Server',
+            'cd /d "%~dp0"',
+            'start /MIN "" "workflow-engine.exe"',
+            'echo Waiting for server...',
+            ':wait',
+            'ping 127.0.0.1 -n 2 > nul',
+            'curl -s http://localhost:19529/api/health >nul 2>&1',
+            'if errorlevel 1 goto wait',
+            'echo Server ready: http://localhost:19529',
+            'start http://localhost:19529'
+          )
+          $serverLines | Set-Content -Path "$pkgDir/server-start.bat" -Encoding ASCII
           Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
 
       - name: Upload zip
@@ -330,6 +340,7 @@ jobs:
           # Create staging directory
           $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item src-tauri/target/release/gui.exe $staging/
           Copy-Item src-tauri/target/release/workflow-engine.exe $staging/
           Copy-Item src-tauri/target/release/wf-cli.exe $staging/
           Copy-Item -Recurse dist $staging/dist
@@ -337,20 +348,29 @@ jobs:
           Copy-Item src-tauri/node-schema.json $staging/
           Copy-Item -Recurse src-tauri/python-runtime $staging/python-runtime -ErrorAction SilentlyContinue
           
-          # Create start.bat
+          # Create start.bat (launches GUI)
           @(
             '@echo off',
             'title Workflow Engine',
             'cd /d "%~dp0"',
+            'start "" "gui.exe"',
+            'echo Workflow Engine desktop started'
+          ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
+          
+          # Create server-start.bat (launches HTTP server)
+          @(
+            '@echo off',
+            'title Workflow Engine Server',
+            'cd /d "%~dp0"',
             'start /MIN "" "workflow-engine.exe"',
-            'echo Waiting for Workflow Engine to start...',
+            'echo Waiting for server...',
             ':wait',
             'ping 127.0.0.1 -n 2 > nul',
             'curl -s http://localhost:19529/api/health >nul 2>&1',
             'if errorlevel 1 goto wait',
-            'echo Workflow Engine started on http://localhost:19529',
+            'echo Server ready: http://localhost:19529',
             'start http://localhost:19529'
-          ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
+          ) | Set-Content -Path "$staging/server-start.bat" -Encoding ASCII
           
           # Ensure LICENSE exists
           if (-not (Test-Path LICENSE)) {
