@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
-import { useTheme, type Theme } from '../composables/useTheme'
+import { useTheme } from '../composables/useTheme'
 import { setStoredLocale, type Locale } from '@/i18n'
 import pkg from '../../package.json'
 import changelogData from '../assets/changelog.json'
@@ -21,7 +21,6 @@ import Separator from '../components/ui/separator/Separator.vue'
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group'
 import ActionIcon from '../components/ActionIcon.vue'
 import Select from '../components/ui/select/Select.vue'
-import { cn } from '@/lib/utils'
 import SKILL_CONTENT from '../assets/workflow-engine-cli.SKILL.md?raw'
 
 const emit = defineEmits<{ 'back': [] }>()
@@ -29,7 +28,7 @@ const emit = defineEmits<{ 'back': [] }>()
 const { t, locale } = useI18n()
 const toast = useToast()
 const APP_VERSION = pkg.version
-const { theme: currentTheme, setTheme } = useTheme()
+useTheme() // initialise theme system
 
 const localeOptions = computed<{ value: Locale; label: string }[]>(() => [
   { value: 'zh-CN', label: t('settingsPage.langZh') },
@@ -71,12 +70,6 @@ const logLevelOptions = computed(() => [
   { value: 'error', label: t('settingsPage.logError') },
 ])
 
-const themeOptions = computed<{ value: Theme; label: string; icon: string; desc: string }[]>(() => [
-  { value: 'light', label: t('settingsPage.themeLight'), icon: 'Sun', desc: t('settingsPage.themeLightDesc') },
-  { value: 'dark', label: t('settingsPage.themeDark'), icon: 'Moon', desc: t('settingsPage.themeDarkDesc') },
-  { value: 'system', label: t('settingsPage.themeSystem'), icon: 'Monitor', desc: t('settingsPage.themeSystemDesc') },
-])
-
 onMounted(async () => {
   loading.value = true
   try {
@@ -103,7 +96,7 @@ async function save() {
   finally { saving.value = false }
 }
 
-async function toggleAutoStart() { settings.value.auto_start = !settings.value.auto_start; await save() }
+async function toggleAutoStart() { settings.value.auto_start = !settings.value.auto_start }
 async function openLogDir() { try { await safeInvoke('open_log_dir') } catch (e: any) { toast.error(t('settingsPage.logOpenFailed') + ': ' + e) } }
 async function clearLogs() { try { await safeInvoke('clear_logs'); toast.success(t('settingsPage.logCleared')) } catch (e: any) { toast.error(t('settingsPage.logClearFailed') + ': ' + e) } }
 function truncatePath(p: string, n: number) { return p.length <= n ? p : '...' + p.slice(-(n - 3)) }
@@ -139,25 +132,17 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           <ActionIcon name="Palette" cls="w-4 h-4 text-muted-foreground" />
           <div class="flex-1">
             <CardTitle class="text-sm">{{ t('settingsPage.appearance') }}</CardTitle>
-            <CardDescription class="text-xs">{{ t('settingsPage.theme') }}</CardDescription>
+            <CardDescription class="text-xs">Dark — {{ t('settingsPage.themeDarkDesc') }}</CardDescription>
           </div>
         </CardHeader>
         <CardContent class="px-4 pb-4 pt-0">
-          <div class="grid grid-cols-3 gap-3">
-            <Button
-              v-for="opt in themeOptions" :key="opt.value"
-              variant="outline"
-              :aria-pressed="currentTheme === opt.value"
-              :class="cn(
-                'flex flex-col items-center gap-2 p-4 h-auto border-2',
-                currentTheme === opt.value ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/50',
-              )"
-              @click="setTheme(opt.value)"
-            >
-              <ActionIcon :name="opt.icon" cls="w-6 h-6" />
-              <span class="text-sm font-semibold text-foreground">{{ opt.label }}</span>
-              <span class="text-[10px] text-muted-foreground text-center leading-tight">{{ opt.desc }}</span>
-            </Button>
+          <div class="flex items-center gap-3 p-3 bg-muted/30 rounded-md">
+            <ActionIcon name="Moon" cls="w-4 h-4 text-primary" />
+            <div class="flex-1">
+              <span class="text-sm font-medium text-foreground">{{ t('settingsPage.themeDark') }}</span>
+              <span class="text-xs text-muted-foreground ml-2">— {{ t('settingsPage.themeDarkDesc') }}</span>
+            </div>
+            <Badge variant="success" class="text-[10px]">Active</Badge>
           </div>
         </CardContent>
       </Card>
@@ -181,46 +166,47 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
       <!-- ═══ Browser ═══ -->
       <Card>
         <CardHeader class="flex flex-row items-center gap-2 p-4 pb-3">
-          <ActionIcon name="Globe" cls="w-4 h-4 text-muted-foreground" />
+          <ActionIcon name="Monitor" cls="w-4 h-4 text-muted-foreground" />
           <div class="flex-1">
             <CardTitle class="text-sm">{{ t('settingsPage.browserNode') }}</CardTitle>
             <CardDescription class="text-xs">{{ t('settingsPage.browserAutoDesc') }}</CardDescription>
           </div>
         </CardHeader>
-        <CardContent class="px-4 pb-4 pt-0 space-y-4">
+        <CardContent class="px-4 pb-4 pt-0">
           <!-- System check -->
-          <div v-if="sysInfo" class="p-3 bg-muted/50 rounded-md space-y-1.5">
-            <h3 class="text-xs text-muted-foreground flex items-center gap-2">
-              {{ t('settingsPage.envBrowser') }}
+          <div v-if="sysInfo" class="p-3 bg-muted/30 rounded-md space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-foreground">{{ t('settingsPage.envPython') }}</span>
+              <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
+                {{ sysInfo.python_available ? t('settingsPage.envDetected') : t('settingsPage.envNotFound') }}
+              </span>
+            </div>
+            <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
+              <span class="text-muted-foreground pl-3">{{ t('settingsPage.envPath') }}</span>
+              <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
+            </div>
+            <div v-if="!sysInfo.python_available" class="text-xs text-danger">
+              {{ t('settingsPage.installPython') }}
+              <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">{{ t('settingsPage.downloadLink') }}</a>
+            </div>
+            <Separator class="my-2" />
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-foreground">WebBridge</span>
+              <span :class="sysInfo.webbridge_connected ? 'text-success' : 'text-muted-foreground'">
+                {{ sysInfo.webbridge_connected ? '✓ 已连接' : '未连接（请安装浏览器扩展）' }}
+              </span>
+            </div>
+            <div v-if="sysInfo.webbridge_info" class="flex justify-between items-center text-xs">
+              <span class="text-muted-foreground pl-3">扩展版本</span>
+              <span class="text-success text-[11px]">{{ sysInfo.webbridge_info.version }}</span>
+            </div>
+            <!-- Browser status -->
+            <Separator class="my-2" />
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-foreground">{{ t('settingsPage.envBrowser') }}</span>
               <Badge :variant="sysInfo.ready ? 'success' : 'warning'" class="text-[10px]">
                 {{ sysInfo.ready ? t('settingsPage.envReady') : t('settingsPage.envNotReady') }}
               </Badge>
-            </h3>
-            <div class="flex flex-col gap-1.5">
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">{{ t('settingsPage.envPython') }}</span>
-                <span :class="sysInfo.python_available ? 'text-success' : 'text-danger'">
-                  {{ sysInfo.python_available ? t('settingsPage.envDetected') : t('settingsPage.envNotFound') }}
-                </span>
-              </div>
-              <div v-if="sysInfo.system_python" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">{{ t('settingsPage.envPath') }}</span>
-                <span class="text-success text-[11px] truncate max-w-[200px]" :title="sysInfo.system_python">{{ truncatePath(sysInfo.system_python, 40) }}</span>
-              </div>
-              <div v-if="!sysInfo.python_available" class="text-xs text-destructive">
-                {{ t('settingsPage.installPython') }}
-                <a href="https://www.python.org/downloads/" target="_blank" class="text-primary ml-1 hover:underline">{{ t('settingsPage.downloadLink') }}</a>
-              </div>
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-foreground">WebBridge</span>
-                <span :class="sysInfo.webbridge_connected ? 'text-success' : 'text-muted-foreground'">
-                  {{ sysInfo.webbridge_connected ? '✓ 已连接' : '未连接（请安装浏览器扩展）' }}
-                </span>
-              </div>
-              <div v-if="sysInfo.webbridge_info" class="flex justify-between items-center text-xs">
-                <span class="text-foreground pl-3">扩展版本</span>
-                <span class="text-success text-[11px]">{{ sysInfo.webbridge_info.version }}</span>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -450,8 +436,7 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
   <!-- ═══ Sticky save bar ═══ -->
   <div
     v-if="isDirty"
-    class="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-t border-border px-5 py-3"
-    style="box-shadow: 0 -4px 12px rgba(0,0,0,0.1)"
+    class="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-t-2 border-primary px-5 py-3"
   >
     <div class="max-w-[640px] mx-auto flex items-center justify-between">
       <span class="text-sm text-muted-foreground flex items-center gap-1.5">

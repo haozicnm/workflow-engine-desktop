@@ -223,8 +223,8 @@ onUnmounted(() => {
               @dragend="a.onDragEnd"
             >
               <!-- Drag handle -->
-              <div class="w-6 flex items-center justify-center text-border cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-muted-foreground hover:bg-card active:cursor-grabbing">
-                <GripVertical class="w-3 h-3 text-border shrink-0" />
+              <div class="w-6 flex items-center justify-center text-muted-foreground cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-foreground hover:bg-muted active:cursor-grabbing">
+                <GripVertical class="w-3 h-3 shrink-0" />
               </div>
 
               <StepCard

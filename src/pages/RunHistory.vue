@@ -234,7 +234,7 @@ const stats = computed(() => {
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3">
         <Button variant="outline" size="sm" class="text-xs" @click="emit('back')">{{ t('history.back') }}</Button>
-        <h2 class="text-3xl font-bold tracking-tight">{{ t('history.title') }}</h2>
+        <h2 class="text-xl font-bold tracking-tight">{{ t('history.title') }}</h2>
         <Badge v-if="!loading" variant="secondary" class="text-[10px]">{{ t('history.items', { n: runs.length }) }}</Badge>
       </div>
       <div class="flex items-center gap-2">
@@ -276,7 +276,7 @@ const stats = computed(() => {
         :key="run.id"
         :class="cn(
           'overflow-hidden transition-colors',
-          expandedId === run.id ? 'border-primary/25' : 'hover:border-foreground/20',
+          expandedId === run.id ? 'border-primary/25' : 'hover:border-primary/25',
         )"
       >
         <button
@@ -338,7 +338,7 @@ const stats = computed(() => {
                   <div class="text-[11px] text-muted-foreground">{{ calcDuration(step.started_at, step.finished_at) }}</div>
                   <div v-if="step.error" class="col-start-2 col-end-[-1] text-[11px] text-destructive font-mono">{{ step.error }}</div>
                   <div v-if="step.output" class="col-start-2 col-end-[-1] mt-1">
-                    <pre class="text-[11px] text-muted-foreground bg-background p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
+                    <pre class="text-[11px] text-muted-foreground bg-muted p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
                   </div>
                 </div>
                 <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">{{ t('history.noStepsRecord') }}</div>

@@ -170,7 +170,7 @@ onMounted(loadPlugins)
         <div
           v-for="p in plugins"
           :key="p.name"
-          class="rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/30"
+          class="rounded-lg border border-border bg-muted p-4 transition-colors hover:border-primary/30"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
