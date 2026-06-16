@@ -39,23 +39,23 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executables
-Source: "{src}\workflow-engine.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{src}\wf-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\workflow-engine.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\wf-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Frontend dist
-Source: "{src}\dist\*"; DestDir: "{app}\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#src}\dist\*"; DestDir: "{app}\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Sidecars (Python runtime, Playwright browsers, etc.)
-Source: "{src}\sidecars\*"; DestDir: "{app}\sidecars"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#src}\sidecars\*"; DestDir: "{app}\sidecars"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Node schema
-Source: "{src}\node-schema.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\node-schema.json"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Python runtime
-Source: "{src}\python-runtime\*"; DestDir: "{app}\python-runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#src}\python-runtime\*"; DestDir: "{app}\python-runtime"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Start script
-Source: "{src}\start.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#src}\start.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\start.bat"; WorkingDir: "{app}"

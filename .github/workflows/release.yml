@@ -311,25 +311,38 @@ jobs:
 
       - name: Build Inno Setup installer
         shell: pwsh
-        env:
-          APP_VERSION: ${{ github.ref_name }}
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ github.ref_name }}" -replace '^v',''
           Write-Host "=== Building Inno Setup installer v${version} ==="
           
-          # Create staging directory
-          $staging = "installer-staging"
-          New-Item -ItemType Directory -Force -Path $staging
+          # Find Inno Setup
+          $isccPaths = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $null
+          foreach ($p in $isccPaths) {
+            if (Test-Path $p) { $iscc = $p; break }
+          }
+          if (-not $iscc) {
+            Write-Error "Inno Setup ISCC.exe not found. Tried: $($isccPaths -join ', ')"
+            exit 1
+          }
+          Write-Host "Found ISCC: $iscc"
+          
+          # Create staging directory (absolute path)
+          $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item src-tauri/target/release/workflow-engine.exe $staging/
           Copy-Item src-tauri/target/release/wf-cli.exe $staging/
           Copy-Item -Recurse dist $staging/dist
           Copy-Item -Recurse src-tauri/sidecars $staging/sidecars
           Copy-Item src-tauri/node-schema.json $staging/
-          Copy-Item -Recurse src-tauri/python-runtime $staging/python-runtime
+          Copy-Item -Recurse src-tauri/python-runtime $staging/python-runtime -ErrorAction SilentlyContinue
           
-          # Create start.bat for installed app
-          $lines = @(
+          # Create start.bat
+          @(
             '@echo off',
             'title Workflow Engine',
             'cd /d "%~dp0"',
@@ -341,17 +354,17 @@ jobs:
             'if errorlevel 1 goto wait',
             'echo Workflow Engine started on http://localhost:19529',
             'start http://localhost:19529'
-          )
-          $lines | Set-Content -Path "$staging/start.bat" -Encoding ASCII
+          ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
           
-          # Create dummy LICENSE if not exists
+          # Ensure LICENSE exists
           if (-not (Test-Path LICENSE)) {
-            "MIT License - Workflow Engine" | Set-Content -Path LICENSE
+            "MIT License" | Set-Content -Path LICENSE
           }
           
-          # Run Inno Setup
+          # Run Inno Setup with absolute staging path
           $env:APP_VERSION = $version
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /Dsrc=$staging installer.iss
+          Write-Host "Running: & $iscc /Dsrc=`"$staging`" installer.iss"
+          & $iscc /Dsrc="$staging" installer.iss
           
           Write-Host "=== Installer built ==="
           Get-ChildItem WorkflowEngine-*-setup.exe | ForEach-Object { Write-Host $_.Name }
