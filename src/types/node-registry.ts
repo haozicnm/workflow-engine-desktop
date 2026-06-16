@@ -14,22 +14,22 @@ type TFn = (key: string, defaultMsg?: string) => string
 // ─── 容器定义 ───
 
 export const CONTAINER_DEFS: ContainerDef[] = [
-  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#79c0ff', isContainer: true, category: 'browser', description: '网页操作：导航、点击、输入、提取', outputHint: 'actionId: value, ...', params: [
+  { type: 'browser', label: '浏览器', icon: 'Globe', color: '#a5d6ff', isContainer: true, category: 'browser', description: '网页操作：导航、点击、输入、提取', outputHint: 'actionId: value, ...', params: [
     { key: 'browser', label: '浏览器', type: 'select', options: [
       { label: 'Chromium', value: 'chromium' }, { label: 'Firefox', value: 'firefox' }, { label: 'WebKit', value: 'webkit' },
     ], default: 'chromium' },
     { key: 'headless', label: '无头模式', type: 'checkbox', default: false },
     { key: 'timeout', label: '超时(ms)', type: 'number', default: 30000 },
   ]},
-  { type: 'excel', label: 'Excel', icon: 'BarChart3', color: '#3fb950', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', outputHint: 'actionId: value, ...', params: [
+  { type: 'excel', label: 'Excel', icon: 'BarChart3', color: '#79c0ff', isContainer: true, description: 'Excel 操作：读写单元格、筛选、排序', outputHint: 'actionId: value, ...', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './data.xlsx' },
     { key: 'sheet', label: '工作表', type: 'text', default: 'Sheet1' },
   ]},
-  { type: 'word', label: 'Word', icon: 'FileText', color: '#bc8cff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: 'actionId: value, ...', params: [
+  { type: 'word', label: 'Word', icon: 'FileText', color: '#d2a8ff', isContainer: true, description: 'Word 操作：读写、替换、合并', outputHint: 'actionId: value, ...', params: [
     { key: 'file_path', label: '文件路径', type: 'text', placeholder: './document.docx' },
   ]},
 
-  { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#539bf5', description: '发送 HTTP 请求并获取响应', outputHint: 'status, headers, body', params: [
+  { type: 'http', label: 'HTTP 请求', icon: 'Network', color: '#c9e6ff', description: '发送 HTTP 请求并获取响应', outputHint: 'status, headers, body', params: [
     { key: 'method', label: '方法', type: 'select', options: [
       { label: 'GET', value: 'GET' }, { label: 'POST', value: 'POST' },
       { label: 'PUT', value: 'PUT' }, { label: 'DELETE', value: 'DELETE' },
@@ -48,33 +48,33 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'timeout', field_type: 'number', required: false, default: 30000, desc: '超时(ms)', group: 'advanced' },
     { name: 'connect_timeout', field_type: 'number', required: false, default: 10000, desc: '连接超时(ms)', group: 'advanced' },
   ]},
-  { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#adbac7', description: '等待指定时间后继续', outputHint: 'waited: ms', params: [
+  { type: 'delay', label: '延迟等待', icon: 'Clock', color: '#e2c5ff', description: '等待指定时间后继续', outputHint: 'waited: ms', params: [
     { key: 'duration_ms', label: '毫秒', type: 'number', default: 1000 },
     { key: 'max_duration_ms', label: '最大毫秒(随机)', type: 'number', default: 5000 },
   ]},
 
-  { type: 'script', label: '脚本', icon: 'ScrollText', color: '#7ee787', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
+  { type: 'script', label: '脚本', icon: 'ScrollText', color: '#6ee7b7', description: '执行自定义脚本（Rhai）', outputHint: '脚本返回值', params: [
     { key: 'script', label: '代码', type: 'textarea', placeholder: '// 你的 Rhai 脚本代码' },
   ], paramDefs: [
     { name: 'script', field_type: 'code', required: true, desc: 'Rhai 脚本代码', lang: 'rhai', group: 'basic' },
   ]},
 
-  { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#e85d75', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: 'done, item, index, total', params: [
+  { type: 'cursor', label: '游标迭代', icon: 'Repeat', color: '#ffa0d0', isContainer: true, description: '逐条迭代：每次运行处理一行/一项，游标跨次保存', outputHint: 'done, item, index, total', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{read_excel.data}}' },
   ]},
-  { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: 'count, results[]', params: [
+  { type: 'loop', label: '批量循环', icon: 'RefreshCw', color: '#f0883e', isContainer: true, description: '一次性遍历全部数据，适合小数据内存变换', outputHint: 'count, results[]', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}} 或 [[1,2,3]]' },
     { key: 'collect', label: '结果聚合 (JSON)', type: 'textarea', placeholder: '{"field": "id", "method": "concat"}' },
     { key: 'table', label: '表格输出 (JSON)', type: 'textarea', placeholder: '{"columns": ["name","value"]}' },
   ]},
-  { type: 'while', label: 'While 循环', icon: 'RefreshCw', color: '#daaa3e', isContainer: true, category: 'flow', description: '条件循环，满足条件时重复执行子步骤', outputHint: 'iterations', params: [
+  { type: 'while', label: 'While 循环', icon: 'RefreshCw', color: '#f0883e', isContainer: true, category: 'flow', description: '条件循环，满足条件时重复执行子步骤', outputHint: 'iterations', params: [
     { key: 'condition', label: '循环条件', type: 'text', placeholder: 'index < 10' },
     { key: 'max_iterations', label: '最大迭代次数', type: 'number', default: 1000 },
   ], paramDefs: [
     { name: 'condition', field_type: 'string', required: true, desc: '循环条件表达式（如 index < 10）', group: 'basic' },
     { name: 'max_iterations', field_type: 'number', required: false, default: 1000, desc: '最大迭代次数（防止死循环）', group: 'advanced' },
   ]},
-  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#f778ba', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: 'decision: 选项名, comment, item, auto?, recommendation_reason?', params: [
+  { type: 'approval', label: '人工审批', icon: 'Hand', color: '#ffa0d0', description: '暂停流程等待人工审核：支持条件推荐、超时自动/手动', outputHint: 'decision: 选项名, comment, item, auto?, recommendation_reason?', params: [
     { key: 'title', label: '审批标题', type: 'text', placeholder: '请确认订单信息' },
     { key: 'message', label: '审批内容', type: 'textarea', placeholder: '订单号：{{step_1.action_1_1.订单号}}' },
     { key: 'options', label: '审批选项', type: 'text', placeholder: '同意,拒绝,需要更多信息（逗号分隔）', default: '同意,拒绝' },
@@ -94,7 +94,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
       { label: '标记失败', value: 'fail' },
     ], default: 'recommended' },
   ]},
-  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#768390', dangerous: true, description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: 'stdout, stderr, exit_code', params: [
+  { type: 'shell', label: 'Shell 命令', icon: 'Terminal', color: '#8b949e', dangerous: true, description: '执行任意 Shell 命令（bash/powershell/cmd），支持变量引用', outputHint: 'stdout, stderr, exit_code', params: [
     { key: 'command', label: '命令', type: 'textarea', placeholder: 'echo "Hello {{name}}"' },
     { key: 'shell', label: 'Shell 类型', type: 'select', options: [
       { label: '自动检测', value: 'auto' },
@@ -122,7 +122,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'content', field_type: 'text', required: true, desc: '写入内容', group: 'basic' },
     { name: 'append', field_type: 'boolean', required: false, default: false, desc: '追加模式', group: 'advanced' },
   ]},
-  { type: 'condition', label: '条件判断', icon: 'GitBranch', color: '#daaa3e', category: 'core', description: '根据条件表达式选择分支', outputHint: 'branch, result', params: [], paramDefs: [
+  { type: 'condition', label: '条件判断', icon: 'GitBranch', color: '#f0883e', category: 'core', description: '根据条件表达式选择分支', outputHint: 'branch, result', params: [], paramDefs: [
     { name: 'expression', field_type: 'code', required: true, desc: '条件表达式', lang: 'rhai', group: 'basic' },
   ]},
 
@@ -190,14 +190,14 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'fail_fast', field_type: 'boolean', required: false, default: true, desc: '快速失败', group: 'advanced' },
     { name: 'excel_output', field_type: 'string', required: false, desc: '输出到 Excel 文件', group: 'advanced' },
   ]},
-  { type: 'data_set', label: '设置变量', icon: 'Database', color: '#daaa3e', category: 'data', description: '写入或覆盖上下文变量', outputHint: 'value', params: [
+  { type: 'data_set', label: '设置变量', icon: 'Database', color: '#f0883e', category: 'data', description: '写入或覆盖上下文变量', outputHint: 'value', params: [
     { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
     { key: 'value', label: '变量值', type: 'textarea', placeholder: 'Hello {{name}}' },
   ], paramDefs: [
     { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
     { name: 'value', field_type: 'text', required: true, desc: '变量值', group: 'basic' },
   ]},
-  { type: 'data_get', label: '读取变量', icon: 'Database', color: '#daaa3e', category: 'data', description: '从上下文读取指定变量的值', outputHint: 'value', params: [
+  { type: 'data_get', label: '读取变量', icon: 'Database', color: '#f0883e', category: 'data', description: '从上下文读取指定变量的值', outputHint: 'value', params: [
     { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
   ], paramDefs: [
     { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
@@ -221,13 +221,13 @@ export const CONTAINER_DEFS: ContainerDef[] = [
   ], paramDefs: [
     { name: 'path', field_type: 'file_path', required: true, desc: '文件路径', group: 'basic' },
   ]},
-  { type: 'clipboard_read', label: '读取剪贴板', icon: 'Clipboard', color: '#768390', category: 'system', description: '读取系统剪贴板内容', outputHint: 'text', params: [], paramDefs: [] },
-  { type: 'clipboard_write', label: '写入剪贴板', icon: 'Clipboard', color: '#768390', category: 'system', description: '写入内容到系统剪贴板', outputHint: '', params: [
+  { type: 'clipboard_read', label: '读取剪贴板', icon: 'Clipboard', color: '#8b949e', category: 'system', description: '读取系统剪贴板内容', outputHint: 'text', params: [], paramDefs: [] },
+  { type: 'clipboard_write', label: '写入剪贴板', icon: 'Clipboard', color: '#8b949e', category: 'system', description: '写入内容到系统剪贴板', outputHint: '', params: [
     { key: 'content', label: '内容', type: 'textarea', placeholder: '要写入剪贴板的文本' },
   ], paramDefs: [
     { name: 'content', field_type: 'text', required: true, desc: '写入内容', group: 'basic' },
   ]},
-  { type: 'regex', label: '正则处理', icon: 'Regex', color: '#daaa3e', category: 'data', description: '正则表达式处理：提取捕获组或测试匹配', outputHint: 'matches, count, is_match', params: [
+  { type: 'regex', label: '正则处理', icon: 'Regex', color: '#f0883e', category: 'data', description: '正则表达式处理：提取捕获组或测试匹配', outputHint: 'matches, count, is_match', params: [
     { key: 'mode', label: '模式', type: 'select', options: [
       { label: '提取', value: 'extract' }, { label: '测试', value: 'test' },
     ], default: 'extract' },
@@ -240,7 +240,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'input', field_type: 'text', required: true, desc: '输入文本', group: 'basic' },
     { name: 'global', field_type: 'boolean', required: false, default: false, desc: '全局匹配', group: 'advanced' },
   ]},
-  { type: 'parallel', label: '并行执行', icon: 'LayoutPanelTop', color: '#e85d75', category: 'flow', description: '并行执行多个子步骤', outputHint: 'results', params: [
+  { type: 'parallel', label: '并行执行', icon: 'LayoutPanelTop', color: '#ffa0d0', category: 'flow', description: '并行执行多个子步骤', outputHint: 'results', params: [
     { key: 'branches', label: '分支数', type: 'number', default: 2 },
     { key: 'fail_fast', label: '快速失败', type: 'checkbox', default: true },
     { key: 'max_concurrency', label: '最大并发数', type: 'number', default: 4 },
@@ -249,7 +249,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'fail_fast', field_type: 'boolean', required: false, default: true, desc: '快速失败', group: 'advanced' },
     { name: 'max_concurrency', field_type: 'number', required: false, default: 4, desc: '最大并发数', group: 'advanced' },
   ]},
-  { type: 'map', label: 'Map 映射', icon: 'MapPin', color: '#e85d75', category: 'flow', description: '对每个输入元素应用映射函数', outputHint: 'result', params: [
+  { type: 'map', label: 'Map 映射', icon: 'MapPin', color: '#ffa0d0', category: 'flow', description: '对每个输入元素应用映射函数', outputHint: 'result', params: [
     { key: 'items', label: '数据源', type: 'text', placeholder: '{{step1.data}}' },
     { key: 'body_steps', label: '映射步骤 (JSON)', type: 'textarea', placeholder: '[{"type": "http", ...}]' },
     { key: 'item_var', label: '元素变量名', type: 'text', default: 'item' },
@@ -258,7 +258,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'body_steps', field_type: 'json', required: true, desc: '映射步骤', group: 'basic' },
     { name: 'item_var', field_type: 'string', required: false, default: 'item', desc: '元素变量名', group: 'advanced' },
   ]},
-  { type: 'sub_workflow', label: '子工作流', icon: 'Workflow', color: '#e85d75', category: 'flow', description: '调用另一个工作流作为子流程', outputHint: 'output', params: [
+  { type: 'sub_workflow', label: '子工作流', icon: 'Workflow', color: '#ffa0d0', category: 'flow', description: '调用另一个工作流作为子流程', outputHint: 'output', params: [
     { key: 'workflow_id', label: '工作流 ID', type: 'text', placeholder: 'wf_abc123' },
     { key: 'input_vars', label: '输入变量 (JSON)', type: 'textarea', placeholder: '{"key": "value"}' },
     { key: 'wait', label: '等待完成', type: 'checkbox', default: true },
@@ -267,14 +267,14 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'input_vars', field_type: 'json', required: false, desc: '输入变量', group: 'basic' },
     { name: 'wait', field_type: 'boolean', required: false, default: true, desc: '等待完成', group: 'advanced' },
   ]},
-  { type: 'mouse_keyboard', label: '键鼠操作', icon: 'MousePointerClick', color: '#768390', category: 'desktop', description: '模拟鼠标和键盘操作', outputHint: 'result', params: [
+  { type: 'mouse_keyboard', label: '键鼠操作', icon: 'MousePointerClick', color: '#8b949e', category: 'desktop', description: '模拟鼠标和键盘操作', outputHint: 'result', params: [
     { key: 'actions', label: '操作序列 (JSON)', type: 'textarea', placeholder: '[{"type": "click", "x": 100, "y": 200}]' },
     { key: 'interval_ms', label: '操作间隔(ms)', type: 'number', default: 100 },
   ], paramDefs: [
     { name: 'actions', field_type: 'json', required: true, desc: '操作序列', group: 'basic' },
     { name: 'interval_ms', field_type: 'number', required: false, default: 100, desc: '操作间隔(ms)', group: 'advanced' },
   ]},
-  { type: 'window', label: '窗口管理', icon: 'Monitor', color: '#768390', category: 'desktop', description: '管理桌面窗口', outputHint: 'result', params: [
+  { type: 'window', label: '窗口管理', icon: 'Monitor', color: '#8b949e', category: 'desktop', description: '管理桌面窗口', outputHint: 'result', params: [
     { key: 'action', label: '操作', type: 'select', options: [
       { label: '查找', value: 'find' }, { label: '激活', value: 'activate' }, { label: '关闭', value: 'close' },
       { label: '移动', value: 'move' }, { label: '调整大小', value: 'resize' },
@@ -299,7 +299,7 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'source', field_type: 'file_path', required: true, desc: '图片路径', group: 'basic' },
     { name: 'language', field_type: 'select', required: false, default: 'chi+eng', desc: '识别语言', options: ['chi', 'eng', 'chi+eng'], group: 'basic' },
   ]},
-  { type: 'print', label: '打印', icon: 'Printer', color: '#768390', category: 'system', description: '打印文档或内容', outputHint: '', params: [
+  { type: 'print', label: '打印', icon: 'Printer', color: '#8b949e', category: 'system', description: '打印文档或内容', outputHint: '', params: [
     { key: 'message', label: '消息', type: 'textarea', placeholder: '要打印的内容' },
     { key: 'level', label: '日志级别', type: 'select', options: [
       { label: '信息', value: 'info' }, { label: '警告', value: 'warn' }, { label: '错误', value: 'error' },

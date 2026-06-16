@@ -39,7 +39,7 @@ const showCardMenu = ref(false)
 </script>
 
 <template>
-  <Card color="#6e7681" class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
+  <Card color="var(--color-muted-foreground)" class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
     <!-- Loading skeleton -->
     <div v-if="loading" class="px-4 py-3 space-y-3 animate-pulse">
       <div class="h-5 bg-secondary/50 rounded w-1/3" />

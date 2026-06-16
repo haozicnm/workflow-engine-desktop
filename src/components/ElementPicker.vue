@@ -175,7 +175,7 @@ function confirmSelect() {
             @dblclick="selectElement(el.ref); confirmSelect()"
           >
             <span class="text-xs leading-none">{{ getRoleIcon(el.role) }}</span>
-            <span class="text-xs font-mono text-purple-500 dark:text-purple-400 min-w-[2.5rem]">@{{ el.ref }}</span>
+            <span class="text-xs font-mono text-primary min-w-[2.5rem]">@{{ el.ref }}</span>
             <span class="text-xs font-medium text-foreground/80">{{ el.role }}</span>
             <span v-if="el.name" class="text-xs text-muted-foreground truncate flex-1">{{ el.name }}</span>
           </div>

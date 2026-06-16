@@ -1,104 +1,56 @@
+/* ═══════════ Inter 字体（Google Fonts CDN — Variable + ss03） ═══════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap');
+
 /* ═══════════ Tailwind v4 ═══════════ */
 @import "tailwindcss";
 
-/* ═══════════ Geist 字体 ═══════════ */
-@font-face {
-  font-family: 'Geist';
-  src: url('/fonts/Geist-Variable.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 @custom-variant dark (&:is(.dark *));
 
-/* ═══════════ shadcn-vue 主题（浅色为默认值） ═══════════ */
+/* ═══════════ DESIGN.md 设计令牌（碳灰画布 + 翠绿品牌色） ═══════════ */
 @theme {
-  --color-background: #fafbfc;
-  --color-foreground: #1f2328;
-  --color-card: #f0f2f5;
-  --color-card-foreground: #1f2328;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #1f2328;
-  --color-primary: #0969da;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f0f2f5;
-  --color-secondary-foreground: #1f2328;
-  --color-muted: #f0f2f5;
-  --color-muted-foreground: #656d76;
-  --color-accent: #f6f8fa;
-  --color-accent-foreground: #1f2328;
-  --color-destructive: #cf222e;
+  /* 基础层 — 最深画布 */
+  --color-background: #090a0b;
+  --color-foreground: #f4f4f6;
+  --color-card: #111214;
+  --color-card-foreground: #f4f4f6;
+  --color-popover: #16171a;
+  --color-popover-foreground: #f4f4f6;
+
+  /* 品牌色 — 翠绿色（唯一强调色） */
+  --color-primary: #10b981;
+  --color-primary-badge-bg: rgba(16, 185, 129, 0.15);
+  --color-primary-foreground: #000000;
+
+  /* 表面层级（surface ladder） */
+  --color-secondary: #16171a;
+  --color-secondary-foreground: #d0d6e0;
+  --color-muted: #111214;
+  --color-muted-foreground: #8a8f98;
+  --color-accent: #1a1c1f;
+  --color-accent-foreground: #f4f4f6;
+
+  /* 语义色 */
+  --color-destructive: #cf2d56;
   --color-destructive-foreground: #ffffff;
-  --color-border: #d1d9e0;
-  --color-input: #d1d9e0;
-  --color-ring: #0969da;
-  --color-success: #1a7f37;
+  --color-success: #27a644;
   --color-success-foreground: #ffffff;
-  --color-danger: #cf222e;
+  --color-danger: #cf2d56;
   --color-danger-foreground: #ffffff;
-  --color-warning: #9a6700;
-  --color-warning-foreground: #ffffff;
+  --color-warning: #d4a72c;
+  --color-warning-foreground: #000000;
 
-  /* 容器类型颜色 */
-  --color-container-browser: #79c0ff;
-  --color-container-excel: #58a6ff;
-  --color-container-word: #bc8cff;
-  --color-container-logic: #d29922;
-  --color-container-http: #a5d6ff;
-  --color-container-delay: #d2a8ff;
-  --color-container-notify: #f0883e;
-  --color-container-script: #7ee787;
-  --color-container-clipboard: #8b949e;
-  --color-container-cursor: #e85d75;
-  --color-container-loop: #f0883e;
-  --color-container-approval: #f778ba;
+  /* Hairline 边框（极细、低对比度，无阴影设计语言） */
+  --color-border: #23252a;
+  --color-input: #23252a;
+  --color-ring: #10b981;
 
+  /* 圆角（DESIGN.md: 按钮8px / 卡片12px） */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
-  /* Objects in Space design principles: larger corner radii for a softer, more modern feel */
-  --radius-lg: 24px;
-  --radius-xl: 24px;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.75rem;
 
-  /* 布局常量 */
-  --spacing-step-gap: 1rem;          /* 步骤卡片间距 */
-  --spacing-card-padding-x: 1rem;    /* 卡片水平内边距 */
-  --spacing-card-padding-y: 0.75rem; /* 卡片垂直内边距 */
-  --spacing-section-padding-x: 2rem; /* 页面区域水平内边距 */
-  --height-step-header: 2.5rem;      /* 步骤卡片头部高度 */
-  --height-action-row: 2.25rem;      /* 动作行头部高度 */
-}
-
-/* ─── Dark theme（覆盖 @theme 默认值） ─── */
-.dark {
-  --color-background: #0d1117;
-  --color-foreground: #e6edf3;
-  --color-card: #161b22;
-  --color-card-foreground: #e6edf3;
-  --color-popover: #161b22;
-  --color-popover-foreground: #e6edf3;
-  --color-primary: #58a6ff;
-  --color-primary-badge-bg: rgba(88, 166, 255, 0.2);
-  --color-primary-foreground: #0d1117;
-  --color-secondary: #21262d;
-  --color-secondary-foreground: #e6edf3;
-  --color-muted: #161b22;
-  --color-muted-foreground: #8b949e;
-  --color-accent: #21262d;
-  --color-accent-foreground: #e6edf3;
-  --color-destructive: #f85149;
-  --color-destructive-foreground: #ffffff;
-  --color-border: #30363d;
-  --color-input: #30363d;
-  --color-ring: #58a6ff;
-  --color-success: #3fb950;
-  --color-success-foreground: #0d1117;
-  --color-danger: #f85149;
-  --color-danger-foreground: #ffffff;
-  --color-warning: #d29922;
-  --color-warning-foreground: #0d1117;
-
-  /* 容器类型颜色（暗色模式调亮） */
+  /* 容器类型颜色（翠绿色系调整） */
   --color-container-browser: #a5d6ff;
   --color-container-excel: #79c0ff;
   --color-container-word: #d2a8ff;
@@ -106,20 +58,29 @@
   --color-container-http: #c9e6ff;
   --color-container-delay: #e2c5ff;
   --color-container-notify: #f0883e;
-  --color-container-script: #a5d6a5;
+  --color-container-script: #6ee7b7;
   --color-container-clipboard: #8b949e;
   --color-container-cursor: #f778ba;
   --color-container-loop: #f0883e;
   --color-container-approval: #ffa0d0;
+
+  /* 布局常量 */
+  --spacing-step-gap: 1rem;
+  --spacing-card-padding-x: 1rem;
+  --spacing-card-padding-y: 0.75rem;
+  --spacing-section-padding-x: 2rem;
+  --height-step-header: 2.5rem;
+  --height-action-row: 2.25rem;
 }
 
-/* ═══════════ 全局样式（放在 @layer base 内，不覆盖 Tailwind 工具类） ═══════════ */
+/* ═══════════ 全局样式 ═══════════ */
 @layer base {
   html, body, #app {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-feature-settings: 'calt', 'kern', 'liga', 'ss03';
     font-size: 14px;
     line-height: 1.5;
     background: var(--color-background);
@@ -128,26 +89,22 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* shadcn/ui 默认: border-box */
   *, *::before, *::after {
     box-sizing: border-box;
   }
 
-  /* 滚动条 — shadcn 风格更细更淡 */
+  /* 滚动条 — hairline 风格 */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
 
-  /* 选中文本高亮 */
   ::selection {
     background: var(--color-primary);
     color: var(--color-primary-foreground);
   }
-
-  /* Objects in Space design principles: flat card surfaces — shadow handled per-component */
 }
 
-/* Transition presets */
+/* 过渡预设 */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }

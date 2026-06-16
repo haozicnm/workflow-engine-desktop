@@ -1,5 +1,29 @@
 # Changelog
 
+## v8.3.0 (2026-06-16)
+
+### 🎨 DESIGN.md 设计系统全面落地
+
+- **暗色主题重设计**: 碳灰画布 `#090a0b`（比 Linear 更深）+ 翠绿品牌色 `#10b981`（单一强调色策略）
+- **4 级 Surface Ladder**: `#111214` → `#16171a` → `#1a1c1f`，无阴影纯扁平设计
+- **字体切换**: Geist → Inter Variable（含 ss03 风格化数字），Google Fonts CDN 加载
+- **Hairline 边框**: `#23252a` 极细分割线，替代 GitHub 风格粗边框
+- **圆角规范**: 按钮 8px（`0.5rem`）/ 卡片 12px（`0.75rem`），统一克制
+- **节点状态色**: running（sky-400）、success（emerald-600）、error（rose-600），选中/端口 hover → 翠绿
+- **容器颜色同步**: 15+ 节点类型色彩全部对齐 DESIGN.md 色板
+- **全局清理**: 消除所有硬编码蓝/绿/红/紫/灰，统一 CSS 变量驱动
+
+### 📦 Windows 安装包
+
+- **Inno Setup 安装程序**: 双击安装到 Program Files，开始菜单快捷方式，标准卸载
+- **CI 集成**: Release workflow 自动构建 `WorkflowEngine-vX.X.X-windows-x64-setup.exe`
+- **双语安装向导**: 中文 + English
+
+### 📝 设计资产
+
+- 新增 `DESIGN.md`: 完整设计令牌文档（颜色/字体/圆角/间距/组件规范），供 AI agent 参考
+- 参考源: Cursor（单橙策略）、Linear（最黑底哲学）、Raycast（桌面原生感）
+
 ## v8.2.0 (2026-06-16)
 
 ### 🎨 Canvas 图编辑器
