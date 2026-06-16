@@ -351,7 +351,7 @@ const canRef = computed(() => ['text', 'textarea', 'json', 'code', 'file_path'].
           <Teleport to="body">
             <div
               v-if="openDropdown"
-              class="fixed z-[60] w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md shadow-lg"
+              class="fixed z-[60] w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md"
               :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
             >
             <div

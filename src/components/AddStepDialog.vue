@@ -39,7 +39,7 @@ const groupedContainerDefs = computed(() => {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="emit('close')" @keydown.escape="emit('close')">
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[280px] max-h-[70vh] overflow-y-auto shadow-xl" @click.stop>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg p-2 min-w-[280px] max-h-[70vh] overflow-y-auto" @click.stop>
           <!-- Base nodes -->
           <div
             v-for="def in groupedContainerDefs.baseNodes"

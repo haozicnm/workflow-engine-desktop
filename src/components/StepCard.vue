@@ -375,10 +375,10 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
     <!-- Output display -->
     <div
       v-if="formattedOutput && (runState?.status === 'success' || runState?.status === 'error')"
-      class="border-t border-border bg-background"
+      class="border-t border-border bg-muted"
     >
       <div
-        class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none transition-colors hover:bg-card"
+        class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none transition-colors hover:bg-secondary"
         @click="showOutput = !showOutput"
       >
         <span class="text-[10px] text-muted-foreground w-3.5">{{ showOutput ? '▼' : '▶' }}</span>
@@ -386,7 +386,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           {{ runState?.status === 'error' ? t('stepCard.outputError') : t('stepCard.outputSuccess') }}
         </span>
       </div>
-      <pre v-if="showOutput" class="m-0 px-3 py-2 text-[11px] text-muted-foreground bg-background border-t border-border font-mono max-h-[200px] overflow-auto whitespace-pre-wrap break-all">{{ formattedOutput }}</pre>
+      <pre v-if="showOutput" class="m-0 px-3 py-2 text-[11px] text-muted-foreground bg-muted border-t border-border font-mono max-h-[200px] overflow-auto whitespace-pre-wrap break-all">{{ formattedOutput }}</pre>
     </div>
   </Card>
 </template>

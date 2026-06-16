@@ -38,9 +38,12 @@
   --color-danger-foreground: #ffffff;
   --color-warning: #d4a72c;
   --color-warning-foreground: #000000;
+  --color-info: #57c1ff;
+  --color-info-foreground: #000000;
 
   /* Hairline 边框（极细、低对比度，无阴影设计语言） */
   --color-border: #23252a;
+  --color-hairline-strong: #34343a;
   --color-input: #23252a;
   --color-ring: #10b981;
 
