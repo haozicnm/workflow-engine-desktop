@@ -458,6 +458,21 @@ pub struct FileMkdirNode;
 
 #[async_trait]
 impl NodeExecutor for FileMkdirNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_mkdir".into(),
+            version: "1.0".into(),
+            display_name: "创建目录".into(),
+            description: "递归创建目录".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -485,6 +500,21 @@ pub struct FileCopyNode;
 
 #[async_trait]
 impl NodeExecutor for FileCopyNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_copy".into(),
+            version: "1.0".into(),
+            display_name: "复制文件".into(),
+            description: "复制文件或目录到目标路径".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path", "dest"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -569,6 +599,21 @@ pub struct FileMoveNode;
 
 #[async_trait]
 impl NodeExecutor for FileMoveNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_move".into(),
+            version: "1.0".into(),
+            display_name: "移动文件".into(),
+            description: "移动或重命名文件/目录".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path", "dest"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -609,6 +654,21 @@ pub struct FileGlobNode;
 
 #[async_trait]
 impl NodeExecutor for FileGlobNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_glob".into(),
+            version: "1.0".into(),
+            display_name: "搜索文件".into(),
+            description: "使用通配符模式查找文件".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["pattern"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -642,6 +702,21 @@ pub struct FileChecksumNode;
 
 #[async_trait]
 impl NodeExecutor for FileChecksumNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_checksum".into(),
+            version: "1.0".into(),
+            display_name: "文件校验和".into(),
+            description: "计算文件的 MD5 和 SHA256 校验和".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

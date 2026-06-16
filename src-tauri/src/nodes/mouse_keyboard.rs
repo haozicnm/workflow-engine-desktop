@@ -17,6 +17,37 @@ pub struct MouseKeyboardNode;
 
 #[async_trait]
 impl NodeExecutor for MouseKeyboardNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "mouse_keyboard".into(),
+            version: "1.0".into(),
+            display_name: "鼠标键盘".into(),
+            description: "模拟鼠标点击、移动和键盘输入操作".into(),
+            category: "系统".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "action".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "x".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "y".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": [],
+                "properties": {
+                    "action": {"type": "string", "enum": ["click", "move", "type", "hotkey", "scroll"], "description": "操作类型"},
+                    "x": {"type": "number", "description": "X 坐标"},
+                    "y": {"type": "number", "description": "Y 坐标"},
+                    "button": {"type": "string", "enum": ["left", "right", "middle"], "description": "鼠标按钮"},
+                    "clicks": {"type": "number", "description": "点击次数", "default": 1},
+                    "text": {"type": "string", "description": "输入的文本"},
+                    "delay_ms": {"type": "number", "description": "按键延迟（毫秒）", "default": 50},
+                    "keys": {"type": "string", "description": "快捷键组合"},
+                    "amount": {"type": "number", "description": "滚动量", "default": 3}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

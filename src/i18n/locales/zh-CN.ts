@@ -151,6 +151,7 @@ export default {
     run: '▶ 运行',
     stop: '■ 停止',
     visual: '可视化',
+    canvas: '画布',
     code: '代码',
     noStepsTitle: '还没有步骤',
     noStepsHint: '点击下方「增加步骤」开始构建工作流',
@@ -171,6 +172,9 @@ export default {
     stepSuccess: '执行成功',
     runComplete: '运行完成',
     runFailedMsg: '运行失败: {error}',
+    stepsCount: '{count} 个步骤',
+    edgesCount: '{count} 条连线',
+    canvasEmpty: '画布为空，请在可视化视图中添加步骤',
   },
 
   // ─── 步骤卡片 ───

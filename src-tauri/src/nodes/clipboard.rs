@@ -17,6 +17,22 @@ pub struct ClipboardReadNode;
 
 #[async_trait]
 impl NodeExecutor for ClipboardReadNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "clipboard_read".into(),
+            version: "1.0".into(),
+            display_name: "读取剪贴板".into(),
+            description: "读取系统剪贴板中的文本内容".into(),
+            category: "系统".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "text".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "length".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         _step: &Step,
@@ -43,6 +59,29 @@ pub struct ClipboardWriteNode;
 
 #[async_trait]
 impl NodeExecutor for ClipboardWriteNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "clipboard_write".into(),
+            version: "1.0".into(),
+            display_name: "写入剪贴板".into(),
+            description: "写入文本内容到系统剪贴板".into(),
+            category: "系统".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "text".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "length".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "written".into(), data_type: "boolean".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                    "text": {"type": "string", "description": "要写入的文本"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

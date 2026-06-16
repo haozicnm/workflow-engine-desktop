@@ -8,6 +8,7 @@ import StepCard from '../components/StepCard.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import ContainerConfigPanel from '../components/ContainerConfigPanel.vue'
 import CodeView from '../components/CodeView.vue'
+import CanvasEditor from '../components/CanvasEditor.vue'
 import Button from '../components/ui/button/Button.vue'
 import Tabs from '../components/ui/tabs/Tabs.vue'
 import TabsList from '../components/ui/tabs/TabsList.vue'
@@ -80,7 +81,7 @@ async function handleDoDelete() {
 
 // ─── Active view tab ───
 import { ref } from 'vue'
-const activeView = ref<'visual' | 'code'>('visual')
+const activeView = ref<'visual' | 'code' | 'canvas'>('visual')
 
 // ─── Keyboard shortcuts ───
 function onKeydown(e: KeyboardEvent) {
@@ -191,6 +192,7 @@ onUnmounted(() => {
       <div class="px-[var(--spacing-section-padding-x)] pt-4 pb-0 shrink-0">
         <TabsList>
           <TabsTrigger value="visual">{{ t('editor.visual') }}</TabsTrigger>
+          <TabsTrigger value="canvas">{{ t('editor.canvas') }}</TabsTrigger>
           <TabsTrigger value="code">{{ t('editor.code') }}</TabsTrigger>
         </TabsList>
       </div>
@@ -278,6 +280,15 @@ onUnmounted(() => {
           v-if="a.workflow.value"
           :workflow="a.workflow.value"
           @update:workflow="(wf) => { if (a.store.current) { a.store.current.steps = wf.steps; a.store.current.name = wf.name; a.store.dirty = true } }"
+        />
+      </TabsContent>
+
+      <TabsContent value="canvas" class="flex-1 overflow-hidden mt-0 p-0 min-h-0">
+        <CanvasEditor
+          :workflow="a.workflow.value"
+          :run-states="a.store.runStates"
+          @add-edge="(from, to) => a.store.addEdge(from, to)"
+          @remove-edge="(from, to) => a.store.removeEdge(from, to)"
         />
       </TabsContent>
     </Tabs>

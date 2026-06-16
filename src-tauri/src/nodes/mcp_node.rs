@@ -294,6 +294,21 @@ impl McpNode {
 
 #[async_trait]
 impl NodeExecutor for McpNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "mcp".into(),
+            version: "1.0".into(),
+            display_name: "MCP 服务".into(),
+            description: "调用 MCP 协议的 Python 服务器执行外部工具（HTTP/JSON/Excel CSV/Word 等）".into(),
+            category: "AI".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({"type": "object"}),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

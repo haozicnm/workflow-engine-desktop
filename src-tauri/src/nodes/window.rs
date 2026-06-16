@@ -17,6 +17,31 @@ pub struct WindowNode;
 
 #[async_trait]
 impl NodeExecutor for WindowNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "window".into(),
+            version: "1.0".into(),
+            display_name: "窗口操作".into(),
+            description: "管理桌面窗口：查找、激活、最大化、最小化、关闭、调整大小等".into(),
+            category: "系统".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "action".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "windows".into(), data_type: "array".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["find", "activate", "maximize", "minimize", "restore", "close", "resize", "wait", "list"], "description": "操作类型"},
+                    "title": {"type": "string", "description": "窗口标题"},
+                    "width": {"type": "number", "description": "调整宽度", "default": 800},
+                    "height": {"type": "number", "description": "调整高度", "default": 600},
+                    "timeout_s": {"type": "number", "description": "等待超时秒数", "default": 30}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

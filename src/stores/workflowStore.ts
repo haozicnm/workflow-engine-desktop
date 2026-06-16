@@ -293,6 +293,23 @@ export const useWorkflowStore = defineStore('workflow', () => {
       step.expanded = !step.expanded
     }
   }
+  // ─── Edge Operations (v8.2 Canvas) ───
+
+  function addEdge(from: string, to: string) {
+    if (!current.value) return
+    if (!current.value.edges) current.value.edges = []
+    // Avoid duplicates
+    if (current.value.edges.some(e => e.from === from && e.to === to)) return
+    current.value.edges.push({ from, to })
+    dirty.value = true
+  }
+
+  function removeEdge(from: string, to: string) {
+    if (!current.value?.edges) return
+    current.value.edges = current.value.edges.filter(e => !(e.from === from && e.to === to))
+    dirty.value = true
+  }
+
   // ─── Helpers ───
 
   function findStep(stepId: string): Step | null {
@@ -333,6 +350,8 @@ export const useWorkflowStore = defineStore('workflow', () => {
     addStep,
     removeStep,
     moveStep,
+    addEdge,
+    removeEdge,
     addAction,
     removeAction,
     renameStep,

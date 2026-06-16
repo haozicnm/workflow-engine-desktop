@@ -33,6 +33,28 @@ impl NodeExecutor for MapNode {
         true
     }
 
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "map".into(),
+            version: "1.0".into(),
+            display_name: "数组映射".into(),
+            description: "声明式数组映射转换节点，使用模板将每个元素映射为新的值".into(),
+            category: "数据".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "array".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["source", "template"],
+                "properties": {
+                    "source": {"type": "string", "description": "数据源，如 output.step_id.results"},
+                    "template": {"type": "object", "description": "映射模板，支持 {{__item}} {{__index}} 变量"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

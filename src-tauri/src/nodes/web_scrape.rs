@@ -30,6 +30,42 @@ pub struct WebScrapeNode;
 
 #[async_trait]
 impl NodeExecutor for WebScrapeNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "web_scrape".into(),
+            version: "1.0".into(),
+            display_name: "网页抓取".into(),
+            description: "声明式网页数据抓取，支持单页、批量、分页和本地文件模式".into(),
+            category: "浏览器".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "items".into(), data_type: "array".into(), required: false },
+                crate::nodes::traits::PortDef { label: "total_items".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "pages_scraped".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["extract"],
+                "properties": {
+                    "url": {"type": "string", "description": "目标 URL"},
+                    "urls": {"type": "array", "items": {"type": "string"}, "description": "批量 URL 数组"},
+                    "url_pattern": {"type": "string", "description": "URL 模式，如 {{1..10}} 自动展开"},
+                    "extract": {"type": "array", "description": "提取规则数组"},
+                    "wait_for": {"type": "string", "description": "等待选择器", "default": "body"},
+                    "scroll": {"type": "boolean", "description": "是否滚动页面", "default": false},
+                    "scroll_times": {"type": "number", "description": "滚动次数", "default": 3},
+                    "delay_ms": {"type": "number", "description": "滚动后延迟（毫秒）", "default": 1000},
+                    "retry": {"type": "number", "description": "每个 URL 最大重试次数", "default": 0},
+                    "retry_delay_ms": {"type": "number", "description": "重试间隔（毫秒）", "default": 1000},
+                    "delay_between_ms": {"type": "number", "description": "URL 之间延迟（毫秒）", "default": 0},
+                    "fail_fast": {"type": "boolean", "description": "单个失败是否中止全部", "default": false},
+                    "excel_output": {"type": "string", "description": "结果输出到 Excel 路径"},
+                    "pagination": {"type": "object", "description": "分页配置 {max_pages, next}"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

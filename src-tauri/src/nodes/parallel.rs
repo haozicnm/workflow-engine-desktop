@@ -17,6 +17,29 @@ pub struct ParallelNode;
 
 #[async_trait]
 impl NodeExecutor for ParallelNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "parallel".into(),
+            version: "1.0".into(),
+            display_name: "并行执行".into(),
+            description: "同时执行多个分支，支持 fail_fast 模式".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "branch_count".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "results".into(), data_type: "array".into(), required: true },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["branches"],
+                "properties": {
+                    "branches": {"type": "array", "description": "并行分支数组，每个分支是一组步骤"},
+                    "fail_fast": {"type": "boolean", "description": "任一分支失败时是否取消其他分支", "default": false}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

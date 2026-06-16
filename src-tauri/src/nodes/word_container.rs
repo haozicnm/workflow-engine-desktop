@@ -232,6 +232,29 @@ pub struct WordContainerNode;
 
 #[async_trait]
 impl NodeExecutor for WordContainerNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_container".into(),
+            version: "1.0".into(),
+            display_name: "Word 容器".into(),
+            description: "在单个 Word 文件内按顺序执行多个操作（read/write/replace/create/merge/insert_table）".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "_container_type".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "_step_name".into(), data_type: "string".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["actions"],
+                "properties": {
+                    "file_path": {"type": "string", "description": "Word 文件路径"},
+                    "actions": {"type": "array", "description": "操作列表，每个操作有 id/type/label/config"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

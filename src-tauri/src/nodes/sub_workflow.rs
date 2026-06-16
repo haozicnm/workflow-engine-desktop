@@ -14,6 +14,33 @@ pub struct SubWorkflowNode;
 
 #[async_trait]
 impl NodeExecutor for SubWorkflowNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "sub_workflow".into(),
+            version: "1.0".into(),
+            display_name: "子工作流".into(),
+            description: "加载并执行另一个工作流，支持变量映射和输出映射".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "steps_executed".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "outputs".into(), data_type: "object".into(), required: false },
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "workflow_yaml": {"type": "string", "description": "嵌入的 YAML 子工作流"},
+                    "inline_steps": {"type": "array", "description": "内联步骤数组"},
+                    "workflow_id": {"type": "string", "description": "从数据库加载的 workflow ID（预留）"},
+                    "vars_mapping": {"type": "object", "description": "变量映射：父变量 → 子变量"},
+                    "output_key": {"type": "string", "description": "最后输出的键名", "default": "result"},
+                    "output_mapping": {"type": "object", "description": "子流程输出映射到父变量"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

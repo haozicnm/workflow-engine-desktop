@@ -46,6 +46,27 @@ pub struct FileContainerNode;
 
 #[async_trait]
 impl NodeExecutor for FileContainerNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "file_container".into(),
+            version: "1.0".into(),
+            display_name: "文件操作容器".into(),
+            description: "在一个步骤中执行多个文件操作（读/写/复制/移动/删除/列出/搜索），按 action ID 索引结果".into(),
+            category: "文件".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "results".into(), data_type: "object".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["actions"],
+                "properties": {
+                    "actions": {"type": "array", "description": "文件操作列表"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

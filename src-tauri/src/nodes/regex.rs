@@ -42,6 +42,33 @@ pub struct RegexNode;
 
 #[async_trait]
 impl NodeExecutor for RegexNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "regex".into(),
+            version: "1.0".into(),
+            display_name: "正则表达式".into(),
+            description: "使用正则表达式提取或匹配文本内容".into(),
+            category: "数据".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "matches".into(), data_type: "array".into(), required: false },
+                crate::nodes::traits::PortDef { label: "captures".into(), data_type: "array".into(), required: false },
+                crate::nodes::traits::PortDef { label: "count".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "is_match".into(), data_type: "bool".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["pattern", "input"],
+                "properties": {
+                    "pattern": {"type": "string", "description": "正则表达式模式"},
+                    "input": {"type": "string", "description": "输入文本"},
+                    "mode": {"type": "string", "enum": ["extract", "match"], "description": "操作模式", "default": "extract"},
+                    "global": {"type": "boolean", "description": "是否全局匹配", "default": true}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

@@ -35,6 +35,35 @@ pub struct ApprovalNode;
 
 #[async_trait]
 impl NodeExecutor for ApprovalNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "approval".into(),
+            version: "1.0".into(),
+            display_name: "人工审批".into(),
+            description: "暂停工作流等待人工审批决策，支持超时自动处理和持久化".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "decision".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "comment".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "item".into(), data_type: "any".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "审批标题"},
+                    "message": {"type": "string", "description": "审批消息，支持 {{step_x.field}} 变量"},
+                    "options": {"type": "string", "description": "选项列表，逗号分隔"},
+                    "recommended": {"type": "string", "description": "推荐决策"},
+                    "require_review": {"type": "boolean", "description": "是否需要人工审核"},
+                    "timeout": {"type": "number", "description": "超时秒数"},
+                    "timeout_action": {"type": "string", "enum": ["recommended", "reject", "approve"]},
+                    "timeout_behavior": {"type": "string", "enum": ["auto", "manual"]}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

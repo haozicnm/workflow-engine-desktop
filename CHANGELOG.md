@@ -1,5 +1,28 @@
 # Changelog
 
+## v8.2.0 (2026-06-16)
+
+### 🎨 Canvas 图编辑器
+
+- **可视化画布**: 新增 Canvas 编辑模式，SVG 渲染节点卡片 + 贝塞尔曲线连线
+- **拖拽连线**: 从节点输出端口拖拽到输入端口创建 Edge，直觉操作
+- **节点拖拽**: 卡片可自由拖动定位，实时更新位置
+- **执行高亮**: 运行时当前节点高亮（pending/灰色、running/蓝色、success/绿色、error/红色）
+- **三视图切换**: visual（列表）/ canvas（画布）/ code（YAML）Tab 自由切换
+- **缩放平移**: 滚轮缩放、空白区域拖拽平移画布
+- **状态管理**: useCanvas composable（10 个方法：节点位置/连线管理/缩放/拖拽）
+
+### 📦 节点元数据全覆盖
+
+- **22 个节点完成 type_def**: approval, browser_container, clipboard, cursor, excel, excel_container, file_container, map, mcp_node, mouse_keyboard, ocr, parallel, print, regex, registry, sub_workflow, web_scrape, webbridge, while_node, window, word, word_container
+- **总计 56 个 type_def** 实现（含多子类型节点），100% 节点自描述
+
+### 🔧 修复
+
+- 修复 StepCard.vue header div 未闭合导致 vite build 失败
+- 修复 Editor.vue 重复 import
+- 修复 workflowStore.ts 未使用的 Edge import
+
 ## v8.0.0 (2026-06-15)
 
 ### 🚀 图执行引擎

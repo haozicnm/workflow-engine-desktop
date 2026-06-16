@@ -100,6 +100,31 @@ fn save_cursor(step_id: &str, state: &CursorState) {
 
 #[async_trait]
 impl NodeExecutor for CursorNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "cursor".into(),
+            version: "1.0".into(),
+            display_name: "游标迭代".into(),
+            description: "每次工作流执行只处理一项数据，游标跨次持久化。适用于逐条处理 Excel 行、分页 API 等场景".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "done".into(), data_type: "boolean".into(), required: false },
+                crate::nodes::traits::PortDef { label: "item".into(), data_type: "any".into(), required: false },
+                crate::nodes::traits::PortDef { label: "index".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "total".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["items"],
+                "properties": {
+                    "items": {"type": "array", "description": "数据源数组"},
+                    "body": {"type": "array", "description": "每项要执行的步骤"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

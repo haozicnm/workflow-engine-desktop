@@ -34,6 +34,27 @@ impl PrintNode {
 
 #[async_trait]
 impl NodeExecutor for PrintNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "print".into(),
+            version: "1.0".into(),
+            display_name: "打印日志".into(),
+            description: "打印消息到控制台，支持 info/warn/error 级别".into(),
+            category: "数据".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "printed".into(), data_type: "bool".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "要打印的消息"},
+                    "level": {"type": "string", "enum": ["info", "warn", "error"], "description": "日志级别", "default": "info"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

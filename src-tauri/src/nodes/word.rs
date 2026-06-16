@@ -16,6 +16,31 @@ pub struct WordNode;
 
 #[async_trait]
 impl NodeExecutor for WordNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word".into(),
+            version: "1.0".into(),
+            display_name: "Word 操作".into(),
+            description: "读写 Word 文档，支持 read/write/append/replace 等操作".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "paragraphs".into(), data_type: "array".into(), required: false },
+                crate::nodes::traits::PortDef { label: "paragraph_count".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["action", "path"],
+                "properties": {
+                    "action": {"type": "string", "enum": ["read", "write", "append", "replace"]},
+                    "path": {"type": "string", "description": "Word 文件路径"},
+                    "content": {"type": "string", "description": "文档内容"},
+                    "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "写入模式"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -52,6 +77,28 @@ pub struct WordReadNode;
 
 #[async_trait]
 impl NodeExecutor for WordReadNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_read".into(),
+            version: "1.0".into(),
+            display_name: "Word 读取".into(),
+            description: "读取 Word 文档内容，提取段落文本".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "paragraphs".into(), data_type: "array".into(), required: true },
+                crate::nodes::traits::PortDef { label: "paragraph_count".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "Word 文件路径"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -73,6 +120,29 @@ pub struct WordWriteNode;
 
 #[async_trait]
 impl NodeExecutor for WordWriteNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_write".into(),
+            version: "1.0".into(),
+            display_name: "Word 写入".into(),
+            description: "写入 Word 文档，支持 overwrite 和 append 模式".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "paragraphs_written".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path", "content"],
+                "properties": {
+                    "path": {"type": "string", "description": "Word 文件路径"},
+                    "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "写入模式", "default": "overwrite"},
+                    "content": {"type": "string", "description": "文档内容（字符串或段落数组）"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -115,6 +185,29 @@ pub struct WordCreateNode;
 
 #[async_trait]
 impl NodeExecutor for WordCreateNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_create".into(),
+            version: "1.0".into(),
+            display_name: "Word 创建".into(),
+            description: "创建新的 Word 文档，可指定标题和内容".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "paragraphs_written".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "Word 文件路径"},
+                    "title": {"type": "string", "description": "文档标题"},
+                    "content": {"type": "string", "description": "文档内容"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -164,6 +257,30 @@ pub struct WordReplaceNode;
 
 #[async_trait]
 impl NodeExecutor for WordReplaceNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_replace".into(),
+            version: "1.0".into(),
+            display_name: "Word 查找替换".into(),
+            description: "在 Word 文档中查找并替换文本".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "replaced".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path", "find"],
+                "properties": {
+                    "path": {"type": "string", "description": "Word 文件路径"},
+                    "find": {"type": "string", "description": "要查找的文本"},
+                    "replace": {"type": "string", "description": "替换文本"},
+                    "count": {"type": "number", "description": "替换次数限制（0=全部）", "default": 0}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -199,6 +316,30 @@ pub struct WordMergeNode;
 
 #[async_trait]
 impl NodeExecutor for WordMergeNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "word_merge".into(),
+            version: "1.0".into(),
+            display_name: "Word 合并".into(),
+            description: "合并多个 Word 文档为一个文档".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "merged_files".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "total_paragraphs".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": [],
+                "properties": {
+                    "output": {"type": "string", "description": "输出文件路径", "default": "合并文档.docx"},
+                    "paths": {"type": "string", "description": "逗号分隔的文件路径"},
+                    "files": {"type": "array", "items": {"type": "string"}, "description": "文件路径数组"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

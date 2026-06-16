@@ -108,6 +108,34 @@ fn check_condition(check_val: &Value, cond_op: &str, cond_right: Option<&Value>)
 
 #[async_trait]
 impl NodeExecutor for WhileNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "while".into(),
+            version: "1.0".into(),
+            display_name: "条件循环".into(),
+            description: "遍历数组，每轮检查条件，条件不满足时停止".into(),
+            category: "流程控制".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "count".into(), data_type: "number".into(), required: false },
+                crate::nodes::traits::PortDef { label: "results".into(), data_type: "array".into(), required: true },
+                crate::nodes::traits::PortDef { label: "stopped_at".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["items"],
+                "properties": {
+                    "items": {"type": "string", "description": "数据源数组或引用"},
+                    "body": {"type": "array", "description": "循环体步骤"},
+                    "condition": {"type": "object", "description": "条件配置 {op, check, right}"},
+                    "max_iterations": {"type": "number", "description": "安全上限", "default": 1000},
+                    "collect": {"type": "object", "description": "Collect 后处理配置"},
+                    "table": {"type": "object", "description": "Table 后处理配置"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

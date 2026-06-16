@@ -147,6 +147,7 @@ export default {
     run: '▶ Run',
     stop: '■ Stop',
     visual: 'Visual',
+    canvas: 'Canvas',
     code: 'Code',
     noStepsTitle: 'No steps yet',
     noStepsHint: 'Click "Add Step" below to start building',
@@ -167,6 +168,9 @@ export default {
     stepSuccess: 'Step succeeded',
     runComplete: 'Run complete',
     runFailedMsg: 'Run failed: {error}',
+    stepsCount: '{count} steps',
+    edgesCount: '{count} edges',
+    canvasEmpty: 'Canvas is empty, add steps in Visual view first',
   },
 
   stepCard: {

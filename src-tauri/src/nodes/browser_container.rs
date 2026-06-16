@@ -848,6 +848,31 @@ pub struct BrowserContainerNode;
 
 #[async_trait]
 impl NodeExecutor for BrowserContainerNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "browser_container".into(),
+            version: "1.0".into(),
+            display_name: "浏览器容器".into(),
+            description: "在浏览器中按顺序执行多个操作（导航、点击、提取、截图等），支持 DAG 连线".into(),
+            category: "浏览器".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "output_ports".into(), data_type: "object".into(), required: false },
+                crate::nodes::traits::PortDef { label: "_container_type".into(), data_type: "string".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["actions"],
+                "properties": {
+                    "browser": {"type": "string", "enum": ["chromium", "firefox", "webkit"], "description": "浏览器类型"},
+                    "headless": {"type": "boolean", "description": "是否无头模式"},
+                    "timeout": {"type": "number", "description": "超时毫秒数"},
+                    "actions": {"type": "array", "description": "浏览器操作列表"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

@@ -104,12 +104,22 @@ export interface Step {
   conditionGroup?: LogicConditionGroup
 }
 
+// ─── 边的定义（v8.2 Canvas 图编辑器） ───
+export interface Edge {
+  id?: string
+  from: string
+  fromPort?: string
+  to: string
+  toPort?: string
+}
+
 export interface Workflow {
   id?: string
   name: string
   description?: string
   locked?: boolean
   steps: Step[]
+  edges?: Edge[]
 }
 
 // ─── 执行状态 ───
@@ -123,6 +133,13 @@ export interface StepRunState {
   duration?: number
   actionStates: Record<string, ActionStatus>
   output?: unknown
+}
+
+// ─── 位置类型（Canvas 编辑用） ───
+
+export interface NodePosition {
+  x: number
+  y: number
 }
 
 // ─── 工具函数 ───

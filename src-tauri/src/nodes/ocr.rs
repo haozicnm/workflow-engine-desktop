@@ -14,6 +14,30 @@ pub struct OcrNode;
 
 #[async_trait]
 impl NodeExecutor for OcrNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "ocr".into(),
+            version: "1.0".into(),
+            display_name: "OCR 识别".into(),
+            description: "屏幕文字识别，支持截图区域和文字查找".into(),
+            category: "AI".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "action".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "result".into(), data_type: "object".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["read", "find_text"], "description": "操作类型"},
+                    "region": {"type": "object", "description": "截图区域 {x, y, width, height}"},
+                    "lang": {"type": "string", "description": "OCR 语言", "default": "chi_sim+eng"},
+                    "text": {"type": "string", "description": "要查找的文字"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

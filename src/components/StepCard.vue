@@ -287,6 +287,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
 
     <!-- Progress bar (running) -->
     <div v-if="runState?.status === 'running'" class="h-0.5 bg-secondary overflow-hidden">

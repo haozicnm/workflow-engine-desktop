@@ -310,6 +310,29 @@ pub struct ExcelContainerNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelContainerNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_container".into(),
+            version: "1.0".into(),
+            display_name: "Excel 容器".into(),
+            description: "在一个 Excel 文件内按顺序执行多个操作（读、写、筛选、排序等），支持 DAG 连线".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "output_ports".into(), data_type: "object".into(), required: false },
+                crate::nodes::traits::PortDef { label: "_container_type".into(), data_type: "string".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称"},
+                    "actions": {"type": "array", "description": "操作列表"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,

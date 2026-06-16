@@ -16,6 +16,30 @@ pub struct ExcelNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel".into(),
+            version: "1.0".into(),
+            display_name: "Excel 操作".into(),
+            description: "读写 Excel 文件，支持 read/write/append/update/sheets 等操作".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "data".into(), data_type: "any".into(), required: false },
+                crate::nodes::traits::PortDef { label: "sheet".into(), data_type: "string".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["action", "path"],
+                "properties": {
+                    "action": {"type": "string", "enum": ["read", "write", "append", "update", "sheets", "extract_column"]},
+                    "path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -54,6 +78,30 @@ pub struct ExcelReadNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelReadNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_read".into(),
+            version: "1.0".into(),
+            display_name: "读取 Excel".into(),
+            description: "读取 Excel 工作表数据".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "data".into(), data_type: "any".into(), required: false },
+                crate::nodes::traits::PortDef { label: "sheet".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "rows".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称（可选，默认第一个工作表）"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -81,6 +129,31 @@ pub struct ExcelWriteNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelWriteNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_write".into(),
+            version: "1.0".into(),
+            display_name: "写入 Excel".into(),
+            description: "写入数据到 Excel 文件".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "path".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "rows_written".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path", "data"],
+                "properties": {
+                    "path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称"},
+                    "data": {"type": "array", "description": "要写入的数据（二维数组）"},
+                    "write_mode": {"type": "string", "enum": ["overwrite", "append"]}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -120,6 +193,31 @@ pub struct ExcelCreateNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelCreateNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_create".into(),
+            version: "1.0".into(),
+            display_name: "创建 Excel".into(),
+            description: "创建新的 Excel 文件，可选表头和数据".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "path".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "rows_written".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称"},
+                    "headers": {"type": "string", "description": "列标题，逗号分隔"},
+                    "data": {"type": "array", "description": "初始数据"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -149,6 +247,31 @@ pub struct ExcelFilterNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelFilterNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_filter".into(),
+            version: "1.0".into(),
+            display_name: "筛选 Excel 数据".into(),
+            description: "在内存中按条件筛选 Excel 二维数组数据".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "data".into(), data_type: "any".into(), required: false },
+                crate::nodes::traits::PortDef { label: "filtered_count".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["column", "data"],
+                "properties": {
+                    "column": {"type": "string", "description": "列名或列索引"},
+                    "op": {"type": "string", "enum": ["==", "!=", ">", "<", ">=", "<=", "contains", "starts_with"]},
+                    "value": {"type": "string", "description": "比较值"},
+                    "data": {"type": "array", "description": "要筛选的数据"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -176,6 +299,30 @@ pub struct ExcelSortNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelSortNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_sort".into(),
+            version: "1.0".into(),
+            display_name: "排序 Excel 数据".into(),
+            description: "在内存中对 Excel 二维数组按列排序".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "data".into(), data_type: "any".into(), required: false },
+                crate::nodes::traits::PortDef { label: "sorted_count".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["column", "data"],
+                "properties": {
+                    "column": {"type": "string", "description": "列名或列索引"},
+                    "order": {"type": "string", "enum": ["asc", "desc"]},
+                    "data": {"type": "array", "description": "要排序的数据"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -205,6 +352,30 @@ pub struct ExcelAppendNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelAppendNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_append".into(),
+            version: "1.0".into(),
+            display_name: "追加 Excel 行".into(),
+            description: "向现有 Excel 文件追加数据行".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "path".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "appended_rows".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "Excel 文件路径"},
+                    "sheet": {"type": "string", "description": "工作表名称"},
+                    "data": {"type": "array", "description": "要追加的数据"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
@@ -233,6 +404,31 @@ pub struct ExcelCsvNode;
 
 #[async_trait]
 impl NodeExecutor for ExcelCsvNode {
+    fn type_def(&self) -> crate::nodes::traits::NodeTypeDef {
+        crate::nodes::traits::NodeTypeDef {
+            type_name: "excel_csv".into(),
+            version: "1.0".into(),
+            display_name: "CSV 转换".into(),
+            description: "CSV 与 Excel 文件互转".into(),
+            category: "Office".into(),
+            inputs: vec![],
+            outputs: vec![
+                crate::nodes::traits::PortDef { label: "path".into(), data_type: "string".into(), required: false },
+                crate::nodes::traits::PortDef { label: "rows".into(), data_type: "number".into(), required: false },
+            ],
+            config_schema: serde_json::json!({
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                    "path": {"type": "string", "description": "源文件路径"},
+                    "direction": {"type": "string", "enum": ["csv_to_xlsx", "xlsx_to_csv"]},
+                    "output": {"type": "string", "description": "输出文件路径"},
+                    "delimiter": {"type": "string", "description": "CSV 分隔符"}
+                }
+            }),
+        }
+    }
+
     async fn execute(
         &self,
         step: &Step,
