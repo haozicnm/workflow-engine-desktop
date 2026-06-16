@@ -309,71 +309,80 @@ jobs:
           name: workflow-engine-windows-zip
           path: workflow-engine-*-windows-x64.zip
 
-      - name: Build Inno Setup installer
+      - name: Build Windows installer
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ github.ref_name }}" -replace '^v',''
-          Write-Host "=== Building Inno Setup installer v${version} ==="
+          Write-Host "=== Building Windows installer v${version} ==="
           
-          # Find Inno Setup
-          $isccPaths = @(
-            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          )
-          $iscc = $null
-          foreach ($p in $isccPaths) {
-            if (Test-Path $p) { $iscc = $p; break }
-          }
-          if (-not $iscc) {
-            Write-Error "Inno Setup ISCC.exe not found. Tried: $($isccPaths -join ', ')"
+          # Reuse the zip package dir as the installer source
+          $pkgDir = "workflow-engine-$version-windows-x64"
+          if (-not (Test-Path $pkgDir)) {
+            Write-Error "Package directory not found: $pkgDir"
             exit 1
           }
-          Write-Host "Found ISCC: $iscc"
           
-          # Create staging directory (absolute path)
-          $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
-          New-Item -ItemType Directory -Force -Path $staging | Out-Null
-          Copy-Item src-tauri/target/release/workflow-engine.exe $staging/
-          Copy-Item src-tauri/target/release/wf-cli.exe $staging/
-          Copy-Item -Recurse dist $staging/dist
-          Copy-Item -Recurse src-tauri/sidecars $staging/sidecars
-          Copy-Item src-tauri/node-schema.json $staging/
-          Copy-Item -Recurse src-tauri/python-runtime $staging/python-runtime -ErrorAction SilentlyContinue
+          # Create install.ps1 (one-click installer)
+          @'
+          $ErrorActionPreference = "Stop"
+          $installDir = "$env:ProgramFiles\Workflow Engine"
+          Write-Host "Installing Workflow Engine to $installDir..."
           
-          # Create start.bat
-          @(
-            '@echo off',
-            'title Workflow Engine',
-            'cd /d "%~dp0"',
-            'start /MIN "" "workflow-engine.exe"',
-            'echo Waiting for Workflow Engine to start...',
-            ':wait',
-            'ping 127.0.0.1 -n 2 > nul',
-            'curl -s http://localhost:19529/api/health >nul 2>&1',
-            'if errorlevel 1 goto wait',
-            'echo Workflow Engine started on http://localhost:19529',
-            'start http://localhost:19529'
-          ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
+          # Stop existing
+          Get-Process workflow-engine -ErrorAction SilentlyContinue | Stop-Process -Force
           
-          # Ensure LICENSE exists
-          if (-not (Test-Path LICENSE)) {
-            "MIT License" | Set-Content -Path LICENSE
-          }
+          # Copy files
+          $srcDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          Copy-Item -Recurse "$srcDir\*" $installDir -Exclude "install.ps1","uninstall.ps1"
           
-          # Run Inno Setup with absolute staging path
-          $env:APP_VERSION = $version
-          Write-Host "Running: & $iscc /Dsrc=`"$staging`" installer.iss"
-          & $iscc /Dsrc="$staging" installer.iss
+          # Start menu shortcut
+          $WshShell = New-Object -ComObject WScript.Shell
+          $Shortcut = $WshShell.CreateShortcut("$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Workflow Engine.lnk")
+          $Shortcut.TargetPath = "$installDir\start.bat"
+          $Shortcut.WorkingDirectory = $installDir
+          $Shortcut.Save()
           
-          Write-Host "=== Installer built ==="
-          Get-ChildItem WorkflowEngine-*-setup.exe | ForEach-Object { Write-Host $_.Name }
+          Write-Host "Installation complete! Starting Workflow Engine..."
+          Start-Process "$installDir\start.bat"
+          '@ | Set-Content -Path "$pkgDir/install.ps1" -Encoding UTF8
+          
+          # Create uninstall.ps1
+          @'
+          $ErrorActionPreference = "Stop"
+          Write-Host "Uninstalling Workflow Engine..."
+          Get-Process workflow-engine -ErrorAction SilentlyContinue | Stop-Process -Force
+          Remove-Item -Recurse -Force "$env:ProgramFiles\Workflow Engine" -ErrorAction SilentlyContinue
+          Remove-Item "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Workflow Engine.lnk" -ErrorAction SilentlyContinue
+          Write-Host "Uninstall complete."
+          '@ | Set-Content -Path "$pkgDir/uninstall.ps1" -Encoding UTF8
+          
+          # Create setup.bat (double-click installer entry point)
+          @'
+          @echo off
+          echo ============================================
+          echo   Workflow Engine v%VERSION% Installer
+          echo ============================================
+          echo.
+          echo This will install Workflow Engine to:
+          echo   %ProgramFiles%\Workflow Engine
+          echo.
+          echo Press any key to install, or close this window to cancel.
+          pause >nul
+          powershell -ExecutionPolicy Bypass -File "%~dp0install.ps1"
+          '@ -replace '%VERSION%', $version | Set-Content -Path "$pkgDir/setup.bat" -Encoding ASCII
+          
+          # Package as self-extracting installer (zip renamed to indicate it's installable)
+          $installerZip = "WorkflowEngine-$version-windows-x64-setup.zip"
+          Compress-Archive -Path $pkgDir -DestinationPath $installerZip -Force
+          Write-Host "Installer created: $installerZip"
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-installer
-          path: WorkflowEngine-*-windows-x64-setup.exe
+          path: WorkflowEngine-*-windows-x64-setup.zip
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -381,4 +390,4 @@ jobs:
         with:
           files: |
             workflow-engine-*-windows-x64.zip
-            WorkflowEngine-*-windows-x64-setup.exe
+            WorkflowEngine-*-windows-x64-setup.zip
