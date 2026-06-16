@@ -1,5 +1,16 @@
 # Changelog
 
+## v8.4.0 (2026-06-16)
+
+### 🎨 全页面 DESIGN.md 对齐（第二轮）
+
+- **Settings 重构**: 移除无效 Light/System 主题选择（纯暗色）、去 box-shadow、Browser Node 信息重组、Auto-start 统一保存行为
+- **节点组件色彩对齐**: CanvasNode 状态色 Tailwind → Design tokens（info/success/danger）、port dots hairline-strong
+- **Shadow 清理**: AddStepDialog、ParamField 变量下拉移除 shadow-xl/lg，全面无阴影
+- **Surface 层级修复**: StepCard output 区、Plugins 插件卡片 bg-background→bg-muted
+- **新增 Token**: `--color-info` `#57c1ff`、`--color-hairline-strong` `#34343a`
+- **页面统一**: RunHistory（标题/hover/bg）、Editor（drag handle）、Plugins（卡片层级）
+
 ## v8.3.0 (2026-06-16)
 
 ### 🎨 DESIGN.md 设计系统全面落地
