@@ -327,15 +327,6 @@ jobs:
           }
           Write-Host "Found ISCC: $iscc"
           
-          # Download Chinese language file (not included in default Inno Setup 6 install)
-          $langDir = "C:\Program Files (x86)\Inno Setup 6\Languages"
-          $chineseIsl = "$langDir\ChineseSimplified.isl"
-          if (-not (Test-Path $chineseIsl)) {
-            Write-Host "Downloading ChineseSimplified.isl..."
-            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl" -OutFile $chineseIsl
-            Write-Host "Downloaded: $chineseIsl"
-          }
-          
           # Create staging directory
           $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
