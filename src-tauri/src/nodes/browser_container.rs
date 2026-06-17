@@ -212,9 +212,6 @@ async fn execute_actions(
                 } else {
                     serde_json::json!("bottom")
                 };
-                let params = serde_json::json!({
-                    "to": to,
-                });
                 send_browser_action("scroll", &serde_json::json!({ "y": to }))
                     .await
                     .map_err(|e| anyhow!("滚动失败: {}", e))?;
@@ -428,7 +425,6 @@ async fn execute_actions(
 
             "close_page" => {
                 let index = action.config.get("index").and_then(|v| v.as_u64());
-                let params = serde_json::json!({ "index": index });
                 send_browser_action("close_tab", &serde_json::json!({ "tabId": index }))
                     .await
                     .map_err(|e| anyhow!("关闭标签页失败: {}", e))?;
@@ -512,11 +508,6 @@ async fn execute_actions(
             }
 
             "pdf" => {
-                let path = action
-                    .config
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("output.pdf");
                 send_browser_action("save_as_pdf", &serde_json::json!({}))
                     .await
                     .map_err(|e| anyhow!("生成PDF失败: {}", e))?;
@@ -529,7 +520,7 @@ async fn execute_actions(
                     .get("timeout")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(30000);
-                let params = serde_json::json!({ "timeout_ms": timeout });
+                let params = serde_json::json!({ "timeout": timeout });
                 send_browser_action("wait_network_idle", &params)
                     .await
                     .map_err(|e| anyhow!("等待网络空闲失败: {}", e))?;
@@ -595,11 +586,6 @@ async fn execute_actions(
                     .and_then(|v| v.as_str())
                     .unwrap_or(".");
                 let click_selector = action.config.get("click_selector").and_then(|v| v.as_str());
-                let timeout = action
-                    .config
-                    .get("timeout")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(30000);
                 let params = serde_json::json!({
                     "selector": click_selector,
                     "saveAs": save_dir,
