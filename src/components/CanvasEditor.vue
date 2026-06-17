@@ -233,7 +233,7 @@ function resetView() { canvas.resetView() }
       >
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--border))" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--border)" />
           </marker>
         </defs>
         <g :style="{ transform: `scale(${canvas.zoom.value})`, transformOrigin: '0 0' }">
@@ -254,7 +254,7 @@ function resetView() { canvas.resetView() }
               :x1="0" :y1="0"
               :x2="(canvas.draggingEdge.value.mouseX || 0)"
               :y2="(canvas.draggingEdge.value.mouseY || 0)"
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               stroke-width="2"
               stroke-dasharray="5,5"
             />

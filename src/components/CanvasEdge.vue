@@ -63,14 +63,14 @@ const arrowPath = computed(() => {
     <path
       :d
       fill="none"
-      :stroke="isHovered ? 'hsl(var(--primary))' : 'hsl(var(--border))'"
+      :stroke="isHovered ? 'var(--primary)' : 'var(--border)'"
       stroke-width="2"
       class="transition-colors"
     />
     <!-- Arrow head -->
     <path
       :d="arrowPath"
-      :fill="isHovered ? 'hsl(var(--primary))' : 'hsl(var(--border))'"
+      :fill="isHovered ? 'var(--primary)' : 'var(--border)'"
       class="transition-colors"
     />
     <!-- Delete button (visible on hover) -->
