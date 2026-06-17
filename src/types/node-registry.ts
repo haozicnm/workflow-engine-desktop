@@ -363,10 +363,10 @@ export const BROWSER_ACTIONS: ActionDef[] = [
     { key: 'new_tab', label: '新标签页打开', type: 'checkbox', default: false },
   ]},
   { type: 'click', label: '点击元素', icon: 'MousePointerClick', params: [
-    { key: 'selector', label: '选择器', type: 'text', placeholder: '#btn 或 .class' },
+    { key: 'selector', label: '选择器', type: 'text', placeholder: '#btn / .class / @e1' },
   ]},
   { type: 'input', label: '输入文本', icon: 'Keyboard', params: [
-    { key: 'selector', label: '选择器', type: 'text' },
+    { key: 'selector', label: '选择器', type: 'text', placeholder: '#email / @e3' },
     { key: 'value', label: '内容', type: 'text' },
   ]},
   { type: 'wait', label: '等待', icon: 'Clock', params: [
@@ -503,15 +503,8 @@ export const BROWSER_ACTIONS: ActionDef[] = [
       { label: '结束', value: 'end' }, { label: '最近', value: 'nearest' },
     ], default: 'center' },
   ]},
-  // ─── v1.8 snapshot + @e ref 操作 ───
+  // ─── v1.8 snapshot 操作 ───
   { type: 'snapshot', label: '页面快照', icon: 'Eye', params: [] },
-  { type: 'click_by_ref', label: '按 ref 点击', icon: 'MousePointerClick', params: [
-    { key: 'ref', label: '元素引用', type: 'text', placeholder: '@e1' },
-  ]},
-  { type: 'fill_by_ref', label: '按 ref 填写', icon: 'Keyboard', params: [
-    { key: 'ref', label: '元素引用', type: 'text', placeholder: '@e1' },
-    { key: 'value', label: '内容', type: 'text' },
-  ]},
 ]
 
 // Excel 动作（与后端 excel.rs / excel_container.rs 对齐）

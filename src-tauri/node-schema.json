@@ -1719,14 +1719,7 @@
           { "name": "behavior", "type": "string", "required": false, "default": "smooth", "desc": "行为: smooth/instant" },
           { "name": "block", "type": "string", "required": false, "default": "center", "desc": "对齐: center/start/end/nearest" }
         ]},
-        { "action": "snapshot", "desc": "获取页面元素树 + @eN ref", "params": [] },
-        { "action": "click_by_ref", "desc": "按 @eN ref 点击", "params": [
-          { "name": "ref", "type": "string", "required": true, "desc": "元素引用（如 @e1）" }
-        ]},
-        { "action": "fill_by_ref", "desc": "按 @eN ref 填写", "params": [
-          { "name": "ref", "type": "string", "required": true, "desc": "元素引用（如 @e1）" },
-          { "name": "value", "type": "string", "required": true, "desc": "要填写的值" }
-        ]}
+        { "action": "snapshot", "desc": "获取页面元素树 + @eN ref", "params": [] }
       ]
     },
     {

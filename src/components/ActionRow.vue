@@ -149,7 +149,7 @@ const isBrowser = computed(() => props.containerType === 'browser')
 
 // Selector fields (for element picker)
 function isSelectorField(key: string): boolean {
-  return isBrowser.value && (key === 'selector' || key === 'ref' || key.includes('selector'))
+  return isBrowser.value && (key === 'selector' || key.includes('selector'))
 }
 
 </script>
