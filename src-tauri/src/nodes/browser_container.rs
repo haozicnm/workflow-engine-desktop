@@ -121,9 +121,11 @@ pub async fn execute_browser_container(
 /// 内部：执行所有 action（无超时包装）
 async fn execute_actions(
     config: &BrowserContainerConfig,
-    input_ports: &HashMap<String, Value>,
+    external_input_ports: &HashMap<String, Value>,
 ) -> Result<ContainerResult> {
     let mut output_ports: HashMap<String, Value> = HashMap::new();
+    // Merge external input_ports with accumulated output_ports for intra-container data flow
+    let mut resolved_inputs = external_input_ports.clone();
 
     // ── 使用 WebBridge 作为唯一浏览器后端 ──
     tracing::info!("使用 WebBridge 扩展（WebSocket）");
@@ -220,10 +222,11 @@ async fn execute_actions(
 
             "input" | "fill" => {
                 let selector = require_selector(action)?;
-                // 优先从 input_ports（连线传入）获取值，其次从 config.value
-                let value = input_ports
+                // 优先从 resolved_inputs（连线传入 + 前置 action 输出）获取值
+                let value = resolved_inputs
                     .get(&format!("{}_in", &action.id))
                     .and_then(|v| v.as_str())
+                    .or_else(|| resolved_inputs.get(&action.id).and_then(|v| v.as_str()))
                     .or_else(|| action.config.get("value").and_then(|v| v.as_str()))
                     .unwrap_or("");
                 let clear = action
@@ -378,7 +381,7 @@ async fn execute_actions(
                     .get("value")
                     .and_then(|v| v.as_str())
                     .or_else(|| {
-                        input_ports
+                        resolved_inputs
                             .get(&format!("{}_in", &action.id))
                             .and_then(|v| v.as_str())
                     })
@@ -792,6 +795,10 @@ async fn execute_actions(
                     action.action_type, action.label
                 ));
             }
+        }
+        // 将当前 action 的输出合并到 resolved_inputs，供后续 action 引用
+        for (k, v) in &output_ports {
+            resolved_inputs.entry(k.clone()).or_insert(v.clone());
         }
     }
 
