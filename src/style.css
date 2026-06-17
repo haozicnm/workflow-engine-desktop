@@ -6,54 +6,56 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ═══════════ DESIGN.md 设计令牌（碳灰画布 + 翠绿品牌色） ═══════════ */
-@theme {
-  /* 基础层 — 最深画布 */
-  --color-background: #090a0b;
-  --color-foreground: #f4f4f6;
-  --color-card: #111214;
-  --color-card-foreground: #f4f4f6;
-  --color-popover: #16171a;
-  --color-popover-foreground: #f4f4f6;
+/* ═══════════ shadcn/ui v4 令牌映射 ═══════════ */
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* 品牌色 — 翠绿色（唯一强调色） */
-  --color-primary: #10b981;
-  --color-primary-badge-bg: rgba(16, 185, 129, 0.15);
-  --color-primary-foreground: #000000;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 
-  /* 表面层级（surface ladder） */
-  --color-secondary: #16171a;
-  --color-secondary-foreground: #d0d6e0;
-  --color-muted: #111214;
-  --color-muted-foreground: #8a8f98;
-  --color-accent: #1a1c1f;
-  --color-accent-foreground: #f4f4f6;
+  /* shadcn 标准映射 */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--primary);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-danger: var(--destructive);
+  --color-danger-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
 
-  /* 语义色 */
-  --color-destructive: #cf2d56;
-  --color-destructive-foreground: #ffffff;
-  --color-success: #27a644;
-  --color-success-foreground: #ffffff;
-  --color-danger: #cf2d56;
-  --color-danger-foreground: #ffffff;
-  --color-warning: #d4a72c;
-  --color-warning-foreground: #000000;
-  --color-info: #57c1ff;
-  --color-info-foreground: #000000;
+  /* Workflow 专用 */
+  --color-node-idle: var(--node-idle);
+  --color-node-running: var(--node-running);
+  --color-node-success: var(--node-success);
+  --color-node-error: var(--node-error);
+  --color-edge-color: var(--edge-color);
+  --color-edge-active: var(--edge-active);
+  --color-hairline-strong: oklch(from var(--border) calc(l * 0.6) c h);
+  --color-primary-badge-bg: oklch(from var(--primary) l c h / 0.15);
 
-  /* Hairline 边框（极细、低对比度，无阴影设计语言） */
-  --color-border: #23252a;
-  --color-hairline-strong: #34343a;
-  --color-input: #23252a;
-  --color-ring: #10b981;
-
-  /* 圆角（DESIGN.md: 按钮8px / 卡片12px） */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.75rem;
-
-  /* 容器类型颜色（翠绿色系调整） */
+  /* 容器类型色（hex 保留，不需要 oklch） */
   --color-container-browser: #a5d6ff;
   --color-container-excel: #79c0ff;
   --color-container-word: #d2a8ff;
@@ -76,38 +78,118 @@
   --height-action-row: 2.25rem;
 }
 
+/* ═══════════ 颜色定义（oklch 色彩空间） ═══════════ */
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    --background: oklch(0.992 0.001 286);
+    --foreground: oklch(0.178 0.009 257);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.178 0.009 257);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.178 0.009 257);
+
+    --primary: oklch(0.69 0.148 162);
+    --primary-foreground: oklch(0 0 0);
+
+    --secondary: oklch(0.968 0.003 265);
+    --secondary-foreground: oklch(0.483 0.026 254);
+    --muted: oklch(0.968 0.003 265);
+    --muted-foreground: oklch(0.562 0.023 258);
+    --accent: oklch(0.975 0.003 265);
+    --accent-foreground: oklch(0.178 0.009 257);
+
+    --destructive: oklch(0.563 0.199 15);
+    --destructive-foreground: oklch(1 0 0);
+    --success: oklch(0.637 0.163 150);
+    --success-foreground: oklch(1 0 0);
+    --warning: oklch(0.736 0.136 86);
+    --warning-foreground: oklch(0 0 0);
+    --info: oklch(0.626 0.205 255);
+    --info-foreground: oklch(1 0 0);
+
+    --border: oklch(0.874 0.009 252);
+    --input: oklch(0.874 0.009 252);
+
+    --node-idle: oklch(0.928 0.006 265);
+    --node-running: oklch(0.775 0.132 237);
+    --node-success: oklch(0.637 0.163 150);
+    --node-error: oklch(0.563 0.199 15);
+    --edge-color: oklch(0.874 0.009 252);
+    --edge-active: oklch(0.69 0.148 162);
+
+    --surface: oklch(0.985 0.001 286);
+    --surface-foreground: oklch(0.178 0.009 257);
+    --selection: oklch(0.69 0.148 162);
+    --selection-foreground: oklch(0 0 0);
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: oklch(0.131 0.002 286);
+    --foreground: oklch(0.967 0.003 286);
+    --card: oklch(0.188 0.006 286);
+    --card-foreground: oklch(0.967 0.003 286);
+    --popover: oklch(0.211 0.007 271);
+    --popover-foreground: oklch(0.967 0.003 286);
+
+    --secondary: oklch(0.211 0.007 271);
+    --secondary-foreground: oklch(0.868 0.013 270);
+    --muted: oklch(0.188 0.006 286);
+    --muted-foreground: oklch(0.627 0.023 267);
+    --accent: oklch(0.233 0.008 264);
+    --accent-foreground: oklch(0.967 0.003 286);
+
+    --info: oklch(0.775 0.132 237);
+    --info-foreground: oklch(0 0 0);
+
+    --border: oklch(0.274 0.009 271);
+    --input: oklch(0.274 0.009 271);
+
+    --node-idle: oklch(0.365 0.009 265);
+    --edge-color: oklch(0.332 0.013 275);
+
+    --surface: oklch(0.18 0.005 286);
+    --surface-foreground: oklch(0.627 0.023 267);
+    --selection: oklch(0.69 0.148 162);
+    --selection-foreground: oklch(0 0 0);
+
+    color-scheme: dark;
+  }
+}
+
 /* ═══════════ 全局样式 ═══════════ */
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
   html, body, #app {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-family: var(--font-sans);
     font-feature-settings: 'calt', 'kern', 'liga', 'ss03';
     font-size: 14px;
     line-height: 1.5;
-    background: var(--color-background);
-    color: var(--color-foreground);
+    background: var(--background);
+    color: var(--foreground);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-
-  /* 滚动条 — hairline 风格 */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
   ::selection {
-    background: var(--color-primary);
-    color: var(--color-primary-foreground);
+    background: var(--selection);
+    color: var(--selection-foreground);
   }
 }
 
-/* 过渡预设 */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }

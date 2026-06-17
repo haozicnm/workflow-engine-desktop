@@ -1,33 +1,61 @@
 ---
 version: alpha
 name: workflow-engine-design
-description: "一个深色画布的开发者工具设计系统，为 Vue 3 + Tauri 桌面端的工作流自动化引擎定制。暖炭灰画布 + 翠绿色品牌强调 + Inter 字体 ss03 + surface ladder 层级。借鉴 Linear 的深色克制、Raycast 的桌面原生感、Cursor 的单一强调色哲学。"
+description: "一个兼容 shadcn/ui 的双主题设计系统，为 Vue 3 + Tauri 桌面端的工作流自动化引擎定制。深色碳灰画布 + 亮色暖白 + 翠绿色品牌强调 + Inter 字体 ss03。采用 shadcn 标准双层 oklch 结构（--background → @theme inline → --color-background）。"
 colors:
-  primary: "#10b981"
-  primary-hover: "#34d399"
-  primary-pressed: "#059669"
-  ink: "#f4f4f6"
-  ink-muted: "#d0d6e0"
-  ink-subtle: "#8a8f98"
-  ink-tertiary: "#62666d"
-  on-primary: "#000000"
-  canvas: "#090a0b"
-  surface-1: "#111214"
-  surface-2: "#16171a"
-  surface-3: "#1a1c1f"
-  surface-card: "#141518"
-  hairline: "#23252a"
-  hairline-strong: "#34343a"
-  semantic-success: "#27a644"
-  semantic-error: "#cf2d56"
-  semantic-warning: "#d4a72c"
-  semantic-info: "#57c1ff"
-  node-idle: "#3a3d42"
-  node-running: "#57c1ff"
-  node-success: "#27a644"
-  node-error: "#cf2d56"
-  edge-color: "#34343a"
-  edge-active: "#10b981"
+  # ── shadcn/ui 标准 oklch 变量（亮色默认）──
+  background: "240 10% 99%"
+  foreground: "215 18% 7%"
+  card: "0 0% 100%"
+  card-foreground: "215 18% 7%"
+  popover: "0 0% 100%"
+  popover-foreground: "215 18% 7%"
+  primary: "160 84% 39%"
+  primary-foreground: "0 0% 0%"
+  secondary: "220 14% 96%"
+  secondary-foreground: "213 13% 38%"
+  muted: "220 14% 96%"
+  muted-foreground: "216 9% 47%"
+  accent: "220 20% 97%"
+  accent-foreground: "215 18% 7%"
+  destructive: "347 66% 49%"
+  destructive-foreground: "0 0% 100%"
+  success: "140 62% 40%"
+  success-foreground: "0 0% 100%"
+  warning: "43 63% 50%"
+  warning-foreground: "0 0% 0%"
+  info: "210 100% 52%"
+  info-foreground: "0 0% 100%"
+  border: "212 12% 84%"
+  input: "212 12% 84%"
+  ring: "160 84% 39%"
+  radius: "0.5rem"
+  # ── 暗色覆盖（.dark）──
+  dark-background: "240 5% 3%"
+  dark-foreground: "240 10% 96%"
+  dark-card: "240 7% 8%"
+  dark-card-foreground: "240 10% 96%"
+  dark-popover: "225 9% 10%"
+  dark-popover-foreground: "240 10% 96%"
+  dark-secondary: "225 9% 10%"
+  dark-secondary-foreground: "224 15% 84%"
+  dark-muted: "240 7% 8%"
+  dark-muted-foreground: "222 9% 55%"
+  dark-accent: "220 9% 12%"
+  dark-accent-foreground: "240 10% 96%"
+  dark-info: "202 100% 67%"
+  dark-info-foreground: "0 0% 0%"
+  dark-border: "225 8% 16%"
+  dark-input: "225 8% 16%"
+  # ── Workflow 专用（亮暗共用，值在 CSS 中处理）──
+  node-idle: "220 13% 91%"
+  node-running: "202 100% 67%"
+  node-success: "140 62% 40%"
+  node-error: "347 66% 49%"
+  edge-color: "212 12% 84%"
+  edge-active: "160 84% 39%"
+  dark-node-idle: "220 6% 25%"
+  dark-edge-color: "228 8% 22%"
 
 typography:
   display-lg:
@@ -122,188 +150,187 @@ spacing:
 
 components:
   top-bar:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--background))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body-sm}"
     height: 48px
   sidebar:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink-muted}"
+    backgroundColor: "hsl(var(--background))"
+    textColor: "hsl(var(--secondary-foreground))"
     typography: "{typography.body-sm}"
     width: 240px
   sidebar-item-active:
-    backgroundColor: "{colors.surface-1}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--secondary))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body}"
     rounded: "{rounded.md}"
     padding: 8px 12px
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "hsl(var(--primary))"
+    textColor: "hsl(var(--primary-foreground))"
     typography: "{typography.button}"
     rounded: "{rounded.md}"
     padding: 8px 16px
     height: 36px
   button-primary-hover:
-    backgroundColor: "{colors.primary-hover}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "hsl(var(--primary) / 0.9)"
+    textColor: "hsl(var(--primary-foreground))"
   button-secondary:
-    backgroundColor: "{colors.surface-1}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--secondary))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.button}"
     rounded: "{rounded.md}"
     padding: 8px 16px
     height: 36px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
   button-ghost:
     backgroundColor: transparent
-    textColor: "{colors.ink-muted}"
+    textColor: "hsl(var(--secondary-foreground))"
     typography: "{typography.button}"
     rounded: "{rounded.md}"
     padding: 6px 10px
   tab-list:
-    backgroundColor: "{colors.surface-1}"
+    backgroundColor: "hsl(var(--secondary))"
     rounded: "{rounded.md}"
     padding: 4px
   tab-trigger:
     backgroundColor: transparent
-    textColor: "{colors.ink-subtle}"
+    textColor: "hsl(var(--muted-foreground))"
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
     padding: 6px 12px
   tab-trigger-active:
-    backgroundColor: "{colors.surface-card}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--card))"
+    textColor: "hsl(var(--foreground))"
   dropdown-content:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--popover))"
+    textColor: "hsl(var(--foreground))"
     rounded: "{rounded.md}"
     padding: 4px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
   dropdown-item:
     backgroundColor: transparent
-    textColor: "{colors.ink}"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body-sm}"
     rounded: "{rounded.xs}"
     padding: 6px 10px
   dropdown-item-danger:
     backgroundColor: transparent
-    textColor: "{colors.semantic-error}"
+    textColor: "hsl(var(--destructive))"
     typography: "{typography.body-sm}"
   dialog-content:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--popover))"
+    textColor: "hsl(var(--foreground))"
     rounded: "{rounded.lg}"
     padding: 24px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
   text-input:
-    backgroundColor: "{colors.surface-1}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--secondary))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body}"
     rounded: "{rounded.md}"
     padding: 8px 12px
     height: 36px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
   text-input-focus:
-    border: 1px solid "{colors.primary}"
+    border: 1px solid "hsl(var(--primary))"
   step-card:
-    backgroundColor: "{colors.surface-card}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--card))"
+    textColor: "hsl(var(--foreground))"
     rounded: "{rounded.lg}"
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
   step-card-running:
-    border: 1px solid "{colors.node-running}"
+    border: 1px solid "hsl(var(--node-running))"
   step-card-success:
-    border: 1px solid "{colors.node-success}"
+    border: 1px solid "hsl(var(--node-success))"
   step-card-error:
-    border: 1px solid "{colors.node-error}"
+    border: 1px solid "hsl(var(--node-error))"
   canvas-node:
-    backgroundColor: "{colors.surface-1}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--secondary))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body-sm}"
     rounded: "{rounded.md}"
     padding: 12px 16px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
     minWidth: 180px
   canvas-node-selected:
-    border: 1px solid "{colors.primary}"
+    border: 1px solid "hsl(var(--primary))"
   canvas-node-running:
-    border: 1px solid "{colors.node-running}"
+    border: 1px solid "hsl(var(--node-running))"
   canvas-edge:
-    strokeColor: "{colors.edge-color}"
+    strokeColor: "hsl(var(--edge-color))"
     strokeWidth: 1.5px
   canvas-edge-hover:
-    strokeColor: "{colors.edge-active}"
+    strokeColor: "hsl(var(--edge-active))"
   port-dot:
-    backgroundColor: "{colors.hairline-strong}"
+    backgroundColor: "hsl(var(--border) / 0.8)"
     size: 8px
     rounded: "{rounded.full}"
   port-dot-hover:
-    backgroundColor: "{colors.primary}"
+    backgroundColor: "hsl(var(--primary))"
   badge:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink-subtle}"
+    backgroundColor: "hsl(var(--popover))"
+    textColor: "hsl(var(--muted-foreground))"
     typography: "{typography.caption}"
     rounded: "{rounded.full}"
     padding: 2px 8px
   toast:
-    backgroundColor: "{colors.surface-2}"
-    textColor: "{colors.ink}"
+    backgroundColor: "hsl(var(--popover))"
+    textColor: "hsl(var(--foreground))"
     typography: "{typography.body-sm}"
     rounded: "{rounded.md}"
     padding: 12px 16px
-    border: 1px solid "{colors.hairline}"
+    border: 1px solid "hsl(var(--border))"
 
 ---
 
 ## Overview
 
-Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 3 + Tauri + Rust）。设计系统走**深色克制路线**——借鉴 Linear 的最深黑色画布哲学和 Raycast 的"产品即品牌"理念，用碳灰画布承载翠绿色作为唯一强调色，通过 surface ladder 表达层次而非阴影。
+Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 3 + Tauri + Rust）。设计系统兼容 shadcn/ui 标准——采用双层 oklch 结构（`--background` → `@theme inline` → `--color-background`），通过 `.dark` class 切换亮暗主题。深色碳灰画布 + 亮色暖白 + 翠绿色唯一强调色。
 
 **Key Characteristics:**
-- 深色画布（`{colors.canvas}` — #090a0b），暖色调黑，不是纯黑
-- 翠绿色 `{colors.primary}` (#10b981) 作为唯一品牌色，仅用于主 CTA、focus ring、选中状态
-- 4 级 surface ladder：canvas → surface-1 → surface-2 → surface-3
+- 兼容 shadcn/ui CSS 变量体系，所有组件可直接使用 `bg-background`、`text-foreground` 等标准类
+- 深色画布（`var(--background)` — oklch(0.131 0.002 286)）
+- 亮色画布（`var(--background)` — oklch(0.992 0.001 286)，无 `.dark` 时的默认值）
+- 翠绿色 `var(--primary)` (oklch(0.69 0.148 162)) 作为唯一品牌色
 - Hairline 1px 边框承载卡片层次，无投影
-- Inter 字体 + ss03 stylistic set（同 Raycast 的签名细节）
-- 统一 8px 按钮圆角，12px 卡片圆角
+- Inter 字体 + ss03 stylistic set
+- 统一 8px 按钮圆角（`--radius: 0.5rem`），12px 卡片圆角
 - 节点执行状态色：idle/灰、running/蓝、success/绿、error/红
 
 ## Colors
 
 ### Brand & Accent
-- **翠绿色** (`{colors.primary}` — #10b981)：主 CTA、选中态、focus ring。唯一品牌色，克制使用。
-- **Hover** (`{colors.primary-hover}` — #34d399)：按钮悬停态，稍亮。
-- **Pressed** (`{colors.primary-pressed}` — #059669)：按下态，加深。
+- **翠绿色** (`var(--primary)` — oklch(0.69 0.148 162) / `#10b981`)：主 CTA、选中态、focus ring。唯一品牌色，克制使用。
+- **亮暗一致**：primary 色在亮暗主题下保持不变。
 
 ### Surface
-- **Canvas** (`{colors.canvas}` — #090a0b)：页面底色，暖色调极深灰。
-- **Surface-1** (`{colors.surface-1}` — #111214)：卡片、面板第一层级。
-- **Surface-2** (`{colors.surface-2}` — #16171a)：弹出层、dropdown、dialog。
-- **Surface-3** (`{colors.surface-3}` — #1a1c1f)：嵌套面板背景。
-- **Surface Card** (`{colors.surface-card}` — #141518)：步骤卡片专用背景。
-- **Hairline** (`{colors.hairline}` — #23252a)：1px 卡片边框。
-- **Hairline Strong** (`{colors.hairline-strong}` — #34343a)：强化边框，focus ring 备选。
+- **Background** (`--background`)：页面底色。亮色 `240° 10% 99%`（暖白 `#fcfcfd`），暗色 `240° 5% 3%`（碳灰 `#090a0b`）。
+- **Card** (`--card`)：卡片背景。亮色 `#ffffff`，暗色 `#111214`。
+- **Popover** (`--popover`)：弹出层、dropdown、dialog。亮色 `#ffffff`，暗色 `#16171a`。
+- **Secondary** (`--secondary`)：次要表面。亮色 `#f3f4f6`，暗色 `#16171a`。
+- **Muted** (`--muted`)：弱化表面。亮色 `#f3f4f6`，暗色 `#111214`。
+- **Accent** (`--accent`)：强调表面。亮色 `#f9fafb`，暗色 `#1a1c1f`。
+- **Border** (`--border`)：1px 卡片/组件边框。亮色 `#d0d7de`，暗色 `#23252a`。
 
 ### Text
-- **Ink** (`{colors.ink}` — #f4f4f6)：标题和强调文本。近白但不刺眼。
-- **Ink Muted** (`{colors.ink-muted}` — #d0d6e0)：二级文本。
-- **Ink Subtle** (`{colors.ink-subtle}` — #8a8f98)：三级文本，侧边栏项目。
-- **Ink Tertiary** (`{colors.ink-tertiary}` — #62666d)：禁用态文本。
+- **Foreground** (`--foreground`)：标题和强调文本。亮色 `#0d1117`，暗色 `#f4f4f6`。
+- **Secondary Foreground** (`--secondary-foreground`)：次要文本（原 ink-muted）。亮色 `#57606a`，暗色 `#d0d6e0`。
+- **Muted Foreground** (`--muted-foreground`)：三级文本（原 ink-subtle）。亮色 `#6e7681`，暗色 `#8a8f98`。
 
-### Semantic（执行状态）
-- **Success** (`{colors.semantic-success}` — #27a644)：节点执行成功。
-- **Error** (`{colors.semantic-error}` — #cf2d56)：节点执行失败。
-- **Warning** (`{colors.semantic-warning}` — #d4a72c)：警告。
-- **Info** (`{colors.semantic-info}` — #57c1ff)：信息提示。
-- **Node Idle** (`{colors.node-idle}` — #3a3d42)：待执行节点。
-- **Node Running** (`{colors.node-running}` — #57c1ff)：执行中节点。
-- **Node Success** (`{colors.node-success}` — #27a644)：成功节点。
-- **Node Error** (`{colors.node-error}` — #cf2d56)：失败节点。
+### Semantic（语义色，亮暗一致）
+- **Success** (`--success` — `#27a644`)：节点执行成功。
+- **Destructive** (`--destructive` — `#cf2d56`)：节点执行失败。
+- **Warning** (`--warning` — `#d4a72c`)：警告。
+- **Info** (`--info`)：信息提示。亮色 `#0969da`，暗色 `#57c1ff`。
 
-### Canvas（连线）
-- **Edge Color** (`{colors.edge-color}` — #34343a)：默认连线颜色。
-- **Edge Active** (`{colors.edge-active}` — #10b981)：激活/悬停连线。
+### Workflow（节点/连线专用）
+- **Node Idle** (`--node-idle`)：待执行节点。亮色 `#e5e7eb`，暗色 `#3a3d42`。
+- **Node Running** (`--node-running` — `#57c1ff`)：执行中节点。
+- **Node Success** (`--node-success` — `#27a644`)：成功节点。
+- **Node Error** (`--node-error` — `#cf2d56`)：失败节点。
+- **Edge Color** (`--edge-color`)：默认连线。亮色 `#d0d7de`，暗色 `#34343a`。
+- **Edge Active** (`--edge-active` — `#10b981`)：激活/悬停连线。
 
 ## Typography
 
@@ -340,18 +367,18 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 - 对话框：max-w-md（~448px）居中
 
 ### Whitespace
-深色画布本身就是"留白"。区域间用 `{colors.surface-1}` 面板和 1px `{colors.hairline}` 分隔，间距 `{spacing.section}` 64px。
+深色画布本身就是"留白"。区域间用 `hsl(var(--secondary))` 面板和 1px `hsl(var(--border))` 分隔，间距 `{spacing.section}` 64px。
 
 ## Elevation & Depth
 
 | Level | Treatment | Use |
 |---|---|---|
-| 0 — Canvas | `{colors.canvas}` | 主背景、画布 |
-| 1 — Card | `{colors.surface-card}` + 1px hairline | 步骤卡片、面板 |
-| 2 — Elevated | `{colors.surface-2}` + 1px hairline | Dialog、Dropdown |
-| 3 — Overlay | `{colors.surface-3}` | 嵌套面板 |
+| 0 — Background | `hsl(var(--background))` | 主背景、画布 |
+| 1 — Card | `hsl(var(--card))` + 1px border | 步骤卡片、面板 |
+| 2 — Elevated | `hsl(var(--popover))` + 1px border | Dialog、Dropdown |
+| 3 — Accent | `hsl(var(--accent))` | 嵌套面板 |
 
-系统**不使用阴影**。层次完全由背景色阶梯 + hairline 边框表达。
+系统**不使用阴影**。层次完全由背景色阶梯 + hairline 边框表达。亮暗主题通过 `.dark` class 自动切换表面层次。
 
 ## Shapes
 
@@ -376,7 +403,7 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 **`sidebar`** — 240px 宽，canvas 背景。工作流列表，选中项用 `surface-1` 背景反色。
 
 ### Buttons
-- **`button-primary`** — 翠绿色 CTA，用 `{colors.primary}`。慎用——每屏最多一个。
+- **`button-primary`** — 翠绿色 CTA，用 `hsl(var(--primary))`。慎用——每屏最多一个。
 - **`button-secondary`** — surface-1 背景 + hairline 边框。
 - **`button-ghost`** — 透明背景，悬停时显示底色。
 
@@ -392,8 +419,8 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 - 执行状态：idle（默认边框）、running（蓝色边框）、success（绿色边框）、error（红色边框）。
 
 ### Canvas
-- **`canvas-node`** — surface-1 背景，8px 圆角，1px hairline 边框，最小宽度 180px。选中时边框变为 `{colors.primary}`。
-- **`canvas-edge`** — 1.5px 贝塞尔曲线，默认 `{colors.edge-color}`，悬停/选中 `{colors.edge-active}`。
+- **`canvas-node`** — secondary 背景，8px 圆角，1px border 边框，最小宽度 180px。选中时边框变为 `hsl(var(--primary))`。
+- **`canvas-edge`** — 1.5px 贝塞尔曲线，默认 `hsl(var(--edge-color))`，悬停/选中 `hsl(var(--edge-active))`。
 - **`port-dot`** — 8px 圆点，默认 hairline-strong，悬停变 primary。
 
 ### Dialog
@@ -405,8 +432,9 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 ## Do's and Don'ts
 
 ### Do
-- 用 `{colors.primary}` 翠绿色**仅**用于主 CTA、选中态、focus ring。
-- 用 surface ladder（canvas → surface-1 → surface-2）表达层次，不用阴影。
+- 用 `hsl(var(--primary))` 翠绿色**仅**用于主 CTA、选中态、focus ring。
+- 暗色模式用 surface ladder（canvas → surface-1 → surface-2）表达层次，不用阴影。
+- 亮色模式用 white → gray-50 → gray-100 阶梯表达层次，hairline 边框承载边界。
 - 用 1px hairline 边框承载所有卡片边界。
 - 按钮统一 8px 圆角，卡片 12px 圆角。
 - 节点执行状态色固定在 idle/running/success/error 四色体系内。
@@ -415,9 +443,10 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 ### Don't
 - 不要引入第二个品牌色。翠绿色是唯一强调色。
 - 不要用 box-shadow 表达深度。
-- 不要用纯黑 `#000000`。Canvas 必须是 `#090a0b`。
+- 暗色模式不要用纯黑 `#000000`。Canvas 必须是 `#090a0b`。
+- 亮色模式不要用纯白 `#ffffff` 作 canvas。Canvas 用 `#fcfcfd` 暖白。
 - 不要在不同组件间混用圆角（按钮 6-8px，卡片 12px）。
-- 不要用绿色表示成功操作同时用作品牌色——`{colors.primary}` ≠ `{colors.semantic-success}`。
+- 不要用绿色表示成功操作同时用作品牌色——`hsl(var(--primary))` ≠ `hsl(var(--success))`。
 
 ## Iteration Guide
 
@@ -426,4 +455,4 @@ Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 
 3. 组件变体（hover/pressed/active）作为独立 entry。
 4. 按钮默认 `{rounded.md}` 8px，卡片 `{rounded.lg}` 12px。
 5. 所有文本默认 `{typography.body}` 14px/400/1.5。
-6. Canvas 节点状态色映射：idle → `{colors.node-idle}`、running → `{colors.node-running}`、success → `{colors.node-success}`、error → `{colors.node-error}`。
+6. Canvas 节点状态色映射：idle → `hsl(var(--node-idle))`、running → `hsl(var(--node-running))`、success → `hsl(var(--node-success))`、error → `hsl(var(--node-error))`。
