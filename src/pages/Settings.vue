@@ -28,11 +28,17 @@ const emit = defineEmits<{ 'back': [] }>()
 const { t, locale } = useI18n()
 const toast = useToast()
 const APP_VERSION = pkg.version
-useTheme() // initialise theme system
+const { theme, setTheme } = useTheme()
 
 const localeOptions = computed<{ value: Locale; label: string }[]>(() => [
   { value: 'zh-CN', label: t('settingsPage.langZh') },
   { value: 'en-US', label: t('settingsPage.langEn') },
+])
+
+const themeOptions = computed(() => [
+  { value: 'system' as const, icon: 'Monitor', label: t('settingsPage.themeSystem'), desc: t('settingsPage.themeSystemDesc') },
+  { value: 'light' as const, icon: 'Sun', label: t('settingsPage.themeLight'), desc: t('settingsPage.themeLightDesc') },
+  { value: 'dark' as const, icon: 'Moon', label: t('settingsPage.themeDark'), desc: t('settingsPage.themeDarkDesc') },
 ])
 
 // ── Settings data ──
@@ -132,18 +138,24 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           <ActionIcon name="Palette" cls="w-4 h-4 text-muted-foreground" />
           <div class="flex-1">
             <CardTitle class="text-sm">{{ t('settingsPage.appearance') }}</CardTitle>
-            <CardDescription class="text-xs">Dark — {{ t('settingsPage.themeDarkDesc') }}</CardDescription>
+            <CardDescription class="text-xs">{{ t('settingsPage.theme') }}</CardDescription>
           </div>
         </CardHeader>
         <CardContent class="px-4 pb-4 pt-0">
-          <div class="flex items-center gap-3 p-3 bg-muted/30 rounded-md">
-            <ActionIcon name="Moon" cls="w-4 h-4 text-primary" />
-            <div class="flex-1">
-              <span class="text-sm font-medium text-foreground">{{ t('settingsPage.themeDark') }}</span>
-              <span class="text-xs text-muted-foreground ml-2">— {{ t('settingsPage.themeDarkDesc') }}</span>
+          <RadioGroup :model-value="theme" class="space-y-2" @update:model-value="setTheme($event as any)">
+            <div v-for="opt in themeOptions" :key="opt.value"
+              class="flex items-center gap-3 p-3 rounded-md transition-colors hover:bg-muted/50 cursor-pointer"
+              :class="{ 'bg-muted/30 ring-1 ring-primary/30': theme === opt.value }"
+              @click="setTheme(opt.value)">
+              <RadioGroupItem :value="opt.value" :id="`theme-${opt.value}`" />
+              <ActionIcon :name="opt.icon" cls="w-4 h-4" :class="theme === opt.value ? 'text-primary' : 'text-muted-foreground'" />
+              <Label :for="`theme-${opt.value}`" class="flex-1 cursor-pointer">
+                <span class="text-sm font-medium text-foreground">{{ opt.label }}</span>
+                <span class="text-xs text-muted-foreground ml-2">— {{ opt.desc }}</span>
+              </Label>
+              <Badge v-if="theme === opt.value" variant="success" class="text-[10px]">Active</Badge>
             </div>
-            <Badge variant="success" class="text-[10px]">Active</Badge>
-          </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 

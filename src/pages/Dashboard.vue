@@ -15,6 +15,7 @@ import SidebarMenuItem from '../components/ui/sidebar/SidebarMenuItem.vue'
 import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 import ActionIcon from '../components/ActionIcon.vue'
+import Skeleton from '../components/ui/skeleton/Skeleton.vue'
 import { Package, History, Download } from 'lucide-vue-next'
 import { inject, type Ref } from 'vue'
 
@@ -193,9 +194,9 @@ defineExpose({ loadList })
 
       <!-- Loading skeleton -->
       <div v-if="loading" class="space-y-2 px-2">
-        <div class="h-8 bg-secondary/50 rounded animate-pulse" />
-        <div class="h-8 bg-secondary/50 rounded animate-pulse w-3/4" />
-        <div class="h-8 bg-secondary/50 rounded animate-pulse w-1/2" />
+        <Skeleton class="h-8 w-full" />
+        <Skeleton class="h-8 w-3/4" />
+        <Skeleton class="h-8 w-1/2" />
       </div>
 
       <!-- Empty state (no workflows at all) -->

@@ -201,9 +201,10 @@ onUnmounted(() => {
         <div class="flex flex-1 min-h-0">
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-[var(--spacing-section-padding-x)] pt-6 pb-12 space-y-[var(--spacing-step-gap)] min-h-0">
-            <div v-if="!a.workflow.value?.steps?.length" class="text-center py-16 text-muted-foreground">
-              <div class="text-lg text-foreground mb-2">{{ t('editor.noStepsTitle') }}</div>
-              <div class="text-sm">{{ t('editor.noStepsHint') }}</div>
+            <div v-if="!a.workflow.value?.steps?.length" class="flex flex-col items-center justify-center py-16 text-center">
+              <ActionIcon name="Layers" cls="w-10 h-10 text-muted-foreground/30 mb-4" />
+              <div class="text-lg font-medium text-foreground mb-1">{{ t('editor.noStepsTitle') }}</div>
+              <div class="text-sm text-muted-foreground">{{ t('editor.noStepsHint') }}</div>
             </div>
 
             <!-- Step cards (with drag) -->
