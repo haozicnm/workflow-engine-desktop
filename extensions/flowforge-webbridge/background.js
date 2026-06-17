@@ -1405,6 +1405,96 @@ const tools = {
     }
     return { trace: _traceLog, enabled: _traceEnabled };
   },
+
+  // ─── Wait utilities ───
+
+  async wait_network_idle(params) {
+    const timeout = params.timeout || 5000;
+    await ensureAttached((await resolveTab()).id);
+    await cdpCommand('Page.enable');
+    const deadline = Date.now() + timeout;
+    let inflight = 0;
+    const handler = (params) => { inflight = params.loading ? inflight + 1 : inflight - 1; };
+    chrome.debugger.onEvent.addListener(handler);
+    try {
+      while (Date.now() < deadline) {
+        if (inflight <= 0) return { idle: true, waited: timeout - (deadline - Date.now()) };
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return { idle: inflight <= 0, waited: timeout, stillInflight: inflight };
+    } finally {
+      chrome.debugger.onEvent.removeListener(handler);
+    }
+  },
+
+  async wait_load_state(params) {
+    const state = params.state || 'load';
+    const timeout = params.timeout || 30000;
+    await ensureAttached((await resolveTab()).id);
+    if (state === 'domcontentloaded') {
+      await new Promise(r => setTimeout(r, 500));
+      return { state };
+    }
+    if (state === 'networkidle') {
+      await waitForLoad((await resolveTab()).id, 10000);
+      await this.wait_network_idle({ timeout: Math.min(timeout, 10000) });
+      return { state };
+    }
+    await waitForLoad((await resolveTab()).id, timeout);
+    return { state };
+  },
+
+  async wait_url_contains(params) {
+    const substring = params.substring || params.value || '';
+    if (!substring) throw new Error('wait_url_contains: substring is required');
+    const timeout = params.timeout || 30000;
+    const deadline = Date.now() + timeout;
+    const tab = await resolveTab();
+    while (Date.now() < deadline) {
+      const t = await chrome.tabs.get(tab.id);
+      if (t.url?.includes(substring)) return { matched: true, url: t.url };
+      await new Promise(r => setTimeout(r, 500));
+    }
+    throw new Error(`wait_url_contains: timeout waiting for URL containing "${substring}"`);
+  },
+
+  // ─── Frame ───
+
+  async switch_frame(params) {
+    const selector = params.selector || '';
+    await ensureAttached((await resolveTab()).id);
+    if (!selector) {
+      // Switch to main frame
+      await cdpCommand('Page.enable');
+      return { frame: 'main' };
+    }
+    const doc = await cdpCommand('DOM.getDocument');
+    const frame = await cdpCommand('Runtime.evaluate', {
+      expression: `document.querySelector(${JSON.stringify(selector)});`,
+    });
+    if (!frame.result?.objectId) throw new Error(`switch_frame: element not found: ${selector}`);
+    return { frame: selector };
+  },
+
+  // ─── Element scroll ───
+
+  async scroll_to_element(params) {
+    const { selector, behavior, block } = params;
+    if (!selector) throw new Error('scroll_to_element: selector is required');
+    await ensureAttached((await resolveTab()).id);
+    const objectId = isRef(selector)
+      ? await objectIdFromRef(selector)
+      : await objectIdFromSelector(selector);
+    await cdpCommand('Runtime.callFunctionOn', {
+      objectId,
+      functionDeclaration: `function() { this.scrollIntoView({ behavior: '${behavior || 'smooth'}', block: '${block || 'center'}' }); }`,
+    });
+    const box = await cdpCommand('DOM.getBoxModel', { objectId });
+    const border = box.model?.border;
+    const x = border ? (border[0] + border[4]) / 2 : 0;
+    const y = border ? (border[1] + border[5]) / 2 : 0;
+    return { success: true, x, y };
+  },
 };
 
 // ═══════════════════════════════════════════════
@@ -1525,10 +1615,31 @@ async function waitForNavigateLoad(tabId, waitUntil = 'load') {
     case 'networkidle':
       // 等待网络空闲
       await waitForLoad(tabId, 10000);  // 先等基本加载
-      await tools.wait_network_idle({ timeout: 5000 });
+      await wait_network_idle_standalone({ timeout: 5000 });
       break;
     default: // 'load'
       await waitForLoad(tabId, 30000);
+  }
+}
+
+// 独立版 wait_network_idle（供内部使用，不走 tools dispatch）
+async function wait_network_idle_standalone(options = {}) {
+  const timeout = options.timeout || 5000;
+  const tab = await resolveTab();
+  await ensureAttached(tab.id);
+  await cdpCommand('Page.enable');
+  const deadline = Date.now() + timeout;
+  let inflight = 0;
+  const handler = (p) => { inflight = p.loading ? inflight + 1 : inflight - 1; };
+  chrome.debugger.onEvent.addListener(handler);
+  try {
+    while (Date.now() < deadline) {
+      if (inflight <= 0) return { idle: true };
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return { idle: inflight <= 0 };
+  } finally {
+    chrome.debugger.onEvent.removeListener(handler);
   }
 }
 

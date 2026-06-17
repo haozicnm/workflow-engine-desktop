@@ -183,7 +183,7 @@ async fn execute_actions(
                         "selector": selector,
                         "timeout": timeout,
                     });
-                    send_browser_action("wait", &params)
+                    send_browser_action("wait_for", &params)
                         .await
                         .map_err(|e| anyhow!("等待失败: {}", e))?;
                 }
@@ -215,7 +215,7 @@ async fn execute_actions(
                 let params = serde_json::json!({
                     "to": to,
                 });
-                send_browser_action("scroll_to", &params)
+                send_browser_action("scroll", &serde_json::json!({ "y": to }))
                     .await
                     .map_err(|e| anyhow!("滚动失败: {}", e))?;
             }
@@ -412,7 +412,7 @@ async fn execute_actions(
                     "document.querySelector({})?.dispatchEvent(new MouseEvent('mouseover', {{bubbles:true}}))",
                     serde_json::to_string(selector).unwrap_or_default()
                 );
-                let params = serde_json::json!({ "script": script });
+                let params = serde_json::json!({ "expression": script });
                 send_browser_action("evaluate", &params)
                     .await
                     .map_err(|e| anyhow!("悬停失败: {}", e))?;
@@ -429,7 +429,7 @@ async fn execute_actions(
             "close_page" => {
                 let index = action.config.get("index").and_then(|v| v.as_u64());
                 let params = serde_json::json!({ "index": index });
-                send_browser_action("close_page", &params)
+                send_browser_action("close_tab", &serde_json::json!({ "tabId": index }))
                     .await
                     .map_err(|e| anyhow!("关闭标签页失败: {}", e))?;
             }
@@ -447,7 +447,7 @@ async fn execute_actions(
             }
 
             "pages" => {
-                let resp = send_browser_action("pages", &serde_json::json!({}))
+                let resp = send_browser_action("list_tabs", &serde_json::json!({}))
                     .await
                     .map_err(|e| anyhow!("获取标签页列表失败: {}", e))?;
                 let data = resp.get("data").cloned().unwrap_or(Value::Null);
@@ -486,13 +486,13 @@ async fn execute_actions(
             }
 
             "back" => {
-                send_browser_action("back", &serde_json::json!({}))
+                send_browser_action("go_back", &serde_json::json!({}))
                     .await
                     .map_err(|e| anyhow!("后退失败: {}", e))?;
             }
 
             "forward" => {
-                send_browser_action("forward", &serde_json::json!({}))
+                send_browser_action("go_forward", &serde_json::json!({}))
                     .await
                     .map_err(|e| anyhow!("前进失败: {}", e))?;
             }
@@ -517,8 +517,7 @@ async fn execute_actions(
                     .get("path")
                     .and_then(|v| v.as_str())
                     .unwrap_or("output.pdf");
-                let params = serde_json::json!({ "path": path });
-                send_browser_action("pdf", &params)
+                send_browser_action("save_as_pdf", &serde_json::json!({}))
                     .await
                     .map_err(|e| anyhow!("生成PDF失败: {}", e))?;
             }
@@ -572,7 +571,7 @@ async fn execute_actions(
 
             // ─── 动作验证 (v2) ───
             "verify" => {
-                let resp = send_browser_action("verify", &serde_json::json!({}))
+                let resp = send_browser_action("verify", &serde_json::json!({ "conditions": [] }))
                     .await
                     .map_err(|e| anyhow!("验证失败: {}", e))?;
                 let data = resp.clone();
@@ -602,9 +601,8 @@ async fn execute_actions(
                     .and_then(|v| v.as_u64())
                     .unwrap_or(30000);
                 let params = serde_json::json!({
-                    "save_dir": save_dir,
-                    "click_selector": click_selector,
-                    "timeout_ms": timeout,
+                    "selector": click_selector,
+                    "saveAs": save_dir,
                 });
                 let resp = send_browser_action("download", &params)
                     .await
@@ -630,7 +628,7 @@ async fn execute_actions(
                 };
                 let params = serde_json::json!({
                     "selector": selector,
-                    "file_paths": file_paths,
+                    "filePaths": file_paths,
                 });
                 send_browser_action("upload", &params)
                     .await
@@ -656,14 +654,19 @@ async fn execute_actions(
                 if key.is_empty() && text.is_empty() {
                     return Err(anyhow!("keyboard 需要 key 或 text 参数"));
                 }
-                let params = serde_json::json!({
-                    "key": key,
-                    "text": text,
-                    "delay": delay,
-                });
-                send_browser_action("keyboard", &params)
-                    .await
-                    .map_err(|e| anyhow!("键盘操作失败: {}", e))?;
+                // 映射到扩展工具：key → send_keys, text → key_type
+                if !key.is_empty() {
+                    let params = serde_json::json!({ "key": key });
+                    send_browser_action("send_keys", &params)
+                        .await
+                        .map_err(|e| anyhow!("键盘操作失败: {}", e))?;
+                }
+                if !text.is_empty() {
+                    let params = serde_json::json!({ "text": text, "delay": delay });
+                    send_browser_action("key_type", &params)
+                        .await
+                        .map_err(|e| anyhow!("文本输入失败: {}", e))?;
+                }
             }
 
             "double_click" => {
