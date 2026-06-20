@@ -404,7 +404,7 @@ pub async fn browser_snapshot() -> Response {
     }
     match crate::nodes::webbridge::send_command("snapshot", serde_json::json!({})).await {
         Ok(val) => ok_response(val),
-        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("snapshot 失败: {}", e)),
+        Err(e) => err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("snapshot 失败: {}", e)),
     }
 }
 

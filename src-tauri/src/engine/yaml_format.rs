@@ -434,7 +434,7 @@ mod tests {
             ..Default::default()
         };
         ensure_defaults(&mut wf);
-        assert_eq!(wf.version, Some("1.0".to_string()));
+        assert_eq!(wf.version, Some("2.0".to_string()));
         assert!(wf.meta.is_some());
     }
 

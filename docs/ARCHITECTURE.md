@@ -2,7 +2,7 @@
 
 ## 1. 项目概述
 
-Workflow Engine Desktop 是一个桌面端工作流自动化引擎，用户通过可视化界面编排步骤，引擎按序执行，支持浏览器操作、Excel/Word 处理、条件分支、循环、HTTP 请求等 60+ 种节点类型。
+Workflow Engine Desktop 是一个桌面端工作流自动化引擎，用户通过可视化界面编排步骤，引擎按序执行，支持浏览器操作、Excel/Word 处理、条件分支、循环、HTTP 请求等 34 种节点类型（56 个 type_def）。
 
 **技术栈**：
 - **前端**：Vue 3 + TypeScript + Tailwind CSS + shadcn-vue

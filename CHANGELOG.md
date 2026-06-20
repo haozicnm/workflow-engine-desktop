@@ -1,5 +1,20 @@
 # Changelog
 
+## v8.4.1 (2026-06-20)
+
+### 🐛 Bug Fixes
+
+- 修复 `ensure_defaults_fills_version` 测试断言（FORMAT_VERSION 已从 1.0 升级到 2.0，测试未同步更新）
+- 修复 clippy `needless_borrows_for_generic_args` 警告 (system_manager.rs:407)
+- 修复 clippy `too_many_arguments` 警告 (scheduler.rs:39, 添加 allow 属性)
+
+### 📝 文档
+
+- 修正 README / AGENTS.md 版本号为 8.4.1
+- 更新 ROADMAP-v8.0 反映 8.2/8.3/8.4 已完成阶段
+- 统一 ARCHITECTURE.md 节点数为 34（56 type_def）
+- 归档旧文件至 docs/archive/，删除重复 LIBRARY-DESIGN.md
+
 ## v8.4.0 (2026-06-16)
 
 ### 🎨 全页面 DESIGN.md 对齐（第二轮）

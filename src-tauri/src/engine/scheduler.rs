@@ -36,6 +36,7 @@ pub struct RunPreparation {
 }
 
 /// 执行 run_start 前的通用准备工作（消除 commands/ 和 managers/ 间的代码重复）
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare_run(
     db: &Arc<Database>,
     config: &tokio::sync::RwLock<crate::data::config::AppConfig>,
