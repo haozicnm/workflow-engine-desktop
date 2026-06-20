@@ -826,6 +826,7 @@ impl NodeExecutor for BrowserContainerNode {
                     "actions": {"type": "array", "description": "浏览器操作列表"}
                 }
             }),
+            params: vec![],
         }
     }
 

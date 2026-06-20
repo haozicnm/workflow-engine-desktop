@@ -52,6 +52,7 @@ impl NodeExecutor for PrintNode {
                     "level": {"type": "string", "enum": ["info", "warn", "error"], "description": "日志级别", "default": "info"}
                 }
             }),
+            params: vec![],
         }
     }
 

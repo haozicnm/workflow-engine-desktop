@@ -4,6 +4,7 @@
 //   - type_def()      — 声明式类型元数据（版本/端口/JSON Schema）
 //   - validate_config() — 执行前配置校验
 //   - NodeTypeDef / PortDef — 自描述节点定义
+//   - DisplayOptions / ConditionOp / ParamDef — 声明式条件显示（参考 n8n）
 //
 // 向后兼容：现有 34 个节点只需实现 execute()，新方法有默认值。
 
@@ -13,17 +14,54 @@ use crate::engine::workflow::Step;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+
+// ─── DisplayOptions: 声明式条件显示（参考 n8n） ───────────────────
+
+/// 条件运算符
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "op", content = "value")]
+pub enum ConditionOp {
+    #[serde(rename = "eq")] Eq(serde_json::Value),
+    #[serde(rename = "not")] Not(serde_json::Value),
+    #[serde(rename = "gte")] Gte(f64),
+    #[serde(rename = "lte")] Lte(f64),
+    #[serde(rename = "gt")] Gt(f64),
+    #[serde(rename = "lt")] Lt(f64),
+    #[serde(rename = "between")] Between { from: f64, to: f64 },
+    #[serde(rename = "startsWith")] StartsWith(String),
+    #[serde(rename = "endsWith")] EndsWith(String),
+    #[serde(rename = "includes")] Includes(String),
+    #[serde(rename = "regex")] Regex(String),
+    #[serde(rename = "exists")] Exists,
+}
+
+/// 单个条件值：简单值匹配 或 高级条件运算
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ConditionValue {
+    Simple(serde_json::Value),
+    Advanced { _cnd: ConditionOp },
+}
+
+/// 参数级条件显示规则
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayOptions {
+    /// show: 所有条件必须同时满足（AND 逻辑）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show: Option<HashMap<String, Vec<ConditionValue>>>,
+    /// hide: 任一条件满足即隐藏（OR 逻辑）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hide: Option<HashMap<String, Vec<ConditionValue>>>,
+}
 
 /// 端口定义（输入或输出）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortDef {
-    /// 端口标签，用于变量引用：{{nodeId.portLabel}}
     pub label: String,
-    /// 数据类型提示（string / number / object / any）
     #[serde(default = "default_port_type")]
     pub data_type: String,
-    /// 是否必须
     #[serde(default)]
     pub required: bool,
 }
@@ -32,26 +70,44 @@ fn default_port_type() -> String {
     "any".to_string()
 }
 
+/// 参数定义（schema-driven，支持条件显示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParamDef {
+    pub name: String,
+    #[serde(rename = "field_type")]
+    pub field_type: String,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lang: Option<String>,
+    /// 条件显示规则（n8n displayOptions 风格）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_options: Option<DisplayOptions>,
+}
+
 /// 节点类型定义（自描述元数据）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeTypeDef {
-    /// 唯一类型名（如 "http", "shell", "condition"）
     pub type_name: String,
-    /// 语义化版本
     #[serde(default = "default_version")]
     pub version: String,
-    /// 人类可读的显示名
     pub display_name: String,
-    /// 描述
     pub description: String,
-    /// 分类（用于节点面板分组）
     pub category: String,
-    /// 输入端口定义
     pub inputs: Vec<PortDef>,
-    /// 输出端口定义
     pub outputs: Vec<PortDef>,
-    /// JSON Schema 描述 config 字段
     pub config_schema: serde_json::Value,
+    /// 声明式参数定义（支持条件显示，优先级高于 config_schema）
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<ParamDef>,
 }
 
 fn default_version() -> String {
@@ -73,11 +129,6 @@ impl std::fmt::Display for ValidationError {
 
 #[async_trait]
 pub trait NodeExecutor: Send + Sync {
-    // ─── v8 新增：类型元数据 ───────────────────────────
-
-    /// 返回节点类型定义（元数据：版本/端口/Schema）
-    ///
-    /// 默认返回一个最小定义，节点作者应该 override 这个方法。
     fn type_def(&self) -> NodeTypeDef {
         NodeTypeDef {
             type_name: "unknown".to_string(),
@@ -92,20 +143,16 @@ pub trait NodeExecutor: Send + Sync {
                 required: false,
             }],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 
-    /// 配置预校验（在变量解析后、执行前调用）
-    ///
-    /// 返回 Ok(()) 或错误列表。默认接受一切。
     fn validate_config(
         &self,
         _config: &serde_json::Value,
     ) -> std::result::Result<(), Vec<ValidationError>> {
         Ok(())
     }
-
-    // ─── v7 原有：执行方法 ─────────────────────────────
 
     async fn execute(
         &self,
@@ -114,9 +161,6 @@ pub trait NodeExecutor: Send + Sync {
         executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value>;
 
-    /// 是否由节点自行解析 config 中的模板变量。
-    /// 返回 true 时，executor 跳过全局 `ctx.resolve_config(&step.config)`，
-    /// 由节点在迭代期间自行处理（如 map 节点的 `{{__item}}` 模板）。
     fn resolve_config_self(&self) -> bool {
         false
     }

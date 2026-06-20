@@ -66,6 +66,7 @@ impl NodeExecutor for RegexNode {
                     "global": {"type": "boolean", "description": "是否全局匹配", "default": true}
                 }
             }),
+            params: vec![],
         }
     }
 

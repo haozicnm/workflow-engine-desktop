@@ -50,6 +50,7 @@ impl NodeExecutor for FileReadNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -118,6 +119,7 @@ impl NodeExecutor for FileWriteNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -190,6 +192,7 @@ impl NodeExecutor for FileListNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -301,6 +304,7 @@ impl NodeExecutor for FileDeleteNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -360,6 +364,7 @@ impl NodeExecutor for FileExistsNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -407,6 +412,7 @@ impl NodeExecutor for FileAppendNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -470,6 +476,7 @@ impl NodeExecutor for FileMkdirNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 
@@ -512,6 +519,7 @@ impl NodeExecutor for FileCopyNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path", "dest"] }),
+            params: vec![],
         }
     }
 
@@ -611,6 +619,7 @@ impl NodeExecutor for FileMoveNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path", "dest"] }),
+            params: vec![],
         }
     }
 
@@ -666,6 +675,7 @@ impl NodeExecutor for FileGlobNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["pattern"] }),
+            params: vec![],
         }
     }
 
@@ -714,6 +724,7 @@ impl NodeExecutor for FileChecksumNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({ "type": "object", "required": ["path"] }),
+            params: vec![],
         }
     }
 

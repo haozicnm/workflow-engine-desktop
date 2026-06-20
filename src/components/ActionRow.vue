@@ -238,6 +238,7 @@ function isSelectorField(key: string): boolean {
           :param="param"
           :model-value="localParams[param.key] ?? param.default"
           :grouped-refs="groupedRefs"
+          :sibling-values="localParams"
           :show-element-picker="canPick && isSelectorField(param.key)"
           :picking-element="pickingElement"
           @update:model-value="v => onParamChange(param.key, v)"

@@ -52,6 +52,7 @@ impl NodeExecutor for MapNode {
                     "template": {"type": "object", "description": "映射模板，支持 {{__item}} {{__index}} 变量"}
                 }
             }),
+            params: vec![],
         }
     }
 

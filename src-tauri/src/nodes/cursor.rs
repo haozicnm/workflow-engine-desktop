@@ -122,6 +122,7 @@ impl NodeExecutor for CursorNode {
                     "body": {"type": "array", "description": "每项要执行的步骤"}
                 }
             }),
+            params: vec![],
         }
     }
 

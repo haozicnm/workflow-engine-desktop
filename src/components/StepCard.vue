@@ -306,6 +306,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
             :param-def="pd"
             :model-value="step.config[pd.name] ?? pd.default"
             :grouped-refs="groupedRefs"
+            :sibling-values="step.config"
             class="mb-2"
             @update:model-value="v => onConfigParamChange(pd.name, v)"
           />
@@ -318,6 +319,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           :param="param"
           :model-value="step.config[param.key] ?? param.default"
           :grouped-refs="groupedRefs"
+          :sibling-values="step.config"
           class="mb-2"
           @update:model-value="v => onConfigParamChange(param.key, v)"
         />

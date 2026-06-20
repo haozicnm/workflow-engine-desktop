@@ -63,6 +63,7 @@ impl NodeExecutor for WebScrapeNode {
                     "pagination": {"type": "object", "description": "分页配置 {max_pages, next}"}
                 }
             }),
+            params: vec![],
         }
     }
 

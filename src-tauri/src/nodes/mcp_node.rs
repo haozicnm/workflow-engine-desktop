@@ -306,6 +306,7 @@ impl NodeExecutor for McpNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 

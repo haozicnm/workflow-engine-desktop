@@ -52,6 +52,36 @@ export interface ParamDef {
   options?: string[]
   group?: 'basic' | 'advanced'
   lang?: string
+  /** 条件显示规则（n8n displayOptions 风格） */
+  display_options?: DisplayOptions
+}
+
+// ─── DisplayOptions: 声明式条件显示（参考 n8n） ─────────────────
+
+/** 条件运算符 */
+export type ConditionOp =
+  | { op: 'eq'; value: any }
+  | { op: 'not'; value: any }
+  | { op: 'gte'; value: number }
+  | { op: 'lte'; value: number }
+  | { op: 'gt'; value: number }
+  | { op: 'lt'; value: number }
+  | { op: 'between'; value: { from: number; to: number } }
+  | { op: 'startsWith'; value: string }
+  | { op: 'endsWith'; value: string }
+  | { op: 'includes'; value: string }
+  | { op: 'regex'; value: string }
+  | { op: 'exists' }
+
+/** 单个条件值：简单值匹配 或 高级条件运算 */
+export type ConditionValue = any | { _cnd: ConditionOp }
+
+/** 参数级条件显示规则 */
+export interface DisplayOptions {
+  /** show 条件：所有条件必须同时满足（AND 逻辑） */
+  show?: Record<string, ConditionValue[]>
+  /** hide 条件：任一条件满足即隐藏（OR 逻辑） */
+  hide?: Record<string, ConditionValue[]>
 }
 
 // ─── 逻辑条件 ───

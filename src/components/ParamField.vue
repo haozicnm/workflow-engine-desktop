@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { Target, Link, FolderOpen } from 'lucide-vue-next'
 import type { StepGroup } from '../composables/useVariableRefs'
 import type { ParamDef } from '../types/types'
+import { shouldDisplay } from '../utils/displayEvaluator'
 import Input from './ui/input/Input.vue'
 import Label from './ui/label/Label.vue'
 import Textarea from './ui/textarea/Textarea.vue'
@@ -43,6 +44,8 @@ const props = defineProps<{
   pickingElement?: boolean
   /** 数据来源提示 */
   dataHint?: string
+  /** 同级参数的当前值（用于条件显示评估） */
+  siblingValues?: Record<string, unknown>
 }>()
 
 const emit = defineEmits<{
@@ -198,10 +201,17 @@ const refTags = computed(() => {
 
 const hasRefs = computed(() => (props.groupedRefs?.length ?? 0) > 0)
 const canRef = computed(() => ['text', 'textarea', 'json', 'code', 'file_path'].includes(field.value.type))
+
+// ─── 条件显示评估 ───
+const visible = computed(() => {
+  const displayOptions = props.paramDef?.display_options
+  if (!displayOptions) return true
+  return shouldDisplay(displayOptions, props.siblingValues || {})
+})
 </script>
 
 <template>
-  <div>
+  <div v-if="visible">
     <!-- Label -->
     <Label class="text-[11px] text-muted-foreground block mb-1">
       {{ field.label }}

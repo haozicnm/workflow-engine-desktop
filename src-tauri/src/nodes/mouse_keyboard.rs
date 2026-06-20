@@ -45,6 +45,7 @@ impl NodeExecutor for MouseKeyboardNode {
                     "amount": {"type": "number", "description": "滚动量", "default": 3}
                 }
             }),
+            params: vec![],
         }
     }
 

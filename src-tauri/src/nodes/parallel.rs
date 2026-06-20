@@ -37,6 +37,7 @@ impl NodeExecutor for ParallelNode {
                     "fail_fast": {"type": "boolean", "description": "任一分支失败时是否取消其他分支", "default": false}
                 }
             }),
+            params: vec![],
         }
     }
 

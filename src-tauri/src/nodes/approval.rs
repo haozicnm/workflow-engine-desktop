@@ -61,6 +61,7 @@ impl NodeExecutor for ApprovalNode {
                     "timeout_behavior": {"type": "string", "enum": ["auto", "manual"]}
                 }
             }),
+            params: vec![],
         }
     }
 

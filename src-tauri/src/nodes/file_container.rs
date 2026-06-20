@@ -64,6 +64,7 @@ impl NodeExecutor for FileContainerNode {
                     "actions": {"type": "array", "description": "文件操作列表"}
                 }
             }),
+            params: vec![],
         }
     }
 

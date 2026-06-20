@@ -30,6 +30,7 @@ impl NodeExecutor for ClipboardReadNode {
                 crate::nodes::traits::PortDef { label: "length".into(), data_type: "number".into(), required: false },
             ],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 
@@ -79,6 +80,7 @@ impl NodeExecutor for ClipboardWriteNode {
                     "text": {"type": "string", "description": "要写入的文本"}
                 }
             }),
+            params: vec![],
         }
     }
 

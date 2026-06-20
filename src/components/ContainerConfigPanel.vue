@@ -72,6 +72,7 @@ function onParamChange(key: string, value: unknown) {
           :param="param"
           :model-value="localConfig[param.key] ?? param.default"
           :grouped-refs="groupedRefs"
+          :sibling-values="localConfig"
           @update:model-value="v => onParamChange(param.key, v)"
         />
       </div>

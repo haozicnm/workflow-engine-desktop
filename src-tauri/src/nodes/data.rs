@@ -60,6 +60,7 @@ impl NodeExecutor for DataSetNode {
             category: "数据".into(), inputs: vec![],
             outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
             config_schema: serde_json::json!({"type": "object", "required": ["key"], "properties": {"key": {"type": "string"}, "value": {"type": "string"}}}),
+            params: vec![],
         }
     }
 
@@ -97,6 +98,7 @@ impl NodeExecutor for DataGetNode {
             category: "数据".into(), inputs: vec![],
             outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
             config_schema: serde_json::json!({"type": "object", "required": ["key"], "properties": {"key": {"type": "string"}}}),
+            params: vec![],
         }
     }
 
@@ -135,6 +137,7 @@ impl NodeExecutor for DataLengthNode {
             category: "数据".into(), inputs: vec![],
             outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "number".into(), required: false }],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 
@@ -181,6 +184,7 @@ impl NodeExecutor for DataDefaultNode {
             category: "数据".into(), inputs: vec![],
             outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false }],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 
@@ -227,6 +231,7 @@ impl NodeExecutor for DataMergeNode {
             category: "数据".into(), inputs: vec![],
             outputs: vec![crate::nodes::traits::PortDef { label: "result".into(), data_type: "object".into(), required: false }],
             config_schema: serde_json::json!({"type": "object"}),
+            params: vec![],
         }
     }
 

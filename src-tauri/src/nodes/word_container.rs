@@ -252,6 +252,7 @@ impl NodeExecutor for WordContainerNode {
                     "actions": {"type": "array", "description": "操作列表，每个操作有 id/type/label/config"}
                 }
             }),
+            params: vec![],
         }
     }
 

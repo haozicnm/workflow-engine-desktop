@@ -39,6 +39,7 @@ impl NodeExecutor for WindowNode {
                     "timeout_s": {"type": "number", "description": "等待超时秒数", "default": 30}
                 }
             }),
+            params: vec![],
         }
     }
 

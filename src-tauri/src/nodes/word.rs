@@ -38,6 +38,7 @@ impl NodeExecutor for WordNode {
                     "mode": {"type": "string", "enum": ["overwrite", "append"], "description": "写入模式"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -96,6 +97,7 @@ impl NodeExecutor for WordReadNode {
                     "path": {"type": "string", "description": "Word 文件路径"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -140,6 +142,7 @@ impl NodeExecutor for WordWriteNode {
                     "content": {"type": "string", "description": "文档内容（字符串或段落数组）"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -205,6 +208,7 @@ impl NodeExecutor for WordCreateNode {
                     "content": {"type": "string", "description": "文档内容"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -278,6 +282,7 @@ impl NodeExecutor for WordReplaceNode {
                     "count": {"type": "number", "description": "替换次数限制（0=全部）", "default": 0}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -337,6 +342,7 @@ impl NodeExecutor for WordMergeNode {
                     "files": {"type": "array", "items": {"type": "string"}, "description": "文件路径数组"}
                 }
             }),
+            params: vec![],
         }
     }
 

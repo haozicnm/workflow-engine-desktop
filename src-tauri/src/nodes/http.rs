@@ -37,6 +37,7 @@ impl NodeExecutor for HttpNode {
                     "body": {"type": "string"}
                 }
             }),
+            params: vec![],
         }
     }
 

@@ -35,6 +35,7 @@ impl NodeExecutor for OcrNode {
                     "text": {"type": "string", "description": "要查找的文字"}
                 }
             }),
+            params: vec![],
         }
     }
 

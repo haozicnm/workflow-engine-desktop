@@ -38,6 +38,7 @@ impl NodeExecutor for SubWorkflowNode {
                     "output_mapping": {"type": "object", "description": "子流程输出映射到父变量"}
                 }
             }),
+            params: vec![],
         }
     }
 

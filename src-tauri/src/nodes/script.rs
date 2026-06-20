@@ -37,6 +37,7 @@ impl NodeExecutor for ScriptNode {
                 crate::nodes::traits::PortDef { label: "result".into(), data_type: "any".into(), required: false },
             ],
             config_schema: serde_json::json!({"type": "object", "properties": {"script": {"type": "string"}}}),
+            params: vec![],
         }
     }
 

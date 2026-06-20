@@ -37,6 +37,7 @@ impl NodeExecutor for ExcelNode {
                     "sheet": {"type": "string", "description": "工作表名称"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -99,6 +100,7 @@ impl NodeExecutor for ExcelReadNode {
                     "sheet": {"type": "string", "description": "工作表名称（可选，默认第一个工作表）"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -151,6 +153,7 @@ impl NodeExecutor for ExcelWriteNode {
                     "write_mode": {"type": "string", "enum": ["overwrite", "append"]}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -215,6 +218,7 @@ impl NodeExecutor for ExcelCreateNode {
                     "data": {"type": "array", "description": "初始数据"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -269,6 +273,7 @@ impl NodeExecutor for ExcelFilterNode {
                     "data": {"type": "array", "description": "要筛选的数据"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -320,6 +325,7 @@ impl NodeExecutor for ExcelSortNode {
                     "data": {"type": "array", "description": "要排序的数据"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -373,6 +379,7 @@ impl NodeExecutor for ExcelAppendNode {
                     "data": {"type": "array", "description": "要追加的数据"}
                 }
             }),
+            params: vec![],
         }
     }
 
@@ -426,6 +433,7 @@ impl NodeExecutor for ExcelCsvNode {
                     "delimiter": {"type": "string", "description": "CSV 分隔符"}
                 }
             }),
+            params: vec![],
         }
     }
 

@@ -330,6 +330,7 @@ impl NodeExecutor for ExcelContainerNode {
                     "actions": {"type": "array", "description": "操作列表"}
                 }
             }),
+            params: vec![],
         }
     }
 

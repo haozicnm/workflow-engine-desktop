@@ -133,6 +133,7 @@ impl NodeExecutor for WhileNode {
                     "table": {"type": "object", "description": "Table 后处理配置"}
                 }
             }),
+            params: vec![],
         }
     }
 
