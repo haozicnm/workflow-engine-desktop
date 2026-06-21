@@ -40,3 +40,10 @@ pub mod trigger_cron;
 pub mod trigger_webhook;
 pub mod trigger_file;
 pub mod webhook_response;
+// v8.6 实用节点 + AI
+pub mod json_transform;
+pub mod data_filter;
+pub mod llm_chat;
+pub mod prompt_template;
+pub mod email_send;
+pub mod database_query;

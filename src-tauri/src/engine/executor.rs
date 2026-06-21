@@ -147,6 +147,14 @@ impl StepExecutor {
         register!(executors, "trigger_file", crate::nodes::trigger_file::TriggerFileNode);
         register!(executors, "webhook_response", crate::nodes::webhook_response::WebhookResponseNode);
 
+        // ── v8.6 实用节点 + AI 薄封装 ──
+        register!(executors, "json_transform", crate::nodes::json_transform::JsonTransformNode);
+        register!(executors, "data_filter", crate::nodes::data_filter::DataFilterNode);
+        register!(executors, "llm_chat", crate::nodes::llm_chat::LlmChatNode);
+        register!(executors, "prompt_template", crate::nodes::prompt_template::PromptTemplateNode);
+        register!(executors, "email_send", crate::nodes::email_send::EmailSendNode);
+        register!(executors, "database_query", crate::nodes::database_query::DatabaseQueryNode);
+
         // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {
             use crate::nodes::mcp_node::{create_mcp_executor, get_all_mcp_types};
