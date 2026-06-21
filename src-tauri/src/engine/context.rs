@@ -2,6 +2,7 @@
 use crate::engine::workflow::Workflow;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::warn;
 use uuid::Uuid;
 
@@ -21,6 +22,12 @@ pub struct ExecutionContext {
     pub shell_allowed_commands: Vec<String>,
     /// 子流程嵌套深度（用于防止无限递归）
     pub sub_workflow_depth: u32,
+    /// 调试：单步模式标志（true = 每步暂停等待 debug_step）
+    pub step_mode_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// 调试：断点暂停标志（true = 在断点处暂停等待恢复）
+    pub breakpoint_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// 调试：暂停标志（true = 暂停执行）
+    pub pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// 容器 session 状态
@@ -51,6 +58,9 @@ impl ExecutionContext {
             default_timeouts: crate::data::config::TimeoutConfig::default(),
             shell_allowed_commands: Vec::new(),
             sub_workflow_depth: 0,
+            step_mode_flag: None,
+            breakpoint_flag: None,
+            pause_flag: None,
         }
     }
 

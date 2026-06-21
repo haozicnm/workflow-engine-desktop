@@ -108,6 +108,24 @@ export default {
     importedWorkflow: '导入的工作流',
   },
 
+  // ─── 调试面板 ───
+  debug: {
+    title: '调试器',
+    paused: '已暂停',
+    running: '运行中',
+    stepOver: '步过',
+    continue: '继续执行',
+    stop: '停止',
+    currentStep: '当前步骤',
+    breakpoints: '断点',
+    variables: '变量',
+    noVariables: '运行工作流后变量将在此显示',
+    callStack: '调用栈',
+    stepOutputs: '步骤输出',
+    workflowVars: '工作流变量',
+    internalVars: '内部变量',
+  },
+
   // ─── 编辑器 ───
   editor: {
     title: '编辑器',

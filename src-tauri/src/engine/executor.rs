@@ -320,17 +320,49 @@ impl StepExecutor {
         result.map(|_| ctx)
     }
 
-    /// 图执行：拓扑分层 → 同层并行
+    /// 图执行：拓扑分层 → 同层并行（支持 on_error 策略 + 调试断点/单步）
     async fn run_graph(self: &Arc<Self>, workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
         self.validate_variable_references(workflow)?;
         let levels = self.topological_levels(&workflow.steps, &workflow.edges)?;
         info!("图执行: {} 个层级, {} 个步骤", levels.len(), workflow.steps.len());
         for level in &levels {
+            // 调试：暂停检查（单步模式 / 断点 / 暂停）
+            for node_id in level {
+                if let Some(step) = workflow.steps.iter().find(|s| &s.id == node_id) {
+                    self.check_debug_pause(step, ctx).await;
+                }
+            }
             if level.len() == 1 {
                 let step = workflow.steps.iter().find(|s| s.id == level[0])
                     .ok_or_else(|| anyhow!("节点未找到: {}", level[0]))?;
-                let result = Arc::clone(self).execute(step, ctx).await?;
-                ctx.variables.insert(step.id.clone(), result);
+                match Arc::clone(self).execute(step, ctx).await {
+                    Ok(result) => {
+                        ctx.variables.insert(step.id.clone(), result);
+                    }
+                    Err(e) => {
+                        // G3: 图模式 on_error 策略
+                        match &step.on_error {
+                            Some(crate::engine::workflow::ErrorStrategy::Ignore) => {
+                                warn!("节点 {} 失败 (on_error=ignore): {}", step.id, e);
+                                ctx.set_var(format!("_error.{}", step.id), serde_json::json!(e.to_string()));
+                                // 跳过失败节点，继续执行后续层级
+                            }
+                            Some(crate::engine::workflow::ErrorStrategy::Branch { step_id }) => {
+                                warn!("节点 {} 失败 (on_error=branch → {}): {}", step.id, step_id, e);
+                                ctx.set_var(format!("_error.{}", step.id), serde_json::json!(e.to_string()));
+                                // 跳转到错误处理分支（如果目标节点存在）
+                                if let Some(branch_step) = workflow.steps.iter().find(|s| s.id == *step_id) {
+                                    let branch_result = Arc::clone(self).execute(branch_step, ctx).await?;
+                                    ctx.variables.insert(branch_step.id.clone(), branch_result);
+                                }
+                            }
+                            _ => {
+                                // fail（默认）：传播错误
+                                return Err(e);
+                            }
+                        }
+                    }
+                }
             } else {
                 self.run_parallel_level(level, workflow, ctx).await?;
             }
@@ -341,24 +373,19 @@ impl StepExecutor {
     /// 并行执行一层节点
     async fn run_parallel_level(self: &Arc<Self>, node_ids: &[String], workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
         let mut join_set = tokio::task::JoinSet::new();
-        let cancel = tokio_util::sync::CancellationToken::new();
         for node_id in node_ids {
             let step = workflow.steps.iter().find(|s| &s.id == node_id).cloned()
                 .ok_or_else(|| anyhow!("节点未找到: {}", node_id))?;
             let mut task_ctx = ExecutionContext::new(&step.id, workflow);
             task_ctx.variables = ctx.variables.clone();
             let exec = Arc::clone(self);
-            let task_cancel = cancel.clone();
             join_set.spawn(async move {
-                // 快速失败：如果已有兄弟任务报错，直接跳过
-                if task_cancel.is_cancelled() {
-                    return (step.id.clone(), Err(anyhow!("已取消（兄弟节点失败）")), task_ctx.variables);
-                }
                 let result = exec.execute(&step, &mut task_ctx).await;
                 (step.id.clone(), result, task_ctx.variables)
             });
         }
-        let mut first_error: Option<anyhow::Error> = None;
+        let mut errors: Vec<(String, anyhow::Error)> = Vec::new();
+        let mut panics: Vec<String> = Vec::new();
         while let Some(jr) = join_set.join_next().await {
             match jr {
                 Ok((nid, Ok(val), vars)) => {
@@ -376,21 +403,44 @@ impl StepExecutor {
                 }
                 Ok((nid, Err(e), _)) => {
                     warn!("节点 {} 失败: {}", nid, e);
-                    cancel.cancel(); // 通知其他任务停止
-                    first_error = Some(e);
+                    // 记录错误到 _error.{nodeId} 变量，供下游 on_error:ignore 使用
+                    ctx.set_var(format!("_error.{}", nid), serde_json::json!(e.to_string()));
+                    errors.push((nid, e));
                 }
                 Err(e) => {
-                    cancel.cancel();
-                    if first_error.is_none() {
-                        first_error = Some(anyhow!("并行任务 panic: {}", e));
-                    }
+                    panics.push(format!("{}", e));
                 }
             }
         }
-        if let Some(e) = first_error {
-            return Err(e);
+        // 汇总所有错误（而非只返回第一个）
+        if !panics.is_empty() {
+            return Err(anyhow!("并行任务 panic: {}", panics.join("; ")));
+        }
+        if !errors.is_empty() {
+            let summary: Vec<String> = errors.iter().map(|(nid, e)| format!("{}: {}", nid, e)).collect();
+            return Err(anyhow!("并行执行有 {} 个节点失败: {}", errors.len(), summary.join("; ")));
         }
         Ok(())
+    }
+
+    /// 调试暂停检查：单步模式 / 断点 / 暂停 — 等待用户恢复
+    async fn check_debug_pause(&self, step: &crate::engine::workflow::Step, ctx: &ExecutionContext) {
+        use std::sync::atomic::Ordering;
+        let should_pause = step.breakpoint
+            || ctx.step_mode_flag.as_ref().map(|f| f.load(Ordering::Relaxed)).unwrap_or(false)
+            || ctx.pause_flag.as_ref().map(|f| f.load(Ordering::Relaxed)).unwrap_or(false);
+        if !should_pause { return; }
+        // 设置断点标志，通知前端
+        if let Some(ref bp) = ctx.breakpoint_flag {
+            bp.store(true, Ordering::Relaxed);
+        }
+        info!("调试暂停: 节点 '{}' ({})", step.name, step.id);
+        // 轮询等待恢复（debug_step 或 debug_continue 会清除标志）
+        if let Some(ref bp) = ctx.breakpoint_flag {
+            while bp.load(Ordering::Relaxed) {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
     }
 
     /// 线性执行（向后兼容）

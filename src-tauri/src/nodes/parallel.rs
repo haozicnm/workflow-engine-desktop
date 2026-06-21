@@ -76,6 +76,9 @@ impl NodeExecutor for ParallelNode {
                     default_timeouts: ctx.default_timeouts.clone(),
                     shell_allowed_commands: ctx.shell_allowed_commands.clone(),
                     sub_workflow_depth: ctx.sub_workflow_depth,
+                    step_mode_flag: ctx.step_mode_flag.clone(),
+                    breakpoint_flag: ctx.breakpoint_flag.clone(),
+                    pause_flag: ctx.pause_flag.clone(),
                 };
                 let executor = Arc::clone(executor);
                 let failed = Arc::clone(&failed);

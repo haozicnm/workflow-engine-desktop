@@ -142,6 +142,10 @@ pub async fn run_workflow(
     let mut ctx = ExecutionContext::new(run_id, workflow);
     ctx.default_timeouts = timeouts.clone();
     ctx.shell_allowed_commands = shell_allowed_commands.to_vec();
+    // 注入调试标志到上下文（供图模式 executor 使用）
+    ctx.step_mode_flag = Some(ctrl.step_mode_flag.clone());
+    ctx.breakpoint_flag = Some(ctrl.breakpoint_flag.clone());
+    ctx.pause_flag = Some(ctrl.pause_flag.clone());
     // 注入初始变量（CLI --var 等场景）
     for (k, v) in initial_vars {
         ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));

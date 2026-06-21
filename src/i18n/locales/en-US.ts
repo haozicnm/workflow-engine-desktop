@@ -105,6 +105,24 @@ export default {
     importedWorkflow: 'Imported Workflow',
   },
 
+  // ─── Debug Panel ───
+  debug: {
+    title: 'Debugger',
+    paused: 'Paused',
+    running: 'Running',
+    stepOver: 'Step Over',
+    continue: 'Continue',
+    stop: 'Stop',
+    currentStep: 'Current Step',
+    breakpoints: 'Breakpoints',
+    variables: 'Variables',
+    noVariables: 'Variables will appear after running the workflow',
+    callStack: 'Call Stack',
+    stepOutputs: 'Step Outputs',
+    workflowVars: 'Workflow Variables',
+    internalVars: 'Internal Variables',
+  },
+
   editor: {
     title: 'Editor',
     untitled: 'Untitled Workflow',

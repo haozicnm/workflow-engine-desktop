@@ -7,6 +7,7 @@ import { safeListen } from '../utils/tauri'
 import StepCard from '../components/StepCard.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import ContainerConfigPanel from '../components/ContainerConfigPanel.vue'
+import DebugPanel from '../components/DebugPanel.vue'
 import CodeView from '../components/CodeView.vue'
 import CanvasEditor from '../components/CanvasEditor.vue'
 import Button from '../components/ui/button/Button.vue'
@@ -272,6 +273,21 @@ onUnmounted(() => {
               @update-config="a.onUpdateContainerConfig"
               @close="a.onCloseConfig"
             />
+          </Transition>
+
+          <!-- Debug panel (right side, when running) -->
+          <Transition name="panel-slide">
+            <div
+              v-if="a.isRunning.value && !a.configStep.value"
+              class="w-[320px] border-l border-border bg-background shrink-0 overflow-hidden"
+            >
+              <DebugPanel
+                :workflow-id="a.workflow.value?.id"
+                :is-running="a.isRunning.value"
+                @set-breakpoint="(stepId) => { if (a.workflow.value) { const s = a.workflow.value.steps.find(s => s.id === stepId); if (s) s.breakpoint = true } }"
+                @remove-breakpoint="(stepId) => { if (a.workflow.value) { const s = a.workflow.value.steps.find(s => s.id === stepId); if (s) s.breakpoint = false } }"
+              />
+            </div>
           </Transition>
         </div>
       </TabsContent>
