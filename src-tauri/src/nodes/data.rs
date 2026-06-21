@@ -78,7 +78,8 @@ impl NodeExecutor for DataSetNode {
             .ok_or_else(|| anyhow!("set 需要 key 参数"))?;
         let value = ctx.resolve_config(config.get("value").unwrap_or(&serde_json::Value::Null));
         ctx.set_var(key.to_string(), value.clone());
-        Ok(value)
+        // 返回 {key: value} 对象，支持 {{stepId.key}} 字段访问
+        Ok(serde_json::json!({ key: value }))
     }
 }
 
