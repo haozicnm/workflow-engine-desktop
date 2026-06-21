@@ -155,6 +155,9 @@ impl StepExecutor {
         register!(executors, "email_send", crate::nodes::email_send::EmailSendNode);
         register!(executors, "database_query", crate::nodes::database_query::DatabaseQueryNode);
 
+        // ── v8.8 IM 集成节点 ──
+        register!(executors, "im_message", crate::nodes::im_message::ImMessageNode);
+
         // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {
             use crate::nodes::mcp_node::{create_mcp_executor, get_all_mcp_types};
