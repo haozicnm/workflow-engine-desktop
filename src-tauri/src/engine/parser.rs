@@ -52,6 +52,11 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
     // 校验步骤引用完整性（runCondition / onError branch）
     validate_step_references(&wf.steps)?;
 
+    // DAG 模式：edges 非空时检测循环依赖
+    if !wf.edges.is_empty() {
+        detect_cycles(&wf.steps, &wf.edges)?;
+    }
+
     Ok(wf)
 }
 
@@ -439,6 +444,69 @@ fn extract_step_refs(s: &str) -> Vec<String> {
     refs.sort();
     refs.dedup();
     refs
+}
+
+/// DAG 环检测（DFS visiting 栈，参考 ComfyUI validate_inputs）
+///
+/// 时间复杂度 O(V+E)，空间复杂度 O(V)
+/// 发现环时返回精确的环路径
+fn detect_cycles(
+    steps: &[crate::engine::workflow::Step],
+    edges: &[crate::engine::workflow::Edge],
+) -> Result<()> {
+    use std::collections::{HashMap, HashSet};
+
+    // 构建邻接表
+    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+    for step in steps {
+        adj.entry(step.id.as_str()).or_default();
+    }
+    for edge in edges {
+        adj.entry(edge.from.as_str()).or_default().push(&edge.to);
+    }
+
+    // DFS 环检测
+    let mut visited: HashSet<&str> = HashSet::new();   // 已完成的节点
+    let mut visiting: Vec<&str> = Vec::new();           // 当前递归路径
+
+    fn dfs<'a>(
+        node: &'a str,
+        adj: &HashMap<&str, Vec<&'a str>>,
+        visited: &mut HashSet<&'a str>,
+        visiting: &mut Vec<&'a str>,
+    ) -> Result<()> {
+        if visiting.contains(&node) {
+            // 发现环
+            let cycle_start = visiting.iter().position(|&n| n == node).unwrap();
+            let cycle_path: Vec<&str> = visiting[cycle_start..].to_vec();
+            let path_str = cycle_path.join(" → ");
+            return Err(anyhow::anyhow!(
+                "工作流包含循环依赖: {} → {}",
+                path_str, node
+            ));
+        }
+        if visited.contains(node) {
+            return Ok(()); // 已检查过，无环
+        }
+
+        visiting.push(node);
+        if let Some(neighbors) = adj.get(node) {
+            for &neighbor in neighbors {
+                dfs(neighbor, adj, visited, visiting)?;
+            }
+        }
+        visiting.pop();
+        visited.insert(node);
+        Ok(())
+    }
+
+    for step in steps {
+        if !visited.contains(step.id.as_str()) {
+            dfs(&step.id, &adj, &mut visited, &mut visiting)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
