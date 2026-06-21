@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.vue'
 import Settings from './pages/Settings.vue'
 import RunHistory from './pages/RunHistory.vue'
 import Plugins from './pages/Plugins.vue'
+import Marketplace from './pages/Marketplace.vue'
 import ActionIcon from './components/ActionIcon.vue'
 import SchedulePanel from './components/SchedulePanel.vue'
 import StatusBar from './components/StatusBar.vue'
@@ -38,7 +39,7 @@ onUnmounted(() => {
   ops.unsubscribe()
 })
 
-type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template' | 'plugins'
+type MainView = 'welcome' | 'editor' | 'settings' | 'history' | 'template' | 'plugins' | 'marketplace'
 
 const currentView = ref<MainView>('welcome')
 const selectedWorkflowId = ref<string | null>(null)
@@ -106,6 +107,10 @@ function onOpenHistory() {
 
 function onOpenPlugins() {
   currentView.value = 'plugins'
+}
+
+function onOpenMarketplace() {
+  currentView.value = 'marketplace'
 }
 
 function onBackToMain() {
@@ -183,6 +188,7 @@ function statusColor(status: string): string {
               @open-settings="onOpenSettings"
               @open-history="onOpenHistory"
               @open-plugins="onOpenPlugins"
+              @open-marketplace="onOpenMarketplace"
               @workflow-created="onWorkflowCreated"
             />
           </Sidebar>
@@ -248,6 +254,16 @@ function statusColor(status: string): string {
                 class="fixed top-0 right-0 bottom-0 w-[520px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
               >
                 <Plugins @back="onBackToMain" />
+              </div>
+            </Transition>
+
+            <!-- Marketplace panel overlay -->
+            <Transition name="slide-right">
+              <div
+                v-if="currentView === 'marketplace'"
+                class="fixed top-0 right-0 bottom-0 w-[720px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+              >
+                <Marketplace @back="onBackToMain" />
               </div>
             </Transition>
 

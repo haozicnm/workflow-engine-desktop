@@ -108,6 +108,18 @@ export default {
     importedWorkflow: '导入的工作流',
   },
 
+  // ─── 应用市场 ───
+  marketplace: {
+    title: '应用市场',
+    templates: '模板',
+    search: '搜索模板（名称、标签、分类）',
+    allCategories: '全部分类',
+    noResults: '未找到匹配的模板',
+    install: '安装',
+    installed: '模板「{name}」已安装，可在工作流列表中查看',
+    installFailed: '安装失败',
+  },
+
   // ─── 调试面板 ───
   debug: {
     title: '调试器',

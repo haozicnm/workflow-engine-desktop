@@ -105,6 +105,18 @@ export default {
     importedWorkflow: 'Imported Workflow',
   },
 
+  // ─── Marketplace ───
+  marketplace: {
+    title: 'Marketplace',
+    templates: 'templates',
+    search: 'Search templates (name, tag, category)',
+    allCategories: 'All Categories',
+    noResults: 'No matching templates found',
+    install: 'Install',
+    installed: 'Template "{name}" installed, check your workflow list',
+    installFailed: 'Installation failed',
+  },
+
   // ─── Debug Panel ───
   debug: {
     title: 'Debugger',

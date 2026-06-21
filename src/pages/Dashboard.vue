@@ -16,7 +16,7 @@ import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import Skeleton from '../components/ui/skeleton/Skeleton.vue'
-import { Package, History, Download } from 'lucide-vue-next'
+import { Package, History, Download, Store } from 'lucide-vue-next'
 import { inject, type Ref } from 'vue'
 
 const { t } = useI18n()
@@ -39,6 +39,7 @@ const emit = defineEmits<{
   'open-settings': []
   'open-history': []
   'open-plugins': []
+  'open-marketplace': []
   'workflow-created': [id: string]
 }>()
 
@@ -261,6 +262,14 @@ defineExpose({ loadList })
           <Download class="w-4 h-4" />
         </template>
         {{ t('common.import') }}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+    <SidebarMenuItem>
+      <SidebarMenuButton :tooltip="t('marketplace.title')" @click="emit('open-marketplace')">
+        <template #icon>
+          <Store class="w-4 h-4" />
+        </template>
+        {{ t('marketplace.title') }}
       </SidebarMenuButton>
     </SidebarMenuItem>
   </SidebarFooter>
