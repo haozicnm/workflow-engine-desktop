@@ -54,3 +54,401 @@ params = ["output_dir", "top_n"]
 schedule = "0 0 9 * * * *"
 category = "data"
 file = "data/ithome-news-excel.wf.json"
+
+[[templates]]
+name = "news-aggregate"
+version = "1.0.0"
+description = "每日新闻聚合 — 抓取多个新闻源，合并去重，生成报表"
+params = ["webhook_url"]
+schedule = "0 0 9 * * *"
+category = "data"
+file = "data/news-aggregate.wf.json"
+
+[[templates]]
+name = "price-monitor"
+version = "1.0.0"
+description = "竞品价格监控 — 定时抓取竞品页面价格，变化时告警"
+params = ["url", "last_price", "webhook"]
+schedule = "0 0 */2 * * *"
+category = "data"
+file = "data/price-monitor.wf.json"
+
+[[templates]]
+name = "csv-clean"
+version = "1.0.0"
+description = "CSV 数据清洗 — 读取 CSV，过滤空行，去重，输出清洗后数据"
+params = ["input_file", "output_file"]
+schedule = ""
+category = "data"
+file = "data/csv-clean.wf.json"
+
+[[templates]]
+name = "json-transform"
+version = "1.0.0"
+description = "JSON 数据转换 — 从 API 获取 JSON，提取字段，过滤后输出"
+params = ["api_url"]
+schedule = ""
+category = "data"
+file = "data/json-transform.wf.json"
+
+[[templates]]
+name = "excel-report"
+version = "1.0.0"
+description = "Excel 报表生成 — 从 API 获取数据，生成带格式的 Excel 报表"
+params = ["api_url", "output"]
+schedule = ""
+category = "data"
+file = "data/excel-report.wf.json"
+
+[[templates]]
+name = "merge-dedup"
+version = "1.0.0"
+description = "数据去重合并 — 合并两个数据源，按指定字段去重"
+params = ["file_a", "file_b", "key"]
+schedule = ""
+category = "data"
+file = "data/merge-dedup.wf.json"
+
+[[templates]]
+name = "rss-reader"
+version = "1.0.0"
+description = "RSS 订阅抓取 — 抓取 RSS 订阅源，提取最新文章"
+params = ["rss_url"]
+schedule = "0 0 */6 * * *"
+category = "data"
+file = "data/rss-reader.wf.json"
+
+[[templates]]
+name = "website-change"
+version = "1.0.0"
+description = "网站变更检测 — 定时检测网页内容变化，变化时通知"
+params = ["url", "last_hash", "webhook"]
+schedule = "0 0 */1 * * *"
+category = "data"
+file = "data/website-change.wf.json"
+
+[[templates]]
+name = "db-backup"
+version = "1.0.0"
+description = "数据库备份 — 定时导出 SQLite 数据库到文件"
+params = ["db_path", "backup_dir", "webhook"]
+schedule = "0 0 2 * * *"
+category = "data"
+file = "data/db-backup.wf.json"
+
+# ─── 通用 / 办公 / AI ───
+
+[[templates]]
+name = "email-report"
+version = "1.0.0"
+description = "自动邮件报告 — 定时生成报告并通过邮件发送"
+params = ["smtp_host", "username", "password", "from", "to"]
+schedule = "0 0 9 * * *"
+category = "general"
+file = "general/email-report.wf.json"
+
+[[templates]]
+name = "file-batch-rename"
+version = "1.0.0"
+description = "文件批量重命名 — 批量重命名指定目录下的文件"
+params = ["dir", "prefix"]
+schedule = ""
+category = "general"
+file = "general/file-batch-rename.wf.json"
+
+[[templates]]
+name = "folder-backup"
+version = "1.0.0"
+description = "定时备份文件夹 — 压缩指定文件夹并备份到目标位置"
+params = ["source_dir", "backup_dir", "webhook"]
+schedule = "0 0 3 * * *"
+category = "general"
+file = "general/folder-backup.wf.json"
+
+[[templates]]
+name = "system-health"
+version = "1.0.0"
+description = "系统健康检查 — 检查系统资源使用情况并报告"
+params = []
+schedule = "0 */30 * * * *"
+category = "general"
+file = "general/system-health.wf.json"
+
+[[templates]]
+name = "ai-customer-reply"
+version = "1.0.0"
+description = "智能客服回复 — 用 LLM 自动回复客户消息"
+params = ["message", "api_key"]
+schedule = ""
+category = "general"
+file = "general/ai-customer-reply.wf.json"
+
+[[templates]]
+name = "ai-doc-summary"
+version = "1.0.0"
+description = "文档摘要生成 — 读取文档内容，用 LLM 生成摘要"
+params = ["file_path", "output_path", "api_key"]
+schedule = ""
+category = "general"
+file = "general/ai-doc-summary.wf.json"
+
+[[templates]]
+name = "ai-email-classify"
+version = "1.0.0"
+description = "邮件自动分类 — 用 LLM 对邮件内容进行分类"
+params = ["email_file", "api_key", "webhook"]
+schedule = ""
+category = "general"
+file = "general/ai-email-classify.wf.json"
+
+[[templates]]
+name = "ai-code-review"
+version = "1.0.0"
+description = "代码审查助手 — 用 LLM 审查代码变更并生成报告"
+params = ["branch", "api_key", "webhook"]
+schedule = ""
+category = "general"
+file = "general/ai-code-review.wf.json"
+
+[[templates]]
+name = "api-health-check"
+version = "1.0.0"
+description = "API 健康检查 — 定时检查多个 API 端点可用性"
+params = ["api1", "api2", "api3", "webhook"]
+schedule = "0 */5 * * * *"
+category = "general"
+file = "general/api-health-check.wf.json"
+
+[[templates]]
+name = "deploy-notify"
+version = "1.0.0"
+description = "自动部署通知 — 部署完成后发送通知到多个 IM 平台"
+params = ["deploy_cmd", "service", "env", "slack_webhook", "feishu_webhook"]
+schedule = ""
+category = "general"
+file = "general/deploy-notify.wf.json"
+
+[[templates]]
+name = "github-pr-reminder"
+version = "1.0.0"
+description = "GitHub PR 提醒 — 检查 GitHub PR 状态并发送提醒"
+params = ["repo", "token", "webhook"]
+schedule = "0 0 9 * * *"
+category = "general"
+file = "general/github-pr-reminder.wf.json"
+
+[[templates]]
+name = "log-monitor"
+version = "1.0.0"
+description = "日志监控告警 — 监控日志文件中的错误关键字并告警"
+params = ["log_file", "keyword", "webhook"]
+schedule = "0 */5 * * * *"
+category = "general"
+file = "general/log-monitor.wf.json"
+
+[[templates]]
+name = "webhook-receive"
+version = "1.0.0"
+description = "Webhook 接收处理 — 接收外部 Webhook 请求并处理数据"
+params = []
+schedule = ""
+category = "general"
+file = "general/webhook-receive.wf.json"
+
+[[templates]]
+name = "file-trigger"
+version = "1.0.0"
+description = "文件变化自动处理 — 监测文件夹变化，新文件自动处理"
+params = ["watch_dir", "webhook"]
+schedule = ""
+category = "general"
+file = "general/file-trigger.wf.json"
+
+[[templates]]
+name = "cron-fetch"
+version = "1.0.0"
+description = "定时数据抓取 — Cron 定时触发，抓取 API 数据并存储"
+params = ["api_url", "output_dir", "webhook"]
+schedule = "0 0 * * * *"
+category = "general"
+file = "general/cron-fetch.wf.json"
+
+[[templates]]
+name = "slack-command"
+version = "1.0.0"
+description = "Slack 命令响应 — 接收 Slack 命令并通过 Webhook 响应"
+params = []
+schedule = ""
+category = "general"
+file = "general/slack-command.wf.json"
+
+[[templates]]
+name = "inventory-monitor"
+version = "1.0.0"
+description = "库存监控 — 定时检查库存水平，低于阈值时告警"
+params = ["api_url", "threshold", "webhook"]
+schedule = "0 0 */4 * * *"
+category = "general"
+file = "general/inventory-monitor.wf.json"
+
+[[templates]]
+name = "auto-reply-reviews"
+version = "1.0.0"
+description = "评价自动回复 — 自动回复客户评价"
+params = ["api_url", "api_key"]
+schedule = "0 0 */2 * * *"
+category = "general"
+file = "general/auto-reply-reviews.wf.json"
+
+[[templates]]
+name = "price-alert"
+version = "1.0.0"
+description = "价格监控与通知 — 监控商品价格变化并通知"
+params = ["product_url", "target_price", "webhook"]
+schedule = "0 0 */6 * * *"
+category = "general"
+file = "general/price-alert.wf.json"
+
+[[templates]]
+name = "order-process"
+version = "1.0.0"
+description = "订单自动处理 — 自动处理新订单并通知"
+params = ["api_url", "webhook"]
+schedule = "0 0 * * * *"
+category = "general"
+file = "general/order-process.wf.json"
+
+[[templates]]
+name = "logistics-track"
+version = "1.0.0"
+description = "物流跟踪 — 定时查询物流状态并通知变化"
+params = ["api_url", "tracking_no", "last_status", "webhook"]
+schedule = "0 0 */4 * * *"
+category = "general"
+file = "general/logistics-track.wf.json"
+
+[[templates]]
+name = "db-sync"
+version = "1.0.0"
+description = "数据同步 — 定时同步两个数据库之间的数据"
+params = ["source_db", "target_db", "table"]
+schedule = "0 0 */1 * * *"
+category = "general"
+file = "general/db-sync.wf.json"
+
+[[templates]]
+name = "daily-summary-email"
+version = "1.0.0"
+description = "每日摘要邮件 — 汇总每日数据并发送摘要邮件"
+params = ["db_path", "smtp_host", "username", "password", "from", "to"]
+schedule = "0 0 18 * * *"
+category = "general"
+file = "general/daily-summary-email.wf.json"
+
+[[templates]]
+name = "test-report"
+version = "1.0.0"
+description = "自动化测试报告 — 运行测试并生成报告通知"
+params = ["test_cmd", "webhook"]
+schedule = ""
+category = "general"
+file = "general/test-report.wf.json"
+
+[[templates]]
+name = "ssl-monitor"
+version = "1.0.0"
+description = "SSL 证书监控 — 检查 SSL 证书过期时间并告警"
+params = ["domain", "warn_days", "webhook"]
+schedule = "0 0 8 * * *"
+category = "general"
+file = "general/ssl-monitor.wf.json"
+
+[[templates]]
+name = "sql-report"
+version = "1.0.0"
+description = "数据库查询报表 — 执行 SQL 查询并生成 Excel 报表"
+params = ["db_path", "sql", "output", "webhook"]
+schedule = ""
+category = "general"
+file = "general/sql-report.wf.json"
+
+[[templates]]
+name = "ai-batch-process"
+version = "1.0.0"
+description = "Prompt 批量处理 — 用 LLM 批量处理文本数据"
+params = ["input_file", "output_file", "system_prompt", "api_key", "webhook"]
+schedule = ""
+category = "general"
+file = "general/ai-batch-process.wf.json"
+
+[[templates]]
+name = "ai-translate"
+version = "1.0.0"
+description = "多语言翻译 — 用 LLM 将文本翻译为目标语言"
+params = ["input_file", "output_file", "target_lang", "api_key"]
+schedule = ""
+category = "general"
+file = "general/ai-translate.wf.json"
+
+[[templates]]
+name = "ai-extract-json"
+version = "1.0.0"
+description = "JSON Schema 提取 — 用 LLM 从非结构化文本中提取结构化数据"
+params = ["input_file", "schema", "api_key"]
+schedule = ""
+category = "general"
+file = "general/ai-extract-json.wf.json"
+
+[[templates]]
+name = "cron-cleanup"
+version = "1.0.0"
+description = "定时清理临时文件 — 定期清理指定目录下的临时文件"
+params = ["temp_dir", "days", "webhook"]
+schedule = "0 0 2 * * *"
+category = "general"
+file = "general/cron-cleanup.wf.json"
+
+[[templates]]
+name = "web-scrape-struct"
+version = "1.0.0"
+description = "网页数据采集 — 抓取网页内容并提取结构化数据"
+params = ["url", "output", "webhook"]
+schedule = ""
+category = "general"
+file = "general/web-scrape-struct.wf.json"
+
+[[templates]]
+name = "data-aggregate"
+version = "1.0.0"
+description = "数据聚合统计 — 对数据进行聚合统计分析"
+params = ["db_path", "sql", "sort_field", "top_n"]
+schedule = ""
+category = "general"
+file = "general/data-aggregate.wf.json"
+
+[[templates]]
+name = "batch-image-process"
+version = "1.0.0"
+description = "批量图片处理 — 批量压缩/转换图片文件"
+params = ["input_dir", "output_dir", "max_width", "max_height"]
+schedule = ""
+category = "general"
+file = "general/batch-image-process.wf.json"
+
+[[templates]]
+name = "ai-doc-generate"
+version = "1.0.0"
+description = "自动化文档生成 — 用 LLM 生成文档并通过邮件发送"
+params = ["template", "input", "output_path", "api_key", "smtp_host", "username", "password", "from", "to"]
+schedule = ""
+category = "general"
+file = "general/ai-doc-generate.wf.json"
+
+[[templates]]
+name = "anomaly-detect"
+version = "1.0.0"
+description = "异常检测告警 — 监控数据流，检测异常值并告警"
+params = ["db_path", "webhook"]
+schedule = "0 */5 * * * *"
+category = "general"
+file = "general/anomaly-detect.wf.json"

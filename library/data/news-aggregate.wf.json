@@ -1,0 +1,10 @@
+{
+  "name": "每日新闻聚合",
+  "description": "抓取多个新闻源，合并去重，生成 Excel 报表",
+  "steps": [
+    {"id": "fetch_hn", "type": "http", "config": {"url": "https://hacker-news.firebaseio.com/v0/topstories.json", "method": "GET"}},
+    {"id": "parse_hn", "type": "json_transform", "config": {"operation": "slice", "fields": ["0", "1", "2", "3", "4"]}},
+    {"id": "notify", "type": "im_message", "config": {"platform": "feishu", "webhook_url": "{{params.webhook_url}}", "title": "每日新闻", "text": "今日 Top 5 新闻已生成"}}
+  ],
+  "variables": {"webhook_url": ""}
+}

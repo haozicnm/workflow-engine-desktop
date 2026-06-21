@@ -1,0 +1,1 @@
+{"name":"Webhook 接收处理","description":"接收外部 Webhook 请求并处理数据","steps":[{"id":"trigger","type":"trigger_webhook","config":{"path":"/process-data"}},{"id":"process","type":"json_transform","config":{"operation":"keys"}},{"id":"respond","type":"webhook_response","config":{"status_code":200,"body":{"message":"收到数据","keys":"{{process}}"}}}],"variables":{}}
