@@ -157,6 +157,7 @@ impl StepExecutor {
 
         // ── v8.8 IM 集成节点 ──
         register!(executors, "im_message", crate::nodes::im_message::ImMessageNode);
+        register!(executors, "github_issue", crate::nodes::github_issue::GithubIssueNode);
 
         // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {

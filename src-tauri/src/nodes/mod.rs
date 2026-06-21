@@ -49,3 +49,4 @@ pub mod email_send;
 pub mod database_query;
 // v8.8 IM 集成
 pub mod im_message;
+pub mod github_issue;
