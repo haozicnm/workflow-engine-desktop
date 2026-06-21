@@ -9,6 +9,7 @@ import type { Workflow, Step, Edge, StepRunState } from '../types/types'
 import { useCanvas } from '../composables/useCanvas'
 import CanvasNode from './CanvasNode.vue'
 import CanvasEdge from './CanvasEdge.vue'
+import Minimap from './Minimap.vue'
 import Button from './ui/button/Button.vue'
 
 const { t } = useI18n()
@@ -44,8 +45,7 @@ watch(edgeRef, (val) => {
 const svgContainer = ref<HTMLElement | null>(null)
 const selectedEdgeIdx = ref<number | null>(null)
 
-// Delete 键删除选中的边
-function onKeyDown(e: KeyboardEvent) {
+function onCanvasKeyDown(e: KeyboardEvent) {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (selectedEdgeIdx.value !== null) {
       const line = edgeLines.value[selectedEdgeIdx.value]
@@ -53,6 +53,25 @@ function onKeyDown(e: KeyboardEvent) {
         emit('remove-edge', line.fromId, line.toId)
         selectedEdgeIdx.value = null
       }
+    }
+  }
+  if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+    const selectedId = canvas.selectedNode.value
+    if (selectedId) {
+      const step = stepRef.value.find(s => s.id === selectedId)
+      if (step) clipboard.value = JSON.parse(JSON.stringify(step))
+    }
+  }
+  if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+    if (clipboard.value) {
+      const newStep: Step = JSON.parse(JSON.stringify(clipboard.value))
+      newStep.id = `${clipboard.value.type}_${Date.now()}`
+      newStep.label = `${clipboard.value.label || clipboard.value.type} (copy)`
+      const pos = canvas.nodePositions.value.get(clipboard.value.id)
+      if (pos) {
+        canvas.updateNodePosition(newStep.id, pos.x + 30, pos.y + 30)
+      }
+      stepRef.value.push(newStep)
     }
   }
 }
@@ -141,6 +160,9 @@ function findPortTarget(clientX: number, clientY: number): { stepId: string; por
   }
   return null
 }
+
+// ─── 节点复制粘贴 (Ctrl+C/V) ───
+const clipboard = ref<Step | null>(null)
 
 // ─── 画布平移 ───
 let isPanning = false
@@ -237,7 +259,7 @@ function resetView() { canvas.resetView() }
       class="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing"
       @mousedown="onCanvasMouseDown"
       @wheel.prevent="onCanvasWheel"
-      @keydown="onKeyDown"
+      @keydown="onCanvasKeyDown"
       tabindex="0"
     >
       <!-- SVG 连线层 -->
@@ -307,6 +329,21 @@ function resetView() { canvas.resetView() }
       <div v-if="!stepRef.length" class="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm pointer-events-none">
         {{ t('editor.canvasEmpty') }}
       </div>
+
+      <!-- 迷你地图 -->
+      <Minimap
+        v-if="stepRef.length > 0"
+        :steps="stepRef"
+        :positions="canvas.nodePositions.value"
+        :node-width="canvas.nodeWidth"
+        :node-height="canvas.nodeHeight"
+        :canvas-width="svgContainer?.clientWidth || 800"
+        :canvas-height="svgContainer?.clientHeight || 600"
+        :pan-x="canvas.panX.value"
+        :pan-y="canvas.panY.value"
+        :zoom="canvas.zoom.value"
+        @navigate="(x, y) => { if (svgContainer) { canvas.setPan(-x * canvas.zoom.value + svgContainer.clientWidth / 2, -y * canvas.zoom.value + svgContainer.clientHeight / 2) } }"
+      />
     </div>
   </div>
 </template>
