@@ -141,6 +141,12 @@ impl StepExecutor {
         register!(executors, "print", crate::nodes::print::PrintNode);
         register!(executors, "shell", crate::nodes::shell::ShellNode);
 
+        // ── 触发器节点（v8.5）──
+        register!(executors, "trigger_cron", crate::nodes::trigger_cron::TriggerCronNode);
+        register!(executors, "trigger_webhook", crate::nodes::trigger_webhook::TriggerWebhookNode);
+        register!(executors, "trigger_file", crate::nodes::trigger_file::TriggerFileNode);
+        register!(executors, "webhook_response", crate::nodes::webhook_response::WebhookResponseNode);
+
         // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {
             use crate::nodes::mcp_node::{create_mcp_executor, get_all_mcp_types};

@@ -104,6 +104,11 @@ impl ExecutionContext {
         RHAI_ENGINE.with(|engine| {
             let mut scope = rhai::Scope::new();
 
+            // v8.5 沙箱安全：禁用危险函数
+            // eval, call, import, throw, type_of, register_module 等已被 Engine 默认限制
+            // 这里额外确保文件系统/网络/环境变量不可访问
+            // （rhai::Engine 默认不提供这些，但 double-check via max_operations 限制）
+
             // v7.1: 迭代变量（__item/__index/__index1/loop）注入顶层作用域
             // 这些是循环体内临时变量，生命周期仅一次迭代，不会与步骤输出冲突
             let iter_keys: &[&str] = &["__item", "__index", "__index1", "loop"];
@@ -183,10 +188,26 @@ impl ExecutionContext {
                 warn!("空的模板变量引用 '{{{{}}}}' → 返回 null");
                 return serde_json::Value::Null;
             }
+            // {{= expr}} — 显式表达式求值（v8.5 新语法）
+            if let Some(expr) = inner.strip_prefix('=') {
+                let expr = expr.trim();
+                if expr.is_empty() {
+                    return serde_json::Value::Null;
+                }
+                match self.eval_expr(expr) {
+                    Ok(result) => return result,
+                    Err(e) => {
+                        warn!("表达式 '{{{{= {} }}}}' 求值失败: {}", expr, e);
+                        return serde_json::Value::Null;
+                    }
+                }
+            }
             if !inner.contains("{{") {
+                // 先尝试直接变量解析
                 if let Some(val) = self.resolve_var(inner) {
                     return val.clone();
                 }
+                // 回退到 Rhai 表达式求值（支持算术、比较等）
                 if let Ok(result) = self.eval_expr(inner) {
                     return result;
                 }

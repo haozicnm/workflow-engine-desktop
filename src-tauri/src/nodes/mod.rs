@@ -35,3 +35,8 @@ pub mod while_node;
 pub mod window;
 pub mod word;
 pub mod word_container;
+// v8.5 触发器节点
+pub mod trigger_cron;
+pub mod trigger_webhook;
+pub mod trigger_file;
+pub mod webhook_response;

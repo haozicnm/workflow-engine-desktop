@@ -156,6 +156,9 @@ pub fn build() -> Router {
         )
         // 组合助手
         .route("/api/compose/chain", post(handlers::compose_chain))
+        // v8.5: Webhook 触发器路由
+        .route("/api/webhooks/{workflow_id}", post(handlers::webhook_trigger))
+        .route("/api/webhooks/{workflow_id}/test", get(handlers::webhook_test))
         // WebBridge WebSocket endpoint
         .route("/ws/browser", get(ws_browser_handler))
 }

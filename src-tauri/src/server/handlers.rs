@@ -398,3 +398,87 @@ pub use crate::server::managers::template_manager::{
 };
 
 pub use crate::server::managers::compose_manager::{compose_chain, ComposeChainBody};
+
+// v8.5: Webhook 触发器处理
+
+/// POST /api/webhooks/{workflow_id} — 触发工作流执行
+pub async fn webhook_trigger(
+    Path(workflow_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    body: axum::extract::Json<serde_json::Value>,
+) -> Response {
+    let app = crate::server::state::get();
+    use crate::engine::scheduler;
+
+    let webhook_headers: serde_json::Map<String, serde_json::Value> = headers
+        .iter()
+        .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), serde_json::Value::String(v.to_string()))))
+        .collect();
+
+    let prep = match scheduler::prepare_run(
+        &app.db, &app.config, &app.run_semaphore,
+        &app.cancel_flags, &app.cancel_tokens, &app.pause_flags,
+        &app.breakpoint_flags, &app.step_mode_flags,
+        &workflow_id,
+    ).await {
+        Ok(p) => p,
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("工作流不存在") {
+                return err_response(StatusCode::NOT_FOUND, msg);
+            }
+            return err_response(StatusCode::INTERNAL_SERVER_ERROR, msg);
+        }
+    };
+
+    let run_id = prep.run_id.clone();
+    let run_id_clone = run_id.clone();
+    let mut vars = prep.workflow.variables.clone().unwrap_or_default();
+    vars.insert("_webhook_body".to_string(), body.0.clone());
+    vars.insert("_webhook_headers".to_string(), serde_json::Value::Object(webhook_headers));
+
+    // 注入 webhook 变量到初始变量
+    let initial_vars: Vec<(String, String)> = vars.iter()
+        .filter(|(k, _)| k.starts_with("_webhook_"))
+        .map(|(k, v)| (k.clone(), serde_json::to_string(v).unwrap_or_default()))
+        .collect();
+
+    let db = app.db.clone();
+    let approval_store = app.approval_store.clone();
+    let timeouts = prep.timeouts.clone();
+    let shell_allowed = prep.shell_allowed_commands.clone();
+    let workflow = prep.workflow.clone();
+    let ctrl = scheduler::RunControl {
+        cancel_flag: prep.cancel_flag.clone(),
+        cancel_token: prep.cancel_token.clone(),
+        pause_flag: prep.pause_flag.clone(),
+        breakpoint_flag: prep.breakpoint_flag.clone(),
+        step_mode_flag: prep.step_mode_flag.clone(),
+        debug_snapshots: app.debug_snapshots.clone(),
+    };
+
+    tokio::spawn(async move {
+        let _permit = prep.permit;
+        let result = scheduler::run_workflow(
+            &workflow, &run_id_clone, None, &db, approval_store, &initial_vars, &ctrl, &timeouts, &shell_allowed,
+        ).await;
+        if let Err(e) = result {
+            tracing::warn!("Webhook 工作流执行失败: {} - {}", run_id_clone, e);
+        }
+    });
+
+    Json(serde_json::json!({"run_id": run_id.clone(), "status": "started"})).into_response()
+}
+
+/// GET /api/webhooks/{workflow_id}/test — 测试 Webhook 触发
+pub async fn webhook_test(
+    Path(workflow_id): Path<String>,
+) -> Response {
+    Json(serde_json::json!({
+        "workflow_id": workflow_id,
+        "endpoint": format!("/api/webhooks/{}", workflow_id),
+        "method": "POST",
+        "example_payload": {"key": "value"},
+        "status": "ready"
+    })).into_response()
+}
