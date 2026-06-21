@@ -355,7 +355,8 @@ impl StepExecutor {
                     .ok_or_else(|| anyhow!("节点未找到: {}", level[0]))?;
                 match Arc::clone(self).execute(step, ctx).await {
                     Ok(result) => {
-                        ctx.variables.insert(step.id.clone(), result);
+                        // 存入 step_outputs（不污染 variables，避免和 data_set 等节点冲突）
+                        ctx.set_output(&step.id, result);
                     }
                     Err(e) => {
                         // G3: 图模式 on_error 策略
@@ -371,7 +372,7 @@ impl StepExecutor {
                                 // 跳转到错误处理分支（如果目标节点存在）
                                 if let Some(branch_step) = workflow.steps.iter().find(|s| s.id == *step_id) {
                                     let branch_result = Arc::clone(self).execute(branch_step, ctx).await?;
-                                    ctx.variables.insert(branch_step.id.clone(), branch_result);
+                                    ctx.set_output(&branch_step.id, branch_result);
                                 }
                             }
                             _ => {
@@ -407,16 +408,11 @@ impl StepExecutor {
         while let Some(jr) = join_set.join_next().await {
             match jr {
                 Ok((nid, Ok(val), vars)) => {
-                    ctx.variables.insert(nid.clone(), val);
+                    // 节点输出存入 step_outputs（不污染 variables）
+                    ctx.set_output(&nid, val);
+                    // 合并任务上下文中的所有变量（节点内部 set_var 的值）
                     for (k, v) in vars {
-                        if k != nid {
-                            match ctx.variables.entry(k.clone()) {
-                                std::collections::hash_map::Entry::Vacant(e) => { e.insert(v); }
-                                std::collections::hash_map::Entry::Occupied(_e) => {
-                                    warn!("并行变量冲突: {} (已有值，忽略 {} 的新值)", k, nid);
-                                }
-                            }
-                        }
+                        ctx.variables.insert(k, v);
                     }
                 }
                 Ok((nid, Err(e), _)) => {
@@ -465,7 +461,8 @@ impl StepExecutor {
     async fn run_linear(self: &Arc<Self>, workflow: &Workflow, ctx: &mut ExecutionContext) -> Result<()> {
         for step in &workflow.steps {
             let result = Arc::clone(self).execute(step, ctx).await?;
-            ctx.variables.insert(step.id.clone(), result);
+            // 存入 step_outputs（不污染 variables，避免和 data_set 等节点冲突）
+            ctx.set_output(&step.id, result);
         }
         Ok(())
     }

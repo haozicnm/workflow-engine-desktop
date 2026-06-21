@@ -566,11 +566,24 @@ async fn execute_with_retry(
 }
 
 /// 确定下一个步骤 ID
+///
+/// 两种模式（向后兼容）：
+/// - **DAG 模式**（edges 非空）：用 edges 连线决定执行路径
+///   - 条件节点：根据输出 branch 值匹配 from_port
+///   - 普通节点：走所有出边（取第一条）
+/// - **线性模式**（edges 为空）：用 step.next 或 steps 数组顺序
 pub fn determine_next_step(
     step: &Step,
     workflow: &Workflow,
     ctx: &ExecutionContext,
 ) -> Option<String> {
+    // ── DAG 模式：edges 非空时用连线决定下一步 ──
+    if !workflow.edges.is_empty() {
+        return determine_next_by_edges(step, workflow, ctx);
+    }
+
+    // ── 线性模式（旧逻辑，向后兼容） ──
+
     // 条件节点：根据输出选择 true_next / false_next
     if step.step_type == "condition" {
         if let Some(output) = ctx.get_output(&step.id) {
@@ -613,6 +626,78 @@ pub fn determine_next_step(
         let pos = workflow.steps.iter().position(|s| s.id == step.id)?;
         workflow.steps.get(pos + 1).map(|s| s.id.clone())
     }
+}
+
+/// DAG 模式：通过 edges 连线确定下一步
+///
+/// 核心逻辑：
+/// 1. 收集当前步骤的所有出边（from == current_step.id）
+/// 2. 条件节点：根据输出的 branch 值过滤 from_port
+///    - branch="true" → 只走 from_port="true" 或 from_port="" 的边
+///    - branch="false" → 只走 from_port="false" 或 from_port="" 的边
+/// 3. 普通节点：走所有出边（取第一条，串行模式）
+/// 4. cursor 节点：done=false 时不出边（等待下一次调用）
+fn determine_next_by_edges(
+    step: &Step,
+    workflow: &Workflow,
+    ctx: &ExecutionContext,
+) -> Option<String> {
+    // cursor 节点：未完成时不前进
+    if step.step_type == "cursor" {
+        if let Some(output) = ctx.get_output(&step.id) {
+            let done = output
+                .get("done")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true); // 无 done 字段时默认完成
+            if !done {
+                return None;
+            }
+        }
+    }
+
+    // 收集当前步骤的所有出边
+    let outgoing: Vec<&crate::engine::workflow::Edge> = workflow
+        .edges
+        .iter()
+        .filter(|e| e.from == step.id)
+        .collect();
+
+    if outgoing.is_empty() {
+        return None; // 没有出边，工作流结束
+    }
+
+    // 条件节点：根据 branch 输出过滤 from_port
+    if step.step_type == "condition" {
+        if let Some(output) = ctx.get_output(&step.id) {
+            let branch = output
+                .get("branch")
+                .and_then(|v| v.as_str())
+                .unwrap_or("false");
+
+            // 优先匹配 from_port == branch 的边
+            if let Some(edge) = outgoing
+                .iter()
+                .find(|e| e.from_port == branch)
+            {
+                return Some(edge.to.clone());
+            }
+
+            // 回退：from_port 为空的边（无条件出边）
+            if let Some(edge) = outgoing
+                .iter()
+                .find(|e| e.from_port.is_empty())
+            {
+                return Some(edge.to.clone());
+            }
+
+            // 没有匹配的边，条件分支结束
+            return None;
+        }
+    }
+
+    // 普通节点：取第一条出边（串行模式）
+    // 未来 Phase 2 可改为并行执行所有出边
+    outgoing.first().map(|e| e.to.clone())
 }
 
 // ─── 事件推送 ───
