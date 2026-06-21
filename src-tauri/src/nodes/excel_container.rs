@@ -252,9 +252,11 @@ fn excel_col_to_idx(col: &str) -> Option<usize> {
     if col.is_empty() || !col.bytes().all(|b| b.is_ascii_alphabetic()) {
         return None;
     }
-    Some(col.bytes().fold(0usize, |acc, b| {
-        acc * 26 + (b.to_ascii_uppercase() as usize).saturating_sub(65)
-    }))
+    // 双射 base-26: A=1, B=2, ..., Z=26, AA=27, AB=28, ...
+    let idx = col.bytes().fold(0usize, |acc, b| {
+        acc * 26 + (b.to_ascii_uppercase() as usize - 'A' as usize + 1)
+    });
+    Some(idx - 1) // 转为 0-based
 }
 
 /// 解析列引用：先试字母 (A=0)，再试列名（查表头行）

@@ -127,10 +127,19 @@ impl NodeExecutor for HttpNode {
             match req.send().await {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
-                    let text = resp.text().await.map_err(|e| {
+                    // 限制响应体大小（默认 100MB，防止 OOM）
+                    let max_bytes = 100 * 1024 * 1024usize;
+                    let bytes = resp.bytes().await.map_err(|e| {
                         error!("读取 HTTP 响应失败 ({} {}): {}", method, url, e);
                         error_utils::execution_failed("读取 HTTP 响应", &e.to_string()).to_error()
                     })?;
+                    if bytes.len() > max_bytes {
+                        return Err(anyhow::anyhow!(
+                            "HTTP 响应体过大 ({} bytes > {} bytes limit) [{}]",
+                            bytes.len(), max_bytes, url
+                        ));
+                    }
+                    let text = String::from_utf8_lossy(&bytes).to_string();
 
                     info!("HTTP 响应: {} {} → {}", method, url, status);
 

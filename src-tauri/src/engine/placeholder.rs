@@ -198,8 +198,11 @@ impl PlaceholderMap {
         let mut remaining = s;
 
         while let Some(start) = remaining.find("__WF_PH_") {
-            if let Some(end) = remaining[start..].find("__") {
-                let placeholder = &remaining[start..start + end + 2];
+            // 跳过 "__WF_PH_" 前缀（8字符），从后面找结束的 "__"
+            let after_prefix = start + 8;
+            if let Some(end_rel) = remaining[after_prefix..].find("__") {
+                let end = after_prefix + end_rel + 2; // 闭合 "__" 之后的位置
+                let placeholder = &remaining[start..end];
                 if let Some(index) = Self::parse_placeholder(placeholder) {
                     if let Some(expr) = self.map.get(&index) {
                         let resolved = self.resolve_expression(expr, ctx)?;
@@ -212,13 +215,13 @@ impl PlaceholderMap {
                         };
                         result.push_str(&remaining[..start]);
                         result.push_str(&resolved_str);
-                        remaining = &remaining[start + end + 2..];
+                        remaining = &remaining[end..];
                         continue;
                     }
                 }
                 // 不是有效占位符，跳过
-                result.push_str(&remaining[..start + end + 2]);
-                remaining = &remaining[start + end + 2..];
+                result.push_str(&remaining[..end]);
+                remaining = &remaining[end..];
             } else {
                 break;
             }

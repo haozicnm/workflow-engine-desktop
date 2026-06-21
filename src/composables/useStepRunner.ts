@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useToast } from './useToast'
 import type { Workflow, StepRunState } from '../types/types'
@@ -158,7 +158,15 @@ export function useStepRunner() {
     unlistenStep = null
     unlistenRun = null
     runId.value = null
+    isRunning.value = false
   }
+
+  // 组件卸载时自动清理，防止监听器泄漏
+  onUnmounted(() => {
+    if (isRunning.value) {
+      cleanup()
+    }
+  })
 
   return {
     runWorkflow,

@@ -65,7 +65,17 @@ impl NodeExecutor for ShellNode {
         // 2. 白名单检查（如配置了 shell_allowed_commands，则仅允许匹配的命令）
         if !_ctx.shell_allowed_commands.is_empty() {
             let allowed = &_ctx.shell_allowed_commands;
-            let command_name = command.split_whitespace().next().unwrap_or(&command);
+            // 从命令中提取首个 token 作为命令名，排除空格/tab/换行
+            // 同时剥离引号包裹（如 "cmd" → cmd）
+            let first_token = command.split_whitespace().next().unwrap_or(&command);
+            let command_name = first_token.trim_matches(|c| c == '"' || c == '\'');
+            // 防止 shell 元字符绕过白名单（; && || | ` $）
+            if command_name.contains(|c: char| c == ';' || c == '&' || c == '|' || c == '`' || c == '$') {
+                return Err(anyhow::anyhow!(
+                    "Shell 命令名包含非法元字符: '{}'",
+                    command_name
+                ));
+            }
             let matched = allowed.iter().any(|pattern| {
                 glob::Pattern::new(pattern)
                     .map(|p| p.matches(command_name))

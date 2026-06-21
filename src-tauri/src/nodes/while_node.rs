@@ -202,6 +202,12 @@ impl NodeExecutor for WhileNode {
             results.push(Value::Object(item_outputs));
         }
 
+        // 清理循环变量，防止后续步骤误用
+        ctx.variables.remove("__item");
+        ctx.variables.remove("__current");
+        ctx.variables.remove("__index");
+        ctx.variables.remove("__index1");
+
         let processed_items: Vec<Value> = items[..results.len()].to_vec();
         let mut output = json!({
             "count": results.len(),

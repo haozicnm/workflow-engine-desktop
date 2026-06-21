@@ -89,6 +89,7 @@ export function useEditorActions() {
   async function onSaveAs() {
     if (!workflow.value) return
     const originalName = workflow.value.name
+    const originalId = workflow.value.id
     workflow.value.name = originalName + ' (' + t('common.copy') + ')'
     workflow.value.id = undefined as unknown as string
     store.dirty = true
@@ -96,6 +97,10 @@ export function useEditorActions() {
     if (ok) {
       toast.show(t('editor.savedAs', { name: workflow.value.name }), 'success')
     } else {
+      // 保存失败时恢复原始状态，避免孤儿工作流
+      workflow.value.name = originalName
+      workflow.value.id = originalId
+      store.dirty = true
       toast.show(t('error.saveFailed'), 'error')
     }
   }

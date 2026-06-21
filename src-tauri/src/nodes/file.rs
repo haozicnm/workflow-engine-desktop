@@ -214,7 +214,7 @@ impl NodeExecutor for FileListNode {
             .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect());
 
         let mut entries: Vec<serde_json::Value> = Vec::new();
-        collect_entries(path, path, recursive, &extensions, &mut entries).await?;
+        collect_entries(path, path, recursive, &extensions, &mut entries, 0).await?;
 
         Ok(serde_json::json!({
             "path": path, "count": entries.len(), "files": entries,
@@ -228,7 +228,12 @@ async fn collect_entries(
     recursive: bool,
     extensions: &Option<Vec<&str>>,
     entries: &mut Vec<serde_json::Value>,
+    depth: usize,
 ) -> Result<()> {
+    const MAX_DEPTH: usize = 20;
+    if depth > MAX_DEPTH {
+        return Ok(());
+    }
     let mut read_dir = tokio::fs::read_dir(current)
         .await
         .map_err(|e| anyhow!("读取目录失败 [{}]: {}", current, e))?;
@@ -277,7 +282,7 @@ async fn collect_entries(
 
         if recursive && metadata.is_dir() {
             let sub = entry_path.to_string_lossy().to_string();
-            Box::pin(collect_entries(base, &sub, recursive, extensions, entries)).await?;
+            Box::pin(collect_entries(base, &sub, recursive, extensions, entries, depth + 1)).await?;
         }
     }
     Ok(())
@@ -316,6 +321,14 @@ impl NodeExecutor for FileDeleteNode {
     ) -> Result<serde_json::Value> {
         let config = &step.config;
         let path = get_path(config)?;
+        // 安全检查：禁止删除受保护的系统路径
+        let canonical = std::path::Path::new(path).canonicalize().unwrap_or_else(|_| std::path::PathBuf::from(path));
+        const PROTECTED: &[&str] = &["/", "C:\\", "/home", "/root", "/usr", "/etc", "/var", "/sys", "/boot"];
+        for p in PROTECTED {
+            if canonical == std::path::Path::new(p) {
+                return Err(anyhow!("安全拒绝: 不能删除受保护的路径 [{}]", path));
+            }
+        }
         let meta = tokio::fs::metadata(path)
             .await
             .map_err(|e| anyhow!("文件不存在 [{}]: {}", path, e))?;

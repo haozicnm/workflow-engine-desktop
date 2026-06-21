@@ -161,15 +161,26 @@ pub fn install_plugin(wfplug_path: &Path) -> Result<PluginMeta> {
     // 6. 解压所有文件到插件目录
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let entry_path = entry.mangled_name();
-        let relative_path = entry_path.to_string_lossy();
+        // ZipSlip 防护：使用 enclosed_name 拒绝含 `..` 的路径
+        let entry_path = entry
+            .enclosed_name()
+            .ok_or_else(|| anyhow::anyhow!("插件压缩包含不安全路径: {}", entry.name()))?;
 
         // 跳过目录项和 plugin.json（已读）
-        if entry.is_dir() || relative_path == "plugin.json" {
+        if entry.is_dir() || entry_path.to_string_lossy() == "plugin.json" {
             continue;
         }
 
-        let dest = plugin_dir.join(relative_path.as_ref());
+        let dest = plugin_dir.join(&entry_path);
+        // 二次校验：确保解压目标在插件目录内
+        let canonical_plugin_dir = plugin_dir.canonicalize().unwrap_or_else(|_| plugin_dir.clone());
+        let canonical_dest = dest.canonicalize().unwrap_or_else(|_| dest.clone());
+        if !canonical_dest.starts_with(&canonical_plugin_dir) {
+            return Err(anyhow::anyhow!(
+                "插件压缩包路径越界: {} 逃逸出插件目录",
+                entry.name()
+            ));
+        }
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
         }

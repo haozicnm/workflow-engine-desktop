@@ -93,6 +93,12 @@ impl NodeExecutor for LoopNode {
             results.push(Value::Object(item_outputs));
         }
 
+        // 清理循环变量，防止后续步骤误用
+        ctx.variables.remove("__item");
+        ctx.variables.remove("__index");
+        ctx.variables.remove("__index1");
+        ctx.variables.remove("loop");
+
         let mut output = json!({
             "count": results.len(),
             "results": results,

@@ -19,6 +19,8 @@ pub struct ExecutionContext {
     pub default_timeouts: crate::data::config::TimeoutConfig,
     /// Shell 命令白名单（glob 模式），空=允许所有
     pub shell_allowed_commands: Vec<String>,
+    /// 子流程嵌套深度（用于防止无限递归）
+    pub sub_workflow_depth: u32,
 }
 
 /// 容器 session 状态
@@ -48,6 +50,7 @@ impl ExecutionContext {
             sessions: HashMap::new(),
             default_timeouts: crate::data::config::TimeoutConfig::default(),
             shell_allowed_commands: Vec::new(),
+            sub_workflow_depth: 0,
         }
     }
 

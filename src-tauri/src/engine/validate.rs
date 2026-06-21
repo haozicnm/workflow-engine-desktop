@@ -92,10 +92,46 @@ fn validate_step(step: &Step, all_step_ids: &HashSet<String>) -> ValidationResul
         }
     }
 
-    // 2. 校验必填字段
+    // 2. 校验 step.next 引用
+    if let Some(ref next) = step.next {
+        if !all_step_ids.contains(next.as_str()) {
+            result.error(format!(
+                "{}: next '{}' references a non-existent step",
+                ctx, next
+            ));
+        }
+    }
+
+    // 3. 校验条件步骤的 true_next/false_next
+    if step.step_type == "condition" {
+        for key in &["true_next", "false_next"] {
+            if let Some(target) = step.config.get(*key).and_then(|v| v.as_str()) {
+                if !target.is_empty() && !all_step_ids.contains(target) {
+                    result.error(format!(
+                        "{}: {} '{}' references a non-existent step",
+                        ctx, key, target
+                    ));
+                }
+            }
+        }
+    }
+
+    // 4. 校验 on_error branch 目标
+    if let Some(ref on_error) = step.on_error {
+        if let crate::engine::workflow::ErrorStrategy::Branch { step_id } = on_error {
+            if !step_id.is_empty() && !all_step_ids.contains(step_id.as_str()) {
+                result.error(format!(
+                    "{}: on_error branch target '{}' references a non-existent step",
+                    ctx, step_id
+                ));
+            }
+        }
+    }
+
+    // 5. 校验必填字段
     result.merge(validate_required_fields(step, &ctx));
 
-    // 3. 校验变量格式
+    // 6. 校验变量格式
     result.merge(validate_variable_refs(step, &ctx));
 
     // 4. 递归校验 body_steps（loop/cursor 的子步骤），共用同一个 ID 池

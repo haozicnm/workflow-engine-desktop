@@ -93,6 +93,16 @@ impl NodeExecutor for SubWorkflowNode {
             return Err(anyhow!("子流程没有步骤"));
         }
 
+        // 递归深度保护：防止子流程循环引用导致栈溢出
+        const MAX_SUB_WORKFLOW_DEPTH: u32 = 10;
+        let current_depth = ctx.sub_workflow_depth;
+        if current_depth >= MAX_SUB_WORKFLOW_DEPTH {
+            return Err(anyhow!(
+                "子流程嵌套深度超过限制 ({})，可能存在无限递归",
+                MAX_SUB_WORKFLOW_DEPTH
+            ));
+        }
+
         let internal_count = steps.len();
 
         // ── 构建子工作流临时对象 ──
@@ -111,6 +121,7 @@ impl NodeExecutor for SubWorkflowNode {
 
         // ── 变量隔离：创建子上下文，继承父上下文变量 ──
         let mut sub_ctx = ExecutionContext::new(&ctx.run_id, &sub_wf);
+        sub_ctx.sub_workflow_depth = current_depth + 1;
         // 继承父上下文的所有变量
         for (k, v) in &ctx.variables {
             sub_ctx.set_var(k.clone(), v.clone());

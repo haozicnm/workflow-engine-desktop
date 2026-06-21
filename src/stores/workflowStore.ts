@@ -112,11 +112,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
         current.value.id = id
       }
       // 先保存内容（YAML），再更新元数据
-      // 避免元数据更新成功但内容失败导致的不一致状态
-      const yaml = serializeWorkflow(current.value)
+      // 快照当前状态，保存后比较是否有新变更
+      const snapshot = serializeWorkflow(current.value)
       await safeInvoke('workflow_save_yaml', {
         id: current.value.id,
-        yaml,
+        yaml: snapshot,
       })
       // Update metadata
       await safeInvoke('workflow_update', {
@@ -125,7 +125,10 @@ export const useWorkflowStore = defineStore('workflow', () => {
         description: current.value.description || '',
         enabled: true,
       })
-      dirty.value = false
+      // 只有保存期间没有新变更才清除 dirty 标志
+      if (serializeWorkflow(current.value) === snapshot) {
+        dirty.value = false
+      }
       return true
     } catch (e) {
       toast.error('Failed to save workflow: ' + (e as Error).message)
@@ -205,6 +208,18 @@ export const useWorkflowStore = defineStore('workflow', () => {
   function removeStep(stepId: string) {
     if (!current.value) return
     current.value.steps = current.value.steps.filter(s => s.id !== stepId)
+    // 清理引用已删除步骤的边
+    if (current.value.edges) {
+      current.value.edges = current.value.edges.filter(
+        e => e.from !== stepId && e.to !== stepId
+      )
+    }
+    // 清理其他步骤中引用已删除步骤的 runCondition
+    for (const step of current.value.steps) {
+      if (step.runCondition?.ref === stepId) {
+        delete step.runCondition
+      }
+    }
     dirty.value = true
   }
 
@@ -297,9 +312,22 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   function addEdge(from: string, to: string) {
     if (!current.value) return
+    if (from === to) return // 禁止自环
     if (!current.value.edges) current.value.edges = []
     // Avoid duplicates
     if (current.value.edges.some(e => e.from === from && e.to === to)) return
+    // 简单环检测：添加这条边后，是否能从 to 回到 from？
+    const visited = new Set<string>()
+    const queue = [to]
+    while (queue.length) {
+      const node = queue.shift()!
+      if (node === from) return // 会形成环，拒绝
+      if (visited.has(node)) continue
+      visited.add(node)
+      for (const e of current.value.edges) {
+        if (e.from === node) queue.push(e.to)
+      }
+    }
     current.value.edges.push({ from, to })
     dirty.value = true
   }

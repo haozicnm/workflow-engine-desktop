@@ -135,7 +135,10 @@ impl AppConfig {
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path()?;
         let content = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
+        // 原子写入：先写临时文件，再 rename（防止崩溃导致配置丢失）
+        let tmp_path = path.with_extension("json.tmp");
+        std::fs::write(&tmp_path, &content)?;
+        std::fs::rename(&tmp_path, &path)?;
         Ok(())
     }
 
