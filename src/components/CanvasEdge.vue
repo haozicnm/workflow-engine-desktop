@@ -6,10 +6,12 @@ const props = defineProps<{
   to: { x: number; y: number }
   fromPort?: string
   toPort?: string
+  selected?: boolean
 }>()
 
 const emit = defineEmits<{
   'remove': []
+  'select': []
 }>()
 
 const isHovered = ref(false)
@@ -58,13 +60,14 @@ const arrowPath = computed(() => {
       stroke="transparent"
       stroke-width="12"
       class="cursor-pointer"
+      @click.stop="emit('select')"
     />
     <!-- Visible line -->
     <path
       :d
       fill="none"
-      :stroke="isHovered ? 'var(--primary)' : 'var(--border)'"
-      stroke-width="2"
+      :stroke="props.selected ? 'var(--primary)' : isHovered ? 'var(--primary)' : 'var(--border)'"
+      :stroke-width="props.selected ? 3 : 2"
       class="transition-colors"
     />
     <!-- Arrow head -->

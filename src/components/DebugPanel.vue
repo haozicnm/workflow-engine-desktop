@@ -96,6 +96,25 @@ function toggleGroup(key: string) {
   }
 }
 
+// ─── 变量轮询（暂停时刷新）──
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshVariables() {
+  if (!props.workflowId || debugState.value !== 'paused') return
+  try {
+    const vars = await safeInvoke<Record<string, unknown>>('debug_vars', { runId: props.workflowId })
+    if (vars) variables.value = vars
+  } catch { /* 运行已结束或不可用 */ }
+}
+
+watch(() => debugState.value, (state) => {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+  if (state === 'paused') {
+    refreshVariables() // 立即刷新一次
+    refreshTimer = setInterval(refreshVariables, 2000) // 每 2 秒轮询
+  }
+})
+
 // ─── SSE 监听 ───
 let unlistenBreakpoint: (() => void) | null = null
 let unlistenRun: (() => void) | null = null

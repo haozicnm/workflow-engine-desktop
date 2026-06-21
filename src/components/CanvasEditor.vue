@@ -42,6 +42,20 @@ watch(edgeRef, (val) => {
 
 // SVG 容器
 const svgContainer = ref<HTMLElement | null>(null)
+const selectedEdgeIdx = ref<number | null>(null)
+
+// Delete 键删除选中的边
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selectedEdgeIdx.value !== null) {
+      const line = edgeLines.value[selectedEdgeIdx.value]
+      if (line) {
+        emit('remove-edge', line.fromId, line.toId)
+        selectedEdgeIdx.value = null
+      }
+    }
+  }
+}
 
 // ─── 拖拽节点 ───
 let dragTarget: string | null = null
@@ -223,6 +237,8 @@ function resetView() { canvas.resetView() }
       class="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing"
       @mousedown="onCanvasMouseDown"
       @wheel.prevent="onCanvasWheel"
+      @keydown="onKeyDown"
+      tabindex="0"
     >
       <!-- SVG 连线层 -->
       <svg
@@ -243,6 +259,8 @@ function resetView() { canvas.resetView() }
               v-if="line"
               :from="line.from"
               :to="line.to"
+              :selected="selectedEdgeIdx === i"
+              @select="selectedEdgeIdx = i"
               @remove="emit('remove-edge', line.fromId, line.toId)"
             />
           </template>
