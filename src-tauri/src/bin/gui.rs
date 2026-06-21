@@ -117,8 +117,6 @@ fn main() {
             workflow_engine::commands::schedule::schedule_delete,
         ])
         .setup(move |app| {
-            let app_handle = app.handle().clone();
-
             // Start HTTP server in background for backward compatibility
             let bind_addr: std::net::SocketAddr = http_bind.parse().unwrap_or_else(|e| {
                 eprintln!("❌ 无效的绑定地址: {}", e);
@@ -152,10 +150,8 @@ fn main() {
             // Setup system tray (minimize to tray on close)
             workflow_engine::system::tray::setup(app)?;
 
-            // Start IPC server for wf-cli
-            tokio::spawn(async move {
-                let _ = app_handle;
-            });
+            // IPC server for wf-cli: use tauri async runtime (not raw tokio::spawn
+            // which panics when no Tokio runtime is active in the Tauri setup closure)
 
             Ok(())
         })
