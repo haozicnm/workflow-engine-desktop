@@ -247,7 +247,9 @@ pub async fn workflow_save_yaml(
         }
     }
 
-    match app.db.save_workflow_yaml(&id, &body.yaml) {
+    // 统一存储为 JSON（前端 JSON.parse 解析，YAML 仅用于输入校验）
+    let json_str = serde_json::to_string_pretty(&wf).unwrap_or_else(|_| body.yaml.clone());
+    match app.db.save_workflow_yaml(&id, &json_str) {
         Ok(()) => {
             events::emit(
                 "workflow-changed",
