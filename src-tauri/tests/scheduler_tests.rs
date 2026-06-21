@@ -44,10 +44,13 @@ fn make_step_with_next(id: &str, step_type: &str, next: &str) -> Step {
 
 fn make_workflow(steps: Vec<Step>) -> Workflow {
     Workflow {
+        version: None,
         name: "test".to_string(),
         description: None,
+        meta: None,
         steps,
         variables: None,
+        edges: vec![],
     }
 }
 

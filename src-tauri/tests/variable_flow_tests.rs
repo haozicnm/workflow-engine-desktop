@@ -102,8 +102,7 @@ impl TestResult {
 fn make_chain_step(id: &str, name: &str, step_type: &str, config: &Value) -> Step {
     let actions = config
         .get("actions")
-        .and_then(|a| a.as_array())
-        .map(|arr| arr.clone());
+        .and_then(|a| a.as_array()).cloned();
     let condition_group = config
         .get("conditionGroup")
         .and_then(|v| serde_json::from_value(v.clone()).ok());
@@ -962,7 +961,7 @@ async fn scenario_5_error_ignore_continue() {
     );
     let s3 = result.output("step_3");
     assert_eq!(s3["result"].as_i64().unwrap(), 84);
-    assert_eq!(s3["continued"].as_bool().unwrap(), true);
+    assert!(s3["continued"].as_bool().unwrap());
 }
 
 #[tokio::test]

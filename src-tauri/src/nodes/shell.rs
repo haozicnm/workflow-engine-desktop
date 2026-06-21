@@ -70,7 +70,7 @@ impl NodeExecutor for ShellNode {
             let first_token = command.split_whitespace().next().unwrap_or(&command);
             let command_name = first_token.trim_matches(|c| c == '"' || c == '\'');
             // 防止 shell 元字符绕过白名单（; && || | ` $）
-            if command_name.contains(|c: char| c == ';' || c == '&' || c == '|' || c == '`' || c == '$') {
+            if command_name.contains([';', '&', '|', '`', '$']) {
                 return Err(anyhow::anyhow!(
                     "Shell 命令名包含非法元字符: '{}'",
                     command_name

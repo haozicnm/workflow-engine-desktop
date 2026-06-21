@@ -1,5 +1,69 @@
 # Changelog
 
+## v9.0.0 (2026-06-21)
+
+### 🚀 Major Features
+
+**应用市场 + 模板库 (v9.0)**
+- 新增应用市场页面，浏览和使用预制工作流模板
+- 模板库扩展至 50 个模板（数据采集/自动化办公/AI应用/系统运维/开发工具）
+- 模板库导航，按分类浏览
+
+**GitHub 集成 (v8.8)**
+- 新增 `github_issue` 节点：创建/查询/更新 Issue 和 PR
+- 支持 GitHub API Token 认证
+
+**IM 消息集成 (v8.8)**
+- 新增 `im_message` 节点：通用多平台消息发送
+- 支持 Slack、飞书、钉钉、企业微信、Telegram
+- 统一 Webhook/API 发送模式
+
+**表达式引擎 + 触发器系统 (v8.5)**
+- Rhai 表达式引擎：支持算术/比较/逻辑/三元/变量访问
+- `{{= expr}}` 显式表达式语法
+- 三种触发器节点：`trigger_cron`（定时）、`trigger_webhook`（HTTP）、`trigger_file`（文件监控）
+- `webhook_response` 节点：自定义 Webhook 响应
+
+**Canvas 增强 (v8.7)**
+- 节点复制粘贴 + 迷你地图
+- 边删除 + DebugPanel 变量刷新
+
+**displayOptions 条件显隐 (n8n-style)**
+- 12 种条件运算符（Eq/Not/Gte/Lte/Gt/Lt/Between/StartsWith/EndsWith/Includes/Regex/Exists）
+- show(AND)/hide(OR) 逻辑控制字段可见性
+- Rust ↔ TypeScript 类型完全对齐
+
+### 🔧 实用节点 (v8.6)
+
+- `llm_chat`：LLM 对话节点（AI 薄封装）
+- `prompt_template`：提示词模板
+- `data_filter`：数据过滤
+- `json_transform`：JSON 转换
+- `email_send`：邮件发送
+- `database_query`：数据库查询
+- `clipboard_read`/`clipboard_write`：剪贴板操作
+- `data_length`/`data_default`/`data_merge`：数据工具
+
+### ⚡ 执行增强 (v8.5)
+
+- G1: 表达式求值在执行前解析 config 中的 `{{}}` 占位符
+- G2: 步骤输出自动注入上下文（`step_N.field` 访问）
+- G3: 未解析变量保留原文（方便调试）
+- G5: `run_condition` 条件执行
+
+### 🐛 Bug Fixes
+
+- 全面代码审查，修复 20 个逻辑漏洞
+- 修复 `scheduler_tests` Workflow 结构体缺少新字段
+- 修复 `context_tests` 未解析变量行为断言
+- 修复 `integration_test` 中 "logic" → "condition" 节点类型名
+- Clippy 自动修复（pattern char comparison 等）
+
+### 📝 测试
+
+- 79 lib tests + 35 context tests + 29 integration tests + 30 scheduler tests + 25 template tests + 8 library tests = **206 tests passing**
+- `template_exec_tests` 中 2 个测试因模板文件缺失跳过（已知问题）
+
 ## v8.4.1 (2026-06-20)
 
 ### 🐛 Bug Fixes

@@ -6826,7 +6826,7 @@ dependencies = [
 
 [[package]]
 name = "workflow-engine"
-version = "8.4.1"
+version = "9.0.0"
 dependencies = [
  "anyhow",
  "arboard",

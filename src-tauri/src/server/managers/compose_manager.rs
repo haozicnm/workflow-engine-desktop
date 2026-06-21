@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn chain_builds_steps_with_next() {
-        let blocks = vec!["http".to_string(), "shell".to_string()];
+        let blocks = ["http".to_string(), "shell".to_string()];
         let mut steps = Vec::new();
         for (i, block_type) in blocks.iter().enumerate() {
             let step_id = format!("step_{}", i + 1);

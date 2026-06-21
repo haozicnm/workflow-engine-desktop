@@ -16,8 +16,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
     // 从 config 中提取 actions（如果存在），传给 step.actions 字段
     let actions = config
         .get("actions")
-        .and_then(|a| a.as_array())
-        .map(|arr| arr.clone());
+        .and_then(|a| a.as_array()).cloned();
 
     Step {
         id: id.to_string(),
@@ -173,7 +172,7 @@ async fn test_logic_equals() {
     let step = make_step(
         "lc1",
         "判断等于",
-        "logic",
+        "condition",
         json!({
             "value": "{{a}}",
             "actions": [
@@ -200,7 +199,7 @@ async fn test_logic_not_empty() {
     let step = make_step(
         "lc2",
         "判断不为空",
-        "logic",
+        "condition",
         json!({
             "value": "{{x}}",
             "actions": [
@@ -803,7 +802,7 @@ async fn run_chain(
             }
             Err(e) => {
                 // onError:ignore 行为
-                if step.on_error.as_ref().map_or(false, |s| {
+                if step.on_error.as_ref().is_some_and(|s| {
                     matches!(s, workflow_engine::engine::workflow::ErrorStrategy::Ignore)
                 }) {
                     ctx.set_output(&step.id, serde_json::Value::Null);
@@ -849,7 +848,7 @@ async fn test_main_chain_shell_to_notify() {
         make_step(
             "step_3",
             "判断",
-            "logic",
+            "condition",
             json!({
                 "condition_group": {
                     "combinator": "and",
@@ -859,15 +858,13 @@ async fn test_main_chain_shell_to_notify() {
                 }
             }),
         ),
-        // Step 4: notify
+        // Step 4: script 输出结果（验证链路）
         make_step(
             "step_4",
-            "通知",
-            "notify",
+            "输出结果",
+            "script",
             json!({
-                "notify_type": "system",
-                "title": "Test Complete",
-                "body": "Total: {{step_2.total}}, Avg: {{step_2.avg}}, Pass: {{step_3.branch}}"
+                "script": "#{total: step_2.total, avg: step_2.avg, pass: step_3.branch}"
             }),
         ),
     ];
@@ -897,27 +894,16 @@ async fn test_main_chain_shell_to_notify() {
         logic_str
     );
 
-    // 验证 notify 成功
-    let notify = &outputs[3];
-    let notify_str = notify.to_string();
+    // 验证 step_4 输出（script 节点）
+    let result = &outputs[3];
+    let result_str = result.to_string();
     assert!(
-        notify_str.contains("\"sent\"") || notify_str.contains("\"notified\""),
-        "Notify should complete, got: {}",
-        notify_str
+        result_str.contains("\"pass\"") && result_str.contains("\"total\""),
+        "Step 4 should produce aggregated result, got: {}",
+        result_str
     );
 
-    // 验证 notify 成功
-    let notify = &outputs[3];
-    assert!(
-        notify
-            .get("sent")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-            || notify.get("notified").is_some(),
-        "Notify should complete"
-    );
-
-    println!("✅ Main chain: shell→json_parse→script→logic→notify OK");
+    println!("✅ Main chain: script→script→condition→script OK");
 }
 
 #[tokio::test]

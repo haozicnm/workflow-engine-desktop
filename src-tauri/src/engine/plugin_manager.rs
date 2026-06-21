@@ -171,7 +171,7 @@ pub fn install_plugin(wfplug_path: &Path) -> Result<PluginMeta> {
             continue;
         }
 
-        let dest = plugin_dir.join(&entry_path);
+        let dest = plugin_dir.join(entry_path);
         // 二次校验：确保解压目标在插件目录内
         let canonical_plugin_dir = plugin_dir.canonicalize().unwrap_or_else(|_| plugin_dir.clone());
         let canonical_dest = dest.canonicalize().unwrap_or_else(|_| dest.clone());

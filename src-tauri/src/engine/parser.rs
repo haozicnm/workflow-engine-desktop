@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(body[0].step_type, "browser");
         // v8: actions 从 params 提取到 step.actions
         // 该测试的 actions: [] 为空数组，但 container 类型会保留空 actions
-        let has_actions = body[0]
+        let _has_actions = body[0]
             .actions
             .as_ref()
             .map(|a| !a.is_empty())
@@ -651,7 +651,7 @@ steps:
         assert_eq!(wf.steps[0].step_type, "browser");
         // v8: actions 保持在 step.actions，不再移到 config
         let actions = wf.steps[0].actions.as_ref().unwrap();
-        assert!(actions.len() > 0, "step.actions should be preserved");
+        assert!(!actions.is_empty(), "step.actions should be preserved");
     }
 
     #[test]

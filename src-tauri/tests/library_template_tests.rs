@@ -7,8 +7,8 @@ const LIBRARY_DIR: &str = "../library";
 
 fn load_template(path: &str) -> Value {
     let full = format!("{}/{}", LIBRARY_DIR, path);
-    let content = std::fs::read_to_string(&full).expect(&format!("Template not found: {}", full));
-    serde_json::from_str(&content).expect(&format!("Invalid JSON: {}", path))
+    let content = std::fs::read_to_string(&full).unwrap_or_else(|_| panic!("Template not found: {}", full));
+    serde_json::from_str(&content).unwrap_or_else(|_| panic!("Invalid JSON: {}", path))
 }
 
 fn step_ids(json: &Value) -> HashSet<String> {
@@ -26,10 +26,10 @@ fn parse_and_validate(name: &str, path: &str) {
     let content = std::fs::read_to_string(&full).unwrap();
 
     // 1. Parse as JSON
-    let json: Value = serde_json::from_str(&content).expect(&format!("{}: invalid JSON", name));
+    let json: Value = serde_json::from_str(&content).unwrap_or_else(|_| panic!("{}: invalid JSON", name));
 
     // 2. Parse as Workflow struct
-    let wf = parser::parse_workflow(&content).expect(&format!("{}: parser failed", name));
+    let wf = parser::parse_workflow(&content).unwrap_or_else(|_| panic!("{}: parser failed", name));
 
     // 3. Run semantic validation
     let validation = validate::validate_workflow(&wf);
@@ -53,7 +53,7 @@ fn parse_and_validate(name: &str, path: &str) {
 
     // 5. Check params consistency
     if let Some(params) = json["params"].as_object() {
-        let content_str = content.as_str();
+        let _content_str = content.as_str();
         for key in params.keys() {
             let placeholder = format!("{{{{params.{}}}}}", key);
             // At least one reference should exist (or it's an optional param)
@@ -74,7 +74,7 @@ fn parse_and_validate(name: &str, path: &str) {
 #[test]
 fn test_template1_integration_smoke() {
     let json = load_template("stress/integration-smoke.wf.json");
-    let ids = step_ids(&json);
+    let _ids = step_ids(&json);
     assert_eq!(json["name"].as_str().unwrap(), "integration-smoke");
     // 必须有 14 个步骤（涵盖所有核心节点类型）
     let steps = json["steps"].as_array().unwrap();
@@ -99,7 +99,7 @@ fn test_template1_integration_smoke() {
     // Verify params exist and are used
     assert!(json["params"]["test_dir"].as_str().is_some());
     let content =
-        std::fs::read_to_string(&format!("{}/stress/integration-smoke.wf.json", LIBRARY_DIR))
+        std::fs::read_to_string(format!("{}/stress/integration-smoke.wf.json", LIBRARY_DIR))
             .unwrap();
     assert!(
         content.contains("{{params.test_dir}}"),
@@ -126,7 +126,7 @@ fn test_template2_daily_monitor() {
     assert!(types.contains(&"word"));
     // Verify output_dir is used in file_path
     let content =
-        std::fs::read_to_string(&format!("{}/monitoring/daily-monitor.wf.json", LIBRARY_DIR))
+        std::fs::read_to_string(format!("{}/monitoring/daily-monitor.wf.json", LIBRARY_DIR))
             .unwrap();
     assert!(content.contains("{{params.output_dir}}"));
 
@@ -144,7 +144,7 @@ fn test_template3_file_batch_approval() {
     assert!(types.contains(&"cursor"));
     // approval is inside cursor body_steps, not at top level
     // Verify data_dir and file_pattern are used
-    let content = std::fs::read_to_string(&format!(
+    let content = std::fs::read_to_string(format!(
         "{}/batch/file-batch-approval.wf.json",
         LIBRARY_DIR
     ))
@@ -166,7 +166,7 @@ fn test_template4_http_approval_pipeline() {
     assert!(types.contains(&"http"));
     assert!(types.contains(&"approval"));
     // Verify api_url and notify_title are used
-    let content = std::fs::read_to_string(&format!(
+    let content = std::fs::read_to_string(format!(
         "{}/batch/http-approval-pipeline.wf.json",
         LIBRARY_DIR
     ))
@@ -192,7 +192,7 @@ fn test_template5_web_monitor_alert() {
     assert!(types.contains(&"excel"));
     assert!(types.contains(&"notify"));
     // Verify work_dir and alert_threshold are used
-    let content = std::fs::read_to_string(&format!(
+    let content = std::fs::read_to_string(format!(
         "{}/monitoring/web-monitor-alert.wf.json",
         LIBRARY_DIR
     ))

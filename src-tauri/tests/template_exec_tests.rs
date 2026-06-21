@@ -10,7 +10,7 @@ use workflow_engine::engine::workflow::Step;
 fn parse_template(template_file: &str) -> Vec<Step> {
     // Test runs from src-tauri/, templates are at ../templates/
     let path = format!("../templates/{}", template_file);
-    let content = std::fs::read_to_string(&path).expect(&format!("模板文件不存在: {}", path));
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("模板文件不存在: {}", path));
 
     // 替换相对路径（templates/data/ → 绝对路径）
     let project_root = env::current_dir()
@@ -25,7 +25,7 @@ fn parse_template(template_file: &str) -> Vec<Step> {
     );
 
     let wf =
-        parser::parse_workflow(&content).expect(&format!("Parser 转换失败: {}", template_file));
+        parser::parse_workflow(&content).unwrap_or_else(|_| panic!("Parser 转换失败: {}", template_file));
     wf.steps
 }
 

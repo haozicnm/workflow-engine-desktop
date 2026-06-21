@@ -1,0 +1,2 @@
+   Compiling workflow-engine v8.0.0 (C:\Users\haozi\Dev\workflow-engine-desktop\src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.85s

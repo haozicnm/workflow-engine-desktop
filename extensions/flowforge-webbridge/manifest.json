@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Workflow WebBridge",
-  "version": "1.4.0",
-  "description": "浏览器自动化桥接 — 为 Workflow Engine 提供 CDP 控制能力",
+  "name": "FlowForge WebBridge",
+  "version": "1.0.0",
+  "description": "浏览器自动化桥接 — 为 FlowForge 提供 CDP 控制能力",
   "permissions": [
     "debugger",
     "tabs",

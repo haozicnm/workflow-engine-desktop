@@ -47,7 +47,7 @@ impl NodeExecutor for TriggerFileNode {
 
     async fn execute(
         &self,
-        step: &Step,
+        _step: &Step,
         ctx: &mut ExecutionContext,
         _executor: &Arc<StepExecutor>,
     ) -> Result<serde_json::Value> {

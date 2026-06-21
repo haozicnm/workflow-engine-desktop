@@ -6,8 +6,8 @@ const TEMPLATE_DIR: &str = "../templates";
 
 fn load_template(filename: &str) -> Value {
     let path = format!("{}/{}", TEMPLATE_DIR, filename);
-    let content = std::fs::read_to_string(&path).expect(&format!("模板文件不存在: {}", path));
-    serde_json::from_str(&content).expect(&format!("模板 JSON 解析失败: {}", filename))
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|_| panic!("模板文件不存在: {}", path));
+    serde_json::from_str(&content).unwrap_or_else(|_| panic!("模板 JSON 解析失败: {}", filename))
 }
 
 // ═══════════════════════════════════════════════════

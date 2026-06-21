@@ -14,7 +14,8 @@ import {
 import { setRegistryDefs } from '@/types/registry-state'
 import type { ContainerDef, ContainerType } from '@/types/types'
 
-const API_BASE = 'http://localhost:19528'
+// GUI mode: 19529, standalone: 19528
+const API_BASE = (window as any).__TAURI_INTERNALS__ ? 'http://localhost:19529' : 'http://localhost:19528'
 
 // ─── Schema 节点原始类型 ───
 
