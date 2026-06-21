@@ -65,6 +65,7 @@ tauri-build = { version = "2", optional = true , features = [] }
 default = ["cli"]
 cli = []
 gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:rfd"]
+email = []
 
 [[bin]]
 name = "workflow-engine"
