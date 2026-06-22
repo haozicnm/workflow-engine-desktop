@@ -231,7 +231,7 @@ fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
     anyhow::bail!("MCP server not found: {}", script)
 }
 
-fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
+async fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
     let path = resolve_path(script)?;
     let init = serde_json::json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}});
     let call = serde_json::json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":tool,"arguments":args}});
@@ -242,7 +242,7 @@ fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
     );
 
     let python = find_python();
-    let mut child = Command::new(&python)
+    let mut child = tokio::process::Command::new(&python)
         .arg(&path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -251,12 +251,26 @@ fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
         .with_context(|| format!("spawn {} {}", python, path.display()))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(input.as_bytes())?;
+        use tokio::io::AsyncWriteExt;
+        stdin.write_all(input.as_bytes()).await?;
     }
+    // Drain stderr in background to prevent pipe deadlock
+    let stderr = child.stderr.take();
+    let stderr_task = tokio::spawn(async move {
+        if let Some(mut stderr) = stderr {
+            use tokio::io::AsyncReadExt;
+            let mut buf = String::new();
+            let _ = stderr.read_to_string(&mut buf).await;
+            buf
+        } else {
+            String::new()
+        }
+    });
     let stdout = child.stdout.take().context("no stdout")?;
     let mut last: Option<Value> = None;
-    for line in BufReader::new(stdout).lines() {
-        let line = line?;
+    let mut lines = tokio::io::BufReader::new(stdout).lines();
+    use tokio::io::AsyncBufReadExt;
+    while let Some(line) = lines.next_line().await? {
         if line.trim().is_empty() {
             continue;
         }
@@ -265,7 +279,20 @@ fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
             last = Some(r);
         }
     }
-    child.wait()?;
+    // Wait for process with timeout
+    let timeout = std::time::Duration::from_secs(60);
+    match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => return Err(anyhow::anyhow!("MCP process error: {}", e)),
+        Err(_) => {
+            let _ = child.kill().await;
+            return Err(anyhow::anyhow!("MCP process timeout ({}s)", timeout.as_secs()));
+        }
+    }
+    let stderr_output = stderr_task.await.unwrap_or_default();
+    if !stderr_output.is_empty() {
+        tracing::warn!("MCP stderr: {}", stderr_output.trim());
+    }
     let result = last.ok_or_else(|| anyhow::anyhow!("no result from MCP tool: {}", tool))?;
     let text = result
         .get("result")
@@ -316,7 +343,7 @@ impl NodeExecutor for McpNode {
         _ctx: &mut ExecutionContext,
         _exec: &Arc<StepExecutor>,
     ) -> Result<Value> {
-        call_mcp(&self.script, &self.tool, &step.config)
+        call_mcp(&self.script, &self.tool, &step.config).await
     }
 }
 

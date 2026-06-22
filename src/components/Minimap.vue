@@ -71,8 +71,8 @@ function onMapClick(e: MouseEvent) {
       <rect
         v-for="step in steps"
         :key="step.id"
-        :x="(positions.get(step.id)?.x || 0 - bounds.minX) * scale"
-        :y="(positions.get(step.id)?.y || 0 - bounds.minY) * scale"
+        :x="((positions.get(step.id)?.x ?? 0) - bounds.minX) * scale"
+        :y="((positions.get(step.id)?.y ?? 0) - bounds.minY) * scale"
         :width="nodeWidth * scale"
         :height="nodeHeight * scale"
         rx="1"

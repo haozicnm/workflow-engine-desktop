@@ -322,7 +322,22 @@ impl ExecutionContext {
             result.push_str(&remaining[..start]);
             if let Some(end) = remaining[start + 2..].find("}}") {
                 let key = remaining[start + 2..start + 2 + end].trim();
-                if let Some(val) = self.resolve_var(key) {
+                // v8.5: {{= expr}} 语法 — 表达式求值
+                if let Some(expr) = key.strip_prefix('=') {
+                    let expr = expr.trim();
+                    match self.eval_expr(expr) {
+                        Ok(val) => match val {
+                            serde_json::Value::String(sv) => result.push_str(&sv),
+                            other => result.push_str(&other.to_string()),
+                        },
+                        Err(e) => {
+                            warn!("表达式求值失败: '{}' → {}", expr, e);
+                            result.push_str("{{");
+                            result.push_str(key);
+                            result.push_str("}}");
+                        }
+                    }
+                } else if let Some(val) = self.resolve_var(key) {
                     match val {
                         serde_json::Value::String(sv) => result.push_str(sv),
                         other => result.push_str(&other.to_string()),

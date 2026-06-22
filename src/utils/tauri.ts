@@ -35,6 +35,16 @@ const FIXED_ROUTES: Record<string, RouteEntry> = {
   system_check_browser:  { method: 'GET',    path: '/api/system/check-browser' },
   clear_logs:            { method: 'POST',   path: '/api/system/clear-logs' },
   open_log_dir:          { method: 'POST',   path: '/api/system/open-log-dir' },
+  // v8.5: 调试 API
+  debug_step:            { method: 'POST',   path: '/api/debug/step/{run_id}' },
+  debug_continue:        { method: 'POST',   path: '/api/debug/continue/{run_id}' },
+  debug_vars:            { method: 'GET',    path: '/api/debug/vars/{run_id}' },
+  debug_set_breakpoint:  { method: 'POST',   path: '/api/debug/breakpoint/set' },
+  debug_remove_breakpoint: { method: 'POST', path: '/api/debug/breakpoint/remove' },
+  debug_get_breakpoints: { method: 'GET',    path: '/api/debug/breakpoints/{workflow_id}' },
+  // v9.0: 模板库
+  template_list:         { method: 'GET',    path: '/api/templates' },
+  template_import:       { method: 'POST',   path: '/api/templates/import' },
 }
 
 /** Routes with {param} placeholders that are substituted from args */

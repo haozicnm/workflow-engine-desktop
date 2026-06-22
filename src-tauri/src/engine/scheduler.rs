@@ -242,8 +242,10 @@ impl DagScheduler {
         for (from_id, downstream) in &self.adjacency {
             for (_, to_id) in downstream {
                 if to_id == node_id && !self.completed.contains(from_id.as_str()) {
-                    // 检查这条边是否被阻断
-                    let is_blocked = self.blocked_edges.iter().any(|(k, _)| k.starts_with(&format!("{}:", from_id)));
+                    // 检查这条边是否被阻断（精确匹配 from_id → to_id）
+                    let is_blocked = self.blocked_edges.iter().any(|(k, target)| {
+                        k.starts_with(&format!("{}:", from_id)) && target == node_id
+                    });
                     if !is_blocked {
                         remaining_sources += 1;
                     }
@@ -585,9 +587,12 @@ pub async fn run_workflow(
     ctx.step_mode_flag = Some(ctrl.step_mode_flag.clone());
     ctx.breakpoint_flag = Some(ctrl.breakpoint_flag.clone());
     ctx.pause_flag = Some(ctrl.pause_flag.clone());
-    // 注入初始变量（CLI --var 等场景）
+    // 注入初始变量（CLI --var、Webhook 等场景）
     for (k, v) in initial_vars {
-        ctx.set_var(k.clone(), serde_json::Value::String(v.clone()));
+        // 尝试解析为 JSON，失败则作为字符串
+        let value = serde_json::from_str::<serde_json::Value>(v)
+            .unwrap_or(serde_json::Value::String(v.clone()));
+        ctx.set_var(k.clone(), value);
     }
     let mut state = RunState::new(run_id, ctx.variables.clone());
     let executor = StepExecutor::new(approval_store, db.clone());
@@ -985,8 +990,17 @@ async fn run_dag_workflow(
                                     emit_step_update_ignored(app_handle, run_id, &node_id, &step_name, total_steps, &err_msg);
                                     dag.complete_node(&node_id, None);
                                 }
+                                crate::engine::workflow::ErrorStrategy::Branch { step_id } => {
+                                    info!("DAG 步骤 '{}' 错误分支 → {}", step_name, step_id);
+                                    ctx.set_var(format!("_error.{}", node_id), serde_json::json!(err_msg));
+                                    ctx.set_output(&node_id, serde_json::Value::Null);
+                                    state.mark_step_completed(&node_id);
+                                    dag.complete_node(&node_id, None);
+                                    // 错误分支目标节点直接标记完成（避免被阻断）并记录
+                                    tracing::warn!("DAG on_error:branch → {} (已记录，分支节点将在下轮调度中执行)", step_id);
+                                }
                                 _ => {
-                                    // Fail / Branch → 整体失败
+                                    // Fail → 整体失败
                                     any_failed = true;
                                 }
                             }

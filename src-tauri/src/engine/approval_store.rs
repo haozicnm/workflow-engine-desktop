@@ -80,6 +80,13 @@ impl ApprovalStore {
         self.entries.read().await.values().cloned().collect()
     }
 
+    /// 清理指定审批请求（workflow 超时/取消时调用）
+    pub async fn cleanup(&self, id: &str) {
+        self.senders.write().await.remove(id);
+        self.entries.write().await.remove(id);
+        info!("[ApprovalStore] 清理审批请求: {}", id);
+    }
+
     /// 检查审批是否存在
     pub async fn exists(&self, id: &str) -> bool {
         self.entries.read().await.contains_key(id)

@@ -116,7 +116,10 @@ impl NodeExecutor for DataFilterNode {
                 "gte" => !compare_lt(&item_value, &cmp_value),
                 "lte" => !compare_gt(&item_value, &cmp_value),
                 "is_empty" => matches!(item_value, Value::Null) || item_value.as_str().map(|s| s.is_empty()).unwrap_or(false) || item_value.as_array().map(|a| a.is_empty()).unwrap_or(false),
-                "not_empty" => !matches!(item_value, Value::Null) && !item_value.as_str().map(|s| s.is_empty()).unwrap_or(true),
+                "not_empty" => !matches!(item_value, Value::Null)
+                    && item_value != Value::String(String::new())
+                    && item_value != Value::Array(vec![])
+                    && item_value != Value::Object(serde_json::Map::new()),
                 "regex" => {
                     if let (Some(text), Some(pattern)) = (item_value.as_str(), cmp_value.as_str()) {
                         regex::Regex::new(pattern).map(|re| re.is_match(text)).unwrap_or(false)

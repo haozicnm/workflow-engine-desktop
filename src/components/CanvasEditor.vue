@@ -56,6 +56,8 @@ function onCanvasKeyDown(e: KeyboardEvent) {
     }
   }
   if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+    // 不拦截输入框内的复制操作
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
     const selectedId = canvas.selectedNode.value
     if (selectedId) {
       const step = stepRef.value.find(s => s.id === selectedId)
@@ -63,6 +65,7 @@ function onCanvasKeyDown(e: KeyboardEvent) {
     }
   }
   if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
     if (clipboard.value) {
       const newStep: Step = JSON.parse(JSON.stringify(clipboard.value))
       newStep.id = `${clipboard.value.type}_${Date.now()}`

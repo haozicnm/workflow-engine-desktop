@@ -107,7 +107,10 @@ impl NodeExecutor for LlmChatNode {
 
         info!("LLM 调用: model={}, messages={}", model, messages.len());
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .map_err(|e| anyhow!("HTTP client 创建失败: {}", e))?;
         let resp = client.post(api_url)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")

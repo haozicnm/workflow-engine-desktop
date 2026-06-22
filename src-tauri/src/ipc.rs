@@ -445,8 +445,15 @@ impl IpcServer {
             pause_flag: Arc::new(AtomicBool::new(false)),
             breakpoint_flag: Arc::new(AtomicBool::new(false)),
             step_mode_flag: Arc::new(AtomicBool::new(false)),
-            debug_snapshots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            debug_snapshots: self.app.debug_snapshots.clone(),
         };
+
+        // 注册到共享状态（支持 cancel/pause/resume）
+        self.app.cancel_flags.insert(run_id.clone(), ctrl.cancel_flag.clone());
+        self.app.cancel_tokens.insert(run_id.clone(), ctrl.cancel_token.clone());
+        self.app.pause_flags.insert(run_id.clone(), ctrl.pause_flag.clone());
+        self.app.breakpoint_flags.insert(run_id.clone(), ctrl.breakpoint_flag.clone());
+        self.app.step_mode_flags.insert(run_id.clone(), ctrl.step_mode_flag.clone());
 
         // 发送 ack
         let ack = IpcResponse::Ack {

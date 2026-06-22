@@ -103,7 +103,14 @@ async function refreshVariables() {
   if (!props.workflowId || debugState.value !== 'paused') return
   try {
     const vars = await safeInvoke<Record<string, unknown>>('debug_vars', { runId: props.workflowId })
-    if (vars) variables.value = vars
+    if (vars) {
+      // debug_vars 返回 {variables: {...}, step_outputs: {...}}，需要展平
+      const v = vars as Record<string, unknown>
+      variables.value = {
+        ...(typeof v.variables === 'object' && v.variables ? v.variables as Record<string, unknown> : {}),
+        ...(typeof v.step_outputs === 'object' && v.step_outputs ? v.step_outputs as Record<string, unknown> : {}),
+      }
+    }
   } catch { /* 运行已结束或不可用 */ }
 }
 
