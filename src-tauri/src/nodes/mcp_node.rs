@@ -274,9 +274,16 @@ async fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
         if line.trim().is_empty() {
             continue;
         }
-        let r: Value = serde_json::from_str(&line)?;
-        if r.get("id").and_then(|v| v.as_i64()) == Some(2) && r.get("result").is_some() {
-            last = Some(r);
+        match serde_json::from_str::<Value>(&line) {
+            Ok(r) => {
+                if r.get("id").and_then(|v| v.as_i64()) == Some(2) && r.get("result").is_some() {
+                    last = Some(r);
+                }
+            }
+            Err(e) => {
+                // 解析失败 — 记录但继续读取（MCP server 可能输出非 JSON 日志）
+                tracing::warn!("MCP 非 JSON 输出: {} (line: {})", e, &line[..line.len().min(100)]);
+            }
         }
     }
     // Wait for process with timeout
