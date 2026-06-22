@@ -9,7 +9,10 @@
       "id": "fetch_data",
       "type": "data_set",
       "label": "模拟数据",
-      "config": { "key": "value", "value": "85" }
+      "config": {
+        "key": "value",
+        "value": "85"
+      }
     },
     {
       "id": "check_threshold",
@@ -19,7 +22,12 @@
         "conditionGroup": {
           "combinator": "and",
           "conditions": [
-            { "id": "c1", "left": "{{fetch_data.value}}", "op": "gt", "right": "100" }
+            {
+              "id": "c1",
+              "left": "{{fetch_data.value}}",
+              "op": "gt",
+              "right": "100"
+            }
           ]
         }
       }
@@ -28,18 +36,39 @@
       "id": "notify_ok",
       "type": "data_set",
       "label": "✓ 正常路径",
-      "config": { "key": "status", "value": "数据正常" }
+      "config": {
+        "key": "status",
+        "value": "数据正常"
+      }
     },
     {
       "id": "notify_alert",
       "type": "data_set",
       "label": "✗ 告警路径",
-      "config": { "key": "status", "value": "数据超阈值，触发告警" }
+      "config": {
+        "key": "status",
+        "value": "数据超阈值，触发告警"
+      }
     }
   ],
   "edges": [
-    { "from": "fetch_data", "fromPort": "out", "to": "check_threshold", "toPort": "in" },
-    { "from": "check_threshold", "fromPort": "true", "to": "notify_ok", "toPort": "in" },
-    { "from": "check_threshold", "fromPort": "false", "to": "notify_alert", "toPort": "in" }
+    {
+      "from": "fetch_data",
+      "to": "check_threshold",
+      "from_port": "out",
+      "to_port": "in"
+    },
+    {
+      "from": "check_threshold",
+      "to": "notify_ok",
+      "from_port": "true",
+      "to_port": "in"
+    },
+    {
+      "from": "check_threshold",
+      "to": "notify_alert",
+      "from_port": "false",
+      "to_port": "in"
+    }
   ]
 }

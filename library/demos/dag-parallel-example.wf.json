@@ -6,31 +6,63 @@
       "id": "init",
       "type": "data_set",
       "label": "初始化",
-      "config": { "key": "batch_id", "value": "2026-06-22" }
+      "config": {
+        "key": "batch_id",
+        "value": "2026-06-22"
+      }
     },
     {
       "id": "fetch_a",
       "type": "data_set",
       "label": "抓取数据源 A",
-      "config": { "key": "data_a", "value": "source_a_result" }
+      "config": {
+        "key": "data_a",
+        "value": "source_a_result"
+      }
     },
     {
       "id": "fetch_b",
       "type": "data_set",
       "label": "抓取数据源 B",
-      "config": { "key": "data_b", "value": "source_b_result" }
+      "config": {
+        "key": "data_b",
+        "value": "source_b_result"
+      }
     },
     {
       "id": "merge",
       "type": "data_set",
       "label": "合并结果",
-      "config": { "key": "merged", "value": "{{fetch_a.data_a}} + {{fetch_b.data_b}}" }
+      "config": {
+        "key": "merged",
+        "value": "{{fetch_a.data_a}} + {{fetch_b.data_b}}"
+      }
     }
   ],
   "edges": [
-    { "from": "init", "fromPort": "out", "to": "fetch_a", "toPort": "in" },
-    { "from": "init", "fromPort": "out", "to": "fetch_b", "toPort": "in" },
-    { "from": "fetch_a", "fromPort": "out", "to": "merge", "toPort": "in" },
-    { "from": "fetch_b", "fromPort": "out", "to": "merge", "toPort": "in" }
+    {
+      "from": "init",
+      "to": "fetch_a",
+      "from_port": "out",
+      "to_port": "in"
+    },
+    {
+      "from": "init",
+      "to": "fetch_b",
+      "from_port": "out",
+      "to_port": "in"
+    },
+    {
+      "from": "fetch_a",
+      "to": "merge",
+      "from_port": "out",
+      "to_port": "in"
+    },
+    {
+      "from": "fetch_b",
+      "to": "merge",
+      "from_port": "out",
+      "to_port": "in"
+    }
   ]
 }

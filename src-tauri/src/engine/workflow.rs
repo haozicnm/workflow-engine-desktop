@@ -49,10 +49,12 @@ pub struct Edge {
     /// 源节点 ID
     pub from: String,
     /// 源端口标签
+    #[serde(alias = "fromPort", default)]
     pub from_port: String,
     /// 目标节点 ID
     pub to: String,
     /// 目标端口标签
+    #[serde(alias = "toPort", default)]
     pub to_port: String,
 }
 

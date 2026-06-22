@@ -242,7 +242,6 @@ impl DagScheduler {
         for (from_id, downstream) in &self.adjacency {
             for (_, to_id) in downstream {
                 if to_id == node_id && !self.completed.contains(from_id.as_str()) {
-                    let key = format!("{}:_", from_id);
                     // 检查这条边是否被阻断
                     let is_blocked = self.blocked_edges.iter().any(|(k, _)| k.starts_with(&format!("{}:", from_id)));
                     if !is_blocked {
