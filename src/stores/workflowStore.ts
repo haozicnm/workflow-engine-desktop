@@ -310,12 +310,12 @@ export const useWorkflowStore = defineStore('workflow', () => {
   }
   // ─── Edge Operations (v8.2 Canvas) ───
 
-  function addEdge(from: string, to: string) {
+  function addEdge(from: string, to: string, fromPort?: string, toPort?: string) {
     if (!current.value) return
     if (from === to) return // 禁止自环
     if (!current.value.edges) current.value.edges = []
-    // Avoid duplicates
-    if (current.value.edges.some(e => e.from === from && e.to === to)) return
+    // Avoid duplicates (same from+to+fromPort)
+    if (current.value.edges.some(e => e.from === from && e.to === to && (e.fromPort || '') === (fromPort || ''))) return
     // 简单环检测：添加这条边后，是否能从 to 回到 from？
     const visited = new Set<string>()
     const queue = [to]
@@ -328,7 +328,10 @@ export const useWorkflowStore = defineStore('workflow', () => {
         if (e.from === node) queue.push(e.to)
       }
     }
-    current.value.edges.push({ from, to })
+    const edge: any = { from, to }
+    if (fromPort) edge.fromPort = fromPort
+    if (toPort) edge.toPort = toPort
+    current.value.edges.push(edge)
     dirty.value = true
   }
 

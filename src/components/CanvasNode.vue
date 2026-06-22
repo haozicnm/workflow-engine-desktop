@@ -100,17 +100,53 @@ function onPortMouseDown(port: string, e: MouseEvent) {
       r="5"
       class="fill-hairline-strong stroke-hairline-strong hover:stroke-primary hover:fill-primary/20 cursor-crosshair transition-colors"
       stroke-width="2"
+      data-port-target
+      :data-step-id="step.id"
+      data-port-label="in"
       @mousedown="onPortMouseDown('in', $event)"
     />
 
-    <!-- Output port (right side) -->
-    <circle
-      :cx="position.x + nodeWidth"
-      :cy="position.y + nodeHeight / 2"
-      r="5"
-      class="fill-hairline-strong stroke-hairline-strong hover:stroke-primary hover:fill-primary/20 cursor-crosshair transition-colors"
-      stroke-width="2"
-      @mousedown="onPortMouseDown('out', $event)"
-    />
+    <!-- Output port(s) (right side) -->
+    <template v-if="step.type === 'condition'">
+      <!-- True port (green, upper) -->
+      <circle
+        :cx="position.x + nodeWidth"
+        :cy="position.y + nodeHeight * 0.3"
+        r="5"
+        class="fill-success/80 stroke-success hover:fill-success cursor-crosshair transition-colors"
+        stroke-width="2"
+        @mousedown="onPortMouseDown('true', $event)"
+      />
+      <text
+        :x="position.x + nodeWidth + 10"
+        :y="position.y + nodeHeight * 0.3 + 4"
+        class="fill-success text-[10px] select-none pointer-events-none"
+      >✓</text>
+      <!-- False port (red, lower) -->
+      <circle
+        :cx="position.x + nodeWidth"
+        :cy="position.y + nodeHeight * 0.7"
+        r="5"
+        class="fill-danger/80 stroke-danger hover:fill-danger cursor-crosshair transition-colors"
+        stroke-width="2"
+        @mousedown="onPortMouseDown('false', $event)"
+      />
+      <text
+        :x="position.x + nodeWidth + 10"
+        :y="position.y + nodeHeight * 0.7 + 4"
+        class="fill-danger text-[10px] select-none pointer-events-none"
+      >✗</text>
+    </template>
+    <template v-else>
+      <!-- Single output port -->
+      <circle
+        :cx="position.x + nodeWidth"
+        :cy="position.y + nodeHeight / 2"
+        r="5"
+        class="fill-hairline-strong stroke-hairline-strong hover:stroke-primary hover:fill-primary/20 cursor-crosshair transition-colors"
+        stroke-width="2"
+        @mousedown="onPortMouseDown('out', $event)"
+      />
+    </template>
   </g>
 </template>

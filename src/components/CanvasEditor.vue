@@ -20,7 +20,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'add-edge': [from: string, to: string]
+  'add-edge': [from: string, to: string, fromPort?: string, toPort?: string]
   'remove-edge': [from: string, to: string]
   'update-node-position': [id: string, x: number, y: number]
 }>()
@@ -137,7 +137,7 @@ function onPortDragEnd(e: MouseEvent) {
     const target = findPortTarget(e.clientX, e.clientY)
     if (target && target.stepId !== portDragData.stepId) {
       canvas.finishDraggingEdge(target.stepId, target.portLabel)
-      emit('add-edge', portDragData.stepId, target.stepId)
+      emit('add-edge', portDragData.stepId, target.stepId, portDragData.portLabel, target.portLabel)
     } else {
       canvas.cancelDraggingEdge()
     }
@@ -202,6 +202,8 @@ function onCanvasWheel(e: WheelEvent) {
 interface EdgeLine {
   fromId: string
   toId: string
+  fromPort: string
+  toPort: string
   from: { x: number; y: number }
   to: { x: number; y: number }
 }
@@ -212,12 +214,24 @@ const edgeLines = computed<EdgeLine[]>(() => {
     const fromPos = positions.get(edge.from)
     const toPos = positions.get(edge.to)
     if (!fromPos || !toPos) return null
+
+    // 条件节点的 true/false 端口 Y 偏移
+    const fromStep = stepRef.value.find(s => s.id === edge.from)
+    let fromY = fromPos.y + canvas.nodeHeight / 2
+    if (fromStep?.type === 'condition' && edge.fromPort === 'true') {
+      fromY = fromPos.y + canvas.nodeHeight * 0.3
+    } else if (fromStep?.type === 'condition' && edge.fromPort === 'false') {
+      fromY = fromPos.y + canvas.nodeHeight * 0.7
+    }
+
     return {
       fromId: edge.from,
       toId: edge.to,
+      fromPort: edge.fromPort || 'out',
+      toPort: edge.toPort || 'in',
       from: {
-        x: fromPos.x + canvas.nodeWidth / 2,
-        y: fromPos.y + canvas.nodeHeight / 2,
+        x: fromPos.x + canvas.nodeWidth,
+        y: fromY,
       },
       to: {
         x: toPos.x,
@@ -281,6 +295,8 @@ function resetView() { canvas.resetView() }
               v-if="line"
               :from="line.from"
               :to="line.to"
+              :from-port="line.fromPort"
+              :to-port="line.toPort"
               :selected="selectedEdgeIdx === i"
               @select="selectedEdgeIdx = i"
               @remove="emit('remove-edge', line.fromId, line.toId)"

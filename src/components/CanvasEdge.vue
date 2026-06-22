@@ -16,6 +16,15 @@ const emit = defineEmits<{
 
 const isHovered = ref(false)
 
+// 条件边颜色：true=绿色，false=红色
+const edgeColor = computed(() => {
+  if (props.selected) return 'var(--primary)'
+  if (isHovered.value) return 'var(--primary)'
+  if (props.fromPort === 'true') return 'var(--success, #22c55e)'
+  if (props.fromPort === 'false') return 'var(--danger, #ef4444)'
+  return 'var(--border)'
+})
+
 // Bezier curve: offset control points horizontally
 const d = computed(() => {
   const dx = Math.abs(props.to.x - props.from.x)
@@ -66,7 +75,7 @@ const arrowPath = computed(() => {
     <path
       :d
       fill="none"
-      :stroke="props.selected ? 'var(--primary)' : isHovered ? 'var(--primary)' : 'var(--border)'"
+      :stroke="edgeColor"
       :stroke-width="props.selected ? 3 : 2"
       class="transition-colors"
     />

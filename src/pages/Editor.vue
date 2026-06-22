@@ -304,7 +304,7 @@ onUnmounted(() => {
         <CanvasEditor
           :workflow="a.workflow.value"
           :run-states="a.store.runStates"
-          @add-edge="(from, to) => a.store.addEdge(from, to)"
+          @add-edge="(from, to, fromPort, toPort) => a.store.addEdge(from, to, fromPort, toPort)"
           @remove-edge="(from, to) => a.store.removeEdge(from, to)"
         />
       </TabsContent>
