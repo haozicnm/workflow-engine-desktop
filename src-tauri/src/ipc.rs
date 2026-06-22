@@ -499,6 +499,14 @@ impl IpcServer {
 
         let elapsed = start.elapsed().as_secs_f64();
 
+        // 清理共享状态中的运行标志
+        self.app.cancel_flags.remove(&run_id);
+        self.app.cancel_tokens.remove(&run_id);
+        self.app.pause_flags.remove(&run_id);
+        self.app.breakpoint_flags.remove(&run_id);
+        self.app.step_mode_flags.remove(&run_id);
+        self.app.debug_snapshots.write().await.remove(&run_id);
+
         match result {
             Ok(_) => {
                 let _ = db.update_run_status(&run_id, "completed", None);

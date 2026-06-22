@@ -122,7 +122,17 @@ impl NodeExecutor for DataFilterNode {
                     && item_value != Value::Object(serde_json::Map::new()),
                 "regex" => {
                     if let (Some(text), Some(pattern)) = (item_value.as_str(), cmp_value.as_str()) {
-                        regex::Regex::new(pattern).map(|re| re.is_match(text)).unwrap_or(false)
+                        // 缓存正则编译（避免循环中重复编译）
+                        use std::sync::Mutex;
+                        static REGEX_CACHE: std::sync::LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
+                            std::sync::LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
+                        let mut cache = REGEX_CACHE.lock().unwrap();
+                        if !cache.contains_key(pattern) {
+                            if let Ok(re) = regex::Regex::new(pattern) {
+                                cache.insert(pattern.to_string(), re);
+                            }
+                        }
+                        cache.get(pattern).map(|re| re.is_match(text)).unwrap_or(false)
                     } else {
                         false
                     }

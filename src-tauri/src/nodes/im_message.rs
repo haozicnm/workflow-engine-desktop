@@ -63,15 +63,27 @@ fn build_request_body(platform: &str, text: &str, title: &str, webhook_url: &str
             }),
         )),
         "telegram" => {
-            // Telegram Bot API: POST /bot{token}/sendMessage
-            let bot_token = webhook_url.split("/bot").nth(1)
-                .and_then(|s| s.split('/').next())
-                .unwrap_or("");
-            let chat_id = webhook_url.split("chat_id=").nth(1)
-                .unwrap_or("")
-                .split('&')
-                .next()
-                .unwrap_or("");
+            // Telegram Bot API: 支持两种格式
+            // 1. webhook_url = "bot_token:chat_id" (简洁格式)
+            // 2. webhook_url = "https://api.telegram.org/bot{token}/sendMessage?chat_id={id}"
+            let (bot_token, chat_id) = if webhook_url.starts_with("http") {
+                let token = webhook_url.split("/bot").nth(1)
+                    .and_then(|s| s.split('/').next())
+                    .unwrap_or("");
+                let cid = webhook_url.split("chat_id=").nth(1)
+                    .unwrap_or("")
+                    .split('&')
+                    .next()
+                    .unwrap_or("");
+                (token.to_string(), cid.to_string())
+            } else {
+                // "token:chat_id" 格式
+                let parts: Vec<&str> = webhook_url.splitn(2, ':').collect();
+                (parts.first().unwrap_or(&"").to_string(), parts.get(1).unwrap_or(&"").to_string())
+            };
+            if bot_token.is_empty() || chat_id.is_empty() {
+                return Err(anyhow!("telegram: webhook_url 格式错误，需要 'bot_token:chat_id' 或完整 API URL"));
+            }
             let api_url = format!("https://api.telegram.org/bot{}/sendMessage", bot_token);
             Ok((
                 api_url,

@@ -215,7 +215,9 @@ pub async fn execute_word_container(
                     );
                 }
             }
-            _ => tracing::warn!("Unknown Word action: {}", action.action_type),
+            _ => {
+                record_error(&mut output_ports, &action.id, "Unknown Word action", &anyhow::anyhow!("未知的 Word 操作类型: {}", action.action_type));
+            }
         }
     }
 

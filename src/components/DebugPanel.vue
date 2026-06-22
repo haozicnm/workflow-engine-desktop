@@ -163,6 +163,7 @@ watch(() => props.isRunning, (running) => {
 onUnmounted(() => {
   unlistenBreakpoint?.()
   unlistenRun?.()
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 })
 
 // ─── 格式化变量值 ───

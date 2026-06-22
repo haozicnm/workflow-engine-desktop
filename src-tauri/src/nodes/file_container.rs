@@ -145,9 +145,16 @@ fn get_str_opt<'a>(config: &'a HashMap<String, Value>, key: &str) -> Option<&'a 
 
 async fn file_read(config: &HashMap<String, Value>) -> Result<Value> {
     let path = get_str(config, "path")?;
+    // 文件大小检查（100MB 上限，防止 OOM）
+    const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
+    let metadata = tokio::fs::metadata(path).await
+        .map_err(|e| anyhow!("读取元数据失败 [{}]: {}", path, e))?;
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(anyhow!("文件过大 ({}MB > 100MB 限制) [{}]", metadata.len() / 1024 / 1024, path));
+    }
     let content = tokio::fs::read_to_string(path)
         .await
-        .map_err(|e| anyhow!("读取失败 [{}]: {}", path, e))?;
+        .map_err(|e| anyhow!("读取失败 [{}]: {} (可能是二进制文件)", path, e))?;
     let metadata = tokio::fs::metadata(path).await.ok();
     Ok(json!({
         "path": path,

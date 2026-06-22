@@ -91,10 +91,18 @@ fn read_cursor(step_id: &str) -> CursorState {
 fn save_cursor(step_id: &str, state: &CursorState) {
     let path = cursor_path(step_id);
     if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("cursor: 创建目录失败 {}: {}", parent.display(), e);
+            return;
+        }
     }
-    if let Ok(json) = serde_json::to_string_pretty(state) {
-        let _ = std::fs::write(&path, json);
+    match serde_json::to_string_pretty(state) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(&path, json) {
+                tracing::warn!("cursor: 保存游标失败 {}: {}", path.display(), e);
+            }
+        }
+        Err(e) => tracing::warn!("cursor: 序列化失败: {}", e),
     }
 }
 

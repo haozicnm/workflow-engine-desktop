@@ -228,7 +228,12 @@ pub async fn execute_excel_container(
                     .get("formula")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                let write_cfg = serde_json::json!({ "sheet": config.sheet, "data": [[format!("={}", formula)]] });
+                let formula_str = if formula.starts_with('=') {
+                    formula.to_string()
+                } else {
+                    format!("={}", formula)
+                };
+                let write_cfg = serde_json::json!({ "sheet": config.sheet, "data": [[formula_str]] });
                 if let Err(e) =
                     crate::nodes::excel::excel_write(&config.file_path, &write_cfg).await
                 {
@@ -288,8 +293,8 @@ fn match_filter(op: &str, cell: &Value, filter_val: &Option<Value>) -> bool {
         "gte" => cell_n >= filter_n,
         "lt" => cell_n < filter_n,
         "lte" => cell_n <= filter_n,
-        "is_empty" => cell_s.is_empty(),
-        "not_empty" => !cell_s.is_empty(),
+        "is_empty" => cell_s.is_empty() && cell == &Value::Null,
+        "not_empty" => !cell_s.is_empty() || cell != &Value::Null,
         _ => true,
     }
 }
