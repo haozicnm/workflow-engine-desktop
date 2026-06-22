@@ -825,6 +825,19 @@ async fn run_dag_workflow(
             task_ctx.variables = ctx.variables.clone();
             task_ctx.step_outputs = ctx.step_outputs.clone();
 
+            // 注入 input_ports：从 edges 找到指向当前节点的入边，
+            // 读取上游 step_outputs 注入到 input_ports（供容器节点使用）
+            for edge in &workflow.edges {
+                if edge.to == *node_id {
+                    if let Some(upstream_output) = ctx.step_outputs.get(&edge.from) {
+                        task_ctx.input_ports.insert(
+                            edge.to_port.clone(),
+                            upstream_output.clone(),
+                        );
+                    }
+                }
+            }
+
             join_set.spawn(async move {
                 let start = Instant::now();
                 let result = execute_with_retry(&exec, &step, &mut task_ctx).await;
