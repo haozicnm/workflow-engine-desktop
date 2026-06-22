@@ -101,6 +101,8 @@ pub struct App {
     pub run_semaphore: Arc<tokio::sync::Semaphore>,
     /// 审批存储：内存 channel 实现暂停/恢复
     pub approval_store: Arc<engine::approval_store::ApprovalStore>,
+    /// Webhook 响应通道：run_id → oneshot Sender（webhook_response 节点通过此通道回传响应）
+    pub webhook_response_channels: Arc<tokio::sync::RwLock<HashMap<String, tokio::sync::oneshot::Sender<serde_json::Value>>>>,
 }
 
 impl App {
@@ -135,6 +137,7 @@ impl App {
             debug_snapshots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             run_semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent)),
             approval_store: Arc::new(engine::approval_store::ApprovalStore::new()),
+            webhook_response_channels: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         })
     }
 }

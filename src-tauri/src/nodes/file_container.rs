@@ -344,6 +344,8 @@ async fn file_grep(config: &HashMap<String, Value>) -> Result<Value> {
             e.file_type().is_file() && glob_match(file_pattern, &e.file_name().to_string_lossy())
         });
 
+    // 尝试将 pattern 编译为正则，失败则回退到子串匹配
+    let re = regex::Regex::new(pattern).ok();
     for entry in walker {
         if results.len() >= max_results {
             break;
@@ -355,7 +357,12 @@ async fn file_grep(config: &HashMap<String, Value>) -> Result<Value> {
                     if results.len() >= max_results {
                         break;
                     }
-                    if line.contains(pattern) {
+                    let matched = if let Some(ref re) = re {
+                        re.is_match(line)
+                    } else {
+                        line.contains(pattern)
+                    };
+                    if matched {
                         results.push(json!({
                             "file": file_path.to_string_lossy(),
                             "line": i + 1,

@@ -131,11 +131,12 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
         let result = match result {
             Ok(r) => r,
             Err(_elapsed) => {
-                warn!("Workflow global timeout (30min): {}", run_id_clone);
-                Err(anyhow::anyhow!("Workflow execution timeout (exceeded 30 minutes)"))
+                warn!("工作流全局超时 ({}ms): {}", global_timeout_ms, run_id_clone);
+                Err(anyhow::anyhow!("工作流执行超时 (超过 {}ms)", global_timeout_ms))
             }
         };
 
+        // 确保清理（即使 panic 也能执行，因为 tokio::spawn 的 Future 正常 drop）
         cancel_flags.write().await.remove(&run_id_clone);
         cancel_tokens.write().await.remove(&run_id_clone);
         pause_flags.write().await.remove(&run_id_clone);

@@ -8,7 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Default)]
 pub struct WebhookResponseNode;
@@ -56,14 +56,23 @@ impl NodeExecutor for WebhookResponseNode {
             .or_else(|| step.config.get("body").cloned())
             .unwrap_or(json!({}));
 
-        // 将响应数据存入上下文，供 webhook 路由返回
-        ctx.set_var("_webhook_response".to_string(), json!({
+        let response = json!({
             "status_code": status_code,
             "headers": headers,
             "body": body,
-        }));
+        });
 
-        info!("Webhook 响应已设置: status={}", status_code);
+        // 将响应数据存入上下文
+        ctx.set_var("_webhook_response".to_string(), response.clone());
+
+        // 通过 oneshot channel 发送响应给 webhook handler
+        let app = crate::server::state::get();
+        if let Some(tx) = app.webhook_response_channels.write().await.remove(&ctx.run_id) {
+            let _ = tx.send(response);
+            info!("Webhook 响应已通过 channel 发送: status={}", status_code);
+        } else {
+            warn!("Webhook 响应 channel 不存在（可能已超时或非 webhook 触发）: run_id={}", ctx.run_id);
+        }
 
         Ok(json!({
             "sent": true,

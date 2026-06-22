@@ -20,7 +20,7 @@ impl NodeExecutor for LlmChatNode {
             type_name: "llm_chat".into(),
             version: "1.0".into(),
             display_name: "LLM 对话".into(),
-            description: "调用 LLM API（OpenAI/Claude/DeepSeek/Kimi 等 OpenAI-compatible 格式）".into(),
+            description: "调用 OpenAI-compatible API（OpenAI/DeepSeek/Kimi/通义/文心等）。Claude API 需使用兼容代理。".into(),
             category: "ai".into(),
             inputs: vec![
                 crate::nodes::traits::PortDef { label: "messages".into(), data_type: "array".into(), required: false },

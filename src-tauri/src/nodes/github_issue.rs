@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Default)]
 pub struct GithubIssueNode;
@@ -92,25 +92,43 @@ impl NodeExecutor for GithubIssueNode {
 
         info!("GitHub {} → {} ({})", action, repo, title);
 
-        let resp = client.post(&url)
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "WorkflowEngine")
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| anyhow!("GitHub API 请求失败: {}", e))?;
+        let mut retries = 0;
+        let max_retries = 3;
+        loop {
+            let resp = client.post(&url)
+                .header("Authorization", format!("Bearer {}", token))
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "WorkflowEngine")
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| anyhow!("GitHub API 请求失败: {}", e))?;
 
-        let status = resp.status();
-        let result: Value = resp.json().await.unwrap_or(json!({}));
+            let status = resp.status();
 
-        if status.is_success() {
-            let issue_url = result.get("html_url").and_then(|v| v.as_str()).unwrap_or("");
-            let number = result.get("number").and_then(|v| v.as_u64()).unwrap_or(0);
-            info!("GitHub {} 成功: #{} {}", action, number, issue_url);
-            Ok(json!({ "url": issue_url, "number": number }))
-        } else {
-            Err(anyhow!("GitHub API 返回错误 {}: {}", status, result))
+            // 429 Rate Limited — 等待后重试
+            if status.as_u16() == 429 && retries < max_retries {
+                let retry_after = resp.headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(60);
+                warn!("GitHub rate limited, retry in {}s ({}/{})", retry_after, retries + 1, max_retries);
+                tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+                retries += 1;
+                continue;
+            }
+
+            let result: Value = resp.json().await.unwrap_or(json!({}));
+
+            if status.is_success() {
+                let issue_url = result.get("html_url").and_then(|v| v.as_str()).unwrap_or("");
+                let number = result.get("number").and_then(|v| v.as_u64()).unwrap_or(0);
+                info!("GitHub {} 成功: #{} {}", action, number, issue_url);
+                return Ok(json!({ "url": issue_url, "number": number }));
+            } else {
+                return Err(anyhow!("GitHub API 返回错误 {}: {}", status, result));
+            }
         }
     }
 }

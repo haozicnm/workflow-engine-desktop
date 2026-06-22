@@ -405,6 +405,7 @@ pub use crate::server::managers::compose_manager::{compose_chain, ComposeChainBo
 pub async fn webhook_trigger(
     Path(workflow_id): Path<String>,
     headers: axum::http::HeaderMap,
+    axum::extract::Query(query_params): axum::extract::Query<std::collections::HashMap<String, String>>,
     body: axum::extract::Json<serde_json::Value>,
 ) -> Response {
     let app = crate::server::state::get();
@@ -413,6 +414,11 @@ pub async fn webhook_trigger(
     let webhook_headers: serde_json::Map<String, serde_json::Value> = headers
         .iter()
         .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), serde_json::Value::String(v.to_string()))))
+        .collect();
+
+    let webhook_query: serde_json::Map<String, serde_json::Value> = query_params
+        .iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
         .collect();
 
     let prep = match scheduler::prepare_run(
@@ -436,6 +442,7 @@ pub async fn webhook_trigger(
     let mut vars = prep.workflow.variables.clone().unwrap_or_default();
     vars.insert("_webhook_body".to_string(), body.0.clone());
     vars.insert("_webhook_headers".to_string(), serde_json::Value::Object(webhook_headers));
+    vars.insert("_webhook_query".to_string(), serde_json::Value::Object(webhook_query));
 
     // 注入 webhook 变量到初始变量
     let initial_vars: Vec<(String, String)> = vars.iter()
@@ -457,6 +464,10 @@ pub async fn webhook_trigger(
         debug_snapshots: app.debug_snapshots.clone(),
     };
 
+    // 创建 oneshot channel 用于 webhook_response 回传
+    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel::<serde_json::Value>();
+    app.webhook_response_channels.write().await.insert(run_id.clone(), resp_tx);
+
     tokio::spawn(async move {
         let _permit = prep.permit;
         let result = scheduler::run_workflow(
@@ -465,9 +476,32 @@ pub async fn webhook_trigger(
         if let Err(e) = result {
             tracing::warn!("Webhook 工作流执行失败: {} - {}", run_id_clone, e);
         }
+        // 清理响应通道（如果 webhook_response 节点未发送响应）
+        let app = crate::server::state::get();
+        app.webhook_response_channels.write().await.remove(&run_id_clone);
     });
 
-    Json(serde_json::json!({"run_id": run_id.clone(), "status": "started"})).into_response()
+    // 等待 webhook_response 节点的响应（30 秒超时）
+    match tokio::time::timeout(std::time::Duration::from_secs(30), resp_rx).await {
+        Ok(Ok(response)) => {
+            let status = response.get("status_code").and_then(|v| v.as_u64()).unwrap_or(200) as u16;
+            let body = response.get("body").cloned().unwrap_or(serde_json::json!({"run_id": run_id}));
+            let headers_map = response.get("headers").and_then(|v| v.as_object()).cloned().unwrap_or_default();
+            let mut resp_builder = axum::response::Response::builder()
+                .status(status)
+                .header("Content-Type", "application/json");
+            for (k, v) in &headers_map {
+                if let Some(val) = v.as_str() {
+                    resp_builder = resp_builder.header(k.as_str(), val);
+                }
+            }
+            resp_builder.body(axum::body::Body::from(serde_json::to_string(&body).unwrap_or_default())).unwrap()
+        }
+        _ => {
+            // 超时或无响应 — 返回默认 ack
+            Json(serde_json::json!({"run_id": run_id.clone(), "status": "started"})).into_response()
+        }
+    }
 }
 
 /// GET /api/webhooks/{workflow_id}/test — 测试 Webhook 触发

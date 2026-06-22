@@ -29,7 +29,7 @@ impl NodeExecutor for TriggerCronNode {
                     required: false,
                 },
                 crate::nodes::traits::PortDef {
-                    label: "trigger_count".into(),
+                    label: "timestamp".into(),
                     data_type: "number".into(),
                     required: false,
                 },
