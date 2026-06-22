@@ -292,6 +292,280 @@ type AppHandleRef<'a> = Option<&'a tauri::AppHandle>;
 #[cfg(not(feature = "gui"))]
 type AppHandleRef<'a> = Option<&'a ()>;
 
+/// 检查取消标志和暂停循环，返回 Ok(()) 继续执行，Err 表示已取消
+#[allow(clippy::too_many_arguments)]
+async fn check_cancel_and_pause(
+    ctrl: &RunControl,
+    state: &mut RunState,
+    db: &Arc<Database>,
+    run_id: &str,
+    app_handle: AppHandleRef<'_>,
+    workflow_name: &str,
+) -> Result<()> {
+    // 检查取消（AtomicBool + CancellationToken 双重机制）
+    if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
+        warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
+        state.mark_failed();
+        if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+            warn!("DB update failed: {}", e);
+        }
+        emit_run_update(app_handle, run_id, workflow_name, "cancelled");
+        preview::stop_live_session(run_id, "cancelled");
+        return Err(anyhow::anyhow!("cancelled"));
+    }
+
+    // 检查暂停（等待恢复，同时响应取消令牌）
+    while ctrl.pause_flag.load(Ordering::Relaxed) {
+        tokio::select! {
+            _ = ctrl.cancel_token.cancelled() => {
+                state.mark_failed();
+                if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
+                emit_run_update(app_handle, run_id, workflow_name, "cancelled");
+                return Err(anyhow::anyhow!("cancelled"));
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
+                // 超时后继续循环检查
+            }
+        }
+        // 暂停期间也检查取消
+        if ctrl.cancel_flag.load(Ordering::Relaxed) {
+            state.mark_failed();
+            if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                warn!("DB update failed: {}", e);
+            }
+            emit_run_update(app_handle, run_id, workflow_name, "cancelled");
+            return Err(anyhow::anyhow!("cancelled"));
+        }
+    }
+    Ok(())
+}
+
+/// 断点/单步检查，返回 Ok(()) 继续执行，Err 表示已取消
+#[allow(clippy::too_many_arguments)]
+#[allow(unused_variables)]
+async fn check_breakpoint(
+    ctrl: &RunControl,
+    step: &Step,
+    current_id: &str,
+    ctx: &ExecutionContext,
+    state: &mut RunState,
+    db: &Arc<Database>,
+    app_handle: AppHandleRef<'_>,
+    run_id: &str,
+    workflow_name: &str,
+) -> Result<()> {
+    if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
+        // 更新调试快照
+        update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
+
+        // 通知前端：断点命中
+        #[cfg(feature = "gui")]
+        if let Some(h) = app_handle {
+            if let Err(e) = h.emit(
+                "breakpoint-hit",
+                serde_json::json!({
+                "run_id": run_id,
+                "step_id": current_id,
+                "step_name": step.name,
+                "variables": ctx.variables,
+                "step_outputs": ctx.step_outputs,
+                }),
+            ) {
+                warn!("emit breakpoint-hit failed: {}", e);
+            }
+        }
+
+        // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
+        ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
+        while ctrl.breakpoint_flag.load(Ordering::Relaxed) {
+            tokio::select! {
+                _ = ctrl.cancel_token.cancelled() => {
+                    state.mark_failed();
+                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
+                    emit_run_update(app_handle, run_id, workflow_name, "cancelled");
+                    return Err(anyhow::anyhow!("cancelled"));
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                    // 超时后继续循环检查
+                }
+            }
+            // 暂停期间也检查取消（AtomicBool 快速路径）
+            if ctrl.cancel_flag.load(Ordering::Relaxed) {
+                state.mark_failed();
+                if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
+                    warn!("DB update failed: {}", e);
+                }
+                emit_run_update(app_handle, run_id, workflow_name, "cancelled");
+                return Err(anyhow::anyhow!("cancelled"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// 处理步骤执行成功：设置输出、标记完成、DB 更新、预览、调试快照等
+#[allow(clippy::too_many_arguments)]
+async fn handle_step_success(
+    step: &Step,
+    current_id: &str,
+    output: &serde_json::Value,
+    elapsed_ms: u64,
+    ctx: &mut ExecutionContext,
+    state: &mut RunState,
+    db: &Arc<Database>,
+    app_handle: AppHandleRef<'_>,
+    run_id: &str,
+    total_steps: usize,
+    step_index: &std::collections::HashMap<&str, usize>,
+    ctrl: &RunControl,
+) {
+    ctx.set_output(current_id, output.clone());
+    state.mark_step_completed(current_id);
+    if let Err(e) = db.complete_step_run(run_id, current_id, Some(output), None) {
+        warn!("DB complete_step failed: {}", e);
+    }
+    emit_step_update(
+        app_handle,
+        run_id,
+        current_id,
+        &step.name,
+        total_steps,
+        "completed",
+        Some(output),
+    );
+
+    // Preview: 生成步骤预览 + bundle 快照
+    let mut preview = preview::generate_step_preview(step, output, elapsed_ms);
+    if let Some(bundle_path) = preview::bundle_step_output(run_id, step, output) {
+        preview.bundle_path = Some(bundle_path.to_string_lossy().to_string());
+    }
+    preview::append_trajectory(run_id, &preview);
+
+    // Live session: update after step
+    let step_idx = step_index.get(current_id).copied().unwrap_or(0);
+    preview::update_live_session(run_id, &preview, step_idx);
+
+    // 更新调试快照
+    update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
+
+    // 推送变量快照（实时监视）
+    emit_variable_snapshot(app_handle, run_id, ctx);
+
+    // 单步模式：执行完暂停
+    if ctrl.step_mode_flag.load(Ordering::Relaxed) {
+        ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
+        #[cfg(feature = "gui")]
+        if let Some(h) = app_handle {
+            if let Err(e) = h.emit(
+                "breakpoint-hit",
+                serde_json::json!({
+                    "run_id": run_id,
+                    "step_id": current_id,
+                    "step_name": step.name,
+                    "reason": "step_mode",
+                    "variables": ctx.variables,
+                    "step_outputs": ctx.step_outputs,
+                }),
+            ) {
+                warn!("emit breakpoint-hit failed: {}", e);
+            }
+        }
+    }
+}
+
+/// 处理步骤执行失败：标记失败、DB 更新、错误恢复策略
+/// 返回 Ok(Some(branch_id)) 表示分支跳转，Ok(None) 表示忽略继续，Err 表示失败
+#[allow(clippy::too_many_arguments)]
+async fn handle_step_failure(
+    step: &Step,
+    current_id: &str,
+    err: anyhow::Error,
+    elapsed_ms: u64,
+    ctx: &mut ExecutionContext,
+    state: &mut RunState,
+    db: &Arc<Database>,
+    app_handle: AppHandleRef<'_>,
+    run_id: &str,
+    workflow_name: &str,
+    total_steps: usize,
+    workflow: &Workflow,
+    ctrl: &RunControl,
+    step_index: &std::collections::HashMap<&str, usize>,
+) -> Result<Option<String>> {
+    let err_msg = err.to_string();
+    warn!("步骤失败: {} - {}", step.name, err_msg);
+    state.mark_step_failed(current_id);
+    if let Err(e) = db.complete_step_run(run_id, current_id, None, Some(&err_msg)) {
+        warn!("DB complete_step failed: {}", e);
+    }
+    emit_step_update_with_error(app_handle, run_id, current_id, &step.name, &err_msg);
+
+    // Preview: 记录失败步骤
+    let failed = preview::generate_failed_preview(step, &err_msg, elapsed_ms);
+    preview::append_trajectory(run_id, &failed);
+
+    // Live session: update after failed step
+    let step_idx = step_index.get(current_id).copied().unwrap_or(0);
+    preview::update_live_session(run_id, &failed, step_idx);
+
+    // 更新调试快照（含错误信息）
+    update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
+
+    // ─── 错误恢复策略 ───
+    let strategy = step.on_error.clone().unwrap_or_default();
+    match strategy {
+        crate::engine::workflow::ErrorStrategy::Fail => {
+            state.mark_failed();
+            if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) {
+                warn!("DB update failed: {}", e);
+            }
+            emit_run_update(app_handle, run_id, workflow_name, "failed");
+            preview::stop_live_session(run_id, "failed");
+            Err(err)
+        }
+        crate::engine::workflow::ErrorStrategy::Ignore => {
+            info!("步骤 '{}' 错误已忽略，继续执行", step.name);
+            // 记录错误到上下文，输出 null
+            ctx.set_output(current_id, serde_json::Value::Null);
+            state.mark_step_completed(current_id);
+            emit_step_update_ignored(
+                app_handle,
+                run_id,
+                current_id,
+                &step.name,
+                total_steps,
+                &err_msg,
+            );
+            // 推送变量快照
+            emit_variable_snapshot(app_handle, run_id, ctx);
+            // 继续到下一步
+            Ok(None)
+        }
+        crate::engine::workflow::ErrorStrategy::Branch {
+            step_id: ref branch_id,
+        } => {
+            info!("步骤 '{}' 失败，分支跳转到: {}", step.name, branch_id);
+            // 验证目标步骤存在
+            if !workflow.steps.iter().any(|s| s.id == *branch_id) {
+                warn!("分支目标步骤 '{}' 不存在，回退为 fail", branch_id);
+                state.mark_failed();
+                if let Err(e) = db.update_run_status(
+                    run_id,
+                    "failed",
+                    Some(&format!("分支目标不存在: {}", branch_id)),
+                ) {
+                    warn!("DB update failed: {}", e);
+                }
+                emit_run_update(app_handle, run_id, workflow_name, "failed");
+                return Err(anyhow::anyhow!("分支目标步骤 '{}' 不存在", branch_id));
+            }
+            // 记录错误输出的同时跳转
+            ctx.set_output(current_id, serde_json::Value::Null);
+            Ok(Some(branch_id.clone()))
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_workflow(
     workflow: &Workflow,
@@ -372,41 +646,8 @@ pub async fn run_workflow(
             preview::stop_live_session(run_id, "failed");
             return Err(anyhow::anyhow!(err_msg));
         }
-        // 检查取消（AtomicBool + CancellationToken 双重机制）
-        if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
-            warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
-            state.mark_failed();
-            if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
-                warn!("DB update failed: {}", e);
-            }
-            emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
-            preview::stop_live_session(run_id, "cancelled");
-            return Err(anyhow::anyhow!("cancelled"));
-        }
-
-        // 检查暂停（等待恢复，同时响应取消令牌）
-        while ctrl.pause_flag.load(Ordering::Relaxed) {
-            tokio::select! {
-                _ = ctrl.cancel_token.cancelled() => {
-                    state.mark_failed();
-                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
-                    emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
-                    return Err(anyhow::anyhow!("cancelled"));
-                }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
-                    // 超时后继续循环检查
-                }
-            }
-            // 暂停期间也检查取消
-            if ctrl.cancel_flag.load(Ordering::Relaxed) {
-                state.mark_failed();
-                if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
-                    warn!("DB update failed: {}", e);
-                }
-                emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
-                return Err(anyhow::anyhow!("cancelled"));
-            }
-        }
+        // 检查取消 + 暂停
+        check_cancel_and_pause(ctrl, &mut state, db, run_id, app_handle, &workflow_name).await?;
 
         // 查找当前步骤（引用传递，避免循环中 clone 整个 Step）
         let step = match step_index
@@ -445,52 +686,7 @@ pub async fn run_workflow(
         );
 
         // ─── 断点 / 单步 检查 ───
-        if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
-            // 更新调试快照
-            update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
-
-            // 通知前端：断点命中
-            #[cfg(feature = "gui")]
-            if let Some(h) = app_handle {
-                if let Err(e) = h.emit(
-                    "breakpoint-hit",
-                    serde_json::json!({
-                    "run_id": run_id,
-                    "step_id": current_id,
-                    "step_name": step.name,
-                    "variables": ctx.variables,
-                    "step_outputs": ctx.step_outputs,
-                    }),
-                ) {
-                    warn!("emit breakpoint-hit failed: {}", e);
-                }
-            }
-
-            // 等待恢复（断点暂停或单步暂停，同时响应取消令牌）
-            ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-            while ctrl.breakpoint_flag.load(Ordering::Relaxed) {
-                tokio::select! {
-                    _ = ctrl.cancel_token.cancelled() => {
-                        state.mark_failed();
-                        if let Err(e) = db.update_run_status(run_id, "cancelled", None) { warn!("DB update failed: {}", e); }
-                        emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
-                        return Err(anyhow::anyhow!("cancelled"));
-                    }
-                    _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
-                        // 超时后继续循环检查
-                    }
-                }
-                // 暂停期间也检查取消（AtomicBool 快速路径）
-                if ctrl.cancel_flag.load(Ordering::Relaxed) {
-                    state.mark_failed();
-                    if let Err(e) = db.update_run_status(run_id, "cancelled", None) {
-                        warn!("DB update failed: {}", e);
-                    }
-                    emit_run_update(app_handle, run_id, &workflow_name, "cancelled");
-                    return Err(anyhow::anyhow!("cancelled"));
-                }
-            }
-        }
+        check_breakpoint(ctrl, step, &current_id, &ctx, &mut state, db, app_handle, run_id, &workflow_name).await?;
 
         // ─── 步骤延迟 ───
         if let Some(delay_ms) = step.delay {
@@ -557,131 +753,15 @@ pub async fn run_workflow(
 
         match result {
             Ok(output) => {
-                ctx.set_output(&current_id, output.clone());
-                state.mark_step_completed(&current_id);
-                if let Err(e) = db.complete_step_run(run_id, &current_id, Some(&output), None) {
-                    warn!("DB complete_step failed: {}", e);
-                }
-                emit_step_update(
-                    app_handle,
-                    run_id,
-                    &current_id,
-                    &step.name,
-                    total_steps,
-                    "completed",
-                    Some(&output),
-                );
-
-                // Preview: 生成步骤预览 + bundle 快照
-                let mut preview = preview::generate_step_preview(step, &output, elapsed_ms);
-                if let Some(bundle_path) = preview::bundle_step_output(run_id, step, &output) {
-                    preview.bundle_path = Some(bundle_path.to_string_lossy().to_string());
-                }
-                preview::append_trajectory(run_id, &preview);
-
-                // Live session: update after step
-                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
-                preview::update_live_session(run_id, &preview, step_idx);
-
-                // 更新调试快照
-                update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
-
-                // 推送变量快照（实时监视）
-                emit_variable_snapshot(app_handle, run_id, &ctx);
-
-                // 单步模式：执行完暂停
-                if ctrl.step_mode_flag.load(Ordering::Relaxed) {
-                    ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-                    #[cfg(feature = "gui")]
-                    if let Some(h) = app_handle {
-                        if let Err(e) = h.emit(
-                            "breakpoint-hit",
-                            serde_json::json!({
-                                "run_id": run_id,
-                                "step_id": current_id,
-                                "step_name": step.name,
-                                "reason": "step_mode",
-                                "variables": ctx.variables,
-                                "step_outputs": ctx.step_outputs,
-                            }),
-                        ) {
-                            warn!("emit breakpoint-hit failed: {}", e);
-                        }
-                    }
-                }
+                handle_step_success(step, &current_id, &output, elapsed_ms, &mut ctx, &mut state, db, app_handle, run_id, total_steps, &step_index, ctrl).await;
             }
             Err(e) => {
-                let err_msg = e.to_string();
-                warn!("步骤失败: {} - {}", step.name, err_msg);
-                state.mark_step_failed(&current_id);
-                if let Err(e) = db.complete_step_run(run_id, &current_id, None, Some(&err_msg)) {
-                    warn!("DB complete_step failed: {}", e);
-                }
-                emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
-
-                // Preview: 记录失败步骤
-                let failed = preview::generate_failed_preview(step, &err_msg, elapsed_ms);
-                preview::append_trajectory(run_id, &failed);
-
-                // Live session: update after failed step
-                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
-                preview::update_live_session(run_id, &failed, step_idx);
-
-                // 更新调试快照（含错误信息）
-                update_debug_snapshot(&ctrl.debug_snapshots, run_id, &ctx).await;
-
-                // ─── 错误恢复策略 ───
-                let strategy = step.on_error.clone().unwrap_or_default();
-                match strategy {
-                    crate::engine::workflow::ErrorStrategy::Fail => {
-                        state.mark_failed();
-                        if let Err(e) = db.update_run_status(run_id, "failed", Some(&err_msg)) {
-                            warn!("DB update failed: {}", e);
-                        }
-                        emit_run_update(app_handle, run_id, &workflow_name, "failed");
-                        preview::stop_live_session(run_id, "failed");
-                        return Err(e);
+                match handle_step_failure(step, &current_id, e, elapsed_ms, &mut ctx, &mut state, db, app_handle, run_id, &workflow_name, total_steps, workflow, ctrl, &step_index).await? {
+                    Some(branch_id) => {
+                        current_id = branch_id;
+                        continue;
                     }
-                    crate::engine::workflow::ErrorStrategy::Ignore => {
-                        info!("步骤 '{}' 错误已忽略，继续执行", step.name);
-                        // 记录错误到上下文，输出 null
-                        ctx.set_output(&current_id, serde_json::Value::Null);
-                        state.mark_step_completed(&current_id);
-                        emit_step_update_ignored(
-                            app_handle,
-                            run_id,
-                            &current_id,
-                            &step.name,
-                            total_steps,
-                            &err_msg,
-                        );
-                        // 推送变量快照
-                        emit_variable_snapshot(app_handle, run_id, &ctx);
-                        // 继续到下一步
-                    }
-                    crate::engine::workflow::ErrorStrategy::Branch {
-                        step_id: ref branch_id,
-                    } => {
-                        info!("步骤 '{}' 失败，分支跳转到: {}", step.name, branch_id);
-                        // 验证目标步骤存在
-                        if !workflow.steps.iter().any(|s| s.id == *branch_id) {
-                            warn!("分支目标步骤 '{}' 不存在，回退为 fail", branch_id);
-                            state.mark_failed();
-                            if let Err(e) = db.update_run_status(
-                                run_id,
-                                "failed",
-                                Some(&format!("分支目标不存在: {}", branch_id)),
-                            ) {
-                                warn!("DB update failed: {}", e);
-                            }
-                            emit_run_update(app_handle, run_id, &workflow_name, "failed");
-                            return Err(anyhow::anyhow!("分支目标步骤 '{}' 不存在", branch_id));
-                        }
-                        // 记录错误输出的同时跳转
-                        ctx.set_output(&current_id, serde_json::Value::Null);
-                        current_id = branch_id.clone();
-                        continue; // 跳过 determine_next_step，直接进入循环
-                    }
+                    None => {}
                 }
             }
         }
@@ -863,14 +943,15 @@ async fn run_dag_workflow(
                             emit_step_update(app_handle, run_id, &node_id, &step_name, total_steps, "completed", Some(&output));
 
                             // Preview
-                            let step_ref = DagScheduler::find_step(&workflow.steps, &node_id).unwrap();
-                            let mut preview_out = preview::generate_step_preview(step_ref, &output, elapsed_ms);
-                            if let Some(bundle_path) = preview::bundle_step_output(run_id, step_ref, &output) {
-                                preview_out.bundle_path = Some(bundle_path.to_string_lossy().to_string());
+                            if let Some(step_ref) = DagScheduler::find_step(&workflow.steps, &node_id) {
+                                let mut preview_out = preview::generate_step_preview(step_ref, &output, elapsed_ms);
+                                if let Some(bundle_path) = preview::bundle_step_output(run_id, step_ref, &output) {
+                                    preview_out.bundle_path = Some(bundle_path.to_string_lossy().to_string());
+                                }
+                                preview::append_trajectory(run_id, &preview_out);
+                                let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
+                                preview::update_live_session(run_id, &preview_out, step_idx);
                             }
-                            preview::append_trajectory(run_id, &preview_out);
-                            let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
-                            preview::update_live_session(run_id, &preview_out, step_idx);
 
                             // 条件节点：提取 branch
                             let condition_branch = if step_type == "condition" {
@@ -888,11 +969,12 @@ async fn run_dag_workflow(
                             let _ = db.complete_step_run(run_id, &node_id, None, Some(&err_msg));
                             emit_step_update_with_error(app_handle, run_id, &node_id, &step_name, &err_msg);
 
-                            let step_ref = DagScheduler::find_step(&workflow.steps, &node_id).unwrap();
-                            let failed = preview::generate_failed_preview(step_ref, &err_msg, elapsed_ms);
-                            preview::append_trajectory(run_id, &failed);
-                            let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
-                            preview::update_live_session(run_id, &failed, step_idx);
+                            if let Some(step_ref) = DagScheduler::find_step(&workflow.steps, &node_id) {
+                                let failed = preview::generate_failed_preview(step_ref, &err_msg, elapsed_ms);
+                                preview::append_trajectory(run_id, &failed);
+                                let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
+                                preview::update_live_session(run_id, &failed, step_idx);
+                            }
 
                             let strategy = on_error.unwrap_or_default();
                             match strategy {
