@@ -449,11 +449,11 @@ impl IpcServer {
         };
 
         // 注册到共享状态（支持 cancel/pause/resume）
-        self.app.cancel_flags.insert(run_id.clone(), ctrl.cancel_flag.clone());
-        self.app.cancel_tokens.insert(run_id.clone(), ctrl.cancel_token.clone());
-        self.app.pause_flags.insert(run_id.clone(), ctrl.pause_flag.clone());
-        self.app.breakpoint_flags.insert(run_id.clone(), ctrl.breakpoint_flag.clone());
-        self.app.step_mode_flags.insert(run_id.clone(), ctrl.step_mode_flag.clone());
+        self.app.cancel_flags.write().await.insert(run_id.clone(), ctrl.cancel_flag.clone());
+        self.app.cancel_tokens.write().await.insert(run_id.clone(), ctrl.cancel_token.clone());
+        self.app.pause_flags.write().await.insert(run_id.clone(), ctrl.pause_flag.clone());
+        self.app.breakpoint_flags.write().await.insert(run_id.clone(), ctrl.breakpoint_flag.clone());
+        self.app.step_mode_flags.write().await.insert(run_id.clone(), ctrl.step_mode_flag.clone());
 
         // 发送 ack
         let ack = IpcResponse::Ack {
@@ -500,11 +500,11 @@ impl IpcServer {
         let elapsed = start.elapsed().as_secs_f64();
 
         // 清理共享状态中的运行标志
-        self.app.cancel_flags.remove(&run_id);
-        self.app.cancel_tokens.remove(&run_id);
-        self.app.pause_flags.remove(&run_id);
-        self.app.breakpoint_flags.remove(&run_id);
-        self.app.step_mode_flags.remove(&run_id);
+        self.app.cancel_flags.write().await.remove(&run_id);
+        self.app.cancel_tokens.write().await.remove(&run_id);
+        self.app.pause_flags.write().await.remove(&run_id);
+        self.app.breakpoint_flags.write().await.remove(&run_id);
+        self.app.step_mode_flags.write().await.remove(&run_id);
         self.app.debug_snapshots.write().await.remove(&run_id);
 
         match result {
