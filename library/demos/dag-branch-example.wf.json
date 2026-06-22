@@ -1,0 +1,45 @@
+{
+  "name": "DAG 条件分支示例",
+  "description": "演示 DAG 画布执行模式：条件判断后自动路由到不同分支，edges 决定执行顺序",
+  "variables": {
+    "threshold": 100
+  },
+  "steps": [
+    {
+      "id": "fetch_data",
+      "type": "data_set",
+      "label": "模拟数据",
+      "config": { "key": "value", "value": "85" }
+    },
+    {
+      "id": "check_threshold",
+      "type": "condition",
+      "label": "检查阈值",
+      "config": {
+        "conditionGroup": {
+          "combinator": "and",
+          "conditions": [
+            { "id": "c1", "left": "{{fetch_data.value}}", "op": "gt", "right": "100" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "notify_ok",
+      "type": "data_set",
+      "label": "✓ 正常路径",
+      "config": { "key": "status", "value": "数据正常" }
+    },
+    {
+      "id": "notify_alert",
+      "type": "data_set",
+      "label": "✗ 告警路径",
+      "config": { "key": "status", "value": "数据超阈值，触发告警" }
+    }
+  ],
+  "edges": [
+    { "from": "fetch_data", "fromPort": "out", "to": "check_threshold", "toPort": "in" },
+    { "from": "check_threshold", "fromPort": "true", "to": "notify_ok", "toPort": "in" },
+    { "from": "check_threshold", "fromPort": "false", "to": "notify_alert", "toPort": "in" }
+  ]
+}

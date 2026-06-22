@@ -1,0 +1,36 @@
+{
+  "name": "DAG 并行分支示例",
+  "description": "演示 DAG 并行执行：两个独立任务同时运行，完成后汇合",
+  "steps": [
+    {
+      "id": "init",
+      "type": "data_set",
+      "label": "初始化",
+      "config": { "key": "batch_id", "value": "2026-06-22" }
+    },
+    {
+      "id": "fetch_a",
+      "type": "data_set",
+      "label": "抓取数据源 A",
+      "config": { "key": "data_a", "value": "source_a_result" }
+    },
+    {
+      "id": "fetch_b",
+      "type": "data_set",
+      "label": "抓取数据源 B",
+      "config": { "key": "data_b", "value": "source_b_result" }
+    },
+    {
+      "id": "merge",
+      "type": "data_set",
+      "label": "合并结果",
+      "config": { "key": "merged", "value": "{{fetch_a.data_a}} + {{fetch_b.data_b}}" }
+    }
+  ],
+  "edges": [
+    { "from": "init", "fromPort": "out", "to": "fetch_a", "toPort": "in" },
+    { "from": "init", "fromPort": "out", "to": "fetch_b", "toPort": "in" },
+    { "from": "fetch_a", "fromPort": "out", "to": "merge", "toPort": "in" },
+    { "from": "fetch_b", "fromPort": "out", "to": "merge", "toPort": "in" }
+  ]
+}

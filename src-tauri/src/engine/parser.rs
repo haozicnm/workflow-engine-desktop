@@ -8,6 +8,7 @@
 use crate::engine::workflow::{Step, Workflow};
 use anyhow::{anyhow, Result};
 use serde_json::Value;
+use tracing::warn;
 
 // v8: 容器类型从 registry（node-schema.json）读取，不再硬编码
 // 迭代类型列表（body 步骤存在 actions 里，需转为 body_steps）
@@ -55,6 +56,12 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
     // DAG 模式：edges 非空时检测循环依赖
     if !wf.edges.is_empty() {
         detect_cycles(&wf.steps, &wf.edges)?;
+
+        // 警告：edges + runCondition 共存时提醒用户
+        let has_run_condition = wf.steps.iter().any(|s| s.run_condition.is_some());
+        if has_run_condition {
+            warn!("工作流同时使用了 edges 和 runCondition。DAG 模式下 edges 优先，runCondition 会被忽略。建议迁移到纯 edges 模式。");
+        }
     }
 
     Ok(wf)

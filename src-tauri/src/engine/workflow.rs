@@ -115,6 +115,7 @@ pub struct Step {
     pub step_type: String,
     #[serde(default)]
     pub config: serde_json::Value,
+    /// 下一步 ID（⚠️ 仅线性模式用。DAG 模式下由 edges 决定执行顺序，此字段被忽略）
     pub next: Option<String>,
     pub retry: Option<RetryConfig>,
     pub timeout: Option<u64>,
@@ -143,7 +144,7 @@ pub struct Step {
     #[serde(alias = "conditionGroup", default)]
     pub condition_group: Option<LogicConditionGroup>,
 
-    /// 条件执行（引用逻辑步骤的 branch）
+    /// 条件执行（⚠️ 仅线性模式用。DAG 模式下由 edges 的 fromPort 决定条件路由，此字段被忽略）
     #[serde(alias = "runCondition", default)]
     pub run_condition: Option<RunCondition>,
 }
