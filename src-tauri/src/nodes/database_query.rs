@@ -78,7 +78,7 @@ impl NodeExecutor for DatabaseQueryNode {
                 info!("SQLite 查询: {} (db={})", &sql[..sql.len().min(50)], db_path);
 
                 // 连接缓存：复用同一 db_path 的连接（存储在 ctx.temp 中）
-                let cache_key = format!("_sqlite_conn_{}", db_path);
+                let _cache_key = format!("_sqlite_conn_{}", db_path);
                 let conn = rusqlite::Connection::open(db_path)
                     .map_err(|e| anyhow!("SQLite 连接失败: {}", e))?;
 
