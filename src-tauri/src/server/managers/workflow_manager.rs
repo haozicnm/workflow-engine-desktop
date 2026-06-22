@@ -483,26 +483,24 @@ pub async fn workflow_assemble(Json(body): Json<WorkflowAssembleBody>) -> Respon
         let step_id = step_val
             .get("id")
             .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
+            .unwrap_or("unknown");
         let step_type = step_val
             .get("type")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+            .unwrap_or("");
 
         // 1. 检查 type 是否存在
         if step_type.is_empty() {
             errors.push(AssembleError {
-                step: step_id.clone(),
+                step: step_id.to_owned(),
                 field: "type".into(),
                 message: format!("步骤 #{} 缺少 type 字段", i),
             });
             continue;
         }
-        if !crate::nodes::registry::is_registered(&step_type) {
+        if !crate::nodes::registry::is_registered(step_type) {
             errors.push(AssembleError {
-                step: step_id.clone(),
+                step: step_id.to_owned(),
                 field: "type".into(),
                 message: format!("节点类型 '{}' 未注册", step_type),
             });
@@ -512,25 +510,22 @@ pub async fn workflow_assemble(Json(body): Json<WorkflowAssembleBody>) -> Respon
         // 2. 检查 id 是否唯一
         if step_id == "unknown" {
             errors.push(AssembleError {
-                step: step_id.clone(),
+                step: step_id.to_owned(),
                 field: "id".into(),
                 message: format!("步骤 #{} 缺少 id 字段", i),
             });
         }
 
         // 3. 校验 required params
-        let config = step_val
-            .get("config")
-            .cloned()
-            .unwrap_or(serde_json::json!({}));
-        let param_errors = validate_step_params(&step_type, &step_id, &config);
+        let config = step_val.get("config").cloned().unwrap_or(serde_json::json!({}));
+        let param_errors = validate_step_params(step_type, step_id, &config);
         errors.extend(param_errors);
 
         // 4. 检查 next 引用是否有效
         if let Some(next) = step_val.get("next").and_then(|v| v.as_str()) {
             if !next.is_empty() && !step_ids.contains(next) {
                 errors.push(AssembleError {
-                    step: step_id.clone(),
+                    step: step_id.to_owned(),
                     field: "next".into(),
                     message: format!("引用的下一步骤 '{}' 不存在", next),
                 });
@@ -545,7 +540,7 @@ pub async fn workflow_assemble(Json(body): Json<WorkflowAssembleBody>) -> Respon
         {
             if !step_ids.contains(rc_ref) {
                 errors.push(AssembleError {
-                    step: step_id.clone(),
+                    step: step_id.to_owned(),
                     field: "runCondition.ref".into(),
                     message: format!("引用的条件步骤 '{}' 不存在", rc_ref),
                 });
@@ -553,7 +548,7 @@ pub async fn workflow_assemble(Json(body): Json<WorkflowAssembleBody>) -> Respon
         }
 
         // 6. 容器类型但无 body_steps 的警告
-        if crate::nodes::registry::is_container(&step_type) {
+        if crate::nodes::registry::is_container(step_type) {
             let has_body = step_val
                 .get("body_steps")
                 .or_else(|| step_val.get("bodySteps"))

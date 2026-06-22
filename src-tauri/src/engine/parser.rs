@@ -117,8 +117,9 @@ fn validate_step_references(steps: &[Step]) -> Result<()> {
         // 校验变量引用：{{step_xxx}} / {{step_xxx.y}} 中的 step ID 必须存在
         let config_str = serde_json::to_string(&step.config).unwrap_or_default();
         for ref_id in extract_step_refs(&config_str) {
-            let full_id = format!("step_{}", ref_id);
+            // extract_step_refs 返回去 "step_" 前缀的裸 ID
             // 同时检查带 "step_" 前缀和原始 ID（兼容 step.id == "1" 等非 step_ 前缀命名）
+            let full_id = format!("step_{}", ref_id);
             let stripped = full_id.strip_prefix("step_").unwrap_or(&full_id);
             if !step_ids.contains(full_id.as_str()) && !step_ids.contains(stripped) {
                 return Err(anyhow!(
@@ -421,8 +422,8 @@ pub fn auto_order_steps(steps: &[Step]) -> Vec<usize> {
     order
 }
 
-fn extract_step_refs(s: &str) -> Vec<String> {
-    let mut refs = Vec::new();
+fn extract_step_refs(s: &str) -> std::collections::HashSet<String> {
+    let mut refs = std::collections::HashSet::new();
 
     let prefix1 = "output.step_";
     for (pos, _) in s.match_indices(prefix1) {
@@ -432,7 +433,7 @@ fn extract_step_refs(s: &str) -> Vec<String> {
             .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
             .collect();
         if !id.is_empty() {
-            refs.push(id);
+            refs.insert(id);
         }
     }
 
@@ -444,12 +445,10 @@ fn extract_step_refs(s: &str) -> Vec<String> {
             .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
             .collect();
         if !id.is_empty() {
-            refs.push(id);
+            refs.insert(id);
         }
     }
 
-    refs.sort();
-    refs.dedup();
     refs
 }
 
