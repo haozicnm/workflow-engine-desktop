@@ -191,6 +191,9 @@ impl DagScheduler {
             None => return,
         };
 
+        // 收集被阻断的下游节点，稍后检查是否需要递归跳过
+        let mut blocked_targets: Vec<String> = Vec::new();
+
         for (from_port, to_id) in &downstream {
             // 条件节点：只激活匹配 branch 的边
             if let Some(branch) = condition_output {
@@ -198,6 +201,7 @@ impl DagScheduler {
                     // 这条边被条件阻断
                     self.blocked_edges
                         .insert((format!("{}:{}", node_id, from_port), to_id.clone()));
+                    blocked_targets.push(to_id.clone());
                     continue;
                 }
             }
@@ -210,6 +214,54 @@ impl DagScheduler {
                 if *count == 0 {
                     self.ready.push_back(to_id.clone());
                 }
+            }
+        }
+
+        // 递归检查被阻断的节点：如果所有入边都被阻断，标记为跳过
+        for target in blocked_targets {
+            self.propagate_blocked(&target);
+        }
+    }
+
+    /// 递归检查被阻断的节点：如果 blockCount > 0 且所有入边来源都已完成，
+    /// 则该节点永远不会被调度，标记为跳过（completed）并递归阻断其下游
+    fn propagate_blocked(&mut self, node_id: &str) {
+        if self.completed.contains(node_id) {
+            return; // 已处理
+        }
+
+        // 检查该节点是否还有可能被激活的入边
+        // 即：是否存在某个上游节点未完成且未被阻断
+        let total_in = self.block_count.get(node_id).copied().unwrap_or(0);
+        if total_in == 0 {
+            return; // 已经就绪或已完成
+        }
+
+        // 计算该节点还有多少入边来源未完成
+        let mut remaining_sources = 0;
+        for (from_id, downstream) in &self.adjacency {
+            for (_, to_id) in downstream {
+                if to_id == node_id && !self.completed.contains(from_id.as_str()) {
+                    let key = format!("{}:_", from_id);
+                    // 检查这条边是否被阻断
+                    let is_blocked = self.blocked_edges.iter().any(|(k, _)| k.starts_with(&format!("{}:", from_id)));
+                    if !is_blocked {
+                        remaining_sources += 1;
+                    }
+                }
+            }
+        }
+
+        if remaining_sources == 0 {
+            // 所有入边来源都已完成或被阻断 → 该节点永远不会执行
+            self.completed.insert(node_id.to_string());
+            // 递归阻断其下游
+            let downstream = match self.adjacency.get(node_id) {
+                Some(d) => d.clone(),
+                None => return,
+            };
+            for (_, to_id) in &downstream {
+                self.propagate_blocked(to_id);
             }
         }
     }
@@ -653,11 +705,11 @@ pub async fn run_workflow(
     }
 }
 
-/// DAG 模式执行：blockCount 增量拓扑调度
+/// DAG 模式执行：blockCount 增量拓扑调度（支持并行）
 ///
 /// 核心循环：
-/// 1. 从 DagScheduler 取出就绪节点
-/// 2. 执行节点（支持重试、超时、错误策略）
+/// 1. 从 DagScheduler 取出所有就绪节点
+/// 2. 单节点串行 / 多节点并行（tokio::JoinSet）
 /// 3. 条件节点：提取 branch 输出，传递给 complete_node 做边过滤
 /// 4. complete_node 递减下游 blockCount，新就绪节点入队
 /// 5. 重复直到所有节点完成或无就绪节点（环检测）
@@ -688,34 +740,7 @@ async fn run_dag_workflow(
         total_steps, workflow.edges.len(), dag.ready.len());
 
     while !dag.is_done() {
-        // 取出就绪节点
-        let current_id = match dag.pop_ready() {
-            Some(id) => id,
-            None => {
-                // 无就绪节点但未完成 → 环或死锁
-                let err_msg = "DAG 执行死锁：无就绪节点但有未完成节点（可能存在循环依赖）";
-                warn!("{}", err_msg);
-                state.mark_failed();
-                let _ = db.update_run_status(run_id, "failed", Some(err_msg));
-                emit_run_update(app_handle, run_id, workflow_name, "failed");
-                preview::stop_live_session(run_id, "failed");
-                return Err(anyhow::anyhow!(err_msg));
-            }
-        };
-
-        // 循环检测
-        step_execution_count += 1;
-        if step_execution_count > MAX_STEP_EXECUTIONS {
-            let err_msg = format!("DAG 执行超过上限 {} 步", MAX_STEP_EXECUTIONS);
-            warn!("{}", err_msg);
-            state.mark_failed();
-            let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
-            emit_run_update(app_handle, run_id, workflow_name, "failed");
-            preview::stop_live_session(run_id, "failed");
-            return Err(anyhow::anyhow!(err_msg));
-        }
-
-        // 检查取消
+        // 取消检查
         if ctrl.cancel_flag.load(Ordering::Relaxed) || ctrl.cancel_token.is_cancelled() {
             warn!("工作流取消: {} (run_id: {})", workflow_name, run_id);
             state.mark_failed();
@@ -725,7 +750,7 @@ async fn run_dag_workflow(
             return Err(anyhow::anyhow!("cancelled"));
         }
 
-        // 检查暂停
+        // 暂停检查
         while ctrl.pause_flag.load(Ordering::Relaxed) {
             tokio::select! {
                 _ = ctrl.cancel_token.cancelled() => {
@@ -738,128 +763,160 @@ async fn run_dag_workflow(
             }
         }
 
-        // 查找步骤
-        let step = match DagScheduler::find_step(&workflow.steps, &current_id) {
-            Some(s) => s,
-            None => {
-                warn!("步骤 '{}' 不存在", current_id);
-                state.mark_failed();
-                let _ = db.update_run_status(run_id, "failed", Some(&format!("步骤 '{}' 不存在", current_id)));
-                emit_run_update(app_handle, run_id, workflow_name, "failed");
-                return Err(anyhow::anyhow!("步骤 '{}' 不存在", current_id));
+        // 取出所有就绪节点
+        let mut ready_batch: Vec<String> = Vec::new();
+        while let Some(id) = dag.pop_ready() {
+            ready_batch.push(id);
+        }
+
+        if ready_batch.is_empty() {
+            // 无就绪节点但未完成 → 环或死锁
+            let err_msg = "DAG 执行死锁：无就绪节点但有未完成节点（可能存在循环依赖）";
+            warn!("{}", err_msg);
+            state.mark_failed();
+            let _ = db.update_run_status(run_id, "failed", Some(err_msg));
+            emit_run_update(app_handle, run_id, workflow_name, "failed");
+            preview::stop_live_session(run_id, "failed");
+            return Err(anyhow::anyhow!(err_msg));
+        }
+
+        // 循环检测
+        step_execution_count += ready_batch.len();
+        if step_execution_count > MAX_STEP_EXECUTIONS {
+            let err_msg = format!("DAG 执行超过上限 {} 步", MAX_STEP_EXECUTIONS);
+            warn!("{}", err_msg);
+            state.mark_failed();
+            let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
+            emit_run_update(app_handle, run_id, workflow_name, "failed");
+            preview::stop_live_session(run_id, "failed");
+            return Err(anyhow::anyhow!(err_msg));
+        }
+
+        // 并行执行就绪节点
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for node_id in &ready_batch {
+            let step = match DagScheduler::find_step(&workflow.steps, node_id) {
+                Some(s) => s.clone(),
+                None => {
+                    warn!("步骤 '{}' 不存在", node_id);
+                    state.mark_failed();
+                    let _ = db.update_run_status(run_id, "failed", Some(&format!("步骤 '{}' 不存在", node_id)));
+                    emit_run_update(app_handle, run_id, workflow_name, "failed");
+                    return Err(anyhow::anyhow!("步骤 '{}' 不存在", node_id));
+                }
+            };
+
+            // 通知前端：步骤开始
+            state.mark_step_running(node_id);
+            let _ = db.create_step_run(run_id, node_id);
+            emit_step_update(app_handle, run_id, node_id, &step.name, total_steps, "running", None);
+
+            // 延迟
+            if let Some(delay_ms) = step.delay {
+                if delay_ms > 0 {
+                    tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                }
             }
-        };
 
-        info!("DAG 步骤执行: {} (类型: {})", step.name, step.step_type);
-        state.mark_step_running(&current_id);
-        let _ = db.create_step_run(run_id, &current_id);
-        emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "running", None);
+            // 克隆上下文给并行任务
+            let exec = Arc::clone(executor);
+            let mut task_ctx = ExecutionContext::new(run_id, workflow);
+            task_ctx.variables = ctx.variables.clone();
+            task_ctx.step_outputs = ctx.step_outputs.clone();
 
-        // 断点/单步检查
-        if step.breakpoint || ctrl.step_mode_flag.load(Ordering::Relaxed) {
-            update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
-            ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-            while ctrl.breakpoint_flag.load(Ordering::Relaxed) {
-                tokio::select! {
-                    _ = ctrl.cancel_token.cancelled() => {
-                        state.mark_failed();
-                        let _ = db.update_run_status(run_id, "cancelled", None);
-                        emit_run_update(app_handle, run_id, workflow_name, "cancelled");
-                        return Err(anyhow::anyhow!("cancelled"));
+            join_set.spawn(async move {
+                let start = Instant::now();
+                let result = execute_with_retry(&exec, &step, &mut task_ctx).await;
+                let elapsed = start.elapsed().as_millis() as u64;
+                (step.id.clone(), step.name.clone(), step.step_type.clone(), step.on_error.clone(), result, elapsed, task_ctx.variables)
+            });
+        }
+
+        // 收集并行结果
+        let mut any_failed = false;
+        while let Some(jr) = join_set.join_next().await {
+            match jr {
+                Ok((node_id, step_name, step_type, on_error, result, elapsed_ms, task_vars)) => {
+                    // 合并任务上下文变量
+                    for (k, v) in task_vars {
+                        ctx.variables.insert(k, v);
                     }
-                    _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
+
+                    match result {
+                        Ok(output) => {
+                            ctx.set_output(&node_id, output.clone());
+                            state.mark_step_completed(&node_id);
+                            let _ = db.complete_step_run(run_id, &node_id, Some(&output), None);
+                            emit_step_update(app_handle, run_id, &node_id, &step_name, total_steps, "completed", Some(&output));
+
+                            // Preview
+                            let step_ref = DagScheduler::find_step(&workflow.steps, &node_id).unwrap();
+                            let mut preview_out = preview::generate_step_preview(step_ref, &output, elapsed_ms);
+                            if let Some(bundle_path) = preview::bundle_step_output(run_id, step_ref, &output) {
+                                preview_out.bundle_path = Some(bundle_path.to_string_lossy().to_string());
+                            }
+                            preview::append_trajectory(run_id, &preview_out);
+                            let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
+                            preview::update_live_session(run_id, &preview_out, step_idx);
+
+                            // 条件节点：提取 branch
+                            let condition_branch = if step_type == "condition" {
+                                output.get("branch").and_then(|v| v.as_str()).map(|s| s.to_string())
+                            } else {
+                                None
+                            };
+
+                            dag.complete_node(&node_id, condition_branch.as_deref());
+                        }
+                        Err(e) => {
+                            let err_msg = e.to_string();
+                            warn!("DAG 步骤失败: {} - {}", step_name, err_msg);
+                            state.mark_step_failed(&node_id);
+                            let _ = db.complete_step_run(run_id, &node_id, None, Some(&err_msg));
+                            emit_step_update_with_error(app_handle, run_id, &node_id, &step_name, &err_msg);
+
+                            let step_ref = DagScheduler::find_step(&workflow.steps, &node_id).unwrap();
+                            let failed = preview::generate_failed_preview(step_ref, &err_msg, elapsed_ms);
+                            preview::append_trajectory(run_id, &failed);
+                            let step_idx = step_index.get(node_id.as_str()).copied().unwrap_or(0);
+                            preview::update_live_session(run_id, &failed, step_idx);
+
+                            let strategy = on_error.unwrap_or_default();
+                            match strategy {
+                                crate::engine::workflow::ErrorStrategy::Ignore => {
+                                    info!("DAG 步骤 '{}' 错误已忽略", step_name);
+                                    ctx.set_output(&node_id, serde_json::Value::Null);
+                                    state.mark_step_completed(&node_id);
+                                    emit_step_update_ignored(app_handle, run_id, &node_id, &step_name, total_steps, &err_msg);
+                                    dag.complete_node(&node_id, None);
+                                }
+                                _ => {
+                                    // Fail / Branch → 整体失败
+                                    any_failed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(join_err) => {
+                    warn!("并行任务 panic: {}", join_err);
+                    any_failed = true;
                 }
             }
         }
 
-        // 步骤延迟
-        if let Some(delay_ms) = step.delay {
-            if delay_ms > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-            }
+        if any_failed {
+            state.mark_failed();
+            let _ = db.update_run_status(run_id, "failed", Some("DAG 并行节点失败"));
+            emit_run_update(app_handle, run_id, workflow_name, "failed");
+            preview::stop_live_session(run_id, "failed");
+            return Err(anyhow::anyhow!("DAG 并行节点失败"));
         }
 
-        // 执行步骤
-        let step_start = Instant::now();
-        let result = execute_with_retry(executor, step, ctx).await;
-        let elapsed_ms = step_start.elapsed().as_millis() as u64;
-
-        match result {
-            Ok(output) => {
-                ctx.set_output(&current_id, output.clone());
-                state.mark_step_completed(&current_id);
-                let _ = db.complete_step_run(run_id, &current_id, Some(&output), None);
-                emit_step_update(app_handle, run_id, &current_id, &step.name, total_steps, "completed", Some(&output));
-
-                // Preview
-                let mut preview = preview::generate_step_preview(step, &output, elapsed_ms);
-                if let Some(bundle_path) = preview::bundle_step_output(run_id, step, &output) {
-                    preview.bundle_path = Some(bundle_path.to_string_lossy().to_string());
-                }
-                preview::append_trajectory(run_id, &preview);
-                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
-                preview::update_live_session(run_id, &preview, step_idx);
-                update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
-                emit_variable_snapshot(app_handle, run_id, ctx);
-
-                // 条件节点：提取 branch 值用于边过滤
-                let condition_branch = if step.step_type == "condition" {
-                    output.get("branch").and_then(|v| v.as_str()).map(|s| s.to_string())
-                } else {
-                    None
-                };
-
-                // DAG 调度：递减下游 blockCount
-                dag.complete_node(&current_id, condition_branch.as_deref());
-            }
-            Err(e) => {
-                let err_msg = e.to_string();
-                warn!("DAG 步骤失败: {} - {}", step.name, err_msg);
-                state.mark_step_failed(&current_id);
-                let _ = db.complete_step_run(run_id, &current_id, None, Some(&err_msg));
-                emit_step_update_with_error(app_handle, run_id, &current_id, &step.name, &err_msg);
-
-                let failed = preview::generate_failed_preview(step, &err_msg, elapsed_ms);
-                preview::append_trajectory(run_id, &failed);
-                let step_idx = step_index.get(current_id.as_str()).copied().unwrap_or(0);
-                preview::update_live_session(run_id, &failed, step_idx);
-                update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
-
-                // 错误策略
-                let strategy = step.on_error.clone().unwrap_or_default();
-                match strategy {
-                    crate::engine::workflow::ErrorStrategy::Fail => {
-                        state.mark_failed();
-                        let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
-                        emit_run_update(app_handle, run_id, workflow_name, "failed");
-                        preview::stop_live_session(run_id, "failed");
-                        return Err(e);
-                    }
-                    crate::engine::workflow::ErrorStrategy::Ignore => {
-                        info!("DAG 步骤 '{}' 错误已忽略", step.name);
-                        ctx.set_output(&current_id, serde_json::Value::Null);
-                        state.mark_step_completed(&current_id);
-                        emit_step_update_ignored(app_handle, run_id, &current_id, &step.name, total_steps, &err_msg);
-                        emit_variable_snapshot(app_handle, run_id, ctx);
-                        // 忽略错误后仍然完成节点，递减下游
-                        dag.complete_node(&current_id, None);
-                    }
-                    crate::engine::workflow::ErrorStrategy::Branch { step_id: ref _branch_id } => {
-                        // DAG 模式下 Branch 策略暂不支持（Phase 3）
-                        warn!("DAG 模式暂不支持 onError:Branch，按 Fail 处理");
-                        state.mark_failed();
-                        let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
-                        emit_run_update(app_handle, run_id, workflow_name, "failed");
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        // 单步模式暂停
-        if ctrl.step_mode_flag.load(Ordering::Relaxed) {
-            ctrl.breakpoint_flag.store(true, Ordering::Relaxed);
-        }
+        // 变量快照
+        update_debug_snapshot(&ctrl.debug_snapshots, run_id, ctx).await;
+        emit_variable_snapshot(app_handle, run_id, ctx);
     }
 
     info!("DAG 工作流完成: {} (run_id: {})", workflow_name, run_id);
@@ -1194,4 +1251,136 @@ async fn update_debug_snapshot(
         "step_outputs": ctx.step_outputs,
     });
     snapshots.write().await.insert(run_id.to_string(), snapshot);
+}
+
+#[cfg(test)]
+mod dag_tests {
+    use super::*;
+    use crate::engine::workflow::{Edge, Step};
+    use serde_json::json;
+
+    fn make_step(id: &str, step_type: &str) -> Step {
+        Step {
+            id: id.to_string(),
+            name: id.to_string(),
+            step_type: step_type.to_string(),
+            config: json!({}),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn dag_linear_chain() {
+        let steps = vec![make_step("a", "data_set"), make_step("b", "data_set"), make_step("c", "data_set")];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+
+        // a 是唯一初始就绪节点
+        assert_eq!(dag.pop_ready(), Some("a".to_string()));
+        assert_eq!(dag.pop_ready(), None); // 只有一个
+
+        dag.complete_node("a", None);
+        assert_eq!(dag.pop_ready(), Some("b".to_string()));
+
+        dag.complete_node("b", None);
+        assert_eq!(dag.pop_ready(), Some("c".to_string()));
+
+        dag.complete_node("c", None);
+        assert!(dag.is_done());
+    }
+
+    #[test]
+    fn dag_parallel_ready() {
+        let steps = vec![make_step("a", "data_set"), make_step("b", "data_set"), make_step("c", "data_set")];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+
+        // a 和 b 都是初始就绪（blockCount=0）
+        let mut ready = vec![dag.pop_ready().unwrap(), dag.pop_ready().unwrap()];
+        ready.sort();
+        assert_eq!(ready, vec!["a", "b"]);
+        assert_eq!(dag.pop_ready(), None);
+
+        // a 完成后 c 还不能就绪（b 还没完成）
+        dag.complete_node("a", None);
+        assert_eq!(dag.pop_ready(), None);
+
+        // b 完成后 c 就绪
+        dag.complete_node("b", None);
+        assert_eq!(dag.pop_ready(), Some("c".to_string()));
+
+        dag.complete_node("c", None);
+        assert!(dag.is_done());
+    }
+
+    #[test]
+    fn dag_condition_branch_filtering() {
+        let steps = vec![
+            make_step("check", "condition"),
+            make_step("ok", "data_set"),
+            make_step("fail", "data_set"),
+        ];
+        let edges = vec![
+            Edge { from: "check".into(), from_port: "true".into(), to: "ok".into(), to_port: "in".into() },
+            Edge { from: "check".into(), from_port: "false".into(), to: "fail".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+
+        // check 执行
+        assert_eq!(dag.pop_ready(), Some("check".to_string()));
+
+        // 条件为 true → 只激活 true 边
+        dag.complete_node("check", Some("true"));
+        assert_eq!(dag.pop_ready(), Some("ok".to_string()));
+        assert_eq!(dag.pop_ready(), None); // fail 不会就绪
+
+        dag.complete_node("ok", None);
+        assert!(dag.is_done());
+        // fail 从未执行，但 is_done 只看 completed 数量
+        // 实际运行时 fail 不在 completed 中，所以 is_done 返回 false
+        // 这是预期行为——被条件阻断的节点需要特殊处理
+    }
+
+    #[test]
+    fn dag_diamond_structure() {
+        let steps = vec![
+            make_step("a", "data_set"),
+            make_step("b", "data_set"),
+            make_step("c", "data_set"),
+            make_step("d", "data_set"),
+        ];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+            Edge { from: "a".into(), from_port: "out".into(), to: "c".into(), to_port: "in".into() },
+            Edge { from: "b".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+            Edge { from: "c".into(), from_port: "out".into(), to: "d".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+
+        // a 就绪
+        assert_eq!(dag.pop_ready(), Some("a".to_string()));
+        dag.complete_node("a", None);
+
+        // b 和 c 并行就绪
+        let mut ready = vec![dag.pop_ready().unwrap(), dag.pop_ready().unwrap()];
+        ready.sort();
+        assert_eq!(ready, vec!["b", "c"]);
+
+        // b 完成后 d 还不能就绪
+        dag.complete_node("b", None);
+        assert_eq!(dag.pop_ready(), None);
+
+        // c 完成后 d 就绪
+        dag.complete_node("c", None);
+        assert_eq!(dag.pop_ready(), Some("d".to_string()));
+
+        dag.complete_node("d", None);
+        assert!(dag.is_done());
+    }
 }
