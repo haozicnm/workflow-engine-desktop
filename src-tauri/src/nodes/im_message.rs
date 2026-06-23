@@ -147,7 +147,7 @@ impl NodeExecutor for ImMessageNode {
         let title = config.get("title").and_then(|v| v.as_str()).unwrap_or("Workflow Engine");
 
         // 优先从输入端口获取文本
-        let text = ctx.input_ports.values().next().and_then(|v| v.as_str()).map(String::from)
+        let text = ctx.input_ports.get("text").and_then(|v| v.as_str()).map(String::from)
             .or_else(|| config.get("text").and_then(|v| v.as_str()).map(String::from))
             .unwrap_or_default();
 

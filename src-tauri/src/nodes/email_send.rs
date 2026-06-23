@@ -56,6 +56,9 @@ impl NodeExecutor for EmailSendNode {
         let config = &step.config;
 
         let password = config.get("password").and_then(|v| v.as_str()).unwrap_or("");
+        let smtp_host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
+        let smtp_port = config.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587) as u16;
+        let username = config.get("username").and_then(|v| v.as_str()).unwrap_or("");
         let from = config.get("from").and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("email_send: 缺少 from"))?;
         let to = config.get("to").and_then(|v| v.as_str())
@@ -119,15 +122,17 @@ impl NodeExecutor for EmailSendNode {
             // 通过 HTTP API 发送（如 Resend/SendGrid）
             if let Some(api_url) = config.get("smtp_api_url").and_then(|v| v.as_str()) {
                 let client = reqwest::Client::new();
-                let resp = client.post(api_url)
-                    .header("Authorization", format!("Bearer {}", password))
+                let mut req = client.post(api_url)
                     .json(&json!({
                         "from": from,
                         "to": to.split(',').map(|s| s.trim()).collect::<Vec<_>>(),
                         "subject": subject,
                         if is_html { "html" } else { "text" }: body,
-                    }))
-                    .send()
+                    }));
+                if !password.is_empty() {
+                    req = req.header("Authorization", format!("Bearer {}", password));
+                }
+                let resp = req.send()
                     .await
                     .map_err(|e| anyhow!("邮件 API 请求失败: {}", e))?;
                 let status = resp.status();

@@ -1,6 +1,6 @@
 {
   "$schema": "node-schema.json",
-  "version": "8.3",
+  "version": "9.0.1",
   "description": "Workflow Engine node registry — single source of truth for Rust backend and Vue frontend",
   "nodes": [
     {
@@ -2029,6 +2029,258 @@
         "merge",
         "office"
       ]
+    },
+    {
+      "type": "llm_chat",
+      "label": "LLM 对话",
+      "category": "ai",
+      "icon": "brain",
+      "description": "调用 LLM API（OpenAI/DeepSeek/Kimi 等 OpenAI-compatible 格式）",
+      "outputs": [
+        {"name": "content", "data_type": "text", "desc": "LLM 返回内容"},
+        {"name": "usage", "data_type": "json", "desc": "Token 用量"},
+        {"name": "model", "data_type": "text", "desc": "模型名称"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "api_url": { "type": "string", "default": "https://api.openai.com/v1/chat/completions" },
+          "api_key": { "type": "string", "required": true },
+          "model": { "type": "string", "default": "gpt-4o" },
+          "system_prompt": { "type": "string" },
+          "messages": { "type": "array" },
+          "prompt": { "type": "string" },
+          "temperature": { "type": "number", "default": 0.7 },
+          "max_tokens": { "type": "number", "default": 1024 }
+        }
+      }
+    },
+    {
+      "type": "prompt_template",
+      "label": "Prompt 模板",
+      "category": "ai",
+      "icon": "file-text",
+      "description": "Prompt 模板变量插值（支持 {{variable}} 语法）",
+      "outputs": [
+        {"name": "prompt", "data_type": "text", "desc": "生成的 Prompt 文本"},
+        {"name": "messages", "data_type": "array", "desc": "消息数组"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "template": { "type": "string", "required": true },
+          "system_prompt": { "type": "string" },
+          "role": { "type": "string", "default": "user" }
+        }
+      }
+    },
+    {
+      "type": "email_send",
+      "label": "发送邮件",
+      "category": "core",
+      "icon": "mail",
+      "description": "通过 SMTP 发送邮件",
+      "outputs": [
+        {"name": "sent", "data_type": "bool", "desc": "是否发送成功"},
+        {"name": "message_id", "data_type": "text", "desc": "邮件消息 ID"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "smtp_host": { "type": "string" },
+          "smtp_port": { "type": "number", "default": 587 },
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "from": { "type": "string", "required": true },
+          "to": { "type": "string", "required": true },
+          "subject": { "type": "string", "required": true },
+          "body": { "type": "string" },
+          "html": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    {
+      "type": "database_query",
+      "label": "数据库查询",
+      "category": "core",
+      "icon": "database",
+      "description": "执行 SQL 查询（SQLite）",
+      "outputs": [
+        {"name": "rows", "data_type": "array", "desc": "查询结果行"},
+        {"name": "columns", "data_type": "array", "desc": "列名列表"},
+        {"name": "count", "data_type": "number", "desc": "返回行数"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "db_type": { "type": "string", "default": "sqlite", "enum": ["sqlite"] },
+          "connection": { "type": "string" },
+          "sql": { "type": "string", "required": true },
+          "max_rows": { "type": "number", "default": 1000 },
+          "allow_write": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    {
+      "type": "json_transform",
+      "label": "JSON 转换",
+      "category": "data",
+      "icon": "shuffle",
+      "description": "JSON 数据映射/筛选/排序/合并",
+      "outputs": [
+        {"name": "result", "data_type": "json", "desc": "转换结果"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "operation": { "type": "string", "required": true, "enum": ["pick", "filter", "sort", "map", "merge", "keys", "values"] },
+          "fields": { "type": "array" },
+          "expression": { "type": "string" },
+          "sort_key": { "type": "string" },
+          "sort_desc": { "type": "boolean" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "data_filter",
+      "label": "数据过滤",
+      "category": "data",
+      "icon": "filter",
+      "description": "按条件过滤数组数据",
+      "outputs": [
+        {"name": "filtered", "data_type": "array", "desc": "过滤后的数组"},
+        {"name": "count", "data_type": "number", "desc": "结果数量"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "op": { "type": "string", "enum": ["equals", "not_equals", "contains", "not_contains", "gt", "lt", "gte", "lte", "is_empty", "not_empty", "regex", "in"] },
+          "value": {},
+          "expression": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "im_message",
+      "label": "IM 消息",
+      "category": "integration",
+      "icon": "message-square",
+      "description": "发送消息到 Slack/飞书/钉钉/企业微信/Telegram",
+      "outputs": [
+        {"name": "sent", "data_type": "bool", "desc": "是否发送成功"},
+        {"name": "response", "data_type": "json", "desc": "API 响应"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "platform": { "type": "string", "required": true, "enum": ["slack", "feishu", "dingtalk", "wecom", "telegram"] },
+          "webhook_url": { "type": "string", "required": true },
+          "title": { "type": "string", "default": "Workflow Engine" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "github_issue",
+      "label": "GitHub Issue",
+      "category": "integration",
+      "icon": "github",
+      "description": "通过 GitHub REST API 创建 Issue 或 Pull Request",
+      "outputs": [
+        {"name": "url", "data_type": "text", "desc": "Issue/PR URL"},
+        {"name": "number", "data_type": "number", "desc": "Issue/PR 编号"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string", "required": true },
+          "repo": { "type": "string", "required": true },
+          "action": { "type": "string", "default": "create_issue", "enum": ["create_issue", "create_pr"] },
+          "title": { "type": "string", "required": true },
+          "body": { "type": "string" },
+          "labels": { "type": "array" },
+          "base": { "type": "string" },
+          "head": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "trigger_cron",
+      "label": "定时触发器",
+      "category": "trigger",
+      "icon": "clock",
+      "description": "按 Cron 表达式定时触发",
+      "outputs": [
+        {"name": "triggered_at", "data_type": "text", "desc": "触发时间"},
+        {"name": "timestamp", "data_type": "number", "desc": "Unix 时间戳"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "cron_expr": { "type": "string", "required": true },
+          "timezone": { "type": "string", "default": "UTC" }
+        }
+      }
+    },
+    {
+      "type": "trigger_webhook",
+      "label": "Webhook 触发器",
+      "category": "trigger",
+      "icon": "webhook",
+      "description": "通过 HTTP POST 触发",
+      "outputs": [
+        {"name": "body", "data_type": "json", "desc": "请求体"},
+        {"name": "headers", "data_type": "json", "desc": "请求头"},
+        {"name": "method", "data_type": "text", "desc": "HTTP 方法"},
+        {"name": "query", "data_type": "json", "desc": "查询参数"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "required": true },
+          "method": { "type": "string", "default": "POST" },
+          "auth_header": { "type": "string" }
+        }
+      }
+    },
+    {
+      "type": "trigger_file",
+      "label": "文件变化触发器",
+      "category": "trigger",
+      "icon": "file-check",
+      "description": "监测文件/目录变化时触发",
+      "outputs": [
+        {"name": "path", "data_type": "text", "desc": "触发文件路径"},
+        {"name": "event", "data_type": "text", "desc": "事件类型"},
+        {"name": "triggered_at", "data_type": "text", "desc": "触发时间"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "required": true },
+          "events": { "type": "array", "default": ["create", "modify"] }
+        }
+      }
+    },
+    {
+      "type": "webhook_response",
+      "label": "Webhook 响应",
+      "category": "trigger",
+      "icon": "reply",
+      "description": "向 Webhook 调用方返回 HTTP 响应",
+      "outputs": [
+        {"name": "sent", "data_type": "bool", "desc": "是否已发送"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "status_code": { "type": "number", "default": 200 },
+          "headers": { "type": "object" },
+          "body": {}
+        }
+      }
     }
   ],
   "categories": {

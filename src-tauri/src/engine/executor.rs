@@ -400,39 +400,49 @@ impl StepExecutor {
             let exec = Arc::clone(self);
             join_set.spawn(async move {
                 let result = exec.execute(&step, &mut task_ctx).await;
-                (step.id.clone(), result, task_ctx.variables)
+                (step.id.clone(), result, task_ctx.variables, step.on_error.clone())
             });
         }
-        let mut errors: Vec<(String, anyhow::Error)> = Vec::new();
+        let mut hard_errors: Vec<(String, anyhow::Error)> = Vec::new();
         let mut panics: Vec<String> = Vec::new();
         while let Some(jr) = join_set.join_next().await {
             match jr {
-                Ok((nid, Ok(val), vars)) => {
-                    // 节点输出存入 step_outputs（不污染 variables）
+                Ok((nid, Ok(val), vars, _)) => {
                     ctx.set_output(&nid, val);
-                    // 合并任务上下文中的所有变量（节点内部 set_var 的值）
                     for (k, v) in vars {
                         ctx.variables.insert(k, v);
                     }
                 }
-                Ok((nid, Err(e), _)) => {
+                Ok((nid, Err(e), _, on_error)) => {
                     warn!("节点 {} 失败: {}", nid, e);
-                    // 记录错误到 _error.{nodeId} 变量，供下游 on_error:ignore 使用
                     ctx.set_var(format!("_error.{}", nid), serde_json::json!(e.to_string()));
-                    errors.push((nid, e));
+                    // 检查该节点的 on_error 策略
+                    match on_error.unwrap_or_default() {
+                        crate::engine::workflow::ErrorStrategy::Ignore => {
+                            warn!("并行节点 {} 错误已忽略 (on_error=ignore)", nid);
+                        }
+                        crate::engine::workflow::ErrorStrategy::Branch { step_id } => {
+                            warn!("并行节点 {} 错误分支 → {}", nid, step_id);
+                            // 错误分支目标节点将在下轮调度中执行
+                        }
+                        _ => {
+                            // Fail — 收集硬错误
+                            hard_errors.push((nid, e));
+                        }
+                    }
                 }
                 Err(e) => {
                     panics.push(format!("{}", e));
                 }
             }
         }
-        // 汇总所有错误（而非只返回第一个）
+        // 汇总所有硬错误（on_error=ignore/branch 的节点不计入）
         if !panics.is_empty() {
             return Err(anyhow!("并行任务 panic: {}", panics.join("; ")));
         }
-        if !errors.is_empty() {
-            let summary: Vec<String> = errors.iter().map(|(nid, e)| format!("{}: {}", nid, e)).collect();
-            return Err(anyhow!("并行执行有 {} 个节点失败: {}", errors.len(), summary.join("; ")));
+        if !hard_errors.is_empty() {
+            let summary: Vec<String> = hard_errors.iter().map(|(nid, e)| format!("{}: {}", nid, e)).collect();
+            return Err(anyhow!("并行执行有 {} 个节点失败: {}", hard_errors.len(), summary.join("; ")));
         }
         Ok(())
     }
