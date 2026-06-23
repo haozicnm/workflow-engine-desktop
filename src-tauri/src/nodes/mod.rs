@@ -50,3 +50,13 @@ pub mod database_query;
 // v8.8 IM 集成
 pub mod im_message;
 pub mod github_issue;
+// v9.0 AI 扩展 + 数据节点
+pub mod llm_embedding;
+pub mod llm_agent;
+pub mod text_splitter;
+pub mod json_schema_extract;
+pub mod vector_store;
+pub mod rag_query;
+pub mod redis_node;
+pub mod mongodb_node;
+pub mod s3_node;

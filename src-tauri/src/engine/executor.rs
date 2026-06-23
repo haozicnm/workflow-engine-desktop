@@ -159,6 +159,17 @@ impl StepExecutor {
         register!(executors, "im_message", crate::nodes::im_message::ImMessageNode);
         register!(executors, "github_issue", crate::nodes::github_issue::GithubIssueNode);
 
+        // ── v9.0 AI 扩展 + 数据节点 ──
+        register!(executors, "llm_embedding", crate::nodes::llm_embedding::LlmEmbeddingNode);
+        register!(executors, "llm_agent", crate::nodes::llm_agent::LlmAgentNode);
+        register!(executors, "text_splitter", crate::nodes::text_splitter::TextSplitterNode);
+        register!(executors, "json_schema_extract", crate::nodes::json_schema_extract::JsonSchemaExtractNode);
+        register!(executors, "vector_store", crate::nodes::vector_store::VectorStoreNode);
+        register!(executors, "rag_query", crate::nodes::rag_query::RagQueryNode);
+        register!(executors, "redis", crate::nodes::redis_node::RedisNode);
+        register!(executors, "mongodb", crate::nodes::mongodb_node::MongodbNode);
+        register!(executors, "s3", crate::nodes::s3_node::S3Node);
+
         // ── MCP 节点（Python 实现，仅注册原生没有的类型）──
         {
             use crate::nodes::mcp_node::{create_mcp_executor, get_all_mcp_types};
