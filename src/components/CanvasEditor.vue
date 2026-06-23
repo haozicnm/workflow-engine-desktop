@@ -301,6 +301,7 @@ function resetView() { canvas.resetView() }
               :from-port="line.fromPort"
               :to-port="line.toPort"
               :selected="selectedEdgeIdx === i"
+              :active="runStates[line.fromId]?.status === 'running'"
               @select="selectedEdgeIdx = i"
               @remove="emit('remove-edge', line.fromId, line.toId)"
             />

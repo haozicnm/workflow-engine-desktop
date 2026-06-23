@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+// 数据流动画 CSS（全局注入一次）
+if (!document.getElementById('edge-flow-animation')) {
+  const style = document.createElement('style')
+  style.id = 'edge-flow-animation'
+  style.textContent = `
+    @keyframes edge-flow { to { stroke-dashoffset: -20; } }
+    .animate-flow { animation: edge-flow 0.8s linear infinite; }
+  `
+  document.head.appendChild(style)
+}
+
 const props = defineProps<{
   from: { x: number; y: number }
   to: { x: number; y: number }
   fromPort?: string
   toPort?: string
   selected?: boolean
+  active?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -78,6 +90,17 @@ const arrowPath = computed(() => {
       :stroke="edgeColor"
       :stroke-width="props.selected ? 3 : 2"
       class="transition-colors"
+    />
+    <!-- Data flow animation (active edges) -->
+    <path
+      v-if="props.active"
+      :d
+      fill="none"
+      :stroke="props.fromPort === 'false' ? 'var(--danger, #ef4444)' : 'var(--primary)'"
+      stroke-width="3"
+      stroke-dasharray="8 12"
+      stroke-linecap="round"
+      class="animate-flow opacity-70"
     />
     <!-- Arrow head -->
     <path

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Step, StepRunState, NodePosition } from '../types/types'
 import ActionIcon from './ActionIcon.vue'
+import { getContainerDef } from '../types/node-registry'
 
 const props = defineProps<{
   step: Step
@@ -48,6 +49,19 @@ function onPortMouseDown(port: string, e: MouseEvent) {
   e.stopPropagation()
   emit('start-edge', props.step.id, port, e)
 }
+
+// 动态多端口：从 schema 获取输出端口定义
+const outputPorts = computed(() => {
+  if (props.step.type === 'condition') return null // condition 用硬编码 true/false
+  try {
+    const def = getContainerDef(props.step.type)
+    const outputs = (def as unknown as Record<string, unknown>)?.outputs as Array<Record<string, string>> | undefined
+    if (outputs && outputs.length > 1) {
+      return outputs
+    }
+  } catch { /* 非容器节点，无输出端口定义 */ }
+  return null
+})
 </script>
 
 <template>
@@ -138,6 +152,27 @@ function onPortMouseDown(port: string, e: MouseEvent) {
         :y="position.y + nodeHeight * 0.7 + 4"
         class="fill-danger text-[10px] select-none pointer-events-none"
       >✗</text>
+    </template>
+    <template v-else-if="outputPorts">
+      <!-- Dynamic multi-port (from schema) -->
+      <g v-for="(port, idx) in outputPorts" :key="port.name || port.label">
+        <circle
+          :cx="position.x + nodeWidth"
+          :cy="position.y + nodeHeight * (idx + 1) / (outputPorts.length + 1)"
+          r="5"
+          class="fill-hairline-strong stroke-hairline-strong hover:stroke-primary hover:fill-primary/20 cursor-crosshair transition-colors"
+          stroke-width="2"
+          data-port-target
+          :data-step-id="step.id"
+          :data-port-label="port.name || port.label"
+          @mousedown="onPortMouseDown(port.name || port.label, $event)"
+        />
+        <text
+          :x="position.x + nodeWidth + 8"
+          :y="position.y + nodeHeight * (idx + 1) / (outputPorts.length + 1) + 4"
+          class="fill-muted-foreground text-[9px] select-none pointer-events-none"
+        >{{ port.name || port.label }}</text>
+      </g>
     </template>
     <template v-else>
       <!-- Single output port -->
