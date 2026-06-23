@@ -137,11 +137,66 @@ pub async fn workflow_save_yaml(
 
     app.db.save_workflow_yaml(&id, &yaml)
         .map_err(|e| format!("Failed to save workflow YAML (id={id}): {e}"))?;
+
+    // v9.0: 自动同步 trigger_cron 节点到调度系统
+    sync_trigger_cron_to_schedule(&app, &id, &wf);
+
     let _ = app_handle.emit("workflow-changed", serde_json::json!({
         "action": "save",
         "workflow_id": &id,
     }));
     Ok(())
+}
+
+/// v9.0: 自动同步 trigger_cron 节点到调度系统
+/// 当工作流包含 trigger_cron 步骤时，自动创建/更新对应的 schedule 条目
+fn sync_trigger_cron_to_schedule(app: &crate::App, workflow_id: &str, wf: &crate::engine::workflow::Workflow) {
+    let trigger_steps: Vec<&crate::engine::workflow::Step> = wf.steps.iter()
+        .filter(|s| s.step_type == "trigger_cron")
+        .collect();
+
+    if trigger_steps.is_empty() {
+        return;
+    }
+
+    for step in trigger_steps {
+        let cron_expr = step.config.get("cron_expr")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        if cron_expr.is_empty() {
+            tracing::warn!("trigger_cron 节点 '{}' 缺少 cron_expr，跳过自动调度", step.id);
+            continue;
+        }
+
+        let timezone = step.config.get("timezone")
+            .and_then(|v| v.as_str())
+            .unwrap_or("UTC")
+            .to_string();
+
+        // 检查是否已有同 workflow_id + cron_expr 的计划
+        match app.db.list_enabled_schedules() {
+            Ok(schedules) => {
+                let existing = schedules.iter().find(|s| s.workflow_id == workflow_id && s.cron_expr == cron_expr);
+                if existing.is_some() {
+                    tracing::debug!("trigger_cron 节点 '{}' 的计划已存在，跳过", step.id);
+                    continue;
+                }
+            }
+            Err(e) => {
+                tracing::warn!("查询计划列表失败: {}", e);
+            }
+        }
+
+        // 创建新计划
+        let schedule_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+        if let Err(e) = app.db.create_schedule(&schedule_id, workflow_id, &cron_expr, &timezone, &now) {
+            tracing::warn!("自动创建 trigger_cron 计划失败: {}", e);
+        } else {
+            tracing::info!("已自动创建 trigger_cron 计划: workflow={} cron={}", workflow_id, cron_expr);
+        }
+    }
 }
 
 /// 自动排序步骤（根据 {{step_xxx}} 引用推断依赖）
