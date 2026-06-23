@@ -65,13 +65,20 @@ impl NodeExecutor for WebhookResponseNode {
         // 将响应数据存入上下文
         ctx.set_var("_webhook_response".to_string(), response.clone());
 
-        // 通过 oneshot channel 发送响应给 webhook handler
-        let app = crate::server::state::get();
-        if let Some(tx) = app.webhook_response_channels.write().await.remove(&ctx.run_id) {
-            let _ = tx.send(response);
-            info!("Webhook 响应已通过 channel 发送: status={}", status_code);
-        } else {
-            warn!("Webhook 响应 channel 不存在（可能已超时或非 webhook 触发）: run_id={}", ctx.run_id);
+        // 通过 oneshot channel 发送响应给 webhook handler（如果存在）
+        match crate::server::state::try_get() {
+            Some(app) => {
+                if let Some(tx) = app.webhook_response_channels.write().await.remove(&ctx.run_id) {
+                    let _ = tx.send(response);
+                    info!("Webhook 响应已通过 channel 发送: status={}", status_code);
+                } else {
+                    warn!("Webhook 响应 channel 不存在（可能已超时或非 webhook 触发）: run_id={}", ctx.run_id);
+                }
+            }
+            None => {
+                // 非 HTTP 模式（测试/CLI），只记录到上下文
+                info!("Webhook 响应已记录到上下文: status={}", status_code);
+            }
         }
 
         Ok(json!({

@@ -85,6 +85,8 @@ function onPortMouseDown(port: string, e: MouseEvent) {
           <ActionIcon :name="step.type" cls="w-3.5 h-3.5 shrink-0" />
           <span class="font-medium truncate flex-1">{{ step.label || step.id }}</span>
           <span class="text-[10px] text-muted-foreground truncate max-w-[60px]">{{ step.type }}</span>
+          <!-- 断点标记 -->
+          <span v-if="step.breakpoint" class="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" title="断点" />
         </div>
         <!-- Body -->
         <div class="flex-1 px-2.5 py-1 text-muted-foreground truncate">
