@@ -191,7 +191,7 @@ fn sync_trigger_cron_to_schedule(app: &crate::App, workflow_id: &str, wf: &crate
         // 创建新计划
         let schedule_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
-        if let Err(e) = app.db.create_schedule(&schedule_id, workflow_id, &cron_expr, &timezone, &now) {
+        if let Err(e) = app.db.create_schedule(&schedule_id, workflow_id, &cron_expr, &now) {
             tracing::warn!("自动创建 trigger_cron 计划失败: {}", e);
         } else {
             tracing::info!("已自动创建 trigger_cron 计划: workflow={} cron={}", workflow_id, cron_expr);
