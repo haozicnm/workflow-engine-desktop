@@ -196,10 +196,15 @@ fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
     if let Ok(d) = std::env::var("MCP_SERVERS_DIR") {
         let p = std::path::PathBuf::from(&d).join(script);
         if p.exists() {
+            // 安全校验：拒绝非 .py/.js/.sh 扩展名的脚本
+            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !["py", "js", "sh", "ts"].contains(&ext) {
+                anyhow::bail!("MCP 安全限制: 脚本扩展名 '{}' 不被允许", ext);
+            }
             return Ok(p);
         }
     }
-    // 2. 可执行文件同级 sidecars/
+    // 2. 可执行文件同级 sidecars/（受信任目录）
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join("sidecars").join(script);
@@ -208,13 +213,17 @@ fn resolve_path(script: &str) -> Result<std::path::PathBuf> {
             }
         }
     }
-    // 3. 已安装插件的 sidecars/
+    // 3. 已安装插件的 sidecars/（需要校验目录权限）
     let plugins_dir = plugin_manager::plugins_dir();
     if plugins_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
             for entry in entries.flatten() {
                 let p = entry.path().join("sidecars").join(script);
                 if p.exists() {
+                    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    if !["py", "js", "sh", "ts"].contains(&ext) {
+                        continue; // 跳过不安全的扩展名
+                    }
                     return Ok(p);
                 }
             }

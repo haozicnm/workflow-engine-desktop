@@ -65,14 +65,20 @@ impl NodeExecutor for ShellNode {
         // 2. 白名单检查（如配置了 shell_allowed_commands，则仅允许匹配的命令）
         if !_ctx.shell_allowed_commands.is_empty() {
             let allowed = &_ctx.shell_allowed_commands;
-            // 从命令中提取首个 token 作为命令名，排除空格/tab/换行
-            // 同时剥离引号包裹（如 "cmd" → cmd）
             let first_token = command.split_whitespace().next().unwrap_or(&command);
             let command_name = first_token.trim_matches(|c| c == '"' || c == '\'');
             // 防止 shell 元字符绕过白名单（; && || | ` $）
             if command_name.contains([';', '&', '|', '`', '$']) {
                 return Err(anyhow::anyhow!(
                     "Shell 命令名包含非法元字符: '{}'",
+                    command_name
+                ));
+            }
+            // 禁止白名单中包含解释器（防止 sh -c "任意命令" 绕过）
+            const FORBIDDEN_INTERPRETERS: &[&str] = &["sh", "bash", "cmd", "cmd.exe", "powershell", "powershell.exe", "zsh", "fish", "python", "python3", "perl", "ruby", "node"];
+            if FORBIDDEN_INTERPRETERS.contains(&command_name.to_lowercase().as_str()) {
+                return Err(anyhow::anyhow!(
+                    "安全限制: 白名单模式禁止直接调用解释器 '{}'",
                     command_name
                 ));
             }

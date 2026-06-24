@@ -68,6 +68,30 @@ impl NodeExecutor for HttpNode {
 
         info!("HTTP 请求: {} {} (retry={})", method, url, max_retries);
 
+        // SSRF 防护：拒绝私有地址和 file:// 协议
+        if url.starts_with("file://") || url.starts_with("data:") {
+            return Err(anyhow::anyhow!("HTTP 节点禁止 file:// 和 data: 协议"));
+        }
+        // 简单的 URL 主机解析（不依赖 url crate）
+        if let Some(host_start) = url.find("://").and_then(|i| url.get(i + 3..)) {
+            let host = host_start.split('/').next().unwrap_or("")
+                .split(':').next().unwrap_or("")
+                .split('@').last().unwrap_or("");
+            let is_private = host == "localhost"
+                || host == "127.0.0.1"
+                || host == "::1"
+                || host == "0.0.0.0"
+                || host.starts_with("10.")
+                || host.starts_with("192.168.")
+                || host.starts_with("172.16.") || host.starts_with("172.17.")
+                || host.starts_with("172.18.") || host.starts_with("172.19.")
+                || host.starts_with("172.2") || host.starts_with("172.3")
+                || host == "169.254.169.254"; // 云 metadata
+            if is_private {
+                return Err(anyhow::anyhow!("HTTP 节点 SSRF 防护：禁止访问私有地址 '{}'", host));
+            }
+        }
+
         let connect_timeout = config
             .get("connect_timeout")
             .and_then(|v| v.as_u64())

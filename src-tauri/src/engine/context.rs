@@ -97,17 +97,15 @@ impl ExecutionContext {
                 engine.set_max_string_size(1024 * 1024);
                 engine.set_max_array_size(10_000);
                 engine.set_max_map_size(10_000);
+                // 沙箱：禁用 print/debug 输出
+                engine.on_print(|_| {});
+                engine.on_debug(|_, _, _| {});
                 engine
             };
         }
 
         RHAI_ENGINE.with(|engine| {
             let mut scope = rhai::Scope::new();
-
-            // v8.5 沙箱安全：禁用危险函数
-            // eval, call, import, throw, type_of, register_module 等已被 Engine 默认限制
-            // 这里额外确保文件系统/网络/环境变量不可访问
-            // （rhai::Engine 默认不提供这些，但 double-check via max_operations 限制）
 
             // v7.1: 迭代变量（__item/__index/__index1/loop）注入顶层作用域
             // 这些是循环体内临时变量，生命周期仅一次迭代，不会与步骤输出冲突

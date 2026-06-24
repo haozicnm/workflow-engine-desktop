@@ -46,8 +46,9 @@ pub async fn auth_middleware(request: Request, next: Next) -> Result<Response, (
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
+    // 常量时间比较（防止时间侧信道攻击）
     let expected = format!("Bearer {}", token);
-    if auth_header == expected {
+    if constant_time_eq(auth_header.as_bytes(), expected.as_bytes()) {
         Ok(next.run(request).await)
     } else {
         Err((
@@ -55,4 +56,14 @@ pub async fn auth_middleware(request: Request, next: Next) -> Result<Response, (
             r#"{"error":"Unauthorized: missing or invalid Bearer token. Set Authorization: Bearer <WORKFLOW_ENGINE_TOKEN>"}"#.to_string(),
         ))
     }
+}
+
+/// 常量时间比较（不提前返回，防止时间侧信道）
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        // 长度不同也要比较完整内容，避免泄露长度信息
+        let _ = a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y));
+        return false;
+    }
+    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }

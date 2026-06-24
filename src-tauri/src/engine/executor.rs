@@ -354,19 +354,23 @@ impl StepExecutor {
         self.validate_variable_references(workflow)?;
         let levels = self.topological_levels(&workflow.steps, &workflow.edges)?;
         info!("图执行: {} 个层级, {} 个步骤", levels.len(), workflow.steps.len());
+        let mut executed_nodes: HashSet<String> = HashSet::new(); // 防止 on_error Branch 重复执行
         for level in &levels {
             // 调试：暂停检查（单步模式 / 断点 / 暂停）
             for node_id in level {
+                if executed_nodes.contains(node_id) { continue; }
                 if let Some(step) = workflow.steps.iter().find(|s| &s.id == node_id) {
                     self.check_debug_pause(step, ctx).await;
                 }
             }
             if level.len() == 1 {
+                let node_id = &level[0];
+                if executed_nodes.contains(node_id) { continue; }
                 let step = workflow.steps.iter().find(|s| s.id == level[0])
                     .ok_or_else(|| anyhow!("节点未找到: {}", level[0]))?;
                 match Arc::clone(self).execute(step, ctx).await {
                     Ok(result) => {
-                        // 存入 step_outputs（不污染 variables，避免和 data_set 等节点冲突）
+                        executed_nodes.insert(step.id.clone());
                         ctx.set_output(&step.id, result);
                     }
                     Err(e) => {
@@ -380,8 +384,10 @@ impl StepExecutor {
                             Some(crate::engine::workflow::ErrorStrategy::Branch { step_id }) => {
                                 warn!("节点 {} 失败 (on_error=branch → {}): {}", step.id, step_id, e);
                                 ctx.set_var(format!("_error.{}", step.id), serde_json::json!(e.to_string()));
+                                executed_nodes.insert(step.id.clone());
                                 // 跳转到错误处理分支（如果目标节点存在）
                                 if let Some(branch_step) = workflow.steps.iter().find(|s| s.id == *step_id) {
+                                    executed_nodes.insert(branch_step.id.clone());
                                     let branch_result = Arc::clone(self).execute(branch_step, ctx).await?;
                                     ctx.set_output(&branch_step.id, branch_result);
                                 }

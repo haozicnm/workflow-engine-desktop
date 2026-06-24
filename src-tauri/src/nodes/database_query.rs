@@ -67,8 +67,18 @@ impl NodeExecutor for DatabaseQueryNode {
         // SQL 注入防护：只允许 SELECT（除非明确标记 allow_write）
         let allow_write = config.get("allow_write").and_then(|v| v.as_bool()).unwrap_or(false);
         let trimmed_sql = sql.trim().to_uppercase();
+        // 禁止多语句（分号后跟非空内容）
+        if let Some(semicolon_pos) = trimmed_sql.find(';') {
+            let after = trimmed_sql[semicolon_pos + 1..].trim();
+            if !after.is_empty() {
+                return Err(anyhow!("database_query: 禁止多语句查询"));
+            }
+        }
         if !allow_write && !trimmed_sql.starts_with("SELECT") && !trimmed_sql.starts_with("WITH") {
             return Err(anyhow!("database_query: 只允许 SELECT 查询（设置 allow_write=true 可执行写操作）"));
+        }
+        if allow_write && (trimmed_sql.contains("DROP ") || trimmed_sql.contains("ALTER ") || trimmed_sql.contains("TRUNCATE ")) {
+            return Err(anyhow!("database_query: 禁止 DDL 操作（DROP/ALTER/TRUNCATE）"));
         }
 
         match db_type {

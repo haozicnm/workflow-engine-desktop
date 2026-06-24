@@ -368,7 +368,18 @@ pub async fn workflow_export(Json(body): Json<WorkflowExportBody>) -> Response {
     };
 
     let final_path = if let Some(path) = body.output_path {
-        std::path::PathBuf::from(&path)
+        let p = std::path::PathBuf::from(&path);
+        // 路径遍历防护：规范化后必须在当前工作目录内
+        let canonical = p.canonicalize().unwrap_or(p.clone());
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let canonical_cwd = cwd.canonicalize().unwrap_or(cwd);
+        if !canonical.starts_with(&canonical_cwd) {
+            return err_response(
+                StatusCode::FORBIDDEN,
+                format!("导出路径必须在工作目录内: {}", path),
+            );
+        }
+        p
     } else {
         let sanitized: String = body
             .name
