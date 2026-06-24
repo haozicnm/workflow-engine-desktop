@@ -250,8 +250,9 @@ jobs:
             ~/.cargo/git
             src-tauri/target
             node_modules
-          key: win-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
-          restore-keys: win-${{ runner.os }}-
+          key: win-v2-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock', 'package-lock.json') }}
+          restore-keys: |
+            win-v2-${{ runner.os }}-
 
       - name: Install npm deps
         run: npm ci
@@ -261,7 +262,7 @@ jobs:
 
       - name: Build backend (GUI + HTTP server + CLI)
         working-directory: src-tauri
-        run: cargo build --release --bin workflow-engine-gui --features gui --bin workflow-engine --bin wf-cli
+        run: cargo build --release --bin workflow-engine-gui --features gui --bin workflow-engine --bin wf-cli 2>&1
 
       - name: Create python-runtime placeholder
         shell: pwsh
