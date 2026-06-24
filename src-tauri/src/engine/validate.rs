@@ -117,14 +117,12 @@ fn validate_step(step: &Step, all_step_ids: &HashSet<String>) -> ValidationResul
     }
 
     // 4. 校验 on_error branch 目标
-    if let Some(ref on_error) = step.on_error {
-        if let crate::engine::workflow::ErrorStrategy::Branch { step_id } = on_error {
-            if !step_id.is_empty() && !all_step_ids.contains(step_id.as_str()) {
-                result.error(format!(
-                    "{}: on_error branch target '{}' references a non-existent step",
-                    ctx, step_id
-                ));
-            }
+    if let Some(crate::engine::workflow::ErrorStrategy::Branch { step_id }) = step.on_error.as_ref() {
+        if !step_id.is_empty() && !all_step_ids.contains(step_id.as_str()) {
+            result.error(format!(
+                "{}: on_error branch target '{}' references a non-existent step",
+                ctx, step_id
+            ));
         }
     }
 

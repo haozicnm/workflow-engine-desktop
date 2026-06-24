@@ -76,7 +76,7 @@ impl NodeExecutor for HttpNode {
         if let Some(host_start) = url.find("://").and_then(|i| url.get(i + 3..)) {
             let host = host_start.split('/').next().unwrap_or("")
                 .split(':').next().unwrap_or("")
-                .split('@').last().unwrap_or("");
+                .split('@').next_back().unwrap_or("");
             let is_private = host == "localhost"
                 || host == "127.0.0.1"
                 || host == "::1"

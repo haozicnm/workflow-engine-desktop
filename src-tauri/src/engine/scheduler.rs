@@ -761,12 +761,9 @@ pub async fn run_workflow(
                 handle_step_success(step, &current_id, &output, elapsed_ms, &mut ctx, &mut state, db, app_handle, run_id, total_steps, &step_index, ctrl).await;
             }
             Err(e) => {
-                match handle_step_failure(step, &current_id, e, elapsed_ms, &mut ctx, &mut state, db, app_handle, run_id, &workflow_name, total_steps, workflow, ctrl, &step_index).await? {
-                    Some(branch_id) => {
-                        current_id = branch_id;
-                        continue;
-                    }
-                    None => {}
+                if let Some(branch_id) = handle_step_failure(step, &current_id, e, elapsed_ms, &mut ctx, &mut state, db, app_handle, run_id, &workflow_name, total_steps, workflow, ctrl, &step_index).await? {
+                    current_id = branch_id;
+                    continue;
                 }
             }
         }
@@ -807,7 +804,7 @@ async fn run_dag_workflow(
     ctx: &mut ExecutionContext,
     mut state: RunState,
     ctrl: &RunControl,
-    _run_id: &str,
+    _run_id_log: &str,
     workflow_name: &str,
 ) -> Result<RunState> {
     let total_steps = workflow.steps.len();
