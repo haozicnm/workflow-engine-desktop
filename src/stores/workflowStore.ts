@@ -185,6 +185,11 @@ export const useWorkflowStore = defineStore('workflow', () => {
 
   async function importJson(file: File): Promise<Workflow | null> {
     try {
+      // 文件大小限制（5MB）
+      const MAX_FILE_SIZE = 5 * 1024 * 1024
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`文件过大 (${(file.size / 1024 / 1024).toFixed(1)}MB > 5MB)`)
+      }
       const text = await file.text()
       const wf = deserializeWorkflow(text)
       if (!wf || !Array.isArray(wf.steps)) {

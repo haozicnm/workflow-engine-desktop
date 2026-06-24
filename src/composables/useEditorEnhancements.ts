@@ -50,21 +50,34 @@ export function useEditorEnhancements() {
 
   function snapshot() {
     if (skipSnapshot || !store.current) return
-    const json = JSON.stringify(store.current.steps)
-    // Don't push duplicate
-    if (undoStack.value.length && undoStack.value[undoStack.value.length - 1] === json) return
-    undoStack.value.push(json)
+    // 序列化完整状态：steps + edges + variables + name
+    const snap = JSON.stringify({
+      steps: store.current.steps,
+      edges: store.current.edges || [],
+      variables: store.current.variables || {},
+      name: store.current.name,
+    })
+    if (undoStack.value.length && undoStack.value[undoStack.value.length - 1] === snap) return
+    undoStack.value.push(snap)
     if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
-    redoStack.value = [] // clear redo on new edit
+    redoStack.value = []
   }
 
   function undo() {
     if (!undoStack.value.length || !store.current) return
-    const currentJson = JSON.stringify(store.current.steps)
-    redoStack.value.push(currentJson)
-    const prev = undoStack.value.pop()!
+    const currentSnap = JSON.stringify({
+      steps: store.current.steps,
+      edges: store.current.edges || [],
+      variables: store.current.variables || {},
+      name: store.current.name,
+    })
+    redoStack.value.push(currentSnap)
+    const prev = JSON.parse(undoStack.value.pop()!)
     skipSnapshot = true
-    store.current.steps = JSON.parse(prev)
+    store.current.steps = prev.steps
+    if (prev.edges) store.current.edges = prev.edges
+    if (prev.variables) store.current.variables = prev.variables
+    if (prev.name) store.current.name = prev.name
     store.dirty = true
     skipSnapshot = false
   }

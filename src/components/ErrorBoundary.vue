@@ -1,12 +1,38 @@
 <script setup lang="ts">
-import { ref, onErrorCaptured } from 'vue'
+import { ref, onErrorCaptured, onMounted, onUnmounted } from 'vue'
 import { AlertTriangle } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
 
-
-
 const error = ref<string | null>(null)
 const errorInfo = ref('')
+
+// 捕获 Vue 组件错误
+onErrorCaptured((err, _instance, info) => {
+  error.value = err.message || String(err)
+  errorInfo.value = info
+  console.error('[ErrorBoundary]', err)
+  return false
+})
+
+// 捕获未处理的异步错误和全局错误
+function onGlobalError(event: ErrorEvent) {
+  error.value = event.message || '未知错误'
+  errorInfo.value = 'uncaught error'
+  console.error('[GlobalError]', event.error)
+}
+function onUnhandledRejection(event: PromiseRejectionEvent) {
+  error.value = String(event.reason) || '未处理的 Promise 拒绝'
+  errorInfo.value = 'unhandledrejection'
+  console.error('[UnhandledRejection]', event.reason)
+}
+onMounted(() => {
+  window.addEventListener('error', onGlobalError)
+  window.addEventListener('unhandledrejection', onUnhandledRejection)
+})
+onUnmounted(() => {
+  window.removeEventListener('error', onGlobalError)
+  window.removeEventListener('unhandledrejection', onUnhandledRejection)
+})
 
 onErrorCaptured((err, instance, info) => {
   error.value = err.message || String(err)

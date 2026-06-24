@@ -939,9 +939,14 @@ async fn run_dag_workflow(
         while let Some(jr) = join_set.join_next().await {
             match jr {
                 Ok((node_id, step_name, step_type, on_error, result, elapsed_ms, task_vars)) => {
-                    // 合并任务上下文变量
+                    // 合并任务上下文变量（检测冲突并警告）
                     for (k, v) in task_vars {
-                        ctx.variables.insert(k, v);
+                        if let Some(existing) = ctx.variables.get(&k) {
+                            if *existing != v {
+                                warn!("DAG 并行变量冲突: {} (已有值，忽略 {} 的新值)", k, node_id);
+                            }
+                        }
+                        ctx.variables.entry(k).or_insert(v);
                     }
 
                     match result {

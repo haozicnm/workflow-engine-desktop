@@ -53,8 +53,8 @@ impl NodeExecutor for S3Node {
             .ok_or_else(|| anyhow!("s3: 缺少 bucket"))?;
         let api_url = config.get("api_url").and_then(|v| v.as_str())
             .unwrap_or("http://localhost:9000");
-        let access_key = config.get("access_key").and_then(|v| v.as_str()).unwrap_or("");
-        let secret_key = config.get("secret_key").and_then(|v| v.as_str()).unwrap_or("");
+        let _access_key = config.get("access_key").and_then(|v| v.as_str()).unwrap_or("");
+        let _secret_key = config.get("secret_key").and_then(|v| v.as_str()).unwrap_or("");
 
         let client = reqwest::Client::new();
 

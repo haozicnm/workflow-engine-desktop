@@ -68,6 +68,9 @@ const outputPorts = computed(() => {
   <g
     class="canvas-node cursor-grab active:cursor-grabbing"
     :class="{ 'z-10': selected }"
+    :aria-label="`${step.label || step.id} (${step.type})`"
+    role="button"
+    tabindex="-1"
     @mousedown="onMouseDown"
   >
     <!-- Selection highlight -->

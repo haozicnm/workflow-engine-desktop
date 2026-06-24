@@ -91,7 +91,7 @@ export function useEditorActions() {
     const originalName = workflow.value.name
     const originalId = workflow.value.id
     workflow.value.name = originalName + ' (' + t('common.copy') + ')'
-    workflow.value.id = undefined as unknown as string
+    workflow.value.id = undefined
     store.dirty = true
     const ok = await store.saveWorkflow()
     if (ok) {

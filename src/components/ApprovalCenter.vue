@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Hand, Lightbulb, Search, Star } from 'lucide-vue-next'
 import { useToast } from '../composables/useToast'
@@ -135,7 +135,7 @@ async function init() {
   })
 }
 
-init()
+onMounted(() => { init() })
 
 onUnmounted(() => {
   unlisten?.()

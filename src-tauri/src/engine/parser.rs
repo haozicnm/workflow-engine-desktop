@@ -16,6 +16,15 @@ const ITERATION_TYPES: &[&str] = &["cursor", "loop"];
 
 /// 解析工作流 JSON（支持新旧两种格式）
 pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
+    // 输入大小限制（50MB，防止 OOM）
+    const MAX_INPUT_SIZE: usize = 50 * 1024 * 1024;
+    if json_str.len() > MAX_INPUT_SIZE {
+        return Err(anyhow!(
+            "工作流输入过大 ({}MB > 50MB 限制)",
+            json_str.len() / 1024 / 1024
+        ));
+    }
+
     // 先尝试 JSON，再尝试 YAML
     let raw: Value = serde_json::from_str(json_str)
         .or_else(|_| serde_yaml::from_str(json_str))

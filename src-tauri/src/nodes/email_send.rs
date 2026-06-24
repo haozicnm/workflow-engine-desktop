@@ -56,9 +56,9 @@ impl NodeExecutor for EmailSendNode {
         let config = &step.config;
 
         let password = config.get("password").and_then(|v| v.as_str()).unwrap_or("");
-        let smtp_host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
-        let smtp_port = config.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587) as u16;
-        let username = config.get("username").and_then(|v| v.as_str()).unwrap_or("");
+        let _smtp_host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
+        let _smtp_port = config.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587) as u16;
+        let _username = config.get("username").and_then(|v| v.as_str()).unwrap_or("");
         let from = config.get("from").and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("email_send: 缺少 from"))?;
         let to = config.get("to").and_then(|v| v.as_str())

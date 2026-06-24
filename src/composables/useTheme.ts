@@ -30,14 +30,16 @@ export function useTheme() {
   }
   applyTheme(theme.value)
 
-  // Listen to system theme changes
-  if (typeof window !== 'undefined') {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (theme.value === 'system') {
-        applyTheme('system')
-      }
-    })
+  // Listen to system theme changes (保存引用以便清理)
+  const mediaQuery = typeof window !== 'undefined'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null
+  const onSystemThemeChange = () => {
+    if (theme.value === 'system') {
+      applyTheme('system')
+    }
   }
+  mediaQuery?.addEventListener('change', onSystemThemeChange)
 
   watch(theme, (newTheme) => {
     localStorage.setItem('theme', newTheme)

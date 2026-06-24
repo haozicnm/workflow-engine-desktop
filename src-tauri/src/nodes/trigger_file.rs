@@ -11,7 +11,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 /// 全局文件监控状态：path → last_mtime
 static WATCHER_STATE: std::sync::LazyLock<RwLock<HashMap<String, std::time::SystemTime>>> =
