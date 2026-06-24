@@ -182,6 +182,9 @@ const outputPorts = computed(() => {
         r="5"
         class="fill-hairline-strong stroke-hairline-strong hover:stroke-primary hover:fill-primary/20 cursor-crosshair transition-colors"
         stroke-width="2"
+        data-port-target
+        :data-step-id="step.id"
+        data-port-label="out"
         @mousedown="onPortMouseDown('out', $event)"
       />
     </template>

@@ -59,9 +59,12 @@ export function useCanvas(
     nodePositions.value = positions
   }
 
-  // ─── Re-layout on step/edge change ───
-  watch(() => steps.value, () => autoLayout(), { deep: true })
-  watch(() => edges.value, () => autoLayout(), { deep: true })
+  // ─── Layout state tracking ───
+  const hasUserLayout = ref(false)
+
+  // ─── Re-layout on step/edge change (only if user hasn't manually positioned nodes)
+  watch(() => steps.value, () => { if (!hasUserLayout.value) autoLayout() }, { deep: true })
+  watch(() => edges.value, () => { if (!hasUserLayout.value) autoLayout() }, { deep: true })
 
   // ─── Position management ───
   function getPosition(stepId: string): NodePosition {
@@ -69,6 +72,7 @@ export function useCanvas(
   }
 
   function updateNodePosition(stepId: string, x: number, y: number) {
+    hasUserLayout.value = true
     const pos = nodePositions.value.get(stepId)
     if (pos) {
       pos.x = x

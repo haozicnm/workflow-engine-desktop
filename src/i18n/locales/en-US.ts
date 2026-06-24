@@ -224,6 +224,7 @@ export default {
     dblclickRename: 'Double-click to rename',
     moreActions: 'More actions',
     deleteStepAria: 'Delete step',
+    duplicateStep: 'Duplicate Step',
     containerSettings: 'Container Settings',
     removeCondition: 'Remove Condition',
     errDescFail: 'Stop the entire workflow on step failure',

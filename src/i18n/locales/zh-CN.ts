@@ -229,6 +229,7 @@ export default {
     dblclickRename: '双击重命名',
     moreActions: '更多操作',
     deleteStepAria: '删除步骤',
+    duplicateStep: '复制步骤',
     containerSettings: '容器设置',
     removeCondition: '移除条件',
     errDescFail: '步骤失败时终止整个工作流',

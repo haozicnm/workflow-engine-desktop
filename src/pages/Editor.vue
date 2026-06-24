@@ -104,12 +104,20 @@ function onKeydown(e: KeyboardEvent) {
     else if (a.addActionStepId.value) a.addActionStepId.value = null
   }
 }
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (a.store.dirty) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 // ─── Event listeners ───
 let unlistenLogStep: (() => void) | null = null
 let unlistenLogRun: (() => void) | null = null
 
 onMounted(async () => {
+  // beforeunload 拦截：dirty 时提示保存
+  window.addEventListener('beforeunload', onBeforeUnload)
   a.registry.refreshDynamicTypes()
 
   unlistenLogStep = await safeListen<{
@@ -149,6 +157,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
   unlistenLogStep?.()
   unlistenLogRun?.()
   const runId = a.currentRunId()

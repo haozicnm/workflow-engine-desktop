@@ -109,7 +109,7 @@ const arrowPath = computed(() => {
       class="transition-colors"
     />
     <!-- Delete button (visible on hover) -->
-    <g v-if="isHovered" transform="translate(0, -16)" class="cursor-pointer">
+    <g v-if="isHovered" transform="translate(0, -16)" class="cursor-pointer" @click.stop="emit('remove')">
       <circle
         :cx="(from.x + to.x) / 2"
         :cy="(from.y + to.y) / 2"
@@ -121,7 +121,6 @@ const arrowPath = computed(() => {
         :y="(from.y + to.y) / 2 + 4"
         text-anchor="middle"
         class="fill-destructive-foreground text-[12px] font-bold pointer-events-none select-none"
-        @click.stop="emit('remove')"
       >✕</text>
     </g>
   </g>

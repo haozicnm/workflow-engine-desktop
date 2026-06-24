@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Settings, Plus, Check, X, Loader2, Ellipsis } from 'lucide-vue-next'
+import { Settings, Plus, Check, X, Loader2, Ellipsis, Copy, Trash2 } from 'lucide-vue-next'
 import type { Step, StepRunState, ErrorStrategy } from '../types/types'
 import { getContainerDef, isContainerType, getContainerColorVar } from '../types/node-registry'
 import ActionIcon from './ActionIcon.vue'
@@ -32,6 +32,7 @@ const emit = defineEmits<{
   'rename-action': [stepId: string, actionId: string, label: string]
   'update-action-params': [stepId: string, actionId: string, params: Record<string, unknown>]
   'remove-step': [stepId: string]
+  'duplicate-step': [stepId: string]
   'rename-step': [stepId: string, label: string]
   'update-condition': [stepId: string, condition: string]
   'update-condition-group': [stepId: string, group: import('../types/types').LogicConditionGroup]
@@ -233,6 +234,16 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           <!-- 容器设置 -->
           <DropdownMenuItem @click="emit('open-config', step.id); menuOpen = false">
             <Settings class="w-4 h-4 mr-2" /> {{ t('stepCard.containerSettings') }}
+          </DropdownMenuItem>
+
+          <!-- 复制步骤 -->
+          <DropdownMenuItem @click="emit('duplicate-step', step.id); menuOpen = false">
+            <Copy class="w-4 h-4 mr-2" /> {{ t('stepCard.duplicateStep') }}
+          </DropdownMenuItem>
+
+          <!-- 删除步骤 -->
+          <DropdownMenuItem class="text-destructive focus:bg-destructive/10 focus:text-destructive" @click="emit('remove-step', step.id); menuOpen = false">
+            <Trash2 class="w-4 h-4 mr-2" /> {{ t('stepCard.deleteStep') }}
           </DropdownMenuItem>
 
           <!-- 条件执行 -->
