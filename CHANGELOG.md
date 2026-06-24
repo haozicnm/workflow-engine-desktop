@@ -1,5 +1,41 @@
 # Changelog
 
+## v9.0.2 (2026-06-24)
+
+### 🔒 Security Fixes (P0 — 11 项)
+
+- **Shell 白名单绕过防护**: 白名单模式禁止 `sh`/`bash`/`cmd`/`powershell`，超时后显式 kill 子进程
+- **HTTP SSRF 防护**: 内网地址过滤 + 重定向限制
+- **Rhai 沙箱逃逸**: 禁止 `import`/`eval`/文件系统访问
+- **Secret 泄露**: 日志/错误消息自动脱敏
+- **并发竞态**: 共享状态加锁保护
+
+### 🔧 Bug Fixes (P1+P2 — 21 项)
+
+- **Canvas**: 边删除按钮失效修复 (`pointer-events-none` → `pointer-events-auto`)
+- **Canvas**: 搜索高亮 + 节点定位修复
+- **状态管理**: save 非原子操作改为原子事务
+- **VariablesPanel**: 集成到 Settings 页面
+- **displayOptions**: 字段可见性条件计算修复
+- **并行执行**: from_port 过滤 + 数据流统一
+- **逻辑链**: 6 个审查报告问题修复
+
+### ✨ Features (P2)
+
+- **Canvas 数据流动画**: 运行时边高亮 + 数据流向可视化
+- **动态多端口渲染**: 节点端口按连接数动态扩展
+- **新增 9 个节点**: AI 扩展 + 数据存储类节点
+- **trigger_cron 调度器**: 定时触发器集成
+- **trigger_file 文件监控**: 文件变更触发工作流
+
+### 🔧 Maintenance
+
+- Clippy 4 个 warning 修复
+- 新增节点单元测试
+- UI/UX 审查 + 最终综合审查（5 安全 + 6 功能 + 11 中度 + 12 建议）
+
+**Stats:** 51 files changed, +2272 / -121 lines since v9.0.1
+
 ## v9.0.0 (2026-06-21)
 
 ### 🚀 Major Features
