@@ -159,9 +159,10 @@ function onKeydown(e: KeyboardEvent) {
                   </div>
                 </div>
               </div>
-          </div>
-        </div>
-      </div>
+            </div>  <!-- /MCP border wrapper -->
+          </div>  <!-- /node list -->
+        </div>  <!-- /dialog box -->
+      </div>  <!-- /outer overlay -->
     </Transition>
   </Teleport>
 </template>
