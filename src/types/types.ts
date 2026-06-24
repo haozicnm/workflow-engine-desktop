@@ -132,6 +132,12 @@ export interface Step {
   // logic 容器特有
   condition?: string
   conditionGroup?: LogicConditionGroup
+  // 线性链兼容字段（后端 Step.next）
+  next?: string
+  // 重试配置
+  retry?: { max_retries?: number; delay_ms?: number }
+  // 步骤超时（毫秒）
+  timeout?: number
 }
 
 // ─── 边的定义（v8.2 Canvas 图编辑器） ───
@@ -150,6 +156,8 @@ export interface Workflow {
   locked?: boolean
   steps: Step[]
   edges?: Edge[]
+  // 工作流级变量
+  variables?: Record<string, unknown>
 }
 
 // ─── 执行状态 ───

@@ -442,6 +442,58 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           </div>
         </CardContent>
       </Card>
+
+      <!-- ═══ Integration Services ═══ -->
+      <Card>
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2 text-base">
+            <ActionIcon name="Link" cls="w-4 h-4" />
+            {{ t('settingsPage.integrations') }}
+          </CardTitle>
+          <CardDescription class="text-xs">{{ t('settingsPage.integrationsDesc') }}</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <!-- LLM API Key -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">LLM API Key</Label>
+            <Input type="password" :placeholder="t('settingsPage.llmKeyPlaceholder', 'sk-... (OpenAI / DeepSeek / Kimi)')" />
+            <p class="text-[11px] text-muted-foreground">{{ t('settingsPage.llmKeyDesc', '用于 llm_chat、prompt_template、rag_query 等 AI 节点') }}</p>
+          </div>
+          <!-- LLM Base URL -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">LLM API URL</Label>
+            <Input placeholder="https://api.openai.com/v1/chat/completions" />
+            <p class="text-[11px] text-muted-foreground">{{ t('settingsPage.llmUrlDesc', '支持 OpenAI-compatible 接口：DeepSeek/Kimi/通义等') }}</p>
+          </div>
+          <!-- SMTP -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">SMTP {{ t('settingsPage.server') }}</Label>
+            <div class="grid grid-cols-[1fr_80px] gap-2">
+              <Input :placeholder="t('settingsPage.smtpHost', 'smtp.gmail.com')" />
+              <Input placeholder="587" />
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">SMTP {{ t('settingsPage.credentials') }}</Label>
+            <div class="grid grid-cols-2 gap-2">
+              <Input :placeholder="t('settingsPage.username', '用户名')" />
+              <Input type="password" :placeholder="t('settingsPage.password', '密码/应用专用密码')" />
+            </div>
+          </div>
+          <!-- GitHub Token -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">GitHub Token</Label>
+            <Input type="password" placeholder="ghp_..." />
+            <p class="text-[11px] text-muted-foreground">{{ t('settingsPage.githubDesc', '用于 github_issue 节点创建 Issue/PR') }}</p>
+          </div>
+          <!-- IM Webhook -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">IM {{ t('settingsPage.webhookUrl') }}</Label>
+            <Input :placeholder="t('settingsPage.imWebhookPlaceholder', 'Slack / 飞书 / 钉钉 / 企业微信 Webhook URL')" />
+            <p class="text-[11px] text-muted-foreground">{{ t('settingsPage.imWebhookDesc', '用于 im_message 节点发送消息') }}</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   </div>
 
