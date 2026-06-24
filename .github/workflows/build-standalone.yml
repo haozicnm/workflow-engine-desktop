@@ -70,17 +70,20 @@ jobs:
             chmod 755 pkg/DEBIAN/postinst
           fi
           # 动态生成 DEBIAN/control（修正版本和架构）
-          sed -e "s/^Version:.*/Version: 7.3.0/" \
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ]; then VERSION="9.0.2"; fi
+          echo "=== Packaging deb v${VERSION} for ${DEB_ARCH} ==="
+          sed -e "s/^Version:.*/Version: ${VERSION}/" \
               -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
               debian/control > pkg/DEBIAN/control
           mkdir -p pkg/opt/workflow-engine/data/logs
-          dpkg-deb --build pkg workflow-engine-standalone_7.3.0_${DEB_ARCH}.deb
+          dpkg-deb --build pkg workflow-engine-standalone_${VERSION}_${DEB_ARCH}.deb
 
       - name: Upload deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-standalone-arm64-deb
-          path: workflow-engine-standalone_7.3.0_arm64.deb
+          path: workflow-engine-standalone_*.deb
 
   build-windows:
     name: Windows x86_64
@@ -131,7 +134,8 @@ jobs:
       - name: Package zip
         shell: pwsh
         run: |
-          $version = "7.3.0"
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v',''
+          if ([string]::IsNullOrEmpty($version)) { $version = "9.0.2" }
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
 
@@ -143,13 +147,13 @@ jobs:
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
 
           $lines = @(
-            'echo off'
+            '@echo off'
             'title Workflow Engine'
             'cd /d "%~dp0"'
             'start /MIN "" "workflow-engine.exe"'
-            'echo Workflow Engine started on http://localhost:3000'
+            'echo Workflow Engine started on http://localhost:19529'
             'ping 127.0.0.1 -n 4 > nul'
-            'start http://localhost:3000'
+            'start http://localhost:19529'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
 
@@ -159,4 +163,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-x64
-          path: workflow-engine-7.3.0-windows-x64.zip
+          path: workflow-engine-*-windows-x64.zip

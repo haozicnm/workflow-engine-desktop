@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: '22'
 
+          cache: npm
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -132,6 +133,7 @@ jobs:
         with:
           node-version: '22'
 
+          cache: npm
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -236,6 +238,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -319,6 +322,11 @@ jobs:
         with:
           name: workflow-engine-windows-zip
           path: workflow-engine-*-windows-x64.zip
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
 
       - name: Build Inno Setup installer
         shell: pwsh
