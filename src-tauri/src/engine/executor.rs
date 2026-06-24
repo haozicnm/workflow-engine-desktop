@@ -408,6 +408,22 @@ impl StepExecutor {
                 .ok_or_else(|| anyhow!("节点未找到: {}", node_id))?;
             let mut task_ctx = ExecutionContext::new(&step.id, workflow);
             task_ctx.variables = ctx.variables.clone();
+            task_ctx.step_outputs = ctx.step_outputs.clone(); // 传递上游输出（修复 CLI 路径）
+            // 注入 input_ports（按 edge 映射上游输出）
+            for edge in &workflow.edges {
+                if edge.to == *node_id {
+                    if let Some(upstream_output) = ctx.step_outputs.get(&edge.from) {
+                        // 按 from_port 过滤：非 "out" 端口从输出中提取对应分支数据
+                        let port_data = if edge.from_port.is_empty() || edge.from_port == "out" {
+                            upstream_output.clone()
+                        } else {
+                            upstream_output.get(&edge.from_port).cloned()
+                                .unwrap_or(upstream_output.clone())
+                        };
+                        task_ctx.input_ports.insert(edge.to_port.clone(), port_data);
+                    }
+                }
+            }
             let exec = Arc::clone(self);
             join_set.spawn(async move {
                 let result = exec.execute(&step, &mut task_ctx).await;
@@ -421,23 +437,43 @@ impl StepExecutor {
                 Ok((nid, Ok(val), vars, _)) => {
                     ctx.set_output(&nid, val);
                     for (k, v) in vars {
-                        ctx.variables.insert(k, v);
+                        if let Some(existing) = ctx.variables.get(&k) {
+                            if *existing != v {
+                                warn!("并行变量冲突: {} (已有值，忽略 {} 的新值)", k, nid);
+                            }
+                        }
+                        ctx.variables.entry(k).or_insert(v);
                     }
                 }
                 Ok((nid, Err(e), _, on_error)) => {
                     warn!("节点 {} 失败: {}", nid, e);
                     ctx.set_var(format!("_error.{}", nid), serde_json::json!(e.to_string()));
-                    // 检查该节点的 on_error 策略
                     match on_error.unwrap_or_default() {
                         crate::engine::workflow::ErrorStrategy::Ignore => {
                             warn!("并行节点 {} 错误已忽略 (on_error=ignore)", nid);
                         }
                         crate::engine::workflow::ErrorStrategy::Branch { step_id } => {
                             warn!("并行节点 {} 错误分支 → {}", nid, step_id);
-                            // 错误分支目标节点将在下轮调度中执行
+                            // 直接执行分支节点（不等待下轮调度）
+                            if let Some(branch_step) = workflow.steps.iter().find(|s| s.id == *step_id) {
+                                let mut branch_ctx = ExecutionContext::new(&step_id, workflow);
+                                branch_ctx.variables = ctx.variables.clone();
+                                branch_ctx.step_outputs = ctx.step_outputs.clone();
+                                match Arc::clone(self).execute(branch_step, &mut branch_ctx).await {
+                                    Ok(val) => {
+                                        ctx.set_output(&step_id, val);
+                                        for (k, v) in branch_ctx.variables {
+                                            ctx.variables.entry(k).or_insert(v);
+                                        }
+                                    }
+                                    Err(branch_err) => {
+                                        warn!("错误分支 {} 执行失败: {}", step_id, branch_err);
+                                        hard_errors.push((step_id.clone(), branch_err));
+                                    }
+                                }
+                            }
                         }
                         _ => {
-                            // Fail — 收集硬错误
                             hard_errors.push((nid, e));
                         }
                     }
@@ -447,7 +483,6 @@ impl StepExecutor {
                 }
             }
         }
-        // 汇总所有硬错误（on_error=ignore/branch 的节点不计入）
         if !panics.is_empty() {
             return Err(anyhow!("并行任务 panic: {}", panics.join("; ")));
         }

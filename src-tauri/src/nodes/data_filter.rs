@@ -56,9 +56,9 @@ impl NodeExecutor for DataFilterNode {
 
         // 获取输入数据
         let data = ctx.input_ports
-            .values()
-            .next()
+            .get("data")
             .cloned()
+            .or_else(|| ctx.input_ports.values().next().cloned())
             .or_else(|| ctx.variables.get("__item").cloned())
             .unwrap_or(Value::Null);
 

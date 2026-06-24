@@ -914,9 +914,16 @@ async fn run_dag_workflow(
             for edge in &workflow.edges {
                 if edge.to == *node_id {
                     if let Some(upstream_output) = ctx.step_outputs.get(&edge.from) {
+                        // 按 from_port 过滤：非 "out" 端口从输出中提取对应分支数据
+                        let port_data = if edge.from_port.is_empty() || edge.from_port == "out" {
+                            upstream_output.clone()
+                        } else {
+                            upstream_output.get(&edge.from_port).cloned()
+                                .unwrap_or(upstream_output.clone())
+                        };
                         task_ctx.input_ports.insert(
                             edge.to_port.clone(),
-                            upstream_output.clone(),
+                            port_data,
                         );
                     }
                 }
