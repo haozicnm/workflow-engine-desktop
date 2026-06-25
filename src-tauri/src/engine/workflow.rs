@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub const FORMAT_VERSION: &str = "2.0";
 
 /// 步骤失败时的处理策略
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum ErrorStrategy {
@@ -16,6 +16,42 @@ pub enum ErrorStrategy {
     Ignore,
     /// 跳转到指定步骤继续执行
     Branch { step_id: String },
+}
+
+impl<'de> serde::Deserialize<'de> for ErrorStrategy {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde_json::Value;
+        let value = Value::deserialize(deserializer)?;
+        match &value {
+            Value::String(s) => match s.as_str() {
+                "fail" => Ok(ErrorStrategy::Fail),
+                "ignore" => Ok(ErrorStrategy::Ignore),
+                other => Err(serde::de::Error::custom(format!("unknown ErrorStrategy: {}", other))),
+            },
+            Value::Object(map) => {
+                if let Some(branch) = map.get("branch") {
+                    match branch {
+                        // 前端格式: { "branch": "step_id_string" }
+                        Value::String(s) => Ok(ErrorStrategy::Branch { step_id: s.clone() }),
+                        // 后端格式: { "branch": { "step_id": "..." } }
+                        Value::Object(obj) => {
+                            let step_id = obj.get("step_id")
+                                .and_then(|v| v.as_str())
+                                .ok_or_else(|| serde::de::Error::custom("Branch missing step_id"))?;
+                            Ok(ErrorStrategy::Branch { step_id: step_id.to_string() })
+                        }
+                        _ => Err(serde::de::Error::custom("invalid Branch format")),
+                    }
+                } else {
+                    Err(serde::de::Error::custom("unknown ErrorStrategy object"))
+                }
+            }
+            _ => Err(serde::de::Error::custom("invalid ErrorStrategy format")),
+        }
+    }
 }
 
 /// 工作流元数据
@@ -131,7 +167,7 @@ pub struct Step {
     #[serde(default)]
     pub delay: Option<u64>,
     /// 错误处理策略（默认 fail）
-    #[serde(default)]
+    #[serde(alias = "onError", default)]
     pub on_error: Option<ErrorStrategy>,
     /// 容器节点的动作列表（新格式）
     #[serde(default)]
@@ -178,6 +214,7 @@ impl RunCondition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryConfig {
+    #[serde(alias = "max_retries")]
     pub max: u32,
     pub delay_ms: u64,
 }

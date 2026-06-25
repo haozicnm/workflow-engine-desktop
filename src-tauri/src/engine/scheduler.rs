@@ -1229,7 +1229,6 @@ fn emit_step_update(
     status: &str,
     output: Option<&serde_json::Value>,
 ) {
-    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -1239,9 +1238,12 @@ fn emit_step_update(
         "output": output,
         "error": null,
     });
-    if let Err(e) = app.emit("step-update", event) {
-        warn!("emit failed: {}", e);
+    if let Some(app) = app {
+        if let Err(e) = app.emit("step-update", &event) {
+            warn!("emit failed: {}", e);
+        }
     }
+    crate::server::events::emit("step-update", event);
 }
 #[cfg(not(feature = "gui"))]
 fn emit_step_update(
@@ -1258,15 +1260,17 @@ fn emit_step_update(
 /// 执行后推送变量快照，供前端实时监视
 #[cfg(feature = "gui")]
 fn emit_variable_snapshot(app: Option<&tauri::AppHandle>, run_id: &str, ctx: &ExecutionContext) {
-    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "variables": ctx.variables,
         "step_outputs": ctx.step_outputs,
     });
-    if let Err(e) = app.emit("variable-update", event) {
-        warn!("emit failed: {}", e);
+    if let Some(app) = app {
+        if let Err(e) = app.emit("variable-update", &event) {
+            warn!("emit failed: {}", e);
+        }
     }
+    crate::server::events::emit("variable-update", event);
 }
 #[cfg(not(feature = "gui"))]
 fn emit_variable_snapshot(_app: Option<&()>, _run_id: &str, _ctx: &ExecutionContext) {}
@@ -1279,7 +1283,6 @@ fn emit_step_update_with_error(
     step_name: &str,
     error: &str,
 ) {
-    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -1288,9 +1291,12 @@ fn emit_step_update_with_error(
         "output": null,
         "error": error,
     });
-    if let Err(e) = app.emit("step-update", event) {
-        warn!("emit failed: {}", e);
+    if let Some(app) = app {
+        if let Err(e) = app.emit("step-update", &event) {
+            warn!("emit failed: {}", e);
+        }
     }
+    crate::server::events::emit("step-update", event);
 }
 #[cfg(not(feature = "gui"))]
 fn emit_step_update_with_error(
@@ -1312,7 +1318,6 @@ fn emit_step_update_ignored(
     total_steps: usize,
     error: &str,
 ) {
-    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "step_id": step_id,
@@ -1322,9 +1327,12 @@ fn emit_step_update_ignored(
         "output": null,
         "error": error,
     });
-    if let Err(e) = app.emit("step-update", event) {
-        warn!("emit failed: {}", e);
+    if let Some(app) = app {
+        if let Err(e) = app.emit("step-update", &event) {
+            warn!("emit failed: {}", e);
+        }
     }
+    crate::server::events::emit("step-update", event);
 }
 #[cfg(not(feature = "gui"))]
 fn emit_step_update_ignored(
@@ -1344,15 +1352,17 @@ fn emit_run_update(
     workflow_name: &str,
     status: &str,
 ) {
-    let Some(app) = app else { return };
     let event = serde_json::json!({
         "run_id": run_id,
         "workflow_name": workflow_name,
         "status": status,
     });
-    if let Err(e) = app.emit("run-update", event) {
-        warn!("emit failed: {}", e);
+    if let Some(app) = app {
+        if let Err(e) = app.emit("run-update", &event) {
+            warn!("emit failed: {}", e);
+        }
     }
+    crate::server::events::emit("run-update", event);
 }
 #[cfg(not(feature = "gui"))]
 fn emit_run_update(_app: Option<&()>, _run_id: &str, _workflow_name: &str, _status: &str) {}

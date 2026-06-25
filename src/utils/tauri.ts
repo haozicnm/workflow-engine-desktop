@@ -39,8 +39,8 @@ const FIXED_ROUTES: Record<string, RouteEntry> = {
   debug_step:            { method: 'POST',   path: '/api/debug/step/{run_id}' },
   debug_continue:        { method: 'POST',   path: '/api/debug/continue/{run_id}' },
   debug_vars:            { method: 'GET',    path: '/api/debug/vars/{run_id}' },
-  debug_set_breakpoint:  { method: 'POST',   path: '/api/debug/breakpoint/set' },
-  debug_remove_breakpoint: { method: 'POST', path: '/api/debug/breakpoint/remove' },
+  debug_set_breakpoint:  { method: 'POST',   path: '/api/debug/breakpoints' },
+  debug_remove_breakpoint: { method: 'POST', path: '/api/debug/breakpoints/remove' },
   debug_get_breakpoints: { method: 'GET',    path: '/api/debug/breakpoints/{workflow_id}' },
   // v9.0: 模板库
   template_list:         { method: 'GET',    path: '/api/templates' },

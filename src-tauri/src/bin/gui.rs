@@ -115,6 +115,9 @@ fn main() {
             workflow_engine::commands::schedule::schedule_create,
             workflow_engine::commands::schedule::schedule_update,
             workflow_engine::commands::schedule::schedule_delete,
+            workflow_engine::commands::system::open_log_dir,
+            workflow_engine::commands::system::clear_logs,
+            workflow_engine::commands::system::get_log_path,
         ])
         .setup(move |app| {
             // Start HTTP server in background for backward compatibility

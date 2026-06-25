@@ -191,16 +191,16 @@ export const CONTAINER_DEFS: ContainerDef[] = [
     { name: 'excel_output', field_type: 'string', required: false, desc: '输出到 Excel 文件', group: 'advanced' },
   ]},
   { type: 'data_set', label: '设置变量', icon: 'Database', color: '#f0883e', category: 'data', description: '写入或覆盖上下文变量', outputHint: 'value', params: [
-    { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
+    { key: 'key', label: '变量名', type: 'text', placeholder: 'my_var' },
     { key: 'value', label: '变量值', type: 'textarea', placeholder: 'Hello {{name}}' },
   ], paramDefs: [
-    { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
+    { name: 'key', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
     { name: 'value', field_type: 'text', required: true, desc: '变量值', group: 'basic' },
   ]},
   { type: 'data_get', label: '读取变量', icon: 'Database', color: '#f0883e', category: 'data', description: '从上下文读取指定变量的值', outputHint: 'value', params: [
-    { key: 'name', label: '变量名', type: 'text', placeholder: 'my_var' },
+    { key: 'key', label: '变量名', type: 'text', placeholder: 'my_var' },
   ], paramDefs: [
-    { name: 'name', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
+    { name: 'key', field_type: 'string', required: true, desc: '变量名', group: 'basic' },
   ]},
   { type: 'file_list', label: '列出文件', icon: 'FolderOpen', color: '#d2a8ff', category: 'file', description: '列出目录内容', outputHint: 'files, count', params: [
     { key: 'path', label: '目录路径', type: 'text', placeholder: './data' },

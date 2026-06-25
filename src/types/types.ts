@@ -266,6 +266,39 @@ export function deserializeWorkflow(json: string): Workflow {
         s.label = s.name
         delete s.name
       }
+      // snake_case → camelCase 归一化（后端序列化输出 snake_case）
+      if (s.on_error !== undefined && s.onError === undefined) {
+        s.onError = s.on_error
+        delete s.on_error
+      }
+      if (s.condition_group !== undefined && s.conditionGroup === undefined) {
+        s.conditionGroup = s.condition_group
+        delete s.condition_group
+      }
+      if (s.run_condition !== undefined && s.runCondition === undefined) {
+        s.runCondition = s.run_condition
+        delete s.run_condition
+      }
+      if (s.body_steps !== undefined && s.bodySteps === undefined) {
+        s.bodySteps = s.body_steps
+        delete s.body_steps
+      }
+    }
+  }
+  // 归一化 Edge 字段名: 后端序列化为 from_port/to_port，前端期望 fromPort/toPort
+  if (Array.isArray(wf.edges)) {
+    for (const edge of wf.edges) {
+      if (edge && typeof edge === 'object') {
+        const e = edge as Record<string, unknown>
+        if (e.from_port !== undefined && e.fromPort === undefined) {
+          e.fromPort = e.from_port
+          delete e.from_port
+        }
+        if (e.to_port !== undefined && e.toPort === undefined) {
+          e.toPort = e.to_port
+          delete e.to_port
+        }
+      }
     }
   }
   return wf as unknown as Workflow

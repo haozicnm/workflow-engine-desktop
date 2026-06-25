@@ -145,11 +145,28 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
         debug_snapshots_cleanup.write().await.remove(&run_id_clone);
 
         match result {
-            Ok(_state) => info!("工作流执行完成: {}", run_id_clone),
+            Ok(_state) => {
+                info!("工作流执行完成: {}", run_id_clone);
+                events::emit(
+                    "run-update",
+                    serde_json::json!({
+                        "run_id": &run_id_clone,
+                        "status": "completed",
+                    }),
+                );
+            }
             Err(e) => {
                 let err_msg = e.to_string();
                 let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
+                events::emit(
+                    "run-update",
+                    serde_json::json!({
+                        "run_id": &run_id_clone,
+                        "status": status,
+                        "error": err_msg,
+                    }),
+                );
             }
         }
     });
