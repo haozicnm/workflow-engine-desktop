@@ -1,5 +1,21 @@
 # Changelog
 
+## v9.0.3 (2026-06-25)
+
+### 🔧 Bug Fixes — 前后端对齐 + 逻辑链完整性修复 (10 项)
+
+- **ErrorStrategy::Branch 反序列化**: 同时接受前端 `{branch:"id"}` 和后端 `{branch:{step_id:"id"}}` 格式
+- **Step.on_error serde alias**: 添加 `alias="onError"`，保存-加载后不再丢失错误策略
+- **RetryConfig.max serde alias**: 添加 `alias="max_retries"`，前端重试配置可正确传递到后端
+- **data_set/data_get config 字段名**: 前端 `name` → `key`，与后端 DataSetNode 对齐
+- **debug 断点路径**: 前端路由 `/breakpoint/set` → `/breakpoints` 匹配后端
+- **Tauri 命令注册**: 补注册 `open_log_dir`/`clear_logs`/`get_log_path`
+- **浏览器模式 SSE 事件**: scheduler 所有 emit 函数同时广播 SSE，run_manager 补发完成/失败事件
+- **Edge/Step 字段名 roundtrip**: deserializeWorkflow 归一化 `on_error→onError`, `condition_group→conditionGroup`, `from_port→fromPort` 等
+- **App.vue 文件损坏恢复**: 重构过程中文件字符被替换，恢复原始内容
+
+**Stats:** 7 files changed, +124 / -24 lines since v9.0.2
+
 ## v9.0.2 (2026-06-24)
 
 ### 🔒 Security Fixes (P0 — 11 项)

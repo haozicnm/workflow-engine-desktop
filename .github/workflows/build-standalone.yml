@@ -71,7 +71,7 @@ jobs:
           fi
           # 动态生成 DEBIAN/control（修正版本和架构）
           VERSION="${GITHUB_REF_NAME#v}"
-          if [ -z "$VERSION" ]; then VERSION="9.0.2"; fi
+          if [ -z "$VERSION" ]; then VERSION="9.0.3"; fi
           echo "=== Packaging deb v${VERSION} for ${DEB_ARCH} ==="
           sed -e "s/^Version:.*/Version: ${VERSION}/" \
               -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
@@ -135,7 +135,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${env:GITHUB_REF_NAME}" -replace '^v',''
-          if ([string]::IsNullOrEmpty($version)) { $version = "9.0.2" }
+          if ([string]::IsNullOrEmpty($version)) { $version = "9.0.3" }
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
 
