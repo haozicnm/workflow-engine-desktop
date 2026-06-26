@@ -282,7 +282,7 @@ onUnmounted(() => {
     <Transition name="fade">
       <div
         v-if="visible && pendingCount > 0"
-        class="fixed inset-0 z-40 bg-black/30"
+        class="fixed inset-0 z-40 bg-[var(--bg-overlay-l4)]"
         @click="visible = false"
       />
     </Transition>

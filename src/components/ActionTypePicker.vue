@@ -20,7 +20,7 @@ const emit = defineEmits<{
     <Transition name="fade">
       <div
         v-if="show"
-        class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
+        class="fixed inset-0 bg-[var(--bg-overlay-l4)] flex items-center justify-center z-[100]"
         @click="emit('close')"
       >
         <div class="bg-[var(--bg-base-secondary)] border border-[var(--border-neutral-l1)] rounded-xl p-4 min-w-[280px] max-h-[400px] overflow-y-auto shadow-[0_24px_64px_rgba(0,0,0,0.14)]" @click.stop>
