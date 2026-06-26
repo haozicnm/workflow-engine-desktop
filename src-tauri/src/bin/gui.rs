@@ -120,13 +120,14 @@ fn main() {
             workflow_engine::commands::system::get_log_path,
         ])
         .setup(move |app| {
-            // Start HTTP server in background for backward compatibility
+            // Start HTTP server in background, then navigate WebView to it
             let bind_addr: std::net::SocketAddr = http_bind.parse().unwrap_or_else(|e| {
                 eprintln!("❌ 无效的绑定地址: {}", e);
                 std::process::exit(1);
             });
             let http_app = Arc::new(app_for_http.clone());
             let static_dir_clone = static_dir.clone();
+            let app_handle = app.handle().clone();
 
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Runtime::new().unwrap();
@@ -137,6 +138,14 @@ fn main() {
                     match tokio::net::TcpListener::bind(bind_addr).await {
                         Ok(listener) => {
                             info!("HTTP API 服务已启动: http://{}", bind_addr);
+                            // Server is ready — navigate all webviews to the HTTP URL
+                            let url = format!("http://{}", bind_addr);
+                            if let Ok(url) = url.parse() {
+                                for (label, wv) in app_handle.webview_windows() {
+                                    info!("导航 WebView '{}' → {}", label, url);
+                                    wv.navigate(url);
+                                }
+                            }
                             let _ = axum::serve(
                                 listener,
                                 router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
@@ -152,9 +161,6 @@ fn main() {
 
             // Setup system tray (minimize to tray on close)
             workflow_engine::system::tray::setup(app)?;
-
-            // IPC server for wf-cli: use tauri async runtime (not raw tokio::spawn
-            // which panics when no Tokio runtime is active in the Tauri setup closure)
 
             Ok(())
         })

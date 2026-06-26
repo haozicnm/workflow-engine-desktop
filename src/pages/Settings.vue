@@ -134,20 +134,12 @@ function resetExecution() { settings.value.execution = { max_concurrent_runs: 3,
           </div>
         </CardHeader>
         <CardContent class="px-4 pb-4 pt-0">
-          <RadioGroup :model-value="theme" class="space-y-2" @update:model-value="setTheme($event as any)">
-            <div v-for="opt in themeOptions" :key="opt.value"
-              class="flex items-center gap-3 p-3 rounded-md transition-colors hover:bg-[var(--bg-overlay-l1)]/50 cursor-pointer"
-              :class="{ 'bg-[var(--bg-overlay-l1)]/30 ring-1 ring-primary/30': theme === opt.value }"
-              @click="setTheme(opt.value)">
-              <RadioGroupItem :value="opt.value" :id="`theme-${opt.value}`" />
-              <ActionIcon :name="opt.icon" cls="w-4 h-4" :class="theme === opt.value ? 'text-[var(--text-brand)]' : 'text-[var(--text-tertiary)]'" />
-              <Label :for="`theme-${opt.value}`" class="flex-1 cursor-pointer">
-                <span class="text-sm font-medium text-[var(--text-default)]">{{ opt.label }}</span>
-                <span class="text-xs text-[var(--text-tertiary)] ml-2">— {{ opt.desc }}</span>
-              </Label>
-              <Badge v-if="theme === opt.value" variant="success" class="text-[10px]">Active</Badge>
-            </div>
-          </RadioGroup>
+          <div class="flex items-center gap-3 p-3 rounded-md bg-[var(--bg-overlay-l1)]/30 ring-1 ring-primary/30">
+            <ActionIcon name="Sun" cls="w-4 h-4 text-[var(--text-brand)]" />
+            <span class="text-sm font-medium text-[var(--text-default)]">Light</span>
+            <span class="text-xs text-[var(--text-tertiary)] ml-2">— TRAE Work</span>
+            <Badge variant="success" class="text-[10px] ml-auto">Active</Badge>
+          </div>
         </CardContent>
       </Card>
 
