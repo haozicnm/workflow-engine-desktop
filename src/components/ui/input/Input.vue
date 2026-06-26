@@ -32,9 +32,9 @@ function onInput(event: Event) {
     :value="modelValue"
     :class="
       cn(
-        'flex h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors',
-        'placeholder:text-muted-foreground',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'flex h-9 w-full rounded-md border border-[var(--border-neutral-l1)] bg-[var(--bg-base-default)] px-3 py-1 text-sm text-[var(--text-default)] shadow-none transition-colors',
+        'placeholder:text-[var(--text-tertiary)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-contrast)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base-default)]',
         'disabled:cursor-not-allowed disabled:opacity-50',
         $props.class,
       )

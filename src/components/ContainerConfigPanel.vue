@@ -78,7 +78,7 @@ function onParamChange(key: string, value: unknown) {
       </div>
 
       <!-- No params -->
-      <div v-else class="text-center text-muted-foreground text-sm py-3">
+      <div v-else class="text-center text-[var(--text-tertiary)] text-sm py-3">
         {{ t('containerConfig.noParams') }}
       </div>
     </CardContent>

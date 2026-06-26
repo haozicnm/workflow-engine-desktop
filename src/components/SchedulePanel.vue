@@ -117,10 +117,10 @@ function formatDate(d: string | null): string {
 <template>
   <div class="h-full flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border-neutral-l1)] shrink-0">
       <div>
-        <h2 class="text-base font-semibold text-foreground">{{ t('schedule.title') }}</h2>
-        <p v-if="workflowName" class="text-xs text-muted-foreground mt-0.5">{{ workflowName }}</p>
+        <h2 class="text-base font-semibold text-[var(--text-default)]">{{ t('schedule.title') }}</h2>
+        <p v-if="workflowName" class="text-xs text-[var(--text-tertiary)] mt-0.5">{{ workflowName }}</p>
       </div>
       <div class="flex gap-1.5">
         <Button v-if="workflowId" variant="outline" size="sm" class="h-7 text-xs" @click="showCreate = !showCreate">
@@ -134,7 +134,7 @@ function formatDate(d: string | null): string {
 
     <!-- Create form -->
     <Transition name="collapse">
-      <div v-if="showCreate" class="border-b border-border bg-muted/30">
+      <div v-if="showCreate" class="border-b border-[var(--border-neutral-l1)] bg-[var(--bg-overlay-l1)]/30">
         <div class="px-6 py-4 space-y-3">
           <div class="flex gap-1.5 flex-wrap">
             <Button
@@ -145,17 +145,17 @@ function formatDate(d: string | null): string {
               :class="cn(
                 'h-6 text-[11px]',
                 newCron === p.value
-                  ? 'border-primary text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                  ? 'border-[var(--bg-brand)] text-[var(--text-brand)] bg-[var(--bg-brand)]/10'
+                  : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-overlay-l1)] hover:text-[var(--text-default)]',
               )"
               @click="newCron = p.value"
             >{{ p.label }}</Button>
           </div>
           <div class="flex gap-2 items-center">
             <Input v-model="newCron" :placeholder="t('schedule.cronPlaceholder')" class="flex-1 h-8 text-xs font-mono" />
-            <Button variant="default" size="sm" class="h-8 text-xs bg-success hover:bg-success/90" @click="onCreate">{{ t('common.create') }}</Button>
+            <Button variant="default" size="sm" class="h-8 text-xs bg-[var(--status-success-default)] hover:bg-[var(--status-success-default)]/90" @click="onCreate">{{ t('common.create') }}</Button>
           </div>
-          <p class="text-[11px] text-muted-foreground">{{ cronDescription }}</p>
+          <p class="text-[11px] text-[var(--text-tertiary)]">{{ cronDescription }}</p>
         </div>
       </div>
     </Transition>
@@ -163,21 +163,21 @@ function formatDate(d: string | null): string {
     <!-- List -->
     <div class="flex-1 overflow-y-auto">
       <div v-if="loading" class="flex items-center justify-center py-8">
-        <span class="text-muted-foreground text-sm">{{ t('common.loading') }}</span>
+        <span class="text-[var(--text-tertiary)] text-sm">{{ t('common.loading') }}</span>
       </div>
       <div v-else-if="!schedules.length" class="flex flex-col items-center justify-center py-8 text-center">
-        <Clock class="w-8 h-8 mb-2 text-muted-foreground" />
-        <span class="text-muted-foreground text-sm">{{ workflowId ? t('schedule.noSchedulesFor') : t('schedule.noSchedules') }}</span>
+        <Clock class="w-8 h-8 mb-2 text-[var(--text-tertiary)]" />
+        <span class="text-[var(--text-tertiary)] text-sm">{{ workflowId ? t('schedule.noSchedulesFor') : t('schedule.noSchedules') }}</span>
       </div>
       <div v-else class="p-4 space-y-3">
         <Card v-for="item in schedules" :key="item.id" class="shadow-none">
           <CardContent class="p-4">
             <div class="flex items-start justify-between gap-3">
               <div class="flex-1 min-w-0 space-y-1">
-                <div class="text-sm font-medium text-foreground truncate">{{ item.workflow_name }}</div>
-                <div class="text-xs font-mono text-primary">{{ item.cron_expr }}</div>
-                <div class="text-xs text-muted-foreground">{{ describeCron(item.cron_expr) }}</div>
-                <div class="text-[10px] text-muted-foreground/60">
+                <div class="text-sm font-medium text-[var(--text-default)] truncate">{{ item.workflow_name }}</div>
+                <div class="text-xs font-mono text-[var(--text-brand)]">{{ item.cron_expr }}</div>
+                <div class="text-xs text-[var(--text-tertiary)]">{{ describeCron(item.cron_expr) }}</div>
+                <div class="text-[10px] text-[var(--text-tertiary)]/60">
                   {{ t('schedule.lastNext', { last: formatDate(item.last_run), next: formatDate(item.next_run) }) }}
                 </div>
               </div>
@@ -190,7 +190,7 @@ function formatDate(d: string | null): string {
                 <Button
                   variant="ghost"
                   size="icon"
-                  class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-40 hover:opacity-100 transition-opacity"
+                  class="text-[var(--text-tertiary)] hover:text-[var(--status-error-default)] hover:bg-[var(--status-error-default)]/10 opacity-40 hover:opacity-100 transition-opacity"
                   :aria-label="t('schedule.deleteAria')"
                   @click="onDelete(item)"
                 >

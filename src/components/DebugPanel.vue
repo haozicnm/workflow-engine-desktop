@@ -181,9 +181,9 @@ function formatValue(v: unknown): string {
 <template>
   <div class="flex flex-col h-full">
     <!-- Header -->
-    <div class="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-      <Bug class="w-4 h-4 text-muted-foreground" />
-      <span class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ t('debug.title') }}</span>
+    <div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-neutral-l1)] shrink-0">
+      <Bug class="w-4 h-4 text-[var(--text-tertiary)]" />
+      <span class="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('debug.title') }}</span>
       <Badge v-if="debugState === 'paused'" variant="outline" class="ml-auto text-[10px] bg-yellow-500/10 text-yellow-500 border-yellow-500/30">
         {{ t('debug.paused') }}
       </Badge>
@@ -193,7 +193,7 @@ function formatValue(v: unknown): string {
     </div>
 
     <!-- Controls -->
-    <div class="flex items-center gap-1 px-3 py-2 border-b border-border shrink-0">
+    <div class="flex items-center gap-1 px-3 py-2 border-b border-[var(--border-neutral-l1)] shrink-0">
       <Button variant="ghost" size="sm" :disabled="debugState !== 'paused'" @click="onStepOver" :title="t('debug.stepOver')">
         <SkipForward class="w-3.5 h-3.5" />
       </Button>
@@ -207,8 +207,8 @@ function formatValue(v: unknown): string {
 
     <ScrollArea class="flex-1 overflow-auto">
       <!-- Current Step -->
-      <div v-if="currentStepId" class="px-3 py-2 border-b border-border">
-        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{{ t('debug.currentStep') }}</div>
+      <div v-if="currentStepId" class="px-3 py-2 border-b border-[var(--border-neutral-l1)]">
+        <div class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">{{ t('debug.currentStep') }}</div>
         <div class="flex items-center gap-1">
           <span class="inline-block w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
           <span class="text-sm font-medium">{{ currentStepId }}</span>
@@ -216,12 +216,12 @@ function formatValue(v: unknown): string {
       </div>
 
       <!-- Breakpoints -->
-      <div v-if="breakpoints.length > 0" class="px-3 py-2 border-b border-border">
-        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{{ t('debug.breakpoints') }}</div>
+      <div v-if="breakpoints.length > 0" class="px-3 py-2 border-b border-[var(--border-neutral-l1)]">
+        <div class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">{{ t('debug.breakpoints') }}</div>
         <div
           v-for="bp in breakpoints"
           :key="bp.id"
-          class="flex items-center gap-2 py-0.5 text-sm cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1"
+          class="flex items-center gap-2 py-0.5 text-sm cursor-pointer hover:bg-[var(--bg-overlay-l2)]/50 rounded px-1 -mx-1"
         >
           <span class="inline-block w-2 h-2 rounded-full bg-red-500" />
           <span class="flex-1 truncate">{{ bp.label || bp.id }}</span>
@@ -234,13 +234,13 @@ function formatValue(v: unknown): string {
 
       <!-- Variables -->
       <div class="px-3 py-2">
-        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{{ t('debug.variables') }}</div>
-        <div v-if="variableGroups.length === 0" class="text-xs text-muted-foreground/50 py-2">
+        <div class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">{{ t('debug.variables') }}</div>
+        <div v-if="variableGroups.length === 0" class="text-xs text-[var(--text-tertiary)]/50 py-2">
           {{ t('debug.noVariables') }}
         </div>
         <div v-for="group in variableGroups" :key="group.key" class="mb-1">
           <div
-            class="flex items-center gap-1 py-0.5 text-xs text-muted-foreground cursor-pointer hover:text-foreground"
+            class="flex items-center gap-1 py-0.5 text-xs text-[var(--text-tertiary)] cursor-pointer hover:text-[var(--text-default)]"
             @click="toggleGroup(group.key)"
           >
             <ChevronDown v-if="expandedGroups.has(group.key)" class="w-3 h-3" />
@@ -254,9 +254,9 @@ function formatValue(v: unknown): string {
                 :key="v.key"
                 class="flex gap-1 py-0.5 text-xs font-mono"
               >
-                <span class="text-primary shrink-0">{{ v.key }}</span>
-                <span class="text-muted-foreground">=</span>
-                <span class="text-foreground truncate">{{ formatValue(v.value) }}</span>
+                <span class="text-[var(--text-brand)] shrink-0">{{ v.key }}</span>
+                <span class="text-[var(--text-tertiary)]">=</span>
+                <span class="text-[var(--text-default)] truncate">{{ formatValue(v.value) }}</span>
               </div>
             </div>
           </Transition>
@@ -264,12 +264,12 @@ function formatValue(v: unknown): string {
       </div>
 
       <!-- Call Stack -->
-      <div v-if="callStack.length > 0" class="px-3 py-2 border-t border-border">
-        <div class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{{ t('debug.callStack') }}</div>
+      <div v-if="callStack.length > 0" class="px-3 py-2 border-t border-[var(--border-neutral-l1)]">
+        <div class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">{{ t('debug.callStack') }}</div>
         <div
           v-for="(step, i) in callStack"
           :key="i"
-          class="flex items-center gap-1 py-0.5 text-xs font-mono text-muted-foreground"
+          class="flex items-center gap-1 py-0.5 text-xs font-mono text-[var(--text-tertiary)]"
         >
           <span class="w-3 text-right text-[10px]">{{ i }}</span>
           <span>{{ step }}</span>

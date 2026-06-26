@@ -13,7 +13,7 @@ const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
   <span
     v-if="sidebar?.open.value"
     :class="cn(
-      'text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1.5 block',
+      'text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider px-2 mb-1.5 block',
       $attrs.class as string,
     )"
     v-bind="$attrs"

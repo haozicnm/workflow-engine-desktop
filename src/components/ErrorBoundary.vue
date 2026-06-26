@@ -55,14 +55,14 @@ function dismiss() {
 
 <template>
   <slot v-if="!error" />
-  <div v-else class="min-h-[100dvh] flex items-center justify-center bg-background text-foreground font-sans">
-    <div class="text-center p-10 bg-card border border-border rounded-xl max-w-[480px]">
-      <AlertTriangle class="w-12 h-12 text-warning mx-auto mb-4" />
+  <div v-else class="min-h-[100dvh] flex items-center justify-center bg-[var(--bg-base-default)] text-[var(--text-default)] font-sans">
+    <div class="text-center p-10 bg-[var(--bg-base-secondary)] border border-[var(--border-neutral-l1)] rounded-xl max-w-[480px]">
+      <AlertTriangle class="w-12 h-12 text-[var(--status-warning-default)] mx-auto mb-4" />
       <h2 class="text-lg font-semibold mb-3">出现了一个错误</h2>
-      <p class="text-sm font-mono bg-background text-destructive p-3 rounded-md break-all">{{ error }}</p>
-      <p v-if="errorInfo" class="text-xs text-muted-foreground mt-2">组件: {{ errorInfo }}</p>
+      <p class="text-sm font-mono bg-[var(--bg-base-default)] text-[var(--status-error-default)] p-3 rounded-md break-all">{{ error }}</p>
+      <p v-if="errorInfo" class="text-xs text-[var(--text-tertiary)] mt-2">组件: {{ errorInfo }}</p>
       <div class="mt-6 flex gap-3 justify-center">
-        <Button variant="default" size="sm" class="bg-success text-success-foreground" @click="reload">重新加载</Button>
+        <Button variant="default" size="sm" class="bg-[var(--status-success-default)] text-white" @click="reload">重新加载</Button>
         <Button variant="outline" size="sm" @click="dismiss">忽略</Button>
       </div>
     </div>

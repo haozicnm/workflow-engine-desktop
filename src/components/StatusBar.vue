@@ -72,29 +72,29 @@ function formatNextRun(iso: string | null): string {
 </script>
 
 <template>
-  <div class="status-bar h-7 border-t border-border bg-card/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-muted-foreground select-none shrink-0">
+  <div class="status-bar h-7 border-t border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)]/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-[var(--text-tertiary)] select-none shrink-0">
     <!-- IPC daemon status -->
     <span class="flex items-center gap-1.5" :title="state.ipcOnline ? t('statusBar.daemonConnected') : t('statusBar.daemonDisconnected')">
-      <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
-      <span v-if="state.ipcOnline" class="text-muted-foreground/70">{{ t('dashboard.daemonStatus') }}</span>
-      <span v-else class="text-destructive/70">{{ t('dashboard.daemonOffline') }}</span>
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-[var(--status-success-default)]/80' : 'bg-[var(--status-error-default)]/60'"></span>
+      <span v-if="state.ipcOnline" class="text-[var(--text-tertiary)]/70">{{ t('dashboard.daemonStatus') }}</span>
+      <span v-else class="text-[var(--status-error-default)]/70">{{ t('dashboard.daemonOffline') }}</span>
     </span>
 
     <span class="text-border">│</span>
 
     <!-- API server status -->
     <span class="flex items-center gap-1.5" :title="state.apiOnline ? '后端服务在线' : '后端服务离线'">
-      <span class="w-1.5 h-1.5 rounded-full" :class="state.apiOnline ? 'bg-success/80' : 'bg-destructive/60'"></span>
-      <span class="text-muted-foreground/70">{{ state.apiOnline ? '服务在线' : '服务离线' }}</span>
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.apiOnline ? 'bg-[var(--status-success-default)]/80' : 'bg-[var(--status-error-default)]/60'"></span>
+      <span class="text-[var(--text-tertiary)]/70">{{ state.apiOnline ? '服务在线' : '服务离线' }}</span>
     </span>
 
     <span class="text-border">│</span>
 
     <!-- WebBridge status -->
     <span class="flex items-center gap-1.5" :title="state.webbridgeConnected ? `WebBridge 已连接 (v${state.webbridgeVersion})` : 'WebBridge 未连接'">
-      <span class="w-1.5 h-1.5 rounded-full" :class="state.webbridgeConnected ? 'bg-success/80' : 'bg-muted-foreground/30'"></span>
-      <span class="text-muted-foreground/70">{{ state.webbridgeConnected ? 'WebBridge' : 'WebBridge' }}</span>
-      <span v-if="state.webbridgeConnected" class="text-muted-foreground/40">✓</span>
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.webbridgeConnected ? 'bg-[var(--status-success-default)]/80' : 'bg-muted-foreground/30'"></span>
+      <span class="text-[var(--text-tertiary)]/70">{{ state.webbridgeConnected ? 'WebBridge' : 'WebBridge' }}</span>
+      <span v-if="state.webbridgeConnected" class="text-[var(--text-tertiary)]/40">✓</span>
     </span>
 
     <span class="text-border">│</span>
@@ -102,7 +102,7 @@ function formatNextRun(iso: string | null): string {
     <!-- Idle state -->
     <template v-if="isIdle">
       <span class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-success/70"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--status-success-default)]/70"></span>
         {{ t('statusBar.ready') }}
       </span>
     </template>
@@ -115,17 +115,17 @@ function formatNextRun(iso: string | null): string {
         class="flex items-center gap-1.5"
       >
         <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/70 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--bg-brand)]/70 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-[var(--bg-brand)]"></span>
         </span>
-        <span class="text-foreground font-medium">{{ run.name }}</span>
-        <span v-if="run.currentStep" class="text-muted-foreground/70">
+        <span class="text-[var(--text-default)] font-medium">{{ run.name }}</span>
+        <span v-if="run.currentStep" class="text-[var(--text-tertiary)]/70">
           {{ run.currentStep }}
         </span>
-        <span v-if="run.progress" class="text-muted-foreground/50 tabular-nums">
+        <span v-if="run.progress" class="text-[var(--text-tertiary)]/50 tabular-nums">
           {{ run.progress.done }}/{{ run.progress.total }}
         </span>
-        <span class="text-muted-foreground/40 tabular-nums">
+        <span class="text-[var(--text-tertiary)]/40 tabular-nums">
           {{ formatElapsed(Date.now() - run.startedAt) }}
         </span>
       </div>
@@ -137,13 +137,13 @@ function formatNextRun(iso: string | null): string {
     <!-- Scheduled workflows -->
     <template v-if="hasScheduled">
       <div class="flex items-center gap-1.5">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--status-warning-default)]/80"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>{{ t('statusBar.scheduledCount', { n: state.scheduledWorkflows.length }) }}</span>
-        <span v-for="s in state.scheduledWorkflows.slice(0, 3)" :key="s.id" class="flex items-center gap-1 text-muted-foreground/60">
+        <span v-for="s in state.scheduledWorkflows.slice(0, 3)" :key="s.id" class="flex items-center gap-1 text-[var(--text-tertiary)]/60">
           <span class="max-w-[100px] truncate">{{ s.workflowName }}</span>
-          <span class="text-muted-foreground/40">{{ formatNextRun(s.nextRun) }}</span>
+          <span class="text-[var(--text-tertiary)]/40">{{ formatNextRun(s.nextRun) }}</span>
         </span>
-        <span v-if="state.scheduledWorkflows.length > 3" class="text-muted-foreground/40">
+        <span v-if="state.scheduledWorkflows.length > 3" class="text-[var(--text-tertiary)]/40">
           +{{ state.scheduledWorkflows.length - 3 }}
         </span>
       </div>

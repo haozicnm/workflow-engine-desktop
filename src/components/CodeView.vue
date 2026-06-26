@@ -77,7 +77,7 @@ function onBlur() {
 
 <template>
   <div class="flex flex-col flex-1 min-h-0">
-    <div class="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-card shrink-0">
+    <div class="flex items-center gap-3 px-3 py-1.5 border-b border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)] shrink-0">
       <div class="flex gap-0.5">
         <Button
           v-for="f in (['json', 'yaml'] as ViewFormat[])"
@@ -90,11 +90,11 @@ function onBlur() {
           {{ f }}
         </Button>
       </div>
-      <span v-if="error" class="text-xs text-destructive flex items-center gap-1">
+      <span v-if="error" class="text-xs text-[var(--status-error-default)] flex items-center gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
         {{ error }}
       </span>
-      <span v-else class="text-xs text-muted-foreground">编辑后切换回可视化视图自动应用</span>
+      <span v-else class="text-xs text-[var(--text-tertiary)]">编辑后切换回可视化视图自动应用</span>
     </div>
     <Textarea
       :model-value="codeText"

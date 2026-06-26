@@ -53,10 +53,10 @@ function statusIcon(status: string): string {
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'completed': return 'text-success'
-    case 'failed': return 'text-destructive'
-    case 'skipped': return 'text-muted-foreground'
-    default: return 'text-muted-foreground'
+    case 'completed': return 'text-[var(--status-success-default)]'
+    case 'failed': return 'text-[var(--status-error-default)]'
+    case 'skipped': return 'text-[var(--text-tertiary)]'
+    default: return 'text-[var(--text-tertiary)]'
   }
 }
 
@@ -71,12 +71,12 @@ watch(() => props.runId, loadTrajectory, { immediate: true })
 
 <template>
   <div class="flex flex-col h-full max-h-[600px]">
-    <div v-if="loading" class="flex items-center gap-2 px-2 py-4 text-muted-foreground text-sm">
-      <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+    <div v-if="loading" class="flex items-center gap-2 px-2 py-4 text-[var(--text-tertiary)] text-sm">
+      <div class="w-3.5 h-3.5 border-[1.5px] border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
       <span>加载执行轨迹...</span>
     </div>
 
-    <div v-else-if="trajectory.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">
+    <div v-else-if="trajectory.length === 0" class="text-center text-[var(--text-tertiary)]/50 text-sm py-3">
       暂无预览数据
     </div>
 
@@ -86,8 +86,8 @@ watch(() => props.runId, loadTrajectory, { immediate: true })
         <div
           v-for="(step, idx) in trajectory"
           :key="step.step_id"
-          class="cursor-pointer transition-colors hover:bg-secondary/50 rounded-md"
-          :class="selectedStepId === step.step_id ? 'bg-secondary/80' : ''"
+          class="cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]/50 rounded-md"
+          :class="selectedStepId === step.step_id ? 'bg-[var(--bg-overlay-l1)]/80' : ''"
           @click="selectStep(step.step_id)"
         >
           <div class="flex items-start gap-2.5 px-3 py-2">
@@ -96,16 +96,16 @@ watch(() => props.runId, loadTrajectory, { immediate: true })
               <div
                 class="w-2.5 h-2.5 rounded-full border-2"
                 :class="{
-                  'bg-success border-success': step.status === 'completed',
-                  'bg-destructive border-destructive': step.status === 'failed',
+                  'bg-[var(--status-success-default)] border-[var(--status-success-default)]': step.status === 'completed',
+                  'bg-[var(--status-error-default)] border-[var(--status-error-default)]': step.status === 'failed',
                   'border-muted-foreground/30': step.status === 'skipped',
-                  'border-border': step.status !== 'completed' && step.status !== 'failed' && step.status !== 'skipped',
+                  'border-[var(--border-neutral-l1)]': step.status !== 'completed' && step.status !== 'failed' && step.status !== 'skipped',
                 }"
               />
               <div
                 v-if="idx < trajectory.length - 1"
                 class="w-px flex-1 min-h-[12px]"
-                :class="trajectory[idx + 1].status === 'completed' ? 'bg-success/30' : 'bg-border'"
+                :class="trajectory[idx + 1].status === 'completed' ? 'bg-[var(--status-success-default)]/30' : 'bg-border'"
               />
             </div>
 
@@ -113,18 +113,18 @@ watch(() => props.runId, loadTrajectory, { immediate: true })
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <span :class="statusColor(step.status)" class="text-xs">{{ statusIcon(step.status) }}</span>
-                <span class="text-xs font-medium text-foreground truncate">{{ step.step_name }}</span>
-                <span class="text-[10px] text-muted-foreground/50 shrink-0">{{ step.step_type }}</span>
-                <span v-if="step.duration_ms > 0" class="text-[10px] text-muted-foreground/50 shrink-0">{{ formatMs(step.duration_ms) }}</span>
+                <span class="text-xs font-medium text-[var(--text-default)] truncate">{{ step.step_name }}</span>
+                <span class="text-[10px] text-[var(--text-tertiary)]/50 shrink-0">{{ step.step_type }}</span>
+                <span v-if="step.duration_ms > 0" class="text-[10px] text-[var(--text-tertiary)]/50 shrink-0">{{ formatMs(step.duration_ms) }}</span>
               </div>
-              <div class="text-[11px] text-muted-foreground mt-0.5 truncate">{{ step.summary }}</div>
+              <div class="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate">{{ step.summary }}</div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Step detail (right) -->
-      <div v-if="selectedStep" class="w-[320px] shrink-0 border-l border-border pl-3 overflow-y-auto">
+      <div v-if="selectedStep" class="w-[320px] shrink-0 border-l border-[var(--border-neutral-l1)] pl-3 overflow-y-auto">
         <StepDetail :step="selectedStep" :run-id="runId" />
       </div>
     </div>

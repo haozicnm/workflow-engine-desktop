@@ -50,9 +50,9 @@ onMounted(() => {
 })
 
 const bgClass = {
-  success: 'bg-success border-success/80',
-  error: 'bg-danger border-danger/80',
-  info: 'bg-primary border-primary/80',
+  success: 'bg-[var(--status-success-default)] border-[var(--status-success-default)]/80',
+  error: 'bg-[var(--status-error-default)] border-[var(--status-error-default)]/80',
+  info: 'bg-[var(--bg-brand)] border-[var(--bg-brand)]/80',
 }
 
 const iconMap = {
@@ -67,7 +67,7 @@ const iconMap = {
     role="alert"
     aria-live="polite"
     :class="[
-      'fixed z-[200] flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium text-primary-foreground shadow-lg max-w-[400px]',
+      'fixed z-[200] flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium text-[var(--text-onbrand)] shadow-[0_12px_32px_rgba(0,0,0,0.12)] max-w-[400px]',
       'transition-all duration-300 ease-in-out',
       visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-[120%]',
       bgClass[type || 'info'],
@@ -81,7 +81,7 @@ const iconMap = {
     <Button
       variant="ghost"
       size="icon"
-      class="shrink-0 w-5 h-5 text-primary-foreground hover:bg-white/20 hover:text-primary-foreground"
+      class="shrink-0 w-5 h-5 text-[var(--text-onbrand)] hover:bg-white/20 hover:text-[var(--text-onbrand)]"
       @click="dismissNow"
       :aria-label="t('common.close')"
     >✕</Button>

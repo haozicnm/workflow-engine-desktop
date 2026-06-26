@@ -213,12 +213,12 @@ const visible = computed(() => {
 <template>
   <div v-if="visible">
     <!-- Label -->
-    <Label class="text-[11px] text-muted-foreground block mb-1">
+    <Label class="text-[11px] text-[var(--text-tertiary)] block mb-1">
       {{ field.label }}
-      <span v-if="field.required" class="text-danger ml-0.5">*</span>
+      <span v-if="field.required" class="text-[var(--status-error-default)] ml-0.5">*</span>
     </Label>
     <!-- Hint -->
-    <div v-if="field.hint" class="text-[10px] text-muted-foreground/70 mb-1.5">{{ field.hint }}</div>
+    <div v-if="field.hint" class="text-[10px] text-[var(--text-tertiary)]/70 mb-1.5">{{ field.hint }}</div>
 
     <!-- Text input (string / text) -->
     <div v-if="field.type === 'text'" class="flex gap-1">
@@ -235,7 +235,7 @@ const visible = computed(() => {
         variant="outline"
         size="sm"
         class="h-8 w-8 p-0 shrink-0"
-        :class="pickingElement ? 'text-warning' : ''"
+        :class="pickingElement ? 'text-[var(--status-warning-default)]' : ''"
         :title="pickingElement ? t('actionRow.picking') : t('actionRow.pickFromPage')"
         @click="emit('pick-element')"
       ><Target class="w-4 h-4" /></Button>
@@ -273,7 +273,7 @@ const visible = computed(() => {
         :model-value="!!(modelValue ?? field.default)"
         @update:model-value="onCheckboxChange"
       />
-      <span class="text-[11px] text-muted-foreground">
+      <span class="text-[11px] text-[var(--text-tertiary)]">
         {{ (modelValue ?? field.default) ? 'ON' : 'OFF' }}
       </span>
     </div>
@@ -299,20 +299,20 @@ const visible = computed(() => {
         class="text-xs font-mono"
         @input="onJsonInput"
       />
-      <div v-if="jsonError" class="text-[10px] text-danger mt-0.5">{{ jsonError }}</div>
+      <div v-if="jsonError" class="text-[10px] text-[var(--status-error-default)] mt-0.5">{{ jsonError }}</div>
     </div>
 
     <!-- Code editor (textarea with monospace + lang badge) -->
     <div v-else-if="field.type === 'code'">
       <div class="flex items-center justify-between mb-1">
-        <span v-if="field.lang" class="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">{{ field.lang }}</span>
+        <span v-if="field.lang" class="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-overlay-l1)] px-1.5 py-0.5 rounded font-mono">{{ field.lang }}</span>
       </div>
       <Textarea
         :data-field="field.key"
         :model-value="String(modelValue ?? field.default ?? '')"
         :placeholder="field.placeholder || '// code here'"
         :rows="8"
-        class="text-xs font-mono bg-muted/30"
+        class="text-xs font-mono bg-[var(--bg-overlay-l1)]/30"
         @input="onTextareaInput"
       />
     </div>
@@ -339,7 +339,7 @@ const visible = computed(() => {
     <!-- Variable reference (text/textarea/json/code/file_path only) -->
     <div v-if="canRef && hasRefs" class="mt-1">
       <div class="flex items-center gap-1.5">
-        <Link class="w-3 h-3 shrink-0 text-muted-foreground" />
+        <Link class="w-3 h-3 shrink-0 text-[var(--text-tertiary)]" />
         <div class="relative flex-1">
           <Button
             ref="triggerRef"
@@ -361,7 +361,7 @@ const visible = computed(() => {
           <Teleport to="body">
             <div
               v-if="openDropdown"
-              class="fixed z-[60] w-64 max-h-[200px] overflow-y-auto bg-background border border-border rounded-md"
+              class="fixed z-[60] w-64 max-h-[200px] overflow-y-auto bg-[var(--bg-base-default)] border border-[var(--border-neutral-l1)] rounded-md"
               :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
             >
             <div
@@ -369,12 +369,12 @@ const visible = computed(() => {
               :key="group.stepId"
             >
               <!-- Step header -->
-              <div class="px-2 py-1.5 text-[11px] font-semibold text-foreground bg-muted/50 border-b border-border/50 flex items-center gap-1.5 sticky top-0">
+              <div class="px-2 py-1.5 text-[11px] font-semibold text-[var(--text-default)] bg-[var(--bg-overlay-l1)]/50 border-b border-[var(--border-neutral-l1)]/50 flex items-center gap-1.5 sticky top-0">
                 <span>{{ group.stepIcon }}</span>
                 <span>{{ t('actionRow.stepLabel') }}{{ group.stepId.replace('step_', '') }} · {{ group.stepLabel }}</span>
               </div>
               <!-- Output hint -->
-              <div v-if="group.outputHint" class="px-2 py-0.5 text-[10px] text-muted-foreground/60 bg-muted/30 font-mono">
+              <div v-if="group.outputHint" class="px-2 py-0.5 text-[10px] text-[var(--text-tertiary)]/60 bg-[var(--bg-overlay-l1)]/30 font-mono">
                 {{ t('actionRow.outputLabel') }} {{ group.outputHint }}
               </div>
               <!-- Step-level -->
@@ -396,7 +396,7 @@ const visible = computed(() => {
                 @click="selectRef(act.ref)"
               >
                 {{ act.label }}
-                <span v-if="act.isSameContainer" class="text-[10px] text-primary/70 ml-0.5">{{ t('actionRow.sameContainerBadge') }}</span>
+                <span v-if="act.isSameContainer" class="text-[10px] text-[var(--text-brand)]/70 ml-0.5">{{ t('actionRow.sameContainerBadge') }}</span>
               </Button>
             </div>
             </div>
@@ -408,7 +408,7 @@ const visible = computed(() => {
         <span
           v-for="m in refTags"
           :key="m"
-          class="inline-flex items-center px-1 py-0.5 text-[10px] font-mono bg-primary/10 text-primary rounded"
+          class="inline-flex items-center px-1 py-0.5 text-[10px] font-mono bg-[var(--bg-brand)]/10 text-[var(--text-brand)] rounded"
         >
           {{ m }}
         </span>
@@ -416,8 +416,8 @@ const visible = computed(() => {
     </div>
 
     <!-- Data hint -->
-    <div v-if="dataHint" class="text-[11px] px-2 py-1 mt-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
-      {{ t('actionRow.dataFrom') }} <span class="font-medium text-foreground">{{ dataHint }}</span>
+    <div v-if="dataHint" class="text-[11px] px-2 py-1 mt-1 rounded bg-[var(--bg-brand)]/5 text-[var(--text-tertiary)] flex items-center gap-1">
+      {{ t('actionRow.dataFrom') }} <span class="font-medium text-[var(--text-default)]">{{ dataHint }}</span>
     </div>
   </div>
 </template>

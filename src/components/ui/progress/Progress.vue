@@ -17,12 +17,12 @@ const percentage = computed(() => Math.round((props.modelValue ?? 0) / (props.ma
   <ProgressRoot
     v-bind="props"
     :class="cn(
-      'relative h-4 w-full overflow-hidden rounded-full bg-secondary',
+      'relative h-4 w-full overflow-hidden rounded-full bg-[var(--bg-overlay-l1)]',
       props.class,
     )"
   >
     <ProgressIndicator
-      class="h-full w-full flex-1 bg-primary transition-all"
+      class="h-full w-full flex-1 bg-[var(--bg-brand)] transition-all"
       :style="`transform: translateX(-${100 - percentage}%)`"
     />
   </ProgressRoot>

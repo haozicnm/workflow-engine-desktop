@@ -35,7 +35,7 @@ function close() {
     <Transition name="drawer-overlay">
       <div
         v-if="isOpen"
-        :class="cn('fixed inset-0 z-50 bg-black/60 backdrop-blur-sm')"
+        :class="cn('fixed inset-0 z-50 bg-[var(--bg-overlay-l4)] backdrop-blur-sm')"
         @click="close"
       />
     </Transition>
@@ -44,7 +44,7 @@ function close() {
       <div
         v-if="isOpen"
         :class="cn(
-          'fixed z-50 bg-background border-border shadow-2xl flex flex-col',
+          'fixed z-50 bg-[var(--bg-base-default)] border-[var(--border-neutral-l1)] shadow-[0_24px_64px_rgba(0,0,0,0.14)] flex flex-col',
           direction === 'right' && 'right-0 top-0 h-full w-[360px] border-l',
           direction === 'left' && 'left-0 top-0 h-full w-[360px] border-r',
           direction === 'top' && 'top-0 left-0 w-full h-auto border-b',
@@ -52,13 +52,13 @@ function close() {
         )"
       >
         <!-- Header -->
-        <div :class="cn('flex items-center justify-between p-4 border-b border-border')">
+        <div :class="cn('flex items-center justify-between p-4 border-b border-[var(--border-neutral-l1)]')">
           <slot name="header" />
           <button
             :class="cn(
               'ml-auto rounded-md p-1.5',
-              'text-muted-foreground hover:text-foreground hover:bg-secondary',
-              'transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+              'text-[var(--text-tertiary)] hover:text-[var(--text-default)] hover:bg-[var(--bg-overlay-l1)]',
+              'transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--border-contrast)]',
             )"
             @click="close"
           >
@@ -75,7 +75,7 @@ function close() {
         </div>
 
         <!-- Footer -->
-        <div v-if="$slots.footer" :class="cn('border-t border-border p-4')">
+        <div v-if="$slots.footer" :class="cn('border-t border-[var(--border-neutral-l1)] p-4')">
           <slot name="footer" />
         </div>
       </div>

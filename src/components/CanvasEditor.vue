@@ -253,7 +253,7 @@ function resetView() { canvas.resetView() }
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-background">
+  <div class="flex flex-col h-full bg-[var(--bg-base-default)]">
     <!-- 工具栏 -->
     <div class="flex items-center gap-2 px-3 py-2 border-b shrink-0">
       <Button variant="ghost" size="icon" @click="zoomIn">
@@ -262,12 +262,12 @@ function resetView() { canvas.resetView() }
       <Button variant="ghost" size="icon" @click="zoomOut">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </Button>
-      <span class="text-xs text-muted-foreground min-w-[3rem] text-center">{{ zoomPercent }}%</span>
+      <span class="text-xs text-[var(--text-tertiary)] min-w-[3rem] text-center">{{ zoomPercent }}%</span>
       <Button variant="ghost" size="icon" @click="resetView">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
       </Button>
       <div class="flex-1" />
-      <span class="text-xs text-muted-foreground">{{ t('editor.stepsCount', { count: stepRef.length }) }} · {{ t('editor.edgesCount', { count: edgeRef.length }) }}</span>
+      <span class="text-xs text-[var(--text-tertiary)]">{{ t('editor.stepsCount', { count: stepRef.length }) }} · {{ t('editor.edgesCount', { count: edgeRef.length }) }}</span>
     </div>
 
     <!-- 画布 -->
@@ -346,7 +346,7 @@ function resetView() { canvas.resetView() }
       </div>
 
       <!-- 空状态 -->
-      <div v-if="!stepRef.length" class="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm pointer-events-none">
+      <div v-if="!stepRef.length" class="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)] text-sm pointer-events-none">
         {{ t('editor.canvasEmpty') }}
       </div>
 

@@ -38,17 +38,17 @@ defineEmits<{
     <SelectTrigger
       :class="cn(
         'flex h-9 w-full items-center justify-between gap-2',
-        'rounded-md border border-border bg-background px-3 py-2 text-sm',
-        'text-foreground placeholder:text-muted-foreground',
-        'hover:border-ring hover:bg-popover',
-        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
+        'rounded-md border border-[var(--border-neutral-l1)] bg-[var(--bg-base-default)] px-3 py-2 text-sm',
+        'text-[var(--text-default)] placeholder:text-[var(--text-tertiary)]',
+        'hover:border-ring hover:bg-[var(--bg-menu)]',
+        'focus:outline-none focus:ring-2 focus:ring-[var(--border-contrast)] focus:ring-offset-2 focus:ring-offset-[var(--bg-base-default)]',
         'disabled:cursor-not-allowed disabled:opacity-50',
         '[&>span]:line-clamp-1',
       )"
     >
       <SelectValue :placeholder="placeholder ?? t('common.selectDefault')" />
       <SelectIcon as-child>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--text-tertiary)]">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </SelectIcon>
@@ -59,7 +59,7 @@ defineEmits<{
       :side-offset="4"
       :class="cn(
         'relative z-[60] max-h-96 min-w-[8rem] overflow-hidden',
-        'rounded-md border border-border bg-popover shadow-lg',
+        'rounded-md border border-[var(--border-neutral-l1)] bg-[var(--bg-menu)] shadow-[0_12px_32px_rgba(0,0,0,0.12)]',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
         'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
@@ -72,10 +72,10 @@ defineEmits<{
           :value="opt.value"
           :disabled="opt.disabled"
           :class="cn(
-            'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-foreground',
+            'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-[var(--text-default)]',
             'outline-none transition-colors',
-            'hover:bg-accent hover:text-foreground',
-            'focus:bg-accent focus:text-foreground',
+            'hover:bg-[var(--bg-overlay-l2)] hover:text-[var(--text-default)]',
+            'focus:bg-[var(--bg-overlay-l2)] focus:text-[var(--text-default)]',
             'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
           )"
         >

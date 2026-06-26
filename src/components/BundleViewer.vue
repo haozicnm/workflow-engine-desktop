@@ -21,11 +21,11 @@ const truncated = computed(() => {
     <pre
       v-if="!isImage"
       class="text-[10px] font-mono p-2 m-0 whitespace-pre-wrap break-all"
-      :class="isJson ? 'text-foreground' : 'text-muted-foreground'"
+      :class="isJson ? 'text-[var(--text-default)]' : 'text-[var(--text-tertiary)]'"
     >{{ truncated }}</pre>
 
     <!-- Image placeholder (Tauri asset protocol) -->
-    <div v-else class="flex items-center justify-center p-4 text-muted-foreground/50 text-xs">
+    <div v-else class="flex items-center justify-center p-4 text-[var(--text-tertiary)]/50 text-xs">
       [截图快照]
     </div>
   </div>

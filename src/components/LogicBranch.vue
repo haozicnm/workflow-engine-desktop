@@ -133,7 +133,7 @@ function closeVarPicker() {
   <!-- 条件构建器（无外层壳，直接平铺在 Card body 内） -->
   <div class="mb-3">
     <div class="flex items-center justify-between mb-2">
-      <span class="text-xs text-muted-foreground font-medium">{{ t('logic.title') }}</span>
+      <span class="text-xs text-[var(--text-tertiary)] font-medium">{{ t('logic.title') }}</span>
       <Button
         variant="ghost"
         size="sm"
@@ -143,7 +143,7 @@ function closeVarPicker() {
     </div>
 
     <!-- 空状态 -->
-    <div v-if="conditions.length === 0" class="text-xs text-muted-foreground/60 py-2 text-center border border-dashed border-border rounded">
+    <div v-if="conditions.length === 0" class="text-xs text-[var(--text-tertiary)]/60 py-2 text-center border border-dashed border-[var(--border-neutral-l1)] rounded">
       {{ t('logic.emptyHint') }}
     </div>
 
@@ -155,7 +155,7 @@ function closeVarPicker() {
           variant="ghost"
           size="sm"
           class="text-[10px] font-bold px-2 py-0.5 rounded transition-colors"
-          :class="combinator === 'and' ? 'bg-primary/10 text-primary' : 'bg-warning/10 text-warning'"
+          :class="combinator === 'and' ? 'bg-[var(--bg-brand)]/10 text-[var(--text-brand)]' : 'bg-[var(--status-warning-default)]/10 text-[var(--status-warning-default)]'"
           @click="toggleCombinator"
         >
           {{ combinator === 'and' ? 'AND' : 'OR' }}
@@ -163,7 +163,7 @@ function closeVarPicker() {
       </div>
 
       <!-- 条件行 -->
-      <div class="flex items-center gap-2 bg-muted/30 border border-border rounded px-2 py-2">
+      <div class="flex items-center gap-2 bg-[var(--bg-overlay-l1)]/30 border border-[var(--border-neutral-l1)] rounded px-2 py-2">
         <!-- 左值 -->
         <div class="flex-1 min-w-0 relative">
           <Input
@@ -173,8 +173,8 @@ function closeVarPicker() {
             @input="updateCondition(cond.id, 'left', ($event.target as HTMLInputElement).value)"
           />
           <button
-            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-foreground transition-colors"
-            :class="activeVarField === `${cond.id}:left` ? 'opacity-100 text-primary' : ''"
+            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-[var(--text-default)] transition-colors"
+            :class="activeVarField === `${cond.id}:left` ? 'opacity-100 text-[var(--text-brand)]' : ''"
             :title="t('logic.refVariable')"
             :aria-label="t('logic.refVariable')"
             @click="openVarPicker($event, cond.id, 'left')"
@@ -199,8 +199,8 @@ function closeVarPicker() {
             @input="updateCondition(cond.id, 'right', ($event.target as HTMLInputElement).value)"
           />
           <button
-            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-foreground transition-colors"
-            :class="activeVarField === `${cond.id}:right` ? 'opacity-100 text-primary' : ''"
+            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] opacity-40 hover:opacity-100 hover:text-[var(--text-default)] transition-colors"
+            :class="activeVarField === `${cond.id}:right` ? 'opacity-100 text-[var(--text-brand)]' : ''"
             :title="t('logic.refVariable')"
             :aria-label="t('logic.refVariable')"
             @click="openVarPicker($event, cond.id, 'right')"
@@ -211,7 +211,7 @@ function closeVarPicker() {
         <Button
           variant="ghost"
           size="icon"
-          class="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+          class="h-7 w-7 shrink-0 text-[var(--text-tertiary)] hover:text-[var(--status-error-default)]"
           :aria-label="t('logic.deleteConditionAria')"
           @click="removeCondition(cond.id)"
         >
@@ -224,36 +224,36 @@ function closeVarPicker() {
   <!-- 输出模板 -->
   <div class="mb-3">
     <div class="flex items-center justify-between mb-1">
-      <span class="text-xs text-muted-foreground font-medium">{{ t('stepCard.outputLabel') }}</span>
-      <span class="text-[10px] text-muted-foreground/60">{{ t('logic.customOutputHint') }}</span>
+      <span class="text-xs text-[var(--text-tertiary)] font-medium">{{ t('stepCard.outputLabel') }}</span>
+      <span class="text-[10px] text-[var(--text-tertiary)]/60">{{ t('logic.customOutputHint') }}</span>
     </div>
     <Input
       v-model="outputTemplate"
       :placeholder="t('logic.outputPlaceholder')"
       class="h-8 text-xs font-mono"
     />
-    <div class="text-[10px] text-muted-foreground/50 mt-1">
+    <div class="text-[10px] text-[var(--text-tertiary)]/50 mt-1">
       {{ t('logic.outputFormatDesc') }}
     </div>
   </div>
 
   <!-- 执行结果 -->
-  <div v-if="runState?.output" class="mb-3 bg-muted/30 border border-border rounded px-3 py-2 text-xs font-mono">
-    <div class="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">{{ t('stepCard.outputLabel') }}</div>
+  <div v-if="runState?.output" class="mb-3 bg-[var(--bg-overlay-l1)]/30 border border-[var(--border-neutral-l1)] rounded px-3 py-2 text-xs font-mono">
+    <div class="text-[var(--text-tertiary)] mb-1 text-[10px] uppercase tracking-wide">{{ t('stepCard.outputLabel') }}</div>
     <div class="flex items-center gap-2">
-      <span :class="(runState.output as Record<string, unknown>)?.result ? 'text-success' : 'text-destructive'">
+      <span :class="(runState.output as Record<string, unknown>)?.result ? 'text-[var(--status-success-default)]' : 'text-[var(--status-error-default)]'">
         {{ (runState.output as Record<string, unknown>)?.result ? t('logic.resultTrue') : t('logic.resultFalse') }}
       </span>
-      <span class="text-muted-foreground">→</span>
-      <span class="text-foreground">branch: {{ (runState.output as Record<string, unknown>)?.branch }}</span>
-      <span v-if="(runState.output as Record<string, unknown>)?.value !== undefined" class="text-muted-foreground">
+      <span class="text-[var(--text-tertiary)]">→</span>
+      <span class="text-[var(--text-default)]">branch: {{ (runState.output as Record<string, unknown>)?.branch }}</span>
+      <span v-if="(runState.output as Record<string, unknown>)?.value !== undefined" class="text-[var(--text-tertiary)]">
         | value: {{ (runState.output as Record<string, unknown>)?.value }}
       </span>
     </div>
   </div>
 
   <!-- 耗时 -->
-  <div v-if="runState?.duration" class="mt-2 text-[10px] text-muted-foreground text-right">
+  <div v-if="runState?.duration" class="mt-2 text-[10px] text-[var(--text-tertiary)] text-right">
     {{ t('logic.elapsed', { n: runState.duration }) }}
   </div>
 
@@ -264,10 +264,10 @@ function closeVarPicker() {
     <!-- 下拉面板 -->
     <div
       v-if="activeVarField"
-      class="fixed z-50 w-72 bg-background border border-border rounded-md shadow-lg overflow-hidden"
+      class="fixed z-50 w-72 bg-[var(--bg-base-default)] border border-[var(--border-neutral-l1)] rounded-md shadow-[0_12px_32px_rgba(0,0,0,0.12)] overflow-hidden"
       :style="{ top: varDropdownPos.top + 'px', left: varDropdownPos.left + 'px' }"
     >
-      <Input v-model="varSearch" :placeholder="t('logic.searchVar')" class="h-7 text-xs rounded-none border-0 border-b border-border" />
+      <Input v-model="varSearch" :placeholder="t('logic.searchVar')" class="h-7 text-xs rounded-none border-0 border-b border-[var(--border-neutral-l1)]" />
       <div class="max-h-[200px] overflow-y-auto">
         <Button
           v-for="ref in filteredRefs"
@@ -277,8 +277,8 @@ function closeVarPicker() {
           @click="insertVarRef(ref.id)"
         >
           <ActionIcon :name="ref.icon" cls="w-4 h-4 shrink-0" />
-          <span class="flex-1 truncate text-left" :class="ref.type === 'action' ? 'text-muted-foreground' : 'font-medium'">{{ ref.label }}</span>
-          <span class="text-[10px] text-muted-foreground font-mono">{{ ref.id }}</span>
+          <span class="flex-1 truncate text-left" :class="ref.type === 'action' ? 'text-[var(--text-tertiary)]' : 'font-medium'">{{ ref.label }}</span>
+          <span class="text-[10px] text-[var(--text-tertiary)] font-mono">{{ ref.id }}</span>
         </Button>
       </div>
     </div>

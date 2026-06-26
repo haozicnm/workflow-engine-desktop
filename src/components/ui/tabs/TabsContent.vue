@@ -11,7 +11,7 @@ defineProps<{
   <TabsContent
     :value="value"
     :class="cn(
-      'mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 flex flex-col min-h-0',
+      'mt-2 ring-offset-[var(--bg-base-default)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-contrast)] focus-visible:ring-offset-2 flex flex-col min-h-0',
       $attrs.class as string,
     )"
   >

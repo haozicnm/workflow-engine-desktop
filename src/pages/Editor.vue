@@ -170,7 +170,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="flex-1 flex flex-col bg-background text-foreground overflow-hidden min-h-0"
+    class="flex-1 flex flex-col bg-[var(--bg-base-default)] text-[var(--text-default)] overflow-hidden min-h-0"
     tabindex="0"
     @keydown="onKeydown"
   >
@@ -212,9 +212,9 @@ onUnmounted(() => {
           <!-- Step list area -->
           <div class="flex-1 overflow-y-auto px-[var(--spacing-section-padding-x)] pt-6 pb-12 space-y-[var(--spacing-step-gap)] min-h-0">
             <div v-if="!a.workflow.value?.steps?.length" class="flex flex-col items-center justify-center py-16 text-center">
-              <ActionIcon name="Layers" cls="w-10 h-10 text-muted-foreground/30 mb-4" />
-              <div class="text-lg font-medium text-foreground mb-1">{{ t('editor.noStepsTitle') }}</div>
-              <div class="text-sm text-muted-foreground">{{ t('editor.noStepsHint') }}</div>
+              <ActionIcon name="Layers" cls="w-10 h-10 text-[var(--text-tertiary)]/30 mb-4" />
+              <div class="text-lg font-medium text-[var(--text-default)] mb-1">{{ t('editor.noStepsTitle') }}</div>
+              <div class="text-sm text-[var(--text-tertiary)]">{{ t('editor.noStepsHint') }}</div>
             </div>
 
             <!-- Step cards (with drag) -->
@@ -225,7 +225,7 @@ onUnmounted(() => {
               class="flex items-stretch transition-all"
               :class="{
                 'opacity-40 scale-[0.98]': a.dragIndex.value === index,
-                'border-t-2 border-primary -mt-0.5': a.dropIndex.value === index && a.dragIndex.value !== index,
+                'border-t-2 border-[var(--bg-brand)] -mt-0.5': a.dropIndex.value === index && a.dragIndex.value !== index,
               }"
               @dragstart="a.onDragStart(index, $event)"
               @dragover="a.onDragOver(index, $event)"
@@ -234,7 +234,7 @@ onUnmounted(() => {
               @dragend="a.onDragEnd"
             >
               <!-- Drag handle -->
-              <div class="w-6 flex items-center justify-center text-muted-foreground cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-foreground hover:bg-muted active:cursor-grabbing">
+              <div class="w-6 flex items-center justify-center text-[var(--text-tertiary)] cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-[var(--text-default)] hover:bg-[var(--bg-overlay-l1)] active:cursor-grabbing">
                 <GripVertical class="w-3 h-3 shrink-0" />
               </div>
 
@@ -265,7 +265,7 @@ onUnmounted(() => {
               <Button
                 variant="outline"
                 size="lg"
-                class="w-full py-2.5 text-sm text-muted-foreground border-dashed hover:border-primary hover:text-primary"
+                class="w-full py-2.5 text-sm text-[var(--text-tertiary)] border-dashed hover:border-[var(--bg-brand)] hover:text-[var(--text-brand)]"
                 @click="a.showAddStep.value = !a.showAddStep.value"
               >
                 <ActionIcon name="Plus" cls="w-4 h-4" /> {{ t('editor.addStep') }}
@@ -288,7 +288,7 @@ onUnmounted(() => {
           <Transition name="panel-slide">
             <div
               v-if="a.isRunning.value && !a.configStep.value"
-              class="w-[320px] border-l border-border bg-background shrink-0 overflow-hidden"
+              class="w-[320px] border-l border-[var(--border-neutral-l1)] bg-[var(--bg-base-default)] shrink-0 overflow-hidden"
             >
               <DebugPanel
                 :workflow-id="a.workflow.value?.id"

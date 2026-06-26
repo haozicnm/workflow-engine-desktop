@@ -69,32 +69,32 @@ watch(() => props.step.bundle_path, loadBundleFiles, { immediate: true })
     <!-- Step info header -->
     <div class="space-y-1">
       <div class="flex items-center gap-2">
-        <span class="font-semibold text-foreground">{{ step.step_name }}</span>
-        <span class="text-muted-foreground/50">({{ step.step_id }})</span>
+        <span class="font-semibold text-[var(--text-default)]">{{ step.step_name }}</span>
+        <span class="text-[var(--text-tertiary)]/50">({{ step.step_id }})</span>
       </div>
-      <div class="flex gap-3 text-muted-foreground">
+      <div class="flex gap-3 text-[var(--text-tertiary)]">
         <span>{{ step.step_type }}</span>
         <span>{{ step.status }}</span>
         <span v-if="step.duration_ms > 0">{{ formatMs(step.duration_ms) }}</span>
       </div>
-      <div class="text-muted-foreground">{{ step.summary }}</div>
+      <div class="text-[var(--text-tertiary)]">{{ step.summary }}</div>
     </div>
 
     <!-- Detail JSON -->
     <details class="cursor-pointer">
-      <summary class="text-muted-foreground/70 hover:text-muted-foreground">详情 JSON</summary>
-      <pre class="mt-1 p-2 bg-secondary/30 rounded text-[10px] font-mono max-h-[200px] overflow-auto">{{ JSON.stringify(step.detail, null, 2) }}</pre>
+      <summary class="text-[var(--text-tertiary)]/70 hover:text-[var(--text-tertiary)]">详情 JSON</summary>
+      <pre class="mt-1 p-2 bg-[var(--bg-overlay-l1)]/30 rounded text-[10px] font-mono max-h-[200px] overflow-auto">{{ JSON.stringify(step.detail, null, 2) }}</pre>
     </details>
 
     <!-- Bundle files -->
     <div v-if="step.bundle_path" class="space-y-2">
-      <div class="text-muted-foreground/70 font-medium">Bundle 快照</div>
+      <div class="text-[var(--text-tertiary)]/70 font-medium">Bundle 快照</div>
 
-      <div v-if="loadingBundle" class="flex items-center gap-1.5 text-muted-foreground/50">
-        <div class="w-3 h-3 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+      <div v-if="loadingBundle" class="flex items-center gap-1.5 text-[var(--text-tertiary)]/50">
+        <div class="w-3 h-3 border-[1.5px] border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
       </div>
 
-      <div v-else-if="bundleFiles.length === 0" class="text-muted-foreground/50">
+      <div v-else-if="bundleFiles.length === 0" class="text-[var(--text-tertiary)]/50">
         无文件
       </div>
 
@@ -103,7 +103,7 @@ watch(() => props.step.bundle_path, loadBundleFiles, { immediate: true })
           v-for="file in bundleFiles"
           :key="file"
           class="block w-full text-left px-2 py-1 rounded text-[10px] font-mono transition-colors"
-          :class="selectedFile === file ? 'bg-primary/10 text-primary' : 'hover:bg-secondary/50 text-muted-foreground'"
+          :class="selectedFile === file ? 'bg-[var(--bg-brand)]/10 text-[var(--text-brand)]' : 'hover:bg-[var(--bg-overlay-l1)]/50 text-[var(--text-tertiary)]'"
           @click="loadFile(file)"
         >
           {{ file }}
@@ -111,19 +111,19 @@ watch(() => props.step.bundle_path, loadBundleFiles, { immediate: true })
       </div>
 
       <!-- File content viewer -->
-      <div v-if="selectedFile && !loadingFile" class="border border-border rounded-md overflow-hidden">
-        <div class="px-2 py-1 bg-secondary/30 text-[10px] text-muted-foreground border-b border-border">
+      <div v-if="selectedFile && !loadingFile" class="border border-[var(--border-neutral-l1)] rounded-md overflow-hidden">
+        <div class="px-2 py-1 bg-[var(--bg-overlay-l1)]/30 text-[10px] text-[var(--text-tertiary)] border-b border-[var(--border-neutral-l1)]">
           {{ selectedFile }}
         </div>
         <BundleViewer :content="fileContent || ''" :filename="selectedFile" />
       </div>
-      <div v-else-if="loadingFile" class="flex items-center gap-1.5 text-muted-foreground/50 text-[10px] px-2">
-        <div class="w-3 h-3 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+      <div v-else-if="loadingFile" class="flex items-center gap-1.5 text-[var(--text-tertiary)]/50 text-[10px] px-2">
+        <div class="w-3 h-3 border-[1.5px] border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
         加载中...
       </div>
     </div>
 
-    <div v-else class="text-muted-foreground/50">
+    <div v-else class="text-[var(--text-tertiary)]/50">
       无 Bundle 快照
     </div>
   </div>

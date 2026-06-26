@@ -161,10 +161,10 @@ function statusIcon(status: string): string {
 }
 
 function statusColor(status: string): string {
-  if (status === 'start') return 'text-primary'
-  if (status === 'ok') return 'text-success'
-  if (status === 'fail') return 'text-destructive'
-  return 'text-muted-foreground'
+  if (status === 'start') return 'text-[var(--text-brand)]'
+  if (status === 'ok') return 'text-[var(--status-success-default)]'
+  if (status === 'fail') return 'text-[var(--status-error-default)]'
+  return 'text-[var(--text-tertiary)]'
 }
 </script>
 
@@ -178,7 +178,7 @@ function statusColor(status: string): string {
   >
     <ErrorBoundary>
       <SidebarProvider :default-open="true">
-        <div class="flex h-dvh w-full overflow-hidden bg-background">
+        <div class="flex h-dvh w-full overflow-hidden bg-[var(--bg-base-default)]">
           <!-- Sidebar: workflow list -->
           <Sidebar>
             <Dashboard
@@ -206,13 +206,13 @@ function statusColor(status: string): string {
             />
 
             <!-- Welcome / empty state -->
-            <div v-else class="flex-1 flex items-center justify-center bg-background">
+            <div v-else class="flex-1 flex items-center justify-center bg-[var(--bg-base-default)]">
               <div class="text-center space-y-4">
                 <div class="flex justify-center">
-                  <ActionIcon name="Settings" cls="w-16 h-16 text-muted-foreground" />
+                  <ActionIcon name="Settings" cls="w-16 h-16 text-[var(--text-tertiary)]" />
                 </div>
-                <h2 class="text-2xl font-bold tracking-tight text-foreground">{{ t('dashboard.createWorkflowToStart') }}</h2>
-                <p class="text-muted-foreground max-w-md">
+                <h2 class="text-2xl font-bold tracking-tight text-[var(--text-default)]">{{ t('dashboard.createWorkflowToStart') }}</h2>
+                <p class="text-[var(--text-tertiary)] max-w-md">
                   {{ t('empty.createWorkflow') }}
                 </p>
               </div>
@@ -222,7 +222,7 @@ function statusColor(status: string): string {
             <Transition name="fade">
               <div
                 v-if="currentView === 'settings' || currentView === 'history' || currentView === 'plugins'"
-                class="fixed inset-0 bg-black/20 z-40"
+                class="fixed inset-0 bg-[var(--bg-overlay-l4)] z-40"
                 @click="onBackToMain"
               />
             </Transition>
@@ -231,7 +231,7 @@ function statusColor(status: string): string {
             <Transition name="slide-right">
               <div
                 v-if="currentView === 'settings'"
-                class="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+                class="fixed top-0 right-0 bottom-0 w-[480px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] z-50 shadow-[0_24px_64px_rgba(0,0,0,0.14)] overflow-y-auto"
               >
                 <Settings @back="onBackToMain" />
               </div>
@@ -241,7 +241,7 @@ function statusColor(status: string): string {
             <Transition name="slide-right">
               <div
                 v-if="currentView === 'history'"
-                class="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+                class="fixed top-0 right-0 bottom-0 w-[480px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] z-50 shadow-[0_24px_64px_rgba(0,0,0,0.14)] overflow-y-auto"
               >
                 <RunHistory @back="onBackToMain" />
               </div>
@@ -251,7 +251,7 @@ function statusColor(status: string): string {
             <Transition name="slide-right">
               <div
                 v-if="currentView === 'plugins'"
-                class="fixed top-0 right-0 bottom-0 w-[520px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+                class="fixed top-0 right-0 bottom-0 w-[520px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] z-50 shadow-[0_24px_64px_rgba(0,0,0,0.14)] overflow-y-auto"
               >
                 <Plugins @back="onBackToMain" />
               </div>
@@ -261,7 +261,7 @@ function statusColor(status: string): string {
             <Transition name="slide-right">
               <div
                 v-if="currentView === 'marketplace'"
-                class="fixed top-0 right-0 bottom-0 w-[720px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+                class="fixed top-0 right-0 bottom-0 w-[720px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] z-50 shadow-[0_24px_64px_rgba(0,0,0,0.14)] overflow-y-auto"
               >
                 <Marketplace @back="onBackToMain" />
               </div>
@@ -271,7 +271,7 @@ function statusColor(status: string): string {
             <Transition name="slide-right">
               <div
                 v-if="showSchedule"
-                class="fixed top-0 right-0 bottom-0 w-[480px] bg-card border-l border-border z-50 shadow-xl overflow-y-auto"
+                class="fixed top-0 right-0 bottom-0 w-[480px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] z-50 shadow-[0_24px_64px_rgba(0,0,0,0.14)] overflow-y-auto"
               >
                 <SchedulePanel
                   :workflow-id="scheduleWorkflowId || undefined"
@@ -282,21 +282,21 @@ function statusColor(status: string): string {
             </SidebarInset>
 
             <!-- ─── Unified Operation Console ─── -->
-            <div class="border-t border-border bg-background shrink-0 select-none">
+            <div class="border-t border-[var(--border-neutral-l1)] bg-[var(--bg-base-default)] shrink-0 select-none">
               <button
-                class="w-full flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-secondary/50 transition-colors"
+                class="w-full flex items-center justify-between px-3 py-1.5 cursor-pointer hover:bg-[var(--bg-overlay-l1)]/50 transition-colors"
                 @click="ops.toggle()"
                 :aria-expanded="ops.visible.value"
-                aria-label="切换操作控制台"
+                :aria-label="t('console.toggle')"
               >
                 <div class="flex items-center gap-2">
-                  <span class="text-[11px] text-muted-foreground">{{ ops.visible.value ? '▼' : '▶' }}</span>
-                  <span class="text-xs text-foreground">{{ t('nav.dashboard') }} {{ t('common.actions') }}</span>
-                  <span v-if="ops.logs.value.length" class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5">
+                  <span class="text-[11px] text-[var(--text-tertiary)]">{{ ops.visible.value ? '▼' : '▶' }}</span>
+                  <span class="text-xs text-[var(--text-default)]">{{ t('nav.dashboard') }} {{ t('common.actions') }}</span>
+                  <span v-if="ops.logs.value.length" class="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-overlay-l1)] rounded px-1.5 py-0.5">
                     {{ ops.logs.value.length }}
                   </span>
-                  <span class="text-[10px] text-success ml-0.5">✓{{ consoleStatusCounts.ok }}</span>
-                  <span v-if="consoleStatusCounts.fail" class="text-[10px] text-destructive ml-0.5">✗{{ consoleStatusCounts.fail }}</span>
+                  <span class="text-[10px] text-[var(--status-success-default)] ml-0.5">✓{{ consoleStatusCounts.ok }}</span>
+                  <span v-if="consoleStatusCounts.fail" class="text-[10px] text-[var(--status-error-default)] ml-0.5">✗{{ consoleStatusCounts.fail }}</span>
                 </div>
                 <Button
                   v-if="ops.visible.value"
@@ -307,22 +307,22 @@ function statusColor(status: string): string {
                 >{{ t('common.clear') }}</Button>
               </button>
               <Transition name="collapse">
-                <div v-if="ops.visible.value" class="max-h-[200px] overflow-y-auto border-t border-border">
-                  <div v-if="!ops.logs.value.length" class="text-muted-foreground text-xs p-3">
+                <div v-if="ops.visible.value" class="max-h-[200px] overflow-y-auto border-t border-[var(--border-neutral-l1)]">
+                  <div v-if="!ops.logs.value.length" class="text-[var(--text-tertiary)] text-xs p-3">
                     {{ t('empty.noHistory') }}
                   </div>
                   <div
                     v-for="(log, i) in ops.logs.value"
                     :key="i"
-                    class="flex items-baseline gap-2 px-3 py-0.5 text-[11px] font-mono hover:bg-card transition-colors"
+                    class="flex items-baseline gap-2 px-3 py-0.5 text-[11px] font-mono hover:bg-[var(--bg-base-secondary)] transition-colors"
                     :class="statusColor(log.status)"
                   >
-                    <span class="text-muted-foreground/50 shrink-0 w-[70px]">{{ log.time }}</span>
+                    <span class="text-[var(--text-tertiary)]/50 shrink-0 w-[70px]">{{ log.time }}</span>
                     <span class="shrink-0 w-[12px]">{{ statusIcon(log.status) }}</span>
-                    <span class="text-muted-foreground/60 shrink-0 w-[32px] text-[10px]">{{ log.source === 'gui' ? 'GUI' : 'Agent' }}</span>
-                    <span class="text-foreground flex-1 truncate">{{ log.name }}</span>
-                    <span v-if="log.detail" class="text-muted-foreground/50 text-[10px] max-w-[180px] truncate">{{ log.detail }}</span>
-                    <span v-if="log.elapsed" class="text-muted-foreground/40 text-[10px] shrink-0">{{ log.elapsed }}ms</span>
+                    <span class="text-[var(--text-tertiary)]/60 shrink-0 w-[32px] text-[10px]">{{ log.source === 'gui' ? 'GUI' : 'Agent' }}</span>
+                    <span class="text-[var(--text-default)] flex-1 truncate">{{ log.name }}</span>
+                    <span v-if="log.detail" class="text-[var(--text-tertiary)]/50 text-[10px] max-w-[180px] truncate">{{ log.detail }}</span>
+                    <span v-if="log.elapsed" class="text-[var(--text-tertiary)]/40 text-[10px] shrink-0">{{ log.elapsed }}ms</span>
                   </div>
                 </div>
               </Transition>
@@ -335,11 +335,11 @@ function statusColor(status: string): string {
 
       <!-- Drag import overlay -->
       <Transition name="fade">
-        <div v-if="isDragging" class="fixed inset-0 bg-background/90 z-[100] flex items-center justify-center">
-          <div class="text-center p-10 border-2 border-dashed border-primary rounded-2xl bg-primary/10">
-            <span class="text-5xl text-muted-foreground">↓</span>
-            <div class="text-base text-foreground mt-2">{{ t('editor.importJson') }}</div>
-            <div class="text-xs text-muted-foreground">.json / .yaml</div>
+        <div v-if="isDragging" class="fixed inset-0 bg-[var(--bg-base-default)]/90 z-[100] flex items-center justify-center">
+          <div class="text-center p-10 border-2 border-dashed border-[var(--bg-brand)] rounded-2xl bg-[var(--bg-brand)]/10">
+            <span class="text-5xl text-[var(--text-tertiary)]">↓</span>
+            <div class="text-base text-[var(--text-default)] mt-2">{{ t('editor.importJson') }}</div>
+            <div class="text-xs text-[var(--text-tertiary)]">.json / .yaml</div>
           </div>
         </div>
       </Transition>

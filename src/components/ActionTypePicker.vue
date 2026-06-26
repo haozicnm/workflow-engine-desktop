@@ -23,16 +23,16 @@ const emit = defineEmits<{
         class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
         @click="emit('close')"
       >
-        <div class="bg-card border border-border rounded-xl p-4 min-w-[280px] max-h-[400px] overflow-y-auto shadow-2xl" @click.stop>
-          <div class="text-sm font-semibold text-foreground mb-3 px-1">{{ t('editor.selectActionType') }}</div>
+        <div class="bg-[var(--bg-base-secondary)] border border-[var(--border-neutral-l1)] rounded-xl p-4 min-w-[280px] max-h-[400px] overflow-y-auto shadow-[0_24px_64px_rgba(0,0,0,0.14)]" @click.stop>
+          <div class="text-sm font-semibold text-[var(--text-default)] mb-3 px-1">{{ t('editor.selectActionType') }}</div>
           <div
             v-for="opt in options"
             :key="opt.type"
-            class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-secondary"
+            class="flex items-center gap-2.5 px-3 py-2.5 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]"
             @click="emit('select', opt.type)"
           >
             <ActionIcon :name="opt.icon" cls="w-4 h-4" />
-            <span class="text-sm font-medium text-foreground">{{ opt.label }}</span>
+            <span class="text-sm font-medium text-[var(--text-default)]">{{ opt.label }}</span>
           </div>
         </div>
       </div>

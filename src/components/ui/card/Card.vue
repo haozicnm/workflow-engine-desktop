@@ -9,9 +9,9 @@ defineProps<{
 <template>
   <div
     :class="cn(
-      'rounded-xl border bg-card text-card-foreground shadow-none overflow-hidden',
-      color ? 'border-l-0' : 'border-border',
-      !color && 'border-border',
+      'rounded-xl border bg-[var(--bg-base-secondary)] text-card-foreground shadow-none overflow-hidden',
+      color ? 'border-l-0' : 'border-[var(--border-neutral-l1)]',
+      !color && 'border-[var(--border-neutral-l1)]',
       $attrs.class,
     )"
   >

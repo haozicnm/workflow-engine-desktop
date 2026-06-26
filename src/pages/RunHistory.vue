@@ -206,10 +206,10 @@ initStatusLabels()
 
 function logLevelColor(level: string): string {
   switch (level) {
-    case 'error': return 'text-danger'
-    case 'warn': return 'text-warning'
-    case 'success': return 'text-success'
-    default: return 'text-muted-foreground'
+    case 'error': return 'text-[var(--status-error-default)]'
+    case 'warn': return 'text-[var(--status-warning-default)]'
+    case 'success': return 'text-[var(--status-success-default)]'
+    default: return 'text-[var(--text-tertiary)]'
   }
 }
 
@@ -250,22 +250,22 @@ const stats = computed(() => {
 
     <!-- Stats -->
     <div v-if="runs.length > 0" class="flex gap-4" role="status" aria-label="运行统计">
-      <span class="text-sm text-muted-foreground">{{ t('history.total', { n: stats.total }) }}</span>
-      <span class="text-sm text-success">✓ {{ stats.completed }}</span>
-      <span class="text-sm text-danger">✗ {{ stats.failed }}</span>
-      <span v-if="stats.running > 0" class="text-sm text-primary">◷ {{ stats.running }}</span>
+      <span class="text-sm text-[var(--text-tertiary)]">{{ t('history.total', { n: stats.total }) }}</span>
+      <span class="text-sm text-[var(--status-success-default)]">✓ {{ stats.completed }}</span>
+      <span class="text-sm text-[var(--status-error-default)]">✗ {{ stats.failed }}</span>
+      <span v-if="stats.running > 0" class="text-sm text-[var(--text-brand)]">◷ {{ stats.running }}</span>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center gap-2.5 h-[200px] text-muted-foreground">
-      <div class="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
+    <div v-if="loading" class="flex items-center justify-center gap-2.5 h-[200px] text-[var(--text-tertiary)]">
+      <div class="w-5 h-5 border-2 border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
       <span>{{ t('common.loading') }}</span>
     </div>
 
     <!-- Empty -->
-    <div v-else-if="runs.length === 0" class="flex flex-col items-center justify-center h-[300px] gap-3 text-muted-foreground">
+    <div v-else-if="runs.length === 0" class="flex flex-col items-center justify-center h-[300px] gap-3 text-[var(--text-tertiary)]">
       <div class="text-5xl">📭</div>
-      <div class="text-base text-foreground">{{ t('history.noHistory') }}</div>
+      <div class="text-base text-[var(--text-default)]">{{ t('history.noHistory') }}</div>
       <div class="text-sm">{{ t('empty.runWorkflow') }}</div>
     </div>
 
@@ -276,11 +276,11 @@ const stats = computed(() => {
         :key="run.id"
         :class="cn(
           'overflow-hidden transition-colors',
-          expandedId === run.id ? 'border-primary/25' : 'hover:border-primary/25',
+          expandedId === run.id ? 'border-[var(--bg-brand)]/25' : 'hover:border-[var(--bg-brand)]/25',
         )"
       >
         <button
-          class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-secondary w-full text-left"
+          class="flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] w-full text-left"
           :aria-expanded="expandedId === run.id"
           :aria-label="expandedId === run.id ? t('common.close') : t('common.detail')"
           @click="toggleExpand(run.id)"
@@ -291,24 +291,24 @@ const stats = computed(() => {
             </Badge>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-foreground">{{ run.workflow_name }}</div>
-            <div class="flex gap-4 mt-1 text-xs text-muted-foreground">
+            <div class="text-sm font-semibold text-[var(--text-default)]">{{ run.workflow_name }}</div>
+            <div class="flex gap-4 mt-1 text-xs text-[var(--text-tertiary)]">
               <span>🕐 {{ formatTime(run.started_at) }}</span>
               <span>⏱ {{ calcDuration(run.started_at, run.finished_at) }}</span>
             </div>
           </div>
           <div class="shrink-0">
-            <span :class="cn('text-sm text-muted-foreground/50 transition-transform inline-block', expandedId === run.id ? 'rotate-90' : '')">▸</span>
+            <span :class="cn('text-sm text-[var(--text-tertiary)]/50 transition-transform inline-block', expandedId === run.id ? 'rotate-90' : '')">▸</span>
           </div>
         </button>
-        <div v-if="run.error" class="px-4 py-2 bg-destructive/5 text-destructive text-xs font-mono border-t border-destructive/20">
+        <div v-if="run.error" class="px-4 py-2 bg-[var(--status-error-default)]/5 text-[var(--status-error-default)] text-xs font-mono border-t border-[var(--status-error-default)]/20">
           ✗ {{ run.error }}
         </div>
 
         <!-- Expanded detail -->
-        <div v-if="expandedId === run.id" class="border-t border-border">
-          <div v-if="loadingDetail === run.id" class="flex items-center gap-2 px-4 py-4 text-muted-foreground text-sm">
-            <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+        <div v-if="expandedId === run.id" class="border-t border-[var(--border-neutral-l1)]">
+          <div v-if="loadingDetail === run.id" class="flex items-center gap-2 px-4 py-4 text-[var(--text-tertiary)] text-sm">
+            <div class="w-3.5 h-3.5 border-[1.5px] border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
             {{ t('history.loadingDetail') }}
           </div>
           <div v-else-if="detailCache[run.id]" class="px-4 pb-4">
@@ -325,39 +325,39 @@ const stats = computed(() => {
                   v-for="(step, idx) in detailCache[run.id].steps"
                   :key="step.id"
                   :class="cn(
-                    'grid items-center gap-2 px-2.5 py-2 rounded-md mb-1 hover:bg-secondary',
-                    step.status === 'running' && 'border-l-2 border-primary',
-                    step.status === 'completed' && 'border-l-2 border-success',
-                    step.status === 'failed' && 'border-l-2 border-danger',
+                    'grid items-center gap-2 px-2.5 py-2 rounded-md mb-1 hover:bg-[var(--bg-overlay-l1)]',
+                    step.status === 'running' && 'border-l-2 border-[var(--bg-brand)]',
+                    step.status === 'completed' && 'border-l-2 border-[var(--status-success-default)]',
+                    step.status === 'failed' && 'border-l-2 border-[var(--status-error-default)]',
                   )"
                   style="grid-template-columns: 28px 22px 1fr auto;"
                 >
-                  <div class="text-[11px] text-muted-foreground/50 text-center">{{ idx + 1 }}</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]/50 text-center">{{ idx + 1 }}</div>
                   <div class="text-sm"><ActionIcon :name="statusBadge(step.status).icon" cls="w-4 h-4" /></div>
-                  <div class="text-sm text-foreground font-mono">{{ step.step_id }}</div>
-                  <div class="text-[11px] text-muted-foreground">{{ calcDuration(step.started_at, step.finished_at) }}</div>
-                  <div v-if="step.error" class="col-start-2 col-end-[-1] text-[11px] text-destructive font-mono">{{ step.error }}</div>
+                  <div class="text-sm text-[var(--text-default)] font-mono">{{ step.step_id }}</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ calcDuration(step.started_at, step.finished_at) }}</div>
+                  <div v-if="step.error" class="col-start-2 col-end-[-1] text-[11px] text-[var(--status-error-default)] font-mono">{{ step.error }}</div>
                   <div v-if="step.output" class="col-start-2 col-end-[-1] mt-1">
-                    <pre class="text-[11px] text-muted-foreground bg-muted p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
+                    <pre class="text-[11px] text-[var(--text-tertiary)] bg-[var(--bg-overlay-l1)] p-2 rounded-md m-0 overflow-x-auto font-mono max-h-[120px] overflow-y-auto">{{ formatOutput(step.output) }}</pre>
                   </div>
                 </div>
-                <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-muted-foreground/50 text-sm py-3">{{ t('history.noStepsRecord') }}</div>
+                <div v-if="detailCache[run.id].steps.length === 0" class="text-center text-[var(--text-tertiary)]/50 text-sm py-3">{{ t('history.noStepsRecord') }}</div>
               </TabsContent>
 
               <!-- Logs list -->
               <TabsContent value="logs" class="max-h-[400px] overflow-y-auto">
-                <div v-if="!logCache[run.id]" class="flex items-center gap-2 px-2 py-4 text-muted-foreground text-sm">
-                  <div class="w-3.5 h-3.5 border-[1.5px] border-border border-t-primary rounded-full animate-spin" />
+                <div v-if="!logCache[run.id]" class="flex items-center gap-2 px-2 py-4 text-[var(--text-tertiary)] text-sm">
+                  <div class="w-3.5 h-3.5 border-[1.5px] border-[var(--border-neutral-l1)] border-t-primary rounded-full animate-spin" />
                   {{ t('history.loadingLogs') }}
                 </div>
-                <div v-else-if="logCache[run.id].length === 0" class="text-center text-muted-foreground/50 text-sm py-3">{{ t('history.noLogsRecord') }}</div>
+                <div v-else-if="logCache[run.id].length === 0" class="text-center text-[var(--text-tertiary)]/50 text-sm py-3">{{ t('history.noLogsRecord') }}</div>
                 <div
                   v-else
                   v-for="log in logCache[run.id]"
                   :key="log.id"
-                  :class="cn('flex gap-2.5 px-2 py-0.5 text-xs font-mono rounded-sm hover:bg-secondary transition-colors', logLevelColor(log.level))"
+                  :class="cn('flex gap-2.5 px-2 py-0.5 text-xs font-mono rounded-sm hover:bg-[var(--bg-overlay-l1)] transition-colors', logLevelColor(log.level))"
                 >
-                  <span class="text-muted-foreground/50 whitespace-nowrap shrink-0">{{ formatTime(log.timestamp) }}</span>
+                  <span class="text-[var(--text-tertiary)]/50 whitespace-nowrap shrink-0">{{ formatTime(log.timestamp) }}</span>
                   <span class="break-all">{{ log.message }}</span>
                 </div>
               </TabsContent>

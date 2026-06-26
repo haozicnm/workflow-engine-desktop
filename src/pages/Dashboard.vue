@@ -174,7 +174,7 @@ defineExpose({ loadList })
 <template>
   <SidebarHeader>
     <div class="flex items-center" :class="sidebar?.open.value ? 'justify-between' : 'justify-center'">
-      <span v-if="sidebar?.open.value" class="text-xl font-bold tracking-tight text-primary">WorkFlow</span>
+      <span v-if="sidebar?.open.value" class="text-xl font-bold tracking-tight text-[var(--text-brand)]">WorkFlow</span>
       <SidebarTrigger />
     </div>
     <!-- Search -->
@@ -184,7 +184,7 @@ defineExpose({ loadList })
       :placeholder="t('nav.searchWorkflow')"
       class="h-8 text-xs"
     />
-    <Button v-if="sidebar?.open.value" size="sm" class="bg-primary text-primary-foreground w-full" @click="onNewWorkflow">
+    <Button v-if="sidebar?.open.value" size="sm" class="bg-[var(--bg-brand)] text-[var(--text-onbrand)] w-full" @click="onNewWorkflow">
       ＋ {{ t('common.create') }}
     </Button>
   </SidebarHeader>
@@ -201,12 +201,12 @@ defineExpose({ loadList })
       </div>
 
       <!-- Empty state (no workflows at all) -->
-      <div v-else-if="workflows.length === 0" class="px-2 py-4 text-center text-xs text-muted-foreground">
+      <div v-else-if="workflows.length === 0" class="px-2 py-4 text-center text-xs text-[var(--text-tertiary)]">
         {{ t('nav.noWorkflows') }}
       </div>
 
       <!-- Empty search results -->
-      <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-muted-foreground">
+      <div v-else-if="!filteredWorkflows.length" class="px-2 py-4 text-center text-xs text-[var(--text-tertiary)]">
         {{ t('nav.noSearchResults') }}
       </div>
 
@@ -218,11 +218,11 @@ defineExpose({ loadList })
           @click.stop="selectWorkflow(wf)"
         >
           <template #icon>
-            <span class="flex items-center justify-center w-5 h-5 rounded bg-primary/10 text-primary text-[10px] font-bold shrink-0">
+            <span class="flex items-center justify-center w-5 h-5 rounded bg-[var(--bg-brand)]/10 text-[var(--text-brand)] text-[10px] font-bold shrink-0">
               {{ wf.name.charAt(0) }}
             </span>
           </template>
-          <span class="truncate text-sm text-foreground">
+          <span class="truncate text-sm text-[var(--text-default)]">
             {{ wf.name }}
           </span>
         </SidebarMenuButton>

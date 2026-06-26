@@ -19,8 +19,8 @@ const sidebar = inject<{ open: Ref<boolean>; toggle: () => void }>('sidebar')
     :class="cn(
       'flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm transition-colors cursor-pointer',
       props.active
-        ? 'bg-primary/10 text-primary font-medium'
-        : 'hover:bg-secondary text-foreground',
+        ? 'bg-[var(--bg-brand)]/10 text-[var(--text-brand)] font-medium'
+        : 'hover:bg-[var(--bg-overlay-l1)] text-[var(--text-default)]',
       !sidebar?.open.value ? 'justify-center' : '',
       $attrs.class as string,
     )"

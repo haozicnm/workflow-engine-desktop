@@ -134,14 +134,14 @@ function cancelRename() {
 
 // Status color
 const statusColor: Record<string, string> = {
-  success: 'bg-success',
-  running: 'bg-warning',
-  error: 'bg-danger',
-  idle: 'bg-muted',
+  success: 'bg-[var(--status-success-default)]',
+  running: 'bg-[var(--status-warning-default)]',
+  error: 'bg-[var(--status-error-default)]',
+  idle: 'bg-[var(--bg-overlay-l1)]',
 }
 
 const statusDotClass = computed(() => {
-  return statusColor[props.status || 'idle'] || 'bg-muted'
+  return statusColor[props.status || 'idle'] || 'bg-[var(--bg-overlay-l1)]'
 })
 
 const hasParams = computed(() => (actionDef.value?.params?.length ?? 0) > 0)
@@ -155,16 +155,16 @@ function isSelectorField(key: string): boolean {
 </script>
 
 <template>
-  <div class="rounded-md border border-border/50 overflow-visible hover:border-border transition-colors">
+  <div class="rounded-md border border-[var(--border-neutral-l1)]/50 overflow-visible hover:border-[var(--border-neutral-l1)] transition-colors">
     <!-- Header (collapsed) -->
     <div
       :class="cn(
-        'flex items-center h-[var(--height-action-row)] px-[var(--spacing-card-padding-x)] py-0 gap-2 cursor-pointer select-none group transition-colors hover:bg-accent/50',
+        'flex items-center h-[var(--height-action-row)] px-[var(--spacing-card-padding-x)] py-0 gap-2 cursor-pointer select-none group transition-colors hover:bg-[var(--bg-overlay-l2)]/50',
       )"
       @click="emit('toggle-expand')"
     >
       <!-- Expand indicator -->
-      <span class="text-[10px] text-muted-foreground w-3 shrink-0">
+      <span class="text-[10px] text-[var(--text-tertiary)] w-3 shrink-0">
         {{ expanded ? '▼' : '▶' }}
       </span>
 
@@ -178,7 +178,7 @@ function isSelectorField(key: string): boolean {
         v-if="editing"
         ref="editInput"
         v-model="editValue"
-        class="flex-1 min-w-0 bg-transparent border-b border-primary text-xs text-foreground outline-none px-0.5"
+        class="flex-1 min-w-0 bg-transparent border-b border-[var(--bg-brand)] text-xs text-[var(--text-default)] outline-none px-0.5"
         @blur="confirmRename"
         @keydown.enter="confirmRename"
         @keydown.escape="cancelRename"
@@ -186,7 +186,7 @@ function isSelectorField(key: string): boolean {
       />
       <span
         v-else
-        class="flex-1 text-xs text-foreground whitespace-nowrap overflow-hidden text-ellipsis"
+        class="flex-1 text-xs text-[var(--text-default)] whitespace-nowrap overflow-hidden text-ellipsis"
         :title="t('actionRow.dblclickRename')"
         @dblclick.stop="startRename"
       >
@@ -195,7 +195,7 @@ function isSelectorField(key: string): boolean {
 
       <!-- Variable name badge -->
       <span
-        class="text-[10px] font-mono text-primary/70 bg-primary/5 px-1.5 py-0.5 rounded shrink-0"
+        class="text-[10px] font-mono text-[var(--text-brand)]/70 bg-[var(--bg-brand)]/5 px-1.5 py-0.5 rounded shrink-0"
         :title="`引用: ${varName}`"
       >
         {{ varName }}
@@ -205,7 +205,7 @@ function isSelectorField(key: string): boolean {
       <Button
         variant="ghost"
         size="icon"
-        class="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 shrink-0"
+        class="text-[var(--text-tertiary)] hover:text-[var(--status-error-default)] hover:bg-[var(--status-error-default)]/10 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 shrink-0"
         :aria-label="t('actionRow.deleteActionAria')"
         @click.stop="emit('remove')"
       >
@@ -215,16 +215,16 @@ function isSelectorField(key: string): boolean {
 
     <!-- Expanded: parameters or "no params" message -->
     <Transition name="action-expand">
-      <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-border/50 space-y-2.5">
+      <div v-if="expanded" class="px-3 pb-3 pt-1 border-t border-[var(--border-neutral-l1)]/50 space-y-2.5">
         <!-- No params message -->
-        <div v-if="!hasParams" class="text-[11px] text-muted-foreground/60 py-1 text-center">
+        <div v-if="!hasParams" class="text-[11px] text-[var(--text-tertiary)]/60 py-1 text-center">
           {{ t('actionRow.noParamsHint') }}
         </div>
 
         <!-- Data flow hint -->
-        <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-primary/5 text-muted-foreground flex items-center gap-1">
+        <div v-if="hasParams && siblingActions" class="text-[11px] px-2 py-1 rounded bg-[var(--bg-brand)]/5 text-[var(--text-tertiary)] flex items-center gap-1">
           <template v-if="prevAction">
-            {{ t('actionRow.dataFrom') }} <span class="font-medium text-foreground">{{ prevAction.label || prevAction.type }}</span>
+            {{ t('actionRow.dataFrom') }} <span class="font-medium text-[var(--text-default)]">{{ prevAction.label || prevAction.type }}</span>
           </template>
           <template v-else>
             {{ t('actionRow.noUpstream') }}

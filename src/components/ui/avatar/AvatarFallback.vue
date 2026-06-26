@@ -9,7 +9,7 @@ const props = defineProps<AvatarFallbackProps & { class?: HTMLAttributes['class'
 <template>
   <AvatarFallback
     v-bind="props"
-    :class="cn('flex h-full w-full items-center justify-center rounded-full bg-muted', props.class)"
+    :class="cn('flex h-full w-full items-center justify-center rounded-full bg-[var(--bg-overlay-l1)]', props.class)"
   >
     <slot />
   </AvatarFallback>

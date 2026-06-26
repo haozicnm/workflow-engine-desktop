@@ -20,21 +20,21 @@ const emit = defineEmits<{
 }>()
 
 const statusColor = computed(() => {
-  if (!props.runState) return 'border-border bg-card'
+  if (!props.runState) return 'border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)]'
   switch (props.runState.status) {
-    case 'running': return 'border-info bg-info/10'
-    case 'success': return 'border-success bg-success/10'
-    case 'error': return 'border-danger bg-danger/10'
-    default: return 'border-border bg-card'
+    case 'running': return 'border-[var(--status-primary-default)] bg-[var(--status-primary-default)]/10'
+    case 'success': return 'border-[var(--status-success-default)] bg-[var(--status-success-default)]/10'
+    case 'error': return 'border-[var(--status-error-default)] bg-[var(--status-error-default)]/10'
+    default: return 'border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)]'
   }
 })
 
 const statusDot = computed(() => {
   if (!props.runState) return ''
   switch (props.runState.status) {
-    case 'running': return 'bg-info animate-pulse'
-    case 'success': return 'bg-success'
-    case 'error': return 'bg-danger'
+    case 'running': return 'bg-[var(--status-primary-default)] animate-pulse'
+    case 'success': return 'bg-[var(--status-success-default)]'
+    case 'error': return 'bg-[var(--status-error-default)]'
     default: return 'bg-muted-foreground'
   }
 })
@@ -97,16 +97,16 @@ const outputPorts = computed(() => {
         :class="statusColor"
       >
         <!-- Header -->
-        <div class="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-border/50 bg-muted/30">
+        <div class="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[var(--border-neutral-l1)]/50 bg-[var(--bg-overlay-l1)]/30">
           <span v-if="statusDot" class="w-2 h-2 rounded-full shrink-0" :class="statusDot" />
           <ActionIcon :name="step.type" cls="w-3.5 h-3.5 shrink-0" />
           <span class="font-medium truncate flex-1">{{ step.label || step.id }}</span>
-          <span class="text-[10px] text-muted-foreground truncate max-w-[60px]">{{ step.type }}</span>
+          <span class="text-[10px] text-[var(--text-tertiary)] truncate max-w-[60px]">{{ step.type }}</span>
           <!-- 断点标记 -->
           <span v-if="step.breakpoint" class="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" title="断点" />
         </div>
         <!-- Body -->
-        <div class="flex-1 px-2.5 py-1 text-muted-foreground truncate">
+        <div class="flex-1 px-2.5 py-1 text-[var(--text-tertiary)] truncate">
           {{ step.actions?.length ? `${step.actions.length} actions` : '' }}
         </div>
       </div>

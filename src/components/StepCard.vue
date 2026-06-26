@@ -173,7 +173,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
         v-if="editingLabel"
         ref="labelEditInput"
         v-model="labelEditValue"
-        class="flex-1 min-w-0 bg-transparent border-b border-primary text-sm font-medium text-foreground outline-none px-0.5"
+        class="flex-1 min-w-0 bg-transparent border-b border-[var(--bg-brand)] text-sm font-medium text-[var(--text-default)] outline-none px-0.5"
         @blur="confirmRenameStep"
         @keydown.enter="confirmRenameStep"
         @keydown.escape="cancelRenameStep"
@@ -181,7 +181,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
       />
       <span
         v-else
-        class="flex-1 text-sm font-medium text-foreground whitespace-nowrap overflow-hidden text-ellipsis"
+        class="flex-1 text-sm font-medium text-[var(--text-default)] whitespace-nowrap overflow-hidden text-ellipsis"
         :title="t('stepCard.dblclickRename')"
         @dblclick.stop="startRenameStep"
       >
@@ -199,7 +199,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
       <Badge
         v-if="step.runCondition"
         variant="outline"
-        class="text-[10px] px-1.5 py-0.5 border-warning/40 text-warning bg-warning/10 shrink-0"
+        class="text-[10px] px-1.5 py-0.5 border-[var(--status-warning-default)]/40 text-[var(--status-warning-default)] bg-[var(--status-warning-default)]/10 shrink-0"
         :title="conditionLabel"
       >{{ conditionLabel }}</Badge>
 
@@ -211,14 +211,14 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
       >{{ t('stepCard.dangerousBadge') }}</Badge>
 
       <!-- Duration + Status -->
-      <span v-if="runState?.duration" class="text-[10px] text-muted-foreground font-mono shrink-0">
+      <span v-if="runState?.duration" class="text-[10px] text-[var(--text-tertiary)] font-mono shrink-0">
         {{ formatDuration(runState.duration) }}
       </span>
       <!-- Status icon: success=check, error=X, running=spinner, idle=dot -->
-      <Check v-if="runState?.status === 'success'" class="w-3.5 h-3.5 text-success shrink-0" />
-      <X v-else-if="runState?.status === 'error'" class="w-3.5 h-3.5 text-danger shrink-0" />
-      <Loader2 v-else-if="runState?.status === 'running'" class="w-3.5 h-3.5 text-warning animate-spin shrink-0" />
-      <span v-else class="w-2 h-2 rounded-full bg-muted shrink-0" />
+      <Check v-if="runState?.status === 'success'" class="w-3.5 h-3.5 text-[var(--status-success-default)] shrink-0" />
+      <X v-else-if="runState?.status === 'error'" class="w-3.5 h-3.5 text-[var(--status-error-default)] shrink-0" />
+      <Loader2 v-else-if="runState?.status === 'running'" class="w-3.5 h-3.5 text-[var(--status-warning-default)] animate-spin shrink-0" />
+      <span v-else class="w-2 h-2 rounded-full bg-[var(--bg-overlay-l1)] shrink-0" />
 
       <!-- ⋯ Menu button → DropdownMenu -->
       <DropdownMenu v-model:open="menuOpen">
@@ -226,7 +226,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           <Button
             variant="ghost"
             size="icon"
-            class="text-muted-foreground hover:text-foreground opacity-40 group-hover:opacity-100 transition-opacity"
+            class="text-[var(--text-tertiary)] hover:text-[var(--text-default)] opacity-40 group-hover:opacity-100 transition-opacity"
             :aria-label="t('stepCard.moreActions')"
           ><Ellipsis class="w-4 h-4" /></Button>
         </DropdownMenuTrigger>
@@ -242,16 +242,16 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
           </DropdownMenuItem>
 
           <!-- 删除步骤 -->
-          <DropdownMenuItem class="text-destructive focus:bg-destructive/10 focus:text-destructive" @click="emit('remove-step', step.id); menuOpen = false">
+          <DropdownMenuItem class="text-[var(--status-error-default)] focus:bg-[var(--status-error-default)]/10 focus:text-[var(--status-error-default)]" @click="emit('remove-step', step.id); menuOpen = false">
             <Trash2 class="w-4 h-4 mr-2" /> {{ t('stepCard.deleteStep') }}
           </DropdownMenuItem>
 
           <!-- 条件执行 -->
           <template v-if="step.type !== 'logic' && logicSteps.length > 0">
             <DropdownMenuSeparator />
-            <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ t('editor.runCondition') }}</DropdownMenuLabel>
+            <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('editor.runCondition') }}</DropdownMenuLabel>
             <div v-for="ls in logicSteps" :key="ls.id">
-              <div class="px-2 py-0.5 text-[11px] text-muted-foreground">
+              <div class="px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]">
                 <ActionIcon :name="getContainerDef(ls.type, t).icon" cls="w-3.5 h-3.5 inline" /> {{ ls.label }}
               </div>
               <DropdownMenuItem
@@ -262,7 +262,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
                   { value: 'merge', icon: 'Merge', label: t('editor.errorBranch') },
                 ]"
                 :key="opt.value"
-                :class="step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value ? 'bg-accent' : ''"
+                :class="step.runCondition?.ref === ls.id && step.runCondition?.when === opt.value ? 'bg-[var(--bg-overlay-l2)]' : ''"
                 @click="setCondition(ls.id, opt.value as 'true' | 'false' | 'both' | 'merge')"
               >
                 <ActionIcon :name="opt.icon" cls="w-3.5 h-3.5 mr-2" /> {{ opt.label }}
@@ -270,7 +270,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
             </div>
             <DropdownMenuItem
               v-if="step.runCondition"
-              class="text-destructive focus:bg-destructive/10 focus:text-destructive"
+              class="text-[var(--status-error-default)] focus:bg-[var(--status-error-default)]/10 focus:text-[var(--status-error-default)]"
               @click="removeCondition"
             >
               {{ t('stepCard.removeCondition') }}
@@ -279,7 +279,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
 
           <!-- 错误策略 -->
           <DropdownMenuSeparator />
-          <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ t('editor.errorStrategy') }}</DropdownMenuLabel>
+          <DropdownMenuLabel class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('editor.errorStrategy') }}</DropdownMenuLabel>
           <DropdownMenuItem
             v-for="(opt, key) in {
               fail: { icon: 'CircleStop', label: t('editor.errorFail'), desc: t('stepCard.errDescFail') },
@@ -287,13 +287,13 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
               branch: { icon: 'ArrowRightLeft', label: t('editor.errorBranch'), desc: t('stepCard.errDescBranch') },
             }"
             :key="key"
-            :class="((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError)) ? 'bg-accent' : ''"
+            :class="((!step.onError && key === 'fail') || step.onError === key || (key === 'branch' && typeof step.onError === 'object' && 'branch' in step.onError)) ? 'bg-[var(--bg-overlay-l2)]' : ''"
             @click="key === 'fail' ? setErrStrategy('fail') : key === 'ignore' ? setErrStrategy('ignore') : setErrStrategy({ branch: '' })"
           >
             <ActionIcon :name="opt.icon" cls="w-4 h-4 mr-2" />
             <div class="flex flex-col">
               <span>{{ opt.label }}</span>
-              <span class="text-[10px] text-muted-foreground">{{ opt.desc }}</span>
+              <span class="text-[10px] text-[var(--text-tertiary)]">{{ opt.desc }}</span>
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -301,12 +301,12 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
     </div>
 
     <!-- Progress bar (running) -->
-    <div v-if="runState?.status === 'running'" class="h-0.5 bg-secondary overflow-hidden">
-      <div class="h-full w-2/5 bg-warning rounded-full animate-progress-slide" />
+    <div v-if="runState?.status === 'running'" class="h-0.5 bg-[var(--bg-overlay-l1)] overflow-hidden">
+      <div class="h-full w-2/5 bg-[var(--status-warning-default)] rounded-full animate-progress-slide" />
     </div>
 
     <!-- ═══ Body (expandable) ═══ -->
-    <div v-show="step.expanded" class="px-[var(--spacing-card-padding-x)] py-[var(--spacing-card-padding-y)] bg-card border-t border-border">
+    <div v-show="step.expanded" class="px-[var(--spacing-card-padding-x)] py-[var(--spacing-card-padding-y)] bg-[var(--bg-base-secondary)] border-t border-[var(--border-neutral-l1)]">
       <!-- Simple step → ParamField (with variable refs!) -->
       <template v-if="!isContainer && step.type !== 'logic'">
         <!-- Schema-driven auto-render (paramDefs) -->
@@ -377,7 +377,7 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
         <Button
           variant="ghost"
           size="sm"
-          class="mt-1 text-xs text-muted-foreground gap-1 w-full justify-start"
+          class="mt-1 text-xs text-[var(--text-tertiary)] gap-1 w-full justify-start"
           @click="emit('add-action', step.id)"
         >
           <Plus class="w-3.5 h-3.5" /> {{ t('stepCard.addAction') }}
@@ -388,18 +388,18 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
     <!-- Output display -->
     <div
       v-if="formattedOutput && (runState?.status === 'success' || runState?.status === 'error')"
-      class="border-t border-border bg-muted"
+      class="border-t border-[var(--border-neutral-l1)] bg-[var(--bg-overlay-l1)]"
     >
       <div
-        class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none transition-colors hover:bg-secondary"
+        class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer select-none transition-colors hover:bg-[var(--bg-overlay-l1)]"
         @click="showOutput = !showOutput"
       >
-        <span class="text-[10px] text-muted-foreground w-3.5">{{ showOutput ? '▼' : '▶' }}</span>
-        <span class="text-xs text-muted-foreground">
+        <span class="text-[10px] text-[var(--text-tertiary)] w-3.5">{{ showOutput ? '▼' : '▶' }}</span>
+        <span class="text-xs text-[var(--text-tertiary)]">
           {{ runState?.status === 'error' ? t('stepCard.outputError') : t('stepCard.outputSuccess') }}
         </span>
       </div>
-      <pre v-if="showOutput" class="m-0 px-3 py-2 text-[11px] text-muted-foreground bg-muted border-t border-border font-mono max-h-[200px] overflow-auto whitespace-pre-wrap break-all">{{ formattedOutput }}</pre>
+      <pre v-if="showOutput" class="m-0 px-3 py-2 text-[11px] text-[var(--text-tertiary)] bg-[var(--bg-overlay-l1)] border-t border-[var(--border-neutral-l1)] font-mono max-h-[200px] overflow-auto whitespace-pre-wrap break-all">{{ formattedOutput }}</pre>
     </div>
   </Card>
 </template>

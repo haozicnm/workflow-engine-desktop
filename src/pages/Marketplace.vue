@@ -87,7 +87,7 @@ onMounted(loadTemplates)
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-background">
+  <div class="flex flex-col h-full bg-[var(--bg-base-default)]">
     <!-- Header -->
     <div class="border-b px-6 py-4 shrink-0">
       <div class="flex items-center gap-3 mb-3">
@@ -96,7 +96,7 @@ onMounted(loadTemplates)
       </div>
       <div class="flex items-center gap-3">
         <div class="relative flex-1 max-w-md">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
           <Input
             v-model="searchQuery"
             :placeholder="t('marketplace.search')"
@@ -111,7 +111,7 @@ onMounted(loadTemplates)
       <div class="w-48 border-r shrink-0 overflow-auto py-3 px-2">
         <button
           class="w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors"
-          :class="!selectedCategory ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'"
+          :class="!selectedCategory ? 'bg-[var(--bg-overlay-l2)] text-[var(--text-default)]' : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-overlay-l2)]/50'"
           @click="selectedCategory = null"
         >
           {{ t('marketplace.allCategories') }}
@@ -120,7 +120,7 @@ onMounted(loadTemplates)
           v-for="cat in categories"
           :key="cat"
           class="w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2"
-          :class="selectedCategory === cat ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'"
+          :class="selectedCategory === cat ? 'bg-[var(--bg-overlay-l2)] text-[var(--text-default)]' : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-overlay-l2)]/50'"
           @click="selectedCategory = cat"
         >
           <span>{{ categoryIcons[cat] || '📦' }}</span>
@@ -132,13 +132,13 @@ onMounted(loadTemplates)
       <div class="flex-1 overflow-auto p-6">
         <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card v-for="i in 6" :key="i" class="p-4">
-            <div class="h-5 w-3/4 bg-muted animate-pulse rounded mb-2" />
-            <div class="h-4 w-full bg-muted animate-pulse rounded mb-1" />
-            <div class="h-4 w-2/3 bg-muted animate-pulse rounded" />
+            <div class="h-5 w-3/4 bg-[var(--bg-overlay-l1)] animate-pulse rounded mb-2" />
+            <div class="h-4 w-full bg-[var(--bg-overlay-l1)] animate-pulse rounded mb-1" />
+            <div class="h-4 w-2/3 bg-[var(--bg-overlay-l1)] animate-pulse rounded" />
           </Card>
         </div>
 
-        <div v-else-if="filteredTemplates.length === 0" class="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <div v-else-if="filteredTemplates.length === 0" class="flex flex-col items-center justify-center py-20 text-[var(--text-tertiary)]">
           <Search class="w-12 h-12 mb-4 opacity-30" />
           <p class="text-sm">{{ t('marketplace.noResults') }}</p>
         </div>
@@ -147,15 +147,15 @@ onMounted(loadTemplates)
           <Card
             v-for="tmpl in filteredTemplates"
             :key="tmpl.name"
-            class="p-4 hover:border-primary/50 transition-colors group"
+            class="p-4 hover:border-[var(--bg-brand)]/50 transition-colors group"
           >
             <div class="flex items-start gap-3 mb-3">
-              <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-lg shrink-0">
+              <div class="w-10 h-10 rounded-lg bg-[var(--bg-brand)]/10 flex items-center justify-center text-lg shrink-0">
                 {{ categoryIcons[tmpl.category] || '📦' }}
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-medium truncate">{{ tmpl.label }}</h3>
-                <p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">{{ tmpl.description }}</p>
+                <p class="text-xs text-[var(--text-tertiary)] mt-0.5 line-clamp-2">{{ tmpl.description }}</p>
               </div>
             </div>
             <div class="flex flex-wrap gap-1 mb-3">
@@ -164,7 +164,7 @@ onMounted(loadTemplates)
               </Badge>
             </div>
             <div class="flex items-center justify-between">
-              <div class="flex items-center gap-1 text-xs text-muted-foreground">
+              <div class="flex items-center gap-1 text-xs text-[var(--text-tertiary)]">
                 <Tag class="w-3 h-3" />
                 <span>{{ tmpl.category }}</span>
                 <span v-if="tmpl.source === 'online'" class="ml-1"><ExternalLink class="w-3 h-3 inline" /></span>

@@ -147,7 +147,7 @@ onUnmounted(() => {
   <!-- 浮动按钮：显示待审批数量 -->
   <Button
     v-if="pendingCount > 0"
-    class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full px-4 py-3 shadow-lg"
+    class="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-full px-4 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
     @click="visible = !visible"
   >
     <Hand class="w-5 h-5" />
@@ -160,13 +160,13 @@ onUnmounted(() => {
     <Transition name="slide">
       <div
         v-if="visible && pendingCount > 0"
-        class="fixed inset-y-0 right-0 z-[60] w-[420px] bg-background border-l border-border shadow-2xl flex flex-col"
+        class="fixed inset-y-0 right-0 z-[60] w-[420px] bg-[var(--bg-base-default)] border-l border-[var(--border-neutral-l1)] shadow-[0_24px_64px_rgba(0,0,0,0.14)] flex flex-col"
       >
         <!-- 头部 -->
-        <div class="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-[var(--border-neutral-l1)]">
           <div class="flex items-center gap-2">
             <Hand class="w-5 h-5" />
-            <h2 class="text-base font-semibold text-foreground">{{ t('approval.pending') }}</h2>
+            <h2 class="text-base font-semibold text-[var(--text-default)]">{{ t('approval.pending') }}</h2>
             <Badge variant="secondary">{{ pendingCount }}</Badge>
           </div>
           <Button
@@ -184,20 +184,20 @@ onUnmounted(() => {
           <div
             v-for="item in pending"
             :key="item.id"
-            class="rounded-lg border border-border bg-card p-4 space-y-3"
+            class="rounded-lg border border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)] p-4 space-y-3"
           >
             <!-- 标题 + 时间 -->
             <div class="flex items-start justify-between">
               <div>
-                <h3 class="font-medium text-foreground">{{ item.title }}</h3>
-                <p class="text-xs text-muted-foreground mt-0.5">
+                <h3 class="font-medium text-[var(--text-default)]">{{ item.title }}</h3>
+                <p class="text-xs text-[var(--text-tertiary)] mt-0.5">
                   {{ t('approval.stepLabel') }}: {{ item.step_id }} · {{ formatElapsed(item.elapsed) }}
                 </p>
               </div>
               <div
                 v-if="item.timeout_secs > 0"
                 class="text-xs px-2 py-1 rounded"
-                :class="timeoutPercent(item) > 80 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'"
+                :class="timeoutPercent(item) > 80 ? 'bg-[var(--status-error-default)]/10 text-[var(--status-error-default)]' : 'bg-[var(--bg-overlay-l1)] text-[var(--text-tertiary)]'"
               >
                 {{ formatTimeout(item) }}
               </div>
@@ -206,17 +206,17 @@ onUnmounted(() => {
             <!-- 超时进度条 -->
             <div
               v-if="item.timeout_secs > 0"
-              class="h-1 rounded-full bg-muted overflow-hidden"
+              class="h-1 rounded-full bg-[var(--bg-overlay-l1)] overflow-hidden"
             >
               <div
                 class="h-full rounded-full transition-all duration-1000"
-                :class="timeoutPercent(item) > 80 ? 'bg-destructive' : 'bg-primary'"
+                :class="timeoutPercent(item) > 80 ? 'bg-[var(--status-error-default)]' : 'bg-[var(--bg-brand)]'"
                 :style="{ width: `${timeoutPercent(item)}%` }"
               />
             </div>
 
             <!-- 审批内容 -->
-            <div class="rounded-md bg-muted p-3 text-sm text-foreground whitespace-pre-wrap break-words">
+            <div class="rounded-md bg-[var(--bg-overlay-l1)] p-3 text-sm text-[var(--text-default)] whitespace-pre-wrap break-words">
               {{ item.message }}
             </div>
 
@@ -231,7 +231,7 @@ onUnmounted(() => {
               </Button>
               <pre
                 v-if="item.showItem"
-                class="mt-1 rounded-md border border-border bg-muted p-2 text-xs text-muted-foreground font-mono max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all"
+                class="mt-1 rounded-md border border-[var(--border-neutral-l1)] bg-[var(--bg-overlay-l1)] p-2 text-xs text-[var(--text-tertiary)] font-mono max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all"
               >{{ JSON.stringify(item.item, null, 2) }}</pre>
             </div>
 
@@ -245,7 +245,7 @@ onUnmounted(() => {
                 size="sm"
                 @click="decide(item, opt)"
               >
-                <Star v-if="opt === item.recommended" class="w-3 h-3 mr-1 text-warning fill-warning" />
+                <Star v-if="opt === item.recommended" class="w-3 h-3 mr-1 text-[var(--status-warning-default)] fill-warning" />
                 {{ opt }}
               </Button>
             </div>
@@ -253,17 +253,17 @@ onUnmounted(() => {
             <!-- 推荐提示 -->
             <p
               v-if="item.recommended"
-              class="text-xs text-muted-foreground"
+              class="text-xs text-[var(--text-tertiary)]"
             >
-              <Lightbulb class="w-3 h-3 inline-block mr-1 text-warning" />{{ t('approval.recommendedLabel') }}: {{ item.recommended }}
+              <Lightbulb class="w-3 h-3 inline-block mr-1 text-[var(--status-warning-default)]" />{{ t('approval.recommendedLabel') }}: {{ item.recommended }}
             </p>
 
             <!-- 条件推荐原因（新增） -->
             <p
               v-if="item.recommendation_reason"
-              class="text-xs text-primary whitespace-pre-wrap"
+              class="text-xs text-[var(--text-brand)] whitespace-pre-wrap"
             >
-              <Search class="w-3 h-3 inline-block mr-1 text-primary" />{{ item.recommendation_reason }}
+              <Search class="w-3 h-3 inline-block mr-1 text-[var(--text-brand)]" />{{ item.recommendation_reason }}
             </p>
 
             <!-- 审批意见 -->

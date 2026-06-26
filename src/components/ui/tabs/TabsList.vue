@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 <template>
   <TabsList
     :class="cn(
-      'inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
+      'inline-flex h-9 items-center justify-center rounded-lg bg-[var(--bg-overlay-l1)] p-1 text-[var(--text-tertiary)]',
       $attrs.class as string,
     )"
   >

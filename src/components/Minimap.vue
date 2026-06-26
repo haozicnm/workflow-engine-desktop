@@ -63,7 +63,7 @@ function onMapClick(e: MouseEvent) {
 
 <template>
   <div
-    class="absolute bottom-3 left-3 w-[160px] h-[100px] bg-background/80 backdrop-blur border border-border rounded-lg overflow-hidden cursor-crosshair z-10"
+    class="absolute bottom-3 left-3 w-[160px] h-[100px] bg-[var(--bg-base-default)]/80 backdrop-blur border border-[var(--border-neutral-l1)] rounded-lg overflow-hidden cursor-crosshair z-10"
     @click="onMapClick"
   >
     <svg width="160" height="100" class="pointer-events-none">

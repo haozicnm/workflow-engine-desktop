@@ -120,12 +120,12 @@ onMounted(loadPlugins)
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-card">
+  <div class="h-full flex flex-col bg-[var(--bg-base-secondary)]">
     <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border-neutral-l1)] shrink-0">
       <div>
-        <h2 class="text-lg font-semibold text-foreground">插件管理</h2>
-        <p class="text-xs text-muted-foreground mt-0.5">安装和管理 workflow 功能插件</p>
+        <h2 class="text-lg font-semibold text-[var(--text-default)]">插件管理</h2>
+        <p class="text-xs text-[var(--text-tertiary)] mt-0.5">安装和管理 workflow 功能插件</p>
       </div>
       <div class="flex items-center gap-2">
         <input
@@ -155,9 +155,9 @@ onMounted(loadPlugins)
 
       <!-- Empty -->
       <div v-else-if="plugins.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-        <ActionIcon name="Package" cls="w-12 h-12 text-muted-foreground mb-4" />
-        <h3 class="text-base font-medium text-foreground mb-1">暂无已安装插件</h3>
-        <p class="text-sm text-muted-foreground mb-4 max-w-sm">
+        <ActionIcon name="Package" cls="w-12 h-12 text-[var(--text-tertiary)] mb-4" />
+        <h3 class="text-base font-medium text-[var(--text-default)] mb-1">暂无已安装插件</h3>
+        <p class="text-sm text-[var(--text-tertiary)] mb-4 max-w-sm">
           点击「安装插件」选择 .wfplug 文件，即可快速添加新功能包
         </p>
         <Button @click="triggerFilePick">
@@ -170,17 +170,17 @@ onMounted(loadPlugins)
         <div
           v-for="p in plugins"
           :key="p.name"
-          class="rounded-lg border border-border bg-muted p-4 transition-colors hover:border-primary/30"
+          class="rounded-lg border border-[var(--border-neutral-l1)] bg-[var(--bg-overlay-l1)] p-4 transition-colors hover:border-[var(--bg-brand)]/30"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
-                <ActionIcon :name="getIcon(p.icon)" cls="w-4 h-4 text-primary" />
-                <h3 class="text-sm font-semibold text-foreground truncate">{{ p.title }}</h3>
-                <span class="text-[10px] text-muted-foreground bg-secondary rounded px-1.5 py-0.5 shrink-0">v{{ p.version }}</span>
+                <ActionIcon :name="getIcon(p.icon)" cls="w-4 h-4 text-[var(--text-brand)]" />
+                <h3 class="text-sm font-semibold text-[var(--text-default)] truncate">{{ p.title }}</h3>
+                <span class="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-overlay-l1)] rounded px-1.5 py-0.5 shrink-0">v{{ p.version }}</span>
               </div>
-              <p class="text-xs text-muted-foreground line-clamp-2 mb-2">{{ p.description }}</p>
-              <div class="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <p class="text-xs text-[var(--text-tertiary)] line-clamp-2 mb-2">{{ p.description }}</p>
+              <div class="flex items-center gap-3 text-[10px] text-[var(--text-tertiary)]">
                 <span v-if="p.author" class="flex items-center gap-1">
                   {{ p.author }}
                 </span>
@@ -206,10 +206,10 @@ onMounted(loadPlugins)
     </div>
 
     <!-- Footer hint -->
-    <div class="px-6 py-3 border-t border-border shrink-0">
-      <p class="text-[10px] text-muted-foreground">
+    <div class="px-6 py-3 border-t border-[var(--border-neutral-l1)] shrink-0">
+      <p class="text-[10px] text-[var(--text-tertiary)]">
         插件安装后会自动注册 MCP 节点并导入模板。删除时自动清理。.wfplug 文件可在项目
-        <code class="bg-secondary rounded px-1 text-[10px]">samba-web-manager/</code> 目录找到。
+        <code class="bg-[var(--bg-overlay-l1)] rounded px-1 text-[10px]">samba-web-manager/</code> 目录找到。
       </p>
     </div>
   </div>

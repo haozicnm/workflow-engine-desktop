@@ -7,5 +7,5 @@ const props = defineProps<DropdownMenuSeparatorProps & { class?: HTMLAttributes[
 </script>
 
 <template>
-  <DropdownMenuSeparator v-bind="props" :class="cn('-mx-1 my-1 h-px bg-muted', props.class)" />
+  <DropdownMenuSeparator v-bind="props" :class="cn('-mx-1 my-1 h-px bg-[var(--bg-overlay-l1)]', props.class)" />
 </template>

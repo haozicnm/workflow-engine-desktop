@@ -76,11 +76,11 @@ function onKeydown(e: KeyboardEvent) {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="emit('close')" @keydown="onKeydown">
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card border border-border rounded-lg min-w-[320px] max-w-[400px] max-h-[70vh] overflow-hidden flex flex-col" @click.stop>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--bg-base-secondary)] border border-[var(--border-neutral-l1)] rounded-lg min-w-[320px] max-w-[400px] max-h-[70vh] overflow-hidden flex flex-col" @click.stop>
           <!-- 搜索框 -->
-          <div class="p-2 border-b border-border">
+          <div class="p-2 border-b border-[var(--border-neutral-l1)]">
             <div class="relative">
-              <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
               <Input
                 v-model="searchQuery"
                 :placeholder="t('editor.searchNodes', '搜索节点...')"
@@ -94,26 +94,26 @@ function onKeydown(e: KeyboardEvent) {
           <div class="overflow-y-auto flex-1 p-1">
             <!-- 搜索结果为空 -->
             <div v-if="searchQuery && groupedContainerDefs.baseNodes.length === 0 && groupedContainerDefs.mcpNodes.length === 0"
-              class="py-8 text-center text-sm text-muted-foreground">
+              class="py-8 text-center text-sm text-[var(--text-tertiary)]">
               {{ t('editor.noNodesFound', '未找到匹配的节点') }}
             </div>
 
             <!-- 按 category 分组显示 -->
             <template v-if="!searchQuery">
               <div v-for="[cat, nodes] in groupedContainerDefs.categories" :key="cat" class="mb-1">
-                <div class="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                <div class="px-3 py-1 text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] font-medium">
                   {{ categoryLabels[cat] || cat }}
                 </div>
                 <div
                   v-for="def in nodes"
                   :key="def.type"
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-secondary"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]"
                   @click="emit('select', def.type)"
                 >
                   <ActionIcon :name="def.icon" cls="w-5 h-5 shrink-0" />
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium text-foreground">{{ def.label }}</div>
-                    <div class="text-[11px] text-muted-foreground truncate">{{ def.description }}</div>
+                    <div class="text-sm font-medium text-[var(--text-default)]">{{ def.label }}</div>
+                    <div class="text-[11px] text-[var(--text-tertiary)] truncate">{{ def.description }}</div>
                   </div>
                 </div>
               </div>
@@ -124,22 +124,22 @@ function onKeydown(e: KeyboardEvent) {
               <div
                 v-for="def in groupedContainerDefs.baseNodes"
                 :key="def.type"
-                class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-secondary"
+                class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]"
                 @click="emit('select', def.type)"
               >
                 <ActionIcon :name="def.icon" cls="w-5 h-5 shrink-0" />
                 <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-foreground">{{ def.label }}</div>
-                  <div class="text-[11px] text-muted-foreground truncate">{{ def.description }}</div>
+                  <div class="text-sm font-medium text-[var(--text-default)]">{{ def.label }}</div>
+                  <div class="text-[11px] text-[var(--text-tertiary)] truncate">{{ def.description }}</div>
                 </div>
               </div>
             </template>
 
             <!-- MCP extension divider + collapse -->
-            <div v-if="groupedContainerDefs.mcpNodes.length" class="border-t border-border mt-1 pt-1">
+            <div v-if="groupedContainerDefs.mcpNodes.length" class="border-t border-[var(--border-neutral-l1)] mt-1 pt-1">
               <Button
                 variant="ghost"
-                class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs text-muted-foreground justify-start"
+                class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs text-[var(--text-tertiary)] justify-start"
                 @click="showMcpNodes = !showMcpNodes"
               >
                 <span class="transition-transform duration-150" :class="showMcpNodes ? 'rotate-90' : ''">▶</span>
@@ -149,13 +149,13 @@ function onKeydown(e: KeyboardEvent) {
                 <div
                   v-for="def in groupedContainerDefs.mcpNodes"
                   :key="def.type"
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-secondary ml-4"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] ml-4"
                   @click="emit('select', def.type)"
                 >
                   <ActionIcon :name="def.icon" cls="w-4 h-4 shrink-0" />
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm text-foreground">{{ def.label }}</div>
-                    <div class="text-[10px] text-muted-foreground truncate">{{ def.description }}</div>
+                    <div class="text-sm text-[var(--text-default)]">{{ def.label }}</div>
+                    <div class="text-[10px] text-[var(--text-tertiary)] truncate">{{ def.description }}</div>
                   </div>
                 </div>
               </div>

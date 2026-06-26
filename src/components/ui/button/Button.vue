@@ -19,17 +19,17 @@ const props = withDefaults(defineProps<Props>(), {
 
 const variantClasses: Record<string, string> = {
   default:
-    'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+    'bg-[var(--bg-brand)] text-[var(--text-onbrand)] shadow-none hover:bg-[var(--bg-brand)]/90',
   destructive:
-    'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+    'bg-[var(--status-error-default)] text-white shadow-none hover:bg-[var(--status-error-default)]/90',
   outline:
-    'border border-border bg-transparent text-foreground shadow-sm hover:bg-secondary hover:text-foreground',
+    'border border-[var(--border-neutral-l1)] bg-transparent text-[var(--text-default)] shadow-none hover:bg-[var(--bg-overlay-l1)] hover:text-[var(--text-default)]',
   secondary:
-    'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+    'bg-[var(--bg-overlay-l1)] text-[var(--text-secondary)] shadow-none hover:bg-[var(--bg-overlay-l1)]/80',
   ghost:
-    'text-foreground hover:bg-secondary hover:text-foreground',
+    'text-[var(--text-default)] hover:bg-[var(--bg-overlay-l1)] hover:text-[var(--text-default)]',
   link:
-    'text-primary underline-offset-4 hover:underline',
+    'text-[var(--text-brand)] underline-offset-4 hover:underline',
 }
 
 const sizeClasses: Record<string, string> = {
@@ -42,7 +42,7 @@ const sizeClasses: Record<string, string> = {
 const classes = computed(() =>
   cn(
     'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-contrast)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base-default)]',
     'disabled:pointer-events-none disabled:opacity-50',
     'active:scale-[0.98]',
     variantClasses[props.variant],

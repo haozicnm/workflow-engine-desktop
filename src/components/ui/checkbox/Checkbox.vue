@@ -28,10 +28,10 @@ function toggle() {
     :aria-checked="modelValue"
     :disabled="disabled"
     :class="cn(
-      'peer h-4 w-4 shrink-0 rounded-sm border border-border shadow-sm transition-colors',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+      'peer h-4 w-4 shrink-0 rounded-sm border border-[var(--border-neutral-l1)] shadow-none transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-contrast)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base-default)]',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      modelValue ? 'bg-primary border-primary text-primary-foreground' : 'bg-background',
+      modelValue ? 'bg-[var(--bg-brand)] border-[var(--bg-brand)] text-[var(--text-onbrand)]' : 'bg-[var(--bg-base-default)]',
       props.class,
     )"
     @click="toggle"
