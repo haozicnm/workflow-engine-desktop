@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Arc;
+use tauri::Manager;
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use workflow_engine::App;
@@ -139,12 +140,10 @@ fn main() {
                         Ok(listener) => {
                             info!("HTTP API 服务已启动: http://{}", bind_addr);
                             // Server is ready — navigate all webviews to the HTTP URL
-                            let url = format!("http://{}", bind_addr);
-                            if let Ok(url) = url.parse() {
-                                for (label, wv) in app_handle.webview_windows() {
-                                    info!("导航 WebView '{}' → {}", label, url);
-                                    wv.navigate(url);
-                                }
+                            let url: tauri::Url = format!("http://{}", bind_addr).parse().expect("valid URL");
+                            for (label, wv) in app_handle.webview_windows() {
+                                info!("导航 WebView '{}' → {}", label, url);
+                                let _ = wv.navigate(url.clone());
                             }
                             let _ = axum::serve(
                                 listener,
