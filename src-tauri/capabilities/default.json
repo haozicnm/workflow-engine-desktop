@@ -1,27 +1,8 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicegui/tauri-v2-capabilities/main/schema.json",
-  "identifier": "default",
-  "description": "Default permissions for Workflow Engine",
+  "identifier": "main-capability",
+  "description": "Main app permissions for Workflow Engine",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "core:window:default",
-    "core:window:allow-close",
-    "core:window:allow-minimize",
-    "core:window:allow-show",
-    "core:window:allow-hide",
-    "core:window:allow-set-size",
-    "core:window:allow-set-position",
-    "core:event:default",
-    "core:event:allow-listen",
-    "core:event:allow-emit",
-    "opener:default",
-    {
-      "identifier": "core:tray:default",
-      "allow": [
-        { "command": "set_tray_icon" },
-        { "command": "set_tray_menu" }
-      ]
-    }
+    "core:default"
   ]
 }

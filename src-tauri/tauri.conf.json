@@ -59,43 +59,9 @@
                             ],
                    "resources":  {
                                      "sidecars/*":  "sidecars/",
-                                     "templates/data/**/*":  "templates/data/"
+                                     "templates/**/*":  "templates/"
                                  }
                },
-    "capabilities":  [
-        {
-            "identifier":  "main-capability",
-            "description":  "Main app permissions",
-            "windows":  ["main"],
-            "permissions":  [
-                "core:default",
-                "core:event:allow-listen",
-                "core:event:allow-emit",
-                "core:window:allow-show",
-                "core:window:allow-hide",
-                "core:window:allow-close",
-                "core:window:allow-minimize",
-                "core:window:allow-maximize",
-                "core:window:allow-unmaximize",
-                "core:window:allow-toggle-maximize",
-                "core:window:allow-start-dragging",
-                "core:webview:allow-print",
-                "core:app:allow-app-show",
-                "core:app:allow-app-hide",
-                "opener:allow-default",
-                "opener:allow-open-url",
-                "opener:allow-open-path",
-                "fs:allow-read",
-                "fs:allow-read-file",
-                "fs:allow-read-dir",
-                "dialog:allow-open",
-                "dialog:allow-save",
-                "dialog:allow-message",
-                "dialog:allow-ask",
-                "dialog:allow-confirm"
-            ]
-        }
-    ],
     "plugins":  {
 
                 }
