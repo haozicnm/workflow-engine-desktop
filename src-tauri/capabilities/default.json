@@ -1,7 +1,7 @@
 {
   "identifier": "main-capability",
   "description": "Main app permissions for Workflow Engine",
-  "windows": ["main"],
+  "windows": [],
   "permissions": [
     "core:default",
     "core:event:allow-listen",
