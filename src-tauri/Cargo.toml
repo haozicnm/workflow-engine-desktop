@@ -55,12 +55,12 @@ open = "5.3.5"
 rfd = { version = "0.15", optional = true }
 lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "hostname", "builder"], optional = true }
 
-# Tauri v2 (desktop mode)
-tauri = { version = "2", features = ["tray-icon", "image-png"], optional = true }
-tauri-plugin-opener = { version = "2", optional = true }
+# Tauri v2.1 (matches frontend @tauri-apps/api 2.11.x)
+tauri = { version = "2.1", features = ["tray-icon", "image-png"], optional = true }
+tauri-plugin-opener = { version = "2.1", optional = true }
 
 [build-dependencies]
-tauri-build = { version = "2", optional = true , features = [] }
+tauri-build = { version = "2.1", optional = true, features = [] }
 
 [features]
 default = ["cli"]
