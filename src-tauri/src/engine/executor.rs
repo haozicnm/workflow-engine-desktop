@@ -368,6 +368,20 @@ impl StepExecutor {
                 if executed_nodes.contains(node_id) { continue; }
                 let step = workflow.steps.iter().find(|s| s.id == level[0])
                     .ok_or_else(|| anyhow!("节点未找到: {}", level[0]))?;
+                // 注入 input_ports（与并行层级一致）
+                for edge in &workflow.edges {
+                    if edge.to == step.id {
+                        if let Some(upstream_output) = ctx.step_outputs.get(&edge.from) {
+                            let port_data = if edge.from_port.is_empty() || edge.from_port == "out" {
+                                upstream_output.clone()
+                            } else {
+                                upstream_output.get(&edge.from_port).cloned()
+                                    .unwrap_or(upstream_output.clone())
+                            };
+                            ctx.input_ports.insert(edge.to_port.clone(), port_data);
+                        }
+                    }
+                }
                 match Arc::clone(self).execute(step, ctx).await {
                     Ok(result) => {
                         executed_nodes.insert(step.id.clone());

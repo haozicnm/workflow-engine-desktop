@@ -1,6 +1,6 @@
 {
   "$schema": "node-schema.json",
-  "version": "9.0.1",
+  "version": "9.1.0",
   "description": "Workflow Engine node registry — single source of truth for Rust backend and Vue frontend",
   "nodes": [
     {
