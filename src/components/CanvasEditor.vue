@@ -11,6 +11,7 @@ import CanvasNode from './CanvasNode.vue'
 import CanvasEdge from './CanvasEdge.vue'
 import Minimap from './Minimap.vue'
 import Button from './ui/button/Button.vue'
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-vue-next'
 
 const { t } = useI18n()
 
@@ -257,14 +258,14 @@ function resetView() { canvas.resetView() }
     <!-- 工具栏 -->
     <div class="flex items-center gap-2 px-3 py-2 border-b shrink-0">
       <Button variant="ghost" size="icon" @click="zoomIn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        <ZoomIn class="w-4 h-4" />
       </Button>
       <Button variant="ghost" size="icon" @click="zoomOut">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        <ZoomOut class="w-4 h-4" />
       </Button>
       <span class="text-xs text-[var(--text-tertiary)] min-w-[3rem] text-center">{{ zoomPercent }}%</span>
       <Button variant="ghost" size="icon" @click="resetView">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+        <Maximize2 class="w-4 h-4" />
       </Button>
       <div class="flex-1" />
       <span class="text-xs text-[var(--text-tertiary)]">{{ t('editor.stepsCount', { count: stepRef.length }) }} · {{ t('editor.edgesCount', { count: edgeRef.length }) }}</span>

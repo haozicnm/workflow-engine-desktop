@@ -72,7 +72,7 @@ function formatNextRun(iso: string | null): string {
 </script>
 
 <template>
-  <div class="status-bar h-7 border-t border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)]/50 backdrop-blur-sm flex items-center px-3 gap-3 text-xs text-[var(--text-tertiary)] select-none shrink-0">
+  <div class="status-bar h-7 border-t border-[var(--border-neutral-l1)] bg-[var(--bg-base-secondary)] flex items-center px-3 gap-3 text-xs text-[var(--text-tertiary)] select-none shrink-0">
     <!-- IPC daemon status -->
     <span class="flex items-center gap-1.5" :title="state.ipcOnline ? t('statusBar.daemonConnected') : t('statusBar.daemonDisconnected')">
       <span class="w-1.5 h-1.5 rounded-full" :class="state.ipcOnline ? 'bg-[var(--status-success-default)]/80' : 'bg-[var(--status-error-default)]/60'"></span>
@@ -80,24 +80,24 @@ function formatNextRun(iso: string | null): string {
       <span v-else class="text-[var(--status-error-default)]/70">{{ t('dashboard.daemonOffline') }}</span>
     </span>
 
-    <span class="text-border">│</span>
+    <span class="text-[var(--text-disabled)]">│</span>
 
     <!-- API server status -->
-    <span class="flex items-center gap-1.5" :title="state.apiOnline ? '后端服务在线' : '后端服务离线'">
+    <span class="flex items-center gap-1.5" :title="state.apiOnline ? t('statusBar.apiOnline', '后端服务在线') : t('statusBar.apiOffline', '后端服务离线')">
       <span class="w-1.5 h-1.5 rounded-full" :class="state.apiOnline ? 'bg-[var(--status-success-default)]/80' : 'bg-[var(--status-error-default)]/60'"></span>
-      <span class="text-[var(--text-tertiary)]/70">{{ state.apiOnline ? '服务在线' : '服务离线' }}</span>
+      <span class="text-[var(--text-tertiary)]/70">{{ state.apiOnline ? t('statusBar.apiOnlineShort', '服务在线') : t('statusBar.apiOfflineShort', '服务离线') }}</span>
     </span>
 
-    <span class="text-border">│</span>
+    <span class="text-[var(--text-disabled)]">│</span>
 
     <!-- WebBridge status -->
     <span class="flex items-center gap-1.5" :title="state.webbridgeConnected ? `WebBridge 已连接 (v${state.webbridgeVersion})` : 'WebBridge 未连接'">
-      <span class="w-1.5 h-1.5 rounded-full" :class="state.webbridgeConnected ? 'bg-[var(--status-success-default)]/80' : 'bg-muted-foreground/30'"></span>
-      <span class="text-[var(--text-tertiary)]/70">{{ state.webbridgeConnected ? 'WebBridge' : 'WebBridge' }}</span>
+      <span class="w-1.5 h-1.5 rounded-full" :class="state.webbridgeConnected ? 'bg-[var(--status-success-default)]/80' : 'bg-[var(--bg-overlay-l3)]'"></span>
+      <span class="text-[var(--text-tertiary)]/70">{{ state.webbridgeConnected ? t('statusBar.webbridgeConnected', 'WebBridge') : t('statusBar.webbridgeDisconnected', 'WebBridge') }}</span>
       <span v-if="state.webbridgeConnected" class="text-[var(--text-tertiary)]/40">✓</span>
     </span>
 
-    <span class="text-border">│</span>
+    <span class="text-[var(--text-disabled)]">│</span>
 
     <!-- Idle state -->
     <template v-if="isIdle">
@@ -132,7 +132,7 @@ function formatNextRun(iso: string | null): string {
     </template>
 
     <!-- Separator -->
-    <span v-if="hasRunning && hasScheduled" class="text-border">│</span>
+    <span v-if="hasRunning && hasScheduled" class="text-[var(--text-disabled)]">│</span>
 
     <!-- Scheduled workflows -->
     <template v-if="hasScheduled">

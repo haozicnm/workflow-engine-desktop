@@ -163,7 +163,11 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
     <div
       class="h-[var(--height-step-header)] px-[var(--spacing-card-padding-x)] flex items-center cursor-pointer gap-2 select-none transition-colors group"
       :style="{ background: colorAt15(containerColorVar) }"
+      :aria-expanded="step.expanded"
+      role="button"
+      :aria-label="t('stepCard.toggleExpand')"
       @click="step.expanded = !step.expanded"
+      @keydown.enter.prevent="step.expanded = !step.expanded"
     >
       <!-- Icon -->
       <ActionIcon :name="containerDef.icon" cls="w-4 h-4 shrink-0" />
@@ -410,8 +414,8 @@ const containerColorVar = computed(() => getContainerColorVar(props.step.type))
   100% { transform: translateX(350%); }
 }
 @keyframes animate-pulse-step {
-  0%, 100% { outline: 2px solid transparent; outline-offset: -1px; }
-  50% { outline: 2px solid var(--color-warning); outline-offset: -1px; }
+  0%, 100% { box-shadow: inset 0 0 0 2px transparent; }
+  50% { box-shadow: inset 0 0 0 2px var(--color-warning); }
 }
 .animate-progress-slide { animation: animate-progress-slide 1.2s ease-in-out infinite; }
 .animate-pulse-step { animation: animate-pulse-step 1.5s ease-in-out infinite; }

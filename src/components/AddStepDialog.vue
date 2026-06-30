@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import ActionIcon from './ActionIcon.vue'
 import Button from './ui/button/Button.vue'
 import Input from './ui/input/Input.vue'
-import { Search } from 'lucide-vue-next'
+import { Search, ChevronRight } from 'lucide-vue-next'
 import { allContainerDefs } from '../types/node-registry'
 import type { ContainerType } from '../types/types'
 
@@ -55,16 +55,16 @@ const groupedContainerDefs = computed(() => {
 })
 
 const categoryLabels: Record<string, string> = {
-  core: '🔧 核心',
-  data: '📊 数据',
-  flow: '🔄 流程控制',
-  browser: '🌐 浏览器',
-  office: '📋 办公',
-  system: '⚙️ 系统',
-  ai: '🤖 AI',
-  trigger: '⚡ 触发器',
-  integration: '🔗 集成',
-  other: '📦 其他',
+  core: t('category.core', '核心'),
+  data: t('category.data', '数据'),
+  flow: t('category.flow', '流程控制'),
+  browser: t('category.browser', '浏览器'),
+  office: t('category.office', '办公'),
+  system: t('category.system', '系统'),
+  ai: t('category.ai', 'AI'),
+  trigger: t('category.trigger', '触发器'),
+  integration: t('category.integration', '集成'),
+  other: t('category.other', '其他'),
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -75,7 +75,7 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="show" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" @click="emit('close')" @keydown="onKeydown">
+      <div v-if="show" class="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="add-step-dialog-title" @click="emit('close')" @keydown="onKeydown">
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--bg-base-secondary)] border border-[var(--border-neutral-l1)] rounded-lg min-w-[320px] max-w-[400px] max-h-[70vh] overflow-hidden flex flex-col" @click.stop>
           <!-- 搜索框 -->
           <div class="p-2 border-b border-[var(--border-neutral-l1)]">
@@ -86,6 +86,8 @@ function onKeydown(e: KeyboardEvent) {
                 :placeholder="t('editor.searchNodes', '搜索节点...')"
                 class="pl-8 h-8 text-sm"
                 autofocus
+                role="searchbox"
+                aria-label="搜索节点"
               />
             </div>
           </div>
@@ -107,8 +109,12 @@ function onKeydown(e: KeyboardEvent) {
                 <div
                   v-for="def in nodes"
                   :key="def.type"
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] focus-visible:bg-[var(--bg-overlay-l1)] focus-visible:outline-none"
+                  role="option"
+                  :aria-selected="false"
+                  tabindex="0"
                   @click="emit('select', def.type)"
+                  @keydown.enter.prevent="emit('select', def.type)"
                 >
                   <ActionIcon :name="def.icon" cls="w-5 h-5 shrink-0" />
                   <div class="flex-1 min-w-0">
@@ -124,8 +130,11 @@ function onKeydown(e: KeyboardEvent) {
               <div
                 v-for="def in groupedContainerDefs.baseNodes"
                 :key="def.type"
-                class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)]"
+                class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] focus-visible:bg-[var(--bg-overlay-l1)] focus-visible:outline-none"
+                role="option"
+                tabindex="0"
                 @click="emit('select', def.type)"
+                @keydown.enter.prevent="emit('select', def.type)"
               >
                 <ActionIcon :name="def.icon" cls="w-5 h-5 shrink-0" />
                 <div class="flex-1 min-w-0">
@@ -140,17 +149,21 @@ function onKeydown(e: KeyboardEvent) {
               <Button
                 variant="ghost"
                 class="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs text-[var(--text-tertiary)] justify-start"
+                :aria-expanded="showMcpNodes"
                 @click="showMcpNodes = !showMcpNodes"
               >
-                <span class="transition-transform duration-150" :class="showMcpNodes ? 'rotate-90' : ''">▶</span>
+                <ChevronRight class="w-3.5 h-3.5 transition-transform duration-150" :class="showMcpNodes ? 'rotate-90' : ''" />
                 <span>MCP 扩展 ({{ groupedContainerDefs.mcpNodes.length }})</span>
               </Button>
               <div v-if="showMcpNodes" class="space-y-0.5">
                 <div
                   v-for="def in groupedContainerDefs.mcpNodes"
                   :key="def.type"
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] ml-4"
+                  class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-[var(--bg-overlay-l1)] focus-visible:bg-[var(--bg-overlay-l1)] focus-visible:outline-none ml-4"
+                  role="option"
+                  tabindex="0"
                   @click="emit('select', def.type)"
+                  @keydown.enter.prevent="emit('select', def.type)"
                 >
                   <ActionIcon :name="def.icon" cls="w-4 h-4 shrink-0" />
                   <div class="flex-1 min-w-0">

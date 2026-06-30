@@ -39,11 +39,11 @@ const showCardMenu = ref(false)
 </script>
 
 <template>
-  <Card color="var(--color-muted-foreground)" class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
+  <Card class="mx-[var(--spacing-section-padding-x)] mt-6 shrink-0">
     <!-- Loading skeleton -->
     <div v-if="loading" class="px-4 py-3 space-y-3 animate-pulse">
-      <div class="h-5 bg-[var(--bg-overlay-l1)]/50 rounded w-1/3" />
-      <div class="h-3 bg-[var(--bg-overlay-l1)]/30 rounded w-2/3" />
+      <div class="h-5 bg-[var(--bg-overlay-l1)]/50 rounded-md w-1/3" />
+      <div class="h-3 bg-[var(--bg-overlay-l1)]/30 rounded-md w-2/3" />
     </div>
     <div v-else class="px-4 py-3">
       <!-- Row 1: Title + Actions -->
@@ -79,6 +79,7 @@ const showCardMenu = ref(false)
           class="h-7 w-7 shrink-0"
           :class="isLocked ? 'text-[var(--status-warning-default)]' : 'text-[var(--text-tertiary)]/30 hover:text-[var(--text-tertiary)]'"
           :title="isLocked ? t('editor.unlockToEdit') : t('editor.lockToPrevent')"
+          :aria-label="isLocked ? t('editor.unlockToEdit') : t('editor.lockToPrevent')"
           @click="emit('toggle-lock')"
         ><Lock v-if="isLocked" class="w-3.5 h-3.5" /><Unlock v-else class="w-3.5 h-3.5" /></Button>
 
@@ -89,7 +90,7 @@ const showCardMenu = ref(false)
         <!-- ⋯ Menu → DropdownMenu -->
         <DropdownMenu v-model:open="showCardMenu">
           <DropdownMenuTrigger as-child>
-            <Button variant="ghost" size="icon" class="h-8 w-8 opacity-50 hover:opacity-100"><Ellipsis class="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" class="h-8 w-8 opacity-50 hover:opacity-100 focus-visible:opacity-100"><Ellipsis class="w-4 h-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent class="w-44" align="end">
             <DropdownMenuItem @click="emit('save'); showCardMenu = false"><Save class="w-4 h-4 mr-2" /> {{ t('common.save') }}</DropdownMenuItem>

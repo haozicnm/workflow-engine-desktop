@@ -16,7 +16,7 @@ import SidebarMenuButton from '../components/ui/sidebar/SidebarMenuButton.vue'
 import SidebarTrigger from '../components/ui/sidebar/SidebarTrigger.vue'
 import ActionIcon from '../components/ActionIcon.vue'
 import Skeleton from '../components/ui/skeleton/Skeleton.vue'
-import { Package, History, Download, Store } from 'lucide-vue-next'
+import { Package, History, Download, Store, FolderOpen } from 'lucide-vue-next'
 import { inject, type Ref } from 'vue'
 
 const { t } = useI18n()
@@ -178,12 +178,19 @@ defineExpose({ loadList })
       <SidebarTrigger />
     </div>
     <!-- Search -->
-    <Input
-      v-if="sidebar?.open.value"
-      v-model="searchQuery"
-      :placeholder="t('nav.searchWorkflow')"
-      class="h-8 text-xs"
-    />
+    <div class="relative" v-if="sidebar?.open.value">
+      <Input
+        v-model="searchQuery"
+        :placeholder="t('nav.searchWorkflow')"
+        class="h-8 text-xs pr-8"
+      />
+      <button
+        v-if="searchQuery"
+        class="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-default)] hover:bg-[var(--bg-overlay-l2)] transition-colors duration-[0.12s]"
+        @click="searchQuery = ''"
+        :aria-label="t('common.clear')"
+      >×</button>
+    </div>
     <Button v-if="sidebar?.open.value" size="sm" class="bg-[var(--bg-brand)] text-[var(--text-onbrand)] w-full" @click="onNewWorkflow">
       ＋ {{ t('common.create') }}
     </Button>
@@ -195,14 +202,14 @@ defineExpose({ loadList })
 
       <!-- Loading skeleton -->
       <div v-if="loading" class="space-y-2 px-2">
-        <Skeleton class="h-8 w-full" />
-        <Skeleton class="h-8 w-3/4" />
-        <Skeleton class="h-8 w-1/2" />
+        <Skeleton v-for="i in 5" :key="i" class="h-8" :class="i === 5 ? 'w-1/2' : 'w-full'" />
       </div>
 
-      <!-- Empty state (no workflows at all) -->
-      <div v-else-if="workflows.length === 0" class="px-2 py-4 text-center text-xs text-[var(--text-tertiary)]">
-        {{ t('nav.noWorkflows') }}
+      <!-- Empty state -->
+      <div v-else-if="workflows.length === 0" class="flex flex-col items-center gap-2 px-4 py-8 text-center">
+        <FolderOpen class="w-8 h-8 text-[var(--text-tertiary)]/40" />
+        <div class="text-sm font-medium text-[var(--text-tertiary)]">{{ t('nav.noWorkflows') }}</div>
+        <div class="text-[11px] text-[var(--text-tertiary)]/50">{{ t('empty.createWorkflow') }}</div>
       </div>
 
       <!-- Empty search results -->

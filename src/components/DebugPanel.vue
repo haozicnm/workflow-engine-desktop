@@ -3,7 +3,7 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { safeInvoke, safeListen } from '../utils/tauri'
-import { Bug, Play, SkipForward, Square, ChevronRight, ChevronDown } from 'lucide-vue-next'
+import { Bug, Play, SkipForward, Square, ChevronRight, ChevronDown, X } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
 import Badge from './ui/badge/Badge.vue'
 import ScrollArea from './ui/scroll-area/ScrollArea.vue'
@@ -184,10 +184,10 @@ function formatValue(v: unknown): string {
     <div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-neutral-l1)] shrink-0">
       <Bug class="w-4 h-4 text-[var(--text-tertiary)]" />
       <span class="text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('debug.title') }}</span>
-      <Badge v-if="debugState === 'paused'" variant="outline" class="ml-auto text-[10px] bg-yellow-500/10 text-yellow-500 border-yellow-500/30">
+      <Badge v-if="debugState === 'paused'" variant="outline" class="ml-auto text-[10px]" style="color:var(--status-alert-default);background:var(--status-alert-surface-l1);border-color:var(--status-alert-default)">
         {{ t('debug.paused') }}
       </Badge>
-      <Badge v-else-if="debugState === 'running'" variant="outline" class="ml-auto text-[10px] bg-green-500/10 text-green-500 border-green-500/30">
+      <Badge v-else-if="debugState === 'running'" variant="outline" class="ml-auto text-[10px]" style="color:var(--status-success-default);background:var(--status-success-surface-l1);border-color:var(--status-success-default)">
         {{ t('debug.running') }}
       </Badge>
     </div>
@@ -210,7 +210,7 @@ function formatValue(v: unknown): string {
       <div v-if="currentStepId" class="px-3 py-2 border-b border-[var(--border-neutral-l1)]">
         <div class="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-1">{{ t('debug.currentStep') }}</div>
         <div class="flex items-center gap-1">
-          <span class="inline-block w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+          <span class="inline-block w-2 h-2 rounded-full bg-[var(--status-warning-default)] animate-pulse" />
           <span class="text-sm font-medium">{{ currentStepId }}</span>
         </div>
       </div>
@@ -223,12 +223,12 @@ function formatValue(v: unknown): string {
           :key="bp.id"
           class="flex items-center gap-2 py-0.5 text-sm cursor-pointer hover:bg-[var(--bg-overlay-l2)]/50 rounded px-1 -mx-1"
         >
-          <span class="inline-block w-2 h-2 rounded-full bg-red-500" />
+          <span class="inline-block w-2 h-2 rounded-full bg-[var(--status-error-default)]" />
           <span class="flex-1 truncate">{{ bp.label || bp.id }}</span>
           <Button
             variant="ghost" size="icon" class="h-5 w-5 opacity-40 hover:opacity-100"
             @click="emit('remove-breakpoint', bp.id)"
-          >×</Button>
+          ><X class="w-3 h-3" /></Button>
         </div>
       </div>
 

@@ -234,7 +234,7 @@ onUnmounted(() => {
               @dragend="a.onDragEnd"
             >
               <!-- Drag handle -->
-              <div class="w-6 flex items-center justify-center text-[var(--text-tertiary)] cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-[var(--text-default)] hover:bg-[var(--bg-overlay-l1)] active:cursor-grabbing">
+              <div class="w-6 flex items-center justify-center text-[var(--text-tertiary)] cursor-grab select-none shrink-0 rounded-l-md transition-colors hover:text-[var(--text-default)] hover:bg-[var(--bg-overlay-l1)] active:cursor-grabbing" role="button" :aria-label="t('editor.dragToReorder')">
                 <GripVertical class="w-3 h-3 shrink-0" />
               </div>
 
