@@ -279,6 +279,8 @@ function resetView() { canvas.resetView() }
       @wheel.prevent="onCanvasWheel"
       @keydown="onCanvasKeyDown"
       tabindex="0"
+      role="application"
+      aria-label="Canvas 图编辑器"
     >
       <!-- SVG 连线层 -->
       <svg
