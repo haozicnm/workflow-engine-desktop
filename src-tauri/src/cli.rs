@@ -1736,18 +1736,6 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
     let shell_allowed = cfg.execution.shell_allowed_commands.clone();
     drop(cfg);
 
-    // v8: 图执行引擎
-    if !workflow.edges.is_empty() {
-        let executor = crate::engine::executor::StepExecutor::new(
-            app.approval_store.clone(),
-            app.db.clone(),
-        );
-        let _ctx = executor.run_workflow(&workflow).await
-            .map_err(|e| format!("图执行失败: {e}"))?;
-        app.db.update_run_status(&run_id, "completed", None).map_err(|e| e.to_string())?;
-        println!("  完成 ({:.1}s) [图引擎·并行]", start.elapsed().as_secs_f64());
-        return Ok(());
-    }
     let result = scheduler::run_workflow(
         &workflow,
         &run_id,

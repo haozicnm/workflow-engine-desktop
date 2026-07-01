@@ -35,13 +35,6 @@ watch(() => props.workflow?.edges, (val) => { edgeRef.value = val || [] }, { dee
 
 const canvas = useCanvas(stepRef, edgeRef)
 
-// 回写到 workflow
-watch(edgeRef, (val) => {
-  if (props.workflow) {
-    props.workflow.edges = val
-  }
-}, { deep: true })
-
 // SVG 容器
 const svgContainer = ref<HTMLElement | null>(null)
 const selectedEdgeIdx = ref<number | null>(null)

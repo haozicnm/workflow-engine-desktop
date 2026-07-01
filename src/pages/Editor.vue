@@ -187,6 +187,7 @@ onUnmounted(() => {
       @update:editing-name="a.editingName.value = $event"
       @update:name-input="a.nameInput.value = $event"
       @finish-edit-name="a.onFinishEditName()"
+      @update-description="(val) => { if (a.workflow.value) { a.workflow.value.description = val; a.store.dirty = true } }"
       @save="handleSave()"
       @save-as="handleSaveAs()"
       @export="a.onExport()"
@@ -292,6 +293,7 @@ onUnmounted(() => {
             >
               <DebugPanel
                 :workflow-id="a.workflow.value?.id"
+                :debug-run-id="a.debugRunId()"
                 :is-running="a.isRunning.value"
                 @set-breakpoint="(stepId) => { if (a.workflow.value) { const s = a.workflow.value.steps.find(s => s.id === stepId); if (s) s.breakpoint = true } }"
                 @remove-breakpoint="(stepId) => { if (a.workflow.value) { const s = a.workflow.value.steps.find(s => s.id === stepId); if (s) s.breakpoint = false } }"
@@ -315,6 +317,7 @@ onUnmounted(() => {
           :run-states="a.store.runStates"
           @add-edge="(from, to, fromPort, toPort) => a.store.addEdge(from, to, fromPort, toPort)"
           @remove-edge="(from, to) => a.store.removeEdge(from, to)"
+          @update-node-position="(id, x, y) => { if (a.workflow.value) { const s = a.workflow.value.steps.find(s => s.id === id); if (s) s.position = { x, y } } }"
         />
       </TabsContent>
     </Tabs>

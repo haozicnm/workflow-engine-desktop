@@ -296,36 +296,19 @@ pub async fn workflow_auto_order(Json(body): Json<WorkflowAutoOrderBody>) -> Res
 }
 
 pub async fn workflow_export(Json(body): Json<WorkflowExportBody>) -> Response {
-    use crate::engine::workflow::Step;
-
-    let steps: Vec<Step> = body
+    let steps: Vec<crate::engine::workflow::Step> = body
         .nodes
         .iter()
-        .map(|n| {
-            let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
-            let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
-
-            Step {
-                id: id.to_string(),
-                name: label.to_string(),
-                step_type: node_type.to_string(),
-                config,
-                next: None,
-                retry: None,
-                timeout: None,
-                body_steps: None,
-                breakpoint: false,
-                delay: None,
-                on_error: None,
-                actions: None,
-                expanded: None,
-                condition: None,
-                condition_group: None,
-                run_condition: None,
+        .map(|n| serde_json::from_value(n.clone()).unwrap_or_else(|_| {
+            // fallback: minimal step
+            crate::engine::workflow::Step {
+                id: n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                name: n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed").to_string(),
+                step_type: n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                config: n.get("config").cloned().unwrap_or(serde_json::json!({})),
+                ..Default::default()
             }
-        })
+        }))
         .collect();
 
     let vars: Option<std::collections::HashMap<String, serde_json::Value>> =

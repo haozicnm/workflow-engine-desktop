@@ -13,6 +13,7 @@ const store = useWorkflowStore()
 
 const props = defineProps<{
   workflowId?: string
+  debugRunId?: string | null
   isRunning: boolean
 }>()
 
@@ -58,10 +59,12 @@ const breakpoints = computed(() =>
 )
 
 // ─── 调试控制 ───
+const activeRunId = computed(() => props.debugRunId || props.workflowId || null)
+
 async function onStepOver() {
-  if (!props.workflowId) return
+  if (!activeRunId.value) return
   try {
-    await safeInvoke('debug_step', { runId: props.workflowId })
+    await safeInvoke('debug_step', { runId: activeRunId.value })
     debugState.value = 'paused'
   } catch (e) {
     console.error('debug_step failed:', e)
@@ -69,9 +72,9 @@ async function onStepOver() {
 }
 
 async function onContinue() {
-  if (!props.workflowId) return
+  if (!activeRunId.value) return
   try {
-    await safeInvoke('debug_continue', { runId: props.workflowId })
+    await safeInvoke('debug_continue', { runId: activeRunId.value })
     debugState.value = 'running'
   } catch (e) {
     console.error('debug_continue failed:', e)
@@ -79,9 +82,9 @@ async function onContinue() {
 }
 
 async function onStop() {
-  if (!props.workflowId) return
+  if (!activeRunId.value) return
   try {
-    await safeInvoke('run_cancel', { runId: props.workflowId })
+    await safeInvoke('run_cancel', { runId: activeRunId.value })
     debugState.value = 'idle'
   } catch (e) {
     console.error('run_cancel failed:', e)
@@ -100,9 +103,9 @@ function toggleGroup(key: string) {
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 async function refreshVariables() {
-  if (!props.workflowId || debugState.value !== 'paused') return
+  if (!activeRunId.value || debugState.value !== 'paused') return
   try {
-    const vars = await safeInvoke<Record<string, unknown>>('debug_vars', { runId: props.workflowId })
+    const vars = await safeInvoke<Record<string, unknown>>('debug_vars', { runId: activeRunId.value })
     if (vars) {
       // debug_vars 返回 {variables: {...}, step_outputs: {...}}，需要展平
       const v = vars as Record<string, unknown>
@@ -125,6 +128,7 @@ watch(() => debugState.value, (state) => {
 // ─── SSE 监听 ───
 let unlistenBreakpoint: (() => void) | null = null
 let unlistenRun: (() => void) | null = null
+let unlistenVariable: (() => void) | null = null
 
 async function startListening() {
   unlistenBreakpoint = await safeListen<{ run_id: string; step_id: string; reason: string; variables: Record<string, unknown> }>(
@@ -134,6 +138,17 @@ async function startListening() {
       currentStepId.value = event.payload.step_id
       variables.value = event.payload.variables || {}
       callStack.value.push(event.payload.step_id)
+    }
+  )
+
+  unlistenVariable = await safeListen<{ run_id: string; variables: Record<string, unknown>; step_outputs: Record<string, unknown> }>(
+    'variable-update',
+    (event) => {
+      const v = event.payload
+      variables.value = {
+        ...(v.variables || {}),
+        ...(v.step_outputs || {}),
+      }
     }
   )
 
@@ -163,6 +178,7 @@ watch(() => props.isRunning, (running) => {
 onUnmounted(() => {
   unlistenBreakpoint?.()
   unlistenRun?.()
+  unlistenVariable?.()
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 })
 

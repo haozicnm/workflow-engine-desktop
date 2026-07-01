@@ -135,8 +135,11 @@ pub async fn workflow_save_yaml(
         }
     }
 
-    app.db.save_workflow_yaml(&id, &yaml)
-        .map_err(|e| format!("Failed to save workflow YAML (id={id}): {e}"))?;
+    // 统一存储为 JSON（与 HTTP API 一致）
+    let json_str = serde_json::to_string_pretty(&wf)
+        .map_err(|e| format!("序列化失败: {e}"))?;
+    app.db.save_workflow_yaml(&id, &json_str)
+        .map_err(|e| format!("Failed to save workflow (id={id}): {e}"))?;
 
     // v9.0: 自动同步 trigger_cron 节点到调度系统
     sync_trigger_cron_to_schedule(&app, &id, &wf);
@@ -277,36 +280,17 @@ pub async fn export_workflow(
     variables: Option<serde_json::Value>,
     output_path: Option<String>,
 ) -> Result<serde_json::Value, String> {
-    use crate::engine::workflow::Step;
-
-    // 将前端 FlowNode 转换为 Step 列表
-    let steps: Vec<Step> = nodes
+    let steps: Vec<crate::engine::workflow::Step> = nodes
         .iter()
-        .map(|n| {
-            let node_type = n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let label = n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
-            let id = n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let config = n.get("config").cloned().unwrap_or(serde_json::json!({}));
-
-            Step {
-                id: id.to_string(),
-                name: label.to_string(),
-                step_type: node_type.to_string(),
-                config,
-                next: None,
-                retry: None,
-                timeout: None,
-                body_steps: None,
-                breakpoint: false,
-                delay: None,
-                on_error: None,
-                actions: None,
-                expanded: None,
-                condition: None,
-                condition_group: None,
-                run_condition: None,
+        .map(|n| serde_json::from_value(n.clone()).unwrap_or_else(|_| {
+            crate::engine::workflow::Step {
+                id: n.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                name: n.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed").to_string(),
+                step_type: n.get("type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                config: n.get("config").cloned().unwrap_or(serde_json::json!({})),
+                ..Default::default()
             }
-        })
+        }))
         .collect();
 
     // 将 edges 也序列化到 YAML 中（作为自定义字段）

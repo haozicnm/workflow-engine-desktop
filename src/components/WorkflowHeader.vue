@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'toggle-lock': []
   'run': []
   'stop': []
+  'update-description': [val: string]
 }>()
 
 const showCardMenu = ref(false)
@@ -110,7 +111,7 @@ const showCardMenu = ref(false)
           :value="workflow.description"
           :placeholder="t('editor.descPlaceholder')"
           class="w-full text-xs text-[var(--text-tertiary)] bg-transparent border-0 outline-none placeholder:text-[var(--text-tertiary)]/40 hover:text-[var(--text-default)] transition-colors"
-          @input="workflow.description = ($event.target as HTMLInputElement).value"
+          @input="$emit('update-description', ($event.target as HTMLInputElement).value)"
         />
       </div>
     </div>

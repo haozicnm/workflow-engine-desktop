@@ -135,9 +135,17 @@ impl Database {
 
     pub fn delete_workflow(&self, id: &str) -> Result<()> {
         let conn = self.conn_ref()?;
-        // 级联删除：step_runs → runs → schedules → workflow
+        // 级联删除：step_logs → step_runs → approvals → runs → schedules → workflow
+        conn.execute(
+            "DELETE FROM step_logs WHERE step_run_id IN (SELECT id FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1))",
+            params![id],
+        )?;
         conn.execute(
             "DELETE FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
+            params![id],
+        )?;
+        conn.execute(
+            "DELETE FROM approvals WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
             params![id],
         )?;
         conn.execute("DELETE FROM runs WHERE workflow_id = ?1", params![id])?;
@@ -410,9 +418,16 @@ impl Database {
     /// 删除指定工作流的所有运行记录
     pub fn delete_runs_by_workflow(&self, workflow_id: &str) -> Result<()> {
         let conn = self.conn_ref()?;
-        // 先删 step_runs，再删 runs
+        conn.execute(
+            "DELETE FROM step_logs WHERE step_run_id IN (SELECT id FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1))",
+            params![workflow_id],
+        )?;
         conn.execute(
             "DELETE FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
+            params![workflow_id],
+        )?;
+        conn.execute(
+            "DELETE FROM approvals WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
             params![workflow_id],
         )?;
         conn.execute(

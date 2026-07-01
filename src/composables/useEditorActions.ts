@@ -14,7 +14,8 @@ import { getActionDefs } from '../types/node-registry'
 export function useEditorActions() {
   const { t } = useI18n()
   const store = useWorkflowStore()
-  const { runWorkflow, stopWorkflow, isRunning } = useStepRunner()
+  const runner = useStepRunner()
+  const { runWorkflow, stopWorkflow, isRunning } = runner
   const toast = useToast()
   const enh = useEditorEnhancements()
   const globalStatus = useGlobalStatus()
@@ -282,6 +283,7 @@ export function useEditorActions() {
     enh, globalStatus, ops, registry, toast,
     currentRunId: () => currentRunId,
     clearRunId: () => { currentRunId = null },
+    debugRunId: () => runner.runId.value,
     // Actions
     onStartEditName, onFinishEditName,
     onSave, onSaveAs, onExport, onDelete, doDelete, onToggleLock,

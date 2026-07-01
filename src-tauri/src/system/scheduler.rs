@@ -68,12 +68,11 @@ async fn check_and_run(app_handle: &AppHandle, db: &Arc<Database>) {
                     continue;
                 }
 
-                // 触发工作流执行（复用 run_start 逻辑）
+                // 触发工作流执行（复用 prepare_run 统一入口）
                 let wf_id = schedule.workflow_id.clone();
-                let db_clone = db.clone();
                 let handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    match start_scheduled_run(&db_clone, &handle_clone, &wf_id).await {
+                    match start_scheduled_run(&handle_clone, &wf_id).await {
                         Ok(run_id) => {
                             info!("定时任务已触发: workflow={} run={}", wf_id, run_id);
                         }
@@ -87,32 +86,35 @@ async fn check_and_run(app_handle: &AppHandle, db: &Arc<Database>) {
     }
 }
 
-/// 触发一次工作流执行（定时调度专用，不经过 Tauri command）
+/// 触发一次工作流执行（通过 prepare_run 统一入口，共享并发/取消控制）
 async fn start_scheduled_run(
-    db: &Arc<Database>,
-    app_handle: &AppHandle,
+    app_handle: &tauri::AppHandle,
     workflow_id: &str,
 ) -> Result<String, String> {
-    let yaml = db
-        .get_workflow_yaml(workflow_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "工作流不存在".to_string())?;
+    use tauri::Manager;
+    let app = app_handle.state::<crate::App>();
 
-    let workflow = crate::engine::parser::parse_workflow(&yaml)
-        .map_err(|e| format!("YAML 解析失败: {}", e))?;
+    let prep = crate::engine::scheduler::prepare_run(
+        &app.db,
+        &app.config,
+        &app.run_semaphore,
+        &app.cancel_flags,
+        &app.cancel_tokens,
+        &app.pause_flags,
+        &app.breakpoint_flags,
+        &app.step_mode_flags,
+        workflow_id,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    let run_id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    let workflow_name = workflow.name.clone();
-    db.create_run(&run_id, workflow_id, &workflow_name, &now)
-        .map_err(|e| e.to_string())?;
-
+    // 发射启动事件
     if let Err(e) = app_handle.emit(
         "run-update",
         serde_json::json!({
-            "run_id": run_id,
+            "run_id": prep.run_id,
             "workflow_id": workflow_id,
-            "workflow_name": workflow_name,
+            "workflow_name": prep.workflow_name,
             "status": "running",
             "trigger": "schedule",
         }),
@@ -120,53 +122,50 @@ async fn start_scheduled_run(
         warn!("emit run-update failed: {}", e);
     }
 
-    // 读取超时配置
-    use tauri::Manager;
-    let app_state = app_handle.state::<crate::App>();
-    let config_guard = app_state.config.read().await;
-    let timeouts = config_guard.timeouts.clone();
-    let shell_allowed = config_guard.execution.shell_allowed_commands.clone();
-    drop(config_guard);
-
-    let run_id_clone = run_id.clone();
-    let db_clone = db.clone();
+    let run_id = prep.run_id.clone();
+    let db = app.db.clone();
+    let approval_store = app.approval_store.clone();
+    let cancel_flags = app.cancel_flags.clone();
+    let cancel_tokens = app.cancel_tokens.clone();
+    let pause_flags = app.pause_flags.clone();
+    let breakpoint_flags = app.breakpoint_flags.clone();
+    let step_mode_flags = app.step_mode_flags.clone();
+    let debug_snapshots = app.debug_snapshots.clone();
     let handle_clone = app_handle.clone();
-    let approval_store = app_handle.state::<crate::App>().approval_store.clone();
+
     tauri::async_runtime::spawn(async move {
-        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let cancel_token = tokio_util::sync::CancellationToken::new();
-        let pause_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let breakpoint_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let step_mode_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let debug_snapshots =
-            std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+        let _permit = prep.permit;
         let ctrl = crate::engine::scheduler::RunControl {
-            cancel_flag,
-            cancel_token,
-            pause_flag,
-            breakpoint_flag,
-            step_mode_flag,
+            cancel_flag: prep.cancel_flag,
+            cancel_token: prep.cancel_token,
+            pause_flag: prep.pause_flag,
+            breakpoint_flag: prep.breakpoint_flag,
+            step_mode_flag: prep.step_mode_flag,
             debug_snapshots,
         };
         match crate::engine::scheduler::run_workflow(
-            &workflow,
-            &run_id_clone,
+            &prep.workflow,
+            &run_id,
             Some(&handle_clone),
-            &db_clone,
+            &db,
             approval_store,
             &[],
             &ctrl,
-            &timeouts,
-            &shell_allowed,
+            &prep.timeouts,
+            &prep.shell_allowed_commands,
         )
         .await
         {
-            Ok(_) => info!("定时工作流执行完成: {}", run_id_clone),
+            Ok(_) => info!("定时工作流执行完成: {}", run_id),
             Err(e) => {
-                error!("定时工作流执行失败: {} - {}", run_id_clone, e);
-                // run_workflow 内部已发射 run-update 事件，此处不再重复
+                error!("定时工作流执行失败: {} - {}", run_id, e);
             }
         }
+        cancel_flags.write().await.remove(&run_id);
+        cancel_tokens.write().await.remove(&run_id);
+        pause_flags.write().await.remove(&run_id);
+        breakpoint_flags.write().await.remove(&run_id);
+        step_mode_flags.write().await.remove(&run_id);
     });
 
     Ok(run_id)

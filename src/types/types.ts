@@ -138,6 +138,8 @@ export interface Step {
   retry?: { max_retries?: number; delay_ms?: number }
   // 步骤超时（毫秒）
   timeout?: number
+  // Canvas 节点位置
+  position?: NodePosition
 }
 
 // ─── 边的定义（v8.2 Canvas 图编辑器） ───

@@ -64,8 +64,21 @@ function onParamChange(key: string, value: unknown) {
     </CardHeader>
 
     <CardContent class="px-4 pb-4 pt-0">
-      <!-- Param fields (with variable refs!) -->
-      <div v-if="containerDef.params.length > 0" class="space-y-3">
+      <!-- ParamDefs (新格式，优先级更高) -->
+       <div v-if="containerDef.paramDefs && containerDef.paramDefs.length > 0" class="space-y-3">
+         <ParamField
+           v-for="pd in containerDef.paramDefs"
+           :key="pd.name"
+           :param-def="pd"
+           :model-value="localConfig[pd.name] ?? pd.default"
+           :grouped-refs="groupedRefs"
+           :sibling-values="localConfig"
+           @update:model-value="v => onParamChange(pd.name, v)"
+         />
+       </div>
+
+      <!-- Param fields (legacy params, with variable refs!) -->
+      <div v-else-if="containerDef.params.length > 0" class="space-y-3">
         <ParamField
           v-for="param in containerDef.params"
           :key="param.key"

@@ -1,5 +1,27 @@
 # Changelog
 
+## v9.0.4 (2026-07-02)
+
+### 🏗 大框架统一 (5 项)
+
+- **统一 DAG 执行引擎**: CLI `run-file` 改用 `scheduler::run_workflow()`，消除两套并行 DAG 引擎
+- **统一 workflow_save_yaml 格式**: Tauri 命令也存 JSON，与 HTTP API 保持一致
+- **定时调度走 prepare_run**: 共享并发限制/取消/暂停控制，不再绕过安全机制
+- **DebugPanel 传入真正的 run_id**: 断点调试使用 `run_start` 返回的 run_id 而非 workflow_id
+- **variable-update SSE 事件监听**: DebugPanel 实时接收变量更新，替代轮询方案
+
+### ✨ 细节打磨 (7 项)
+
+- **节点位置持久化**: Step 增加 `position` 字段，Canvas 拖拽布局保存后不丢失
+- **description 触发 dirty**: WorkflowHeader 描述修改正确标记未保存状态
+- **ContainerConfigPanel 支持 paramDefs**: 与 StepCard 保持一致，支持新格式参数定义
+- **Edge 同步路径清理**: 移除 CanvasEditor 中冗余的 watch 写回逻辑
+- **导出字段补全**: 导出时保留 `run_condition`/`body_steps`/`on_error` 等字段
+- **级联删除完善**: `delete_workflow`/`delete_runs` 补删 `step_logs`/`approvals` 表
+- **useCanvas 加载已保存位置**: 有位置数据的节点跳过自动布局
+
+**Stats:** 14 files changed, +172 / -160 lines since v9.0.3
+
 ## v9.0.3 (2026-06-25)
 
 ### 🔧 Bug Fixes — 前后端对齐 + 逻辑链完整性修复 (10 项)

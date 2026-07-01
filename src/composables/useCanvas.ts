@@ -35,25 +35,38 @@ export function useCanvas(
     const stepList = steps.value
     const edgeList = edges.value || []
     const positions = new Map<string, NodePosition>()
+    const unsavedSteps: Step[] = []
 
-    if (edgeList.length === 0) {
-      // Linear layout: vertical stack
-      stepList.forEach((step, i) => {
-        positions.set(step.id, { x: 100, y: 40 + i * (nodeHeight + verticalSpacing) })
-      })
-    } else {
-      // Topological layout: group nodes by topological layers
-      const levels = computeLevels(stepList, edgeList)
-      levels.forEach((levelSteps, levelIndex) => {
-        const totalWidth = levelSteps.length * (nodeWidth + horizontalSpacing) - horizontalSpacing
-        const startX = Math.max(100, (totalWidth < 800 ? 800 - totalWidth : 0) / 2 + 100)
-        levelSteps.forEach((stepId, i) => {
-          positions.set(stepId, {
-            x: startX + i * (nodeWidth + horizontalSpacing),
-            y: 40 + levelIndex * (nodeHeight + verticalSpacing * 2),
+    // 先加载已保存的位置
+    for (const step of stepList) {
+      if (step.position) {
+        positions.set(step.id, step.position)
+      } else {
+        unsavedSteps.push(step)
+      }
+    }
+
+    // 只对没有保存位置的步骤进行自动布局
+    if (unsavedSteps.length > 0) {
+      if (edgeList.length === 0) {
+        unsavedSteps.forEach((step, i) => {
+          positions.set(step.id, { x: 100, y: 40 + i * (nodeHeight + verticalSpacing) })
+        })
+      } else {
+        const levels = computeLevels(stepList, edgeList)
+        levels.forEach((levelSteps, levelIndex) => {
+          const totalWidth = levelSteps.length * (nodeWidth + horizontalSpacing) - horizontalSpacing
+          const startX = Math.max(100, (totalWidth < 800 ? 800 - totalWidth : 0) / 2 + 100)
+          levelSteps.forEach((stepId, i) => {
+            if (!positions.has(stepId)) {
+              positions.set(stepId, {
+                x: startX + i * (nodeWidth + horizontalSpacing),
+                y: 40 + levelIndex * (nodeHeight + verticalSpacing * 2),
+              })
+            }
           })
         })
-      })
+      }
     }
 
     nodePositions.value = positions
