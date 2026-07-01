@@ -1,6 +1,6 @@
 {
     "productName":  "Workflow Engine",
-    "version": "9.0.4",
+    "version": "9.0.5",
     "identifier":  "com.workflow-engine.desktop",
     "build":  {
                   "frontendDist":  "../dist",
