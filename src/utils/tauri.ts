@@ -29,6 +29,7 @@ const FIXED_ROUTES: Record<string, RouteEntry> = {
   approval_list_pending: { method: 'GET',    path: '/api/approvals/pending' },
   approval_response:     { method: 'POST',   path: '/api/approvals/respond' },
   node_list_types:       { method: 'GET',    path: '/api/nodes/types' },
+  node_schema:           { method: 'GET',    path: '/api/nodes/schema' },
   settings_get:          { method: 'GET',    path: '/api/settings' },
   settings_update:       { method: 'PUT',    path: '/api/settings' },
   check_ipc:             { method: 'GET',    path: '/api/system/check-ipc' },

@@ -12,10 +12,8 @@ import {
   CONTAINER_DEFS,
 } from '@/types/node-registry'
 import { setRegistryDefs } from '@/types/registry-state'
+import { safeInvoke } from '@/utils/tauri'
 import type { ContainerDef, ContainerType } from '@/types/types'
-
-// GUI mode: 19529, standalone: 19528
-const API_BASE = (window as any).__TAURI_INTERNALS__ ? 'http://localhost:19529' : 'http://localhost:19528'
 
 // ─── Schema 节点原始类型 ───
 
@@ -103,10 +101,7 @@ export async function syncNodeSchema(): Promise<number> {
   if (_loaded) return _mergedDefs.length
 
   try {
-    const resp = await fetch(`${API_BASE}/api/nodes/schema`)
-    if (!resp.ok) return 0
-
-    const schema: SchemaFile = await resp.json()
+    const schema = await safeInvoke<SchemaFile>('node_schema')
     if (!schema?.nodes?.length) return 0
 
     _schemaFile = schema

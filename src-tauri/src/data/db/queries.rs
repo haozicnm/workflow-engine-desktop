@@ -203,6 +203,15 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_run_current_step(&self, run_id: &str, step_id: &str) -> Result<()> {
+        let conn = self.conn_ref()?;
+        conn.execute(
+            "UPDATE runs SET current_step = ?1 WHERE id = ?2",
+            params![step_id, run_id],
+        )?;
+        Ok(())
+    }
+
     /// 启动时清理 running 状态 — 标记为 crashed
     pub fn cleanup_running_on_startup(&self) -> Result<usize> {
         let now = chrono::Utc::now().to_rfc3339();

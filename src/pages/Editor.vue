@@ -158,6 +158,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('keydown', onKeydown)
   unlistenLogStep?.()
   unlistenLogRun?.()
   const runId = a.currentRunId()
@@ -172,7 +173,6 @@ onUnmounted(() => {
   <div
     class="flex-1 flex flex-col bg-[var(--bg-base-default)] text-[var(--text-default)] overflow-hidden min-h-0"
     tabindex="0"
-    @keydown="onKeydown"
   >
     <!-- Workflow Header -->
     <WorkflowHeader

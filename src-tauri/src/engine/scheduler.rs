@@ -680,6 +680,7 @@ pub async fn run_workflow(
         if let Err(e) = db.create_step_run(run_id, &current_id) {
             warn!("DB create_step failed: {}", e);
         }
+        let _ = db.update_run_current_step(run_id, &current_id);
         emit_step_update(
             app_handle,
             run_id,
@@ -891,6 +892,7 @@ async fn run_dag_workflow(
             // 通知前端：步骤开始
             state.mark_step_running(node_id);
             let _ = db.create_step_run(run_id, node_id);
+            let _ = db.update_run_current_step(run_id, node_id);
             emit_step_update(app_handle, run_id, node_id, &step.name, total_steps, "running", None);
 
             // 延迟
@@ -1005,8 +1007,11 @@ async fn run_dag_workflow(
                                     ctx.set_output(&node_id, serde_json::Value::Null);
                                     state.mark_step_completed(&node_id);
                                     dag.complete_node(&node_id, None);
-                                    // 错误分支目标节点直接标记完成（避免被阻断）并记录
-                                    tracing::warn!("DAG on_error:branch → {} (已记录，分支节点将在下轮调度中执行)", step_id);
+                                    // 将分支目标节点加入就绪队列
+                                    if let Some(count) = dag.block_count.get_mut(&step_id) {
+                                        *count = 0;
+                                        dag.ready.push_back(step_id.clone());
+                                    }
                                 }
                                 _ => {
                                     // Fail → 整体失败
