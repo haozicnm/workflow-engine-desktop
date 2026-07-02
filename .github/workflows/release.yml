@@ -25,7 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
           cache: npm
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -132,7 +131,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
           cache: npm
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
