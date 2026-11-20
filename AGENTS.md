@@ -1,4 +1,4 @@
-# AGENTS.md — Workflow Engine v9.0.2
+# AGENTS.md — Workflow Engine v9.1.1
 
 ## Purpose
 
@@ -13,7 +13,7 @@ v8.0 新增**图执行引擎**（拓扑分层+并行执行），同时保持线�
 - **数据库**：SQLite (rusqlite, WAL 模式)
 - **脚本引擎**：Rhai (内置表达式求值)
 - **浏览器自动化**：Playwright Python sidecar (39 种动作)
-- **当前版本**：8.4.1 | FORMAT_VERSION: 2.0
+- **当前版本**：9.1.1 | FORMAT_VERSION: 2.0
 
 ## Build & Test Commands
 
@@ -23,10 +23,10 @@ v8.0 新增**图执行引擎**（拓扑分层+并行执行），同时保持线�
 # 检查编译
 cd src-tauri && cargo check --workspace
 
-# 运行测试
-cd src-tauri && cargo test --lib
+# 快速运行库测试（不能替代完整回归）
+cargo test --lib
 
-# 运行全部测试（含集成测试）
+# 完整回归测试（含集成测试；发布前必须运行）
 cargo test
 
 # 构建 CLI
@@ -41,7 +41,8 @@ cargo build --release
 ```bash
 npm install
 npm run dev      # 开发服务器
-npm run build    # 生产构建
+npm test         # Vitest 测试
+npm run build    # 类型检查 + 生产构建
 ```
 
 ## Architecture
@@ -102,9 +103,9 @@ pub struct Workflow {
 | `src-tauri/src/engine/executor.rs` | **核心执行器**：`run_workflow()` 入口，`topological_levels()` 拓扑排序，`run_parallel_level()` 并行执行，`validate_variable_references()` 变量校验 |
 | `src-tauri/src/engine/workflow.rs` | 数据模型：`Step`, `Edge`, `Position`, `Workflow` |
 | `src-tauri/src/nodes/traits.rs` | **节点 trait**：`NodeExecutor` (execute/type_def/validate_config)，`NodeTypeDef`, `PortDef` |
-| `src-tauri/src/nodes/` | 34+ 节点实现（http/script/condition/data/loop/shell/delay/file/...） |
+| `src-tauri/src/nodes/` | 数十种节点实现，覆盖 HTTP、脚本、数据处理、AI/检索、系统集成等场景 |
 | `src-tauri/src/cli.rs` | CLI 实现：`wf-cli run-file` 自动识别图/线性模式 |
-| `src-tauri/node-schema.json` | 节点元数据 schema |
+| `src-tauri/node-schema.json` | 节点元数据 schema，与节点注册表由一致性测试校验 |
 | `src-tauri/Cargo.toml` | Rust 依赖 + 版本号 |
 | `src/` | Vue 3 前端 |
 
@@ -206,13 +207,13 @@ pub trait NodeExecutor: Send + Sync {
 
 ## 向后兼容约定
 
-- **34 个现有节点**：无需任何改动即可编译通过
+- **节点类型**：具体可用类型以 `node-schema.json` 和节点注册表为准；GUI feature 会影响少数原生类型的注册
 - **线性链工作流**：`edges` 为空时自动回退线性执行
 - **FORMAT_VERSION**：2.0 格式兼容 1.0 旧文件
-- **破坏性变更**：无
 
 ## CI
 
-- **Release**：`push tag v*` 触发，构建 Windows (exe) + Linux ARM64 (deb)
-- **Build**：`push main` 触发，构建 Windows standalone
-- **CI 工作流**：`.github/workflows/release.yml`, `build-standalone.yml`, `build-arm64.yml`
+- **CI**：`main` 分支 push、PR 及手动触发；执行 GUI feature check、完整 `cargo test`、前端测试和生产构建，Rust 工具链固定为 1.95.0
+- **Release**：`push tag v*` 触发，构建 Windows 安装包及 Linux 发布产物
+- **Standalone / ARM64**：手动触发，分别构建 Windows standalone 和 Linux ARM64 deb
+- **CI 工作流**：`.github/workflows/ci.yml`, `release.yml`, `build-standalone.yml`, `build-arm64.yml`

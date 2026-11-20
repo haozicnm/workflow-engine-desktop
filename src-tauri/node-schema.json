@@ -2207,6 +2207,240 @@
       }
     },
     {
+      "type": "llm_agent",
+      "label": "AI Agent",
+      "category": "ai",
+      "icon": "brain",
+      "description": "简单 AI Agent — 循环调用 LLM 直到得到最终答案（工具调用循环）",
+      "inputs": [
+        {"name": "prompt", "data_type": "text", "required": false, "desc": "用户提示词"}
+      ],
+      "outputs": [
+        {"name": "answer", "data_type": "text", "desc": "最终答案"},
+        {"name": "steps", "data_type": "json", "desc": "各轮响应记录"},
+        {"name": "iterations", "data_type": "number", "desc": "迭代轮数"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "api_key": { "type": "string", "required": true },
+          "api_url": { "type": "string", "default": "https://api.openai.com/v1/chat/completions" },
+          "model": { "type": "string", "default": "gpt-4o" },
+          "system_prompt": { "type": "string", "default": "You are a helpful assistant." },
+          "prompt": { "type": "string" },
+          "max_iterations": { "type": "number", "default": 5 },
+          "temperature": { "type": "number", "default": 0.7 }
+        },
+        "required": ["api_key"]
+      }
+    },
+    {
+      "type": "llm_embedding",
+      "label": "文本嵌入",
+      "category": "ai",
+      "icon": "brain",
+      "description": "生成文本嵌入向量（OpenAI-compatible embedding API）",
+      "inputs": [
+        {"name": "text", "data_type": "text", "required": false, "desc": "要嵌入的文本"}
+      ],
+      "outputs": [
+        {"name": "embedding", "data_type": "json", "desc": "嵌入向量"},
+        {"name": "dimensions", "data_type": "number", "desc": "向量维度"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "api_key": { "type": "string", "description": "API Key 或从环境变量 EMBEDDING_API_KEY 读取" },
+          "api_url": { "type": "string", "default": "https://api.openai.com/v1/embeddings" },
+          "model": { "type": "string", "default": "text-embedding-3-small" },
+          "text": { "type": "string", "description": "要嵌入的文本" }
+        },
+        "required": ["api_key"]
+      }
+    },
+    {
+      "type": "text_splitter",
+      "label": "文本分块",
+      "category": "ai",
+      "icon": "scissors",
+      "description": "将长文本按 chunk_size 分割为多个块（用于 RAG 文档处理）",
+      "inputs": [
+        {"name": "text", "data_type": "text", "required": false, "desc": "要分块的文本"}
+      ],
+      "outputs": [
+        {"name": "chunks", "data_type": "json", "desc": "文本块数组"},
+        {"name": "count", "data_type": "number", "desc": "文本块数量"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "要分块的文本" },
+          "chunk_size": { "type": "number", "default": 1000, "description": "每块最大字符数" },
+          "chunk_overlap": { "type": "number", "default": 200, "description": "块之间重叠字符数" },
+          "separator": { "type": "string", "default": "\n", "description": "优先分割符" }
+        }
+      }
+    },
+    {
+      "type": "json_schema_extract",
+      "label": "JSON Schema 提取",
+      "category": "ai",
+      "icon": "braces",
+      "description": "从 LLM 输出文本中提取结构化 JSON（支持 schema 校验）",
+      "inputs": [
+        {"name": "text", "data_type": "text", "required": false, "desc": "LLM 输出文本"}
+      ],
+      "outputs": [
+        {"name": "data", "data_type": "json", "desc": "提取的结构化数据"},
+        {"name": "valid", "data_type": "bool", "desc": "是否通过字段或 Schema 校验"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "LLM 输出文本" },
+          "schema": { "type": "object", "description": "期望的 JSON Schema（可选，用于校验）" },
+          "fields": { "type": "array", "description": "期望的字段名列表（可选，轻量校验）" }
+        }
+      }
+    },
+    {
+      "type": "vector_store",
+      "label": "向量存储",
+      "category": "ai",
+      "icon": "database",
+      "description": "向量存储操作（add/search/delete）— 基于 SQLite 本地存储",
+      "inputs": [
+        {"name": "embedding", "data_type": "json", "required": false, "desc": "add/search: 向量"},
+        {"name": "text", "data_type": "text", "required": false, "desc": "add: 要存储的文本"}
+      ],
+      "outputs": [
+        {"name": "results", "data_type": "json", "desc": "search 返回的记录"},
+        {"name": "count", "data_type": "number", "desc": "search/list 返回的数量"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["add", "search", "delete", "list"], "default": "add" },
+          "collection": { "type": "string", "default": "default", "description": "集合名称" },
+          "db_path": { "type": "string", "default": "vectors.db", "description": "SQLite 数据库路径" },
+          "text": { "type": "string", "description": "add: 要存储的文本" },
+          "embedding": { "type": "array", "description": "add/search: 向量" },
+          "top_k": { "type": "number", "default": 5, "description": "search: 返回前 K 个结果" }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "type": "rag_query",
+      "label": "RAG 查询",
+      "category": "ai",
+      "icon": "search",
+      "description": "RAG 检索增强生成 — 从向量存储检索相关文档，拼接为上下文发送给 LLM",
+      "inputs": [
+        {"name": "query", "data_type": "text", "required": false, "desc": "查询问题"}
+      ],
+      "outputs": [
+        {"name": "answer", "data_type": "text", "desc": "LLM 生成的回答"},
+        {"name": "context", "data_type": "text", "desc": "发送给 LLM 的检索上下文"},
+        {"name": "sources", "data_type": "json", "desc": "检索到的源文档"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "查询问题" },
+          "collection": { "type": "string", "default": "default" },
+          "db_path": { "type": "string", "default": "vectors.db" },
+          "top_k": { "type": "number", "default": 3 },
+          "api_key": { "type": "string", "required": true },
+          "api_url": { "type": "string", "default": "https://api.openai.com/v1/chat/completions" },
+          "model": { "type": "string", "default": "gpt-4o" }
+        },
+        "required": ["api_key"]
+      }
+    },
+    {
+      "type": "redis",
+      "label": "Redis",
+      "category": "data",
+      "icon": "database",
+      "description": "Redis 键值操作（get/set/del/keys/lpush/rpush）",
+      "inputs": [
+        {"name": "value", "data_type": "text", "required": false, "desc": "set/lpush/rpush 的值"}
+      ],
+      "outputs": [
+        {"name": "result", "data_type": "json", "desc": "Redis API 响应"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["get", "set", "del", "keys", "lpush", "rpush", "lrange", "incr"], "default": "get" },
+          "key": { "type": "string", "description": "Redis key" },
+          "value": { "type": "string", "description": "set/lpush/rpush 的值" },
+          "ttl": { "type": "number", "description": "set 的过期时间(秒)" },
+          "pattern": { "type": "string", "default": "*", "description": "keys 的匹配模式" },
+          "start": { "type": "number", "default": 0, "description": "lrange 起始" },
+          "stop": { "type": "number", "default": -1, "description": "lrange 结束" },
+          "api_url": { "type": "string", "default": "http://localhost:8001", "description": "Redis HTTP API 地址（如 http://localhost:8001）" }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "type": "mongodb",
+      "label": "MongoDB",
+      "category": "data",
+      "icon": "database",
+      "description": "MongoDB 文档操作（find/insert/update/delete）",
+      "inputs": [
+        {"name": "document", "data_type": "json", "required": false, "desc": "insert 的文档或 update 的更新操作"}
+      ],
+      "outputs": [
+        {"name": "results", "data_type": "json", "desc": "MongoDB API 响应"},
+        {"name": "count", "data_type": "number", "desc": "响应中的结果数量"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["find", "insert", "update", "delete", "count"], "default": "find" },
+          "collection": { "type": "string", "required": true, "description": "集合名称" },
+          "filter": { "type": "object", "description": "find/update/delete 的查询条件" },
+          "document": { "type": "object", "description": "insert 的文档" },
+          "update": { "type": "object", "description": "update 的更新操作" },
+          "limit": { "type": "number", "default": 100 },
+          "api_url": { "type": "string", "default": "http://localhost:8002", "description": "MongoDB HTTP API 地址" }
+        },
+        "required": ["action", "collection"]
+      }
+    },
+    {
+      "type": "s3",
+      "label": "S3 对象存储",
+      "category": "data",
+      "icon": "cloud",
+      "description": "S3/MinIO/阿里云 OSS 对象存储操作（upload/download/list/delete）",
+      "inputs": [
+        {"name": "content", "data_type": "text", "required": false, "desc": "upload 的内容"}
+      ],
+      "outputs": [
+        {"name": "url", "data_type": "text", "desc": "上传或预签名对象 URL"},
+        {"name": "objects", "data_type": "json", "desc": "list 返回的对象列表"}
+      ],
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string", "enum": ["upload", "download", "list", "delete", "presign"], "default": "upload" },
+          "bucket": { "type": "string", "required": true },
+          "key": { "type": "string", "description": "对象 key" },
+          "content": { "type": "string", "description": "upload 的内容" },
+          "prefix": { "type": "string", "default": "", "description": "list 的前缀" },
+          "api_url": { "type": "string", "default": "http://localhost:9000", "description": "S3 兼容 API 地址" },
+          "access_key": { "type": "string" },
+          "secret_key": { "type": "string" }
+        },
+        "required": ["action", "bucket"]
+      }
+    },
+    {
       "type": "trigger_cron",
       "label": "定时触发器",
       "category": "trigger",

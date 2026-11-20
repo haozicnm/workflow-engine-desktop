@@ -14,9 +14,7 @@ fn test_data(path: &str) -> String {
 /// 辅助函数：构建最小 Step
 fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -> Step {
     // 从 config 中提取 actions（如果存在），传给 step.actions 字段
-    let actions = config
-        .get("actions")
-        .and_then(|a| a.as_array()).cloned();
+    let actions = config.get("actions").and_then(|a| a.as_array()).cloned();
 
     Step {
         id: id.to_string(),
@@ -47,7 +45,7 @@ fn make_step(id: &str, name: &str, step_type: &str, config: serde_json::Value) -
 async fn test_excel_read() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-excel-read", &Default::default());
     let step = make_step(
@@ -79,7 +77,7 @@ async fn test_excel_read() {
 async fn test_excel_sheets() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-excel-sheets", &Default::default());
     let step = make_step(
@@ -113,16 +111,21 @@ async fn test_excel_sheets() {
 async fn test_word_replace() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-word-replace", &Default::default());
+    let temp_dir = std::env::temp_dir().join(format!("wf-word-test-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let word_path = temp_dir.join("report_template.docx");
+    std::fs::copy(test_data("report_template.docx"), &word_path).unwrap();
+    let word_path = word_path.to_string_lossy().replace('\\', "/");
 
     let step = make_step(
         "word1",
         "替换Word",
         "word",
         json!({
-            "file_path": test_data("report_template.docx"),
+            "file_path": word_path,
             "actions": [
                 {"id": "a1", "type": "replace", "label": "替换", "config": {
                     "old_text": "{{DATE}}",
@@ -162,7 +165,7 @@ async fn test_variable_set_get() {
 async fn test_logic_equals() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-logic-eq", &Default::default());
 
@@ -190,7 +193,7 @@ async fn test_logic_equals() {
 async fn test_logic_not_empty() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-logic-ne", &Default::default());
 
@@ -221,7 +224,7 @@ async fn test_logic_not_empty() {
 async fn test_script_arithmetic() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-script", &Default::default());
 
@@ -247,7 +250,7 @@ async fn test_script_arithmetic() {
 async fn test_mcp_script_basic() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-mcp", &Default::default());
 
@@ -280,7 +283,7 @@ async fn test_mcp_script_basic() {
 async fn test_loop_simple() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-loop", &Default::default());
 
@@ -311,7 +314,7 @@ async fn test_loop_simple() {
 async fn test_loop_collect() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-loop-collect", &Default::default());
 
@@ -358,7 +361,7 @@ async fn test_loop_collect() {
 async fn test_while_stops_on_empty() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-while", &Default::default());
 
@@ -392,7 +395,7 @@ async fn test_while_stops_on_empty() {
 async fn test_parallel_branches() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-parallel", &Default::default());
 
@@ -445,14 +448,15 @@ async fn test_parallel_branches() {
 }
 
 // ═══════════════════════════════════════════════════
-// HTTP 节点测试 (需要网络)
+// HTTP 节点测试（仅手动运行，避免公网影响默认回归套件）
 // ═══════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "依赖外部 httpbin 服务；默认回归套件不访问公网"]
 async fn test_http_get() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-http", &Default::default());
 
@@ -579,7 +583,7 @@ fn test_resolve_keeps_type() {
 async fn test_full_pipeline() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("pipeline", &Default::default());
 
@@ -643,7 +647,7 @@ async fn test_full_pipeline() {
 async fn test_map_node() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-map", &Default::default());
 
@@ -670,7 +674,7 @@ async fn test_map_node() {
 async fn test_map_node_logic_operators() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-map-logic", &Default::default());
 
@@ -729,7 +733,7 @@ async fn test_map_node_logic_operators() {
 async fn test_delay_node() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-delay", &Default::default());
 
@@ -763,7 +767,7 @@ async fn test_delay_node() {
 async fn test_delay_node_max_limit() {
     let executor = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-delay-max", &Default::default());
 
@@ -817,11 +821,11 @@ async fn run_chain(
 }
 
 #[tokio::test]
-async fn test_main_chain_shell_to_notify() {
-    // 测试主链路: shell → json_parse → script → logic → notify
+async fn test_main_chain_script_to_condition() {
+    // 测试主链路: script → script → condition → script
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-main-chain", &Default::default());
 
@@ -910,7 +914,7 @@ async fn test_main_chain_shell_to_notify() {
 async fn test_loop_iteration_and_aggregation() {
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-loop", &Default::default());
 
@@ -962,7 +966,7 @@ async fn test_loop_iteration_and_aggregation() {
 async fn test_loop_max_iterations_limit() {
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-loop-limit", &Default::default());
 
@@ -1013,7 +1017,7 @@ async fn test_loop_max_iterations_limit() {
 async fn test_approval_with_conditions_auto() {
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-approval-auto", &Default::default());
 
@@ -1084,7 +1088,7 @@ async fn test_approval_with_conditions_auto() {
 async fn test_onerror_ignore_resilience() {
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
     let mut ctx = ExecutionContext::new("test-onerror-ignore", &Default::default());
 
@@ -1145,30 +1149,33 @@ async fn test_onerror_ignore_resilience() {
 async fn test_params_variable_injection() {
     let exec = StepExecutor::new(
         std::sync::Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        std::sync::Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+        std::sync::Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
     );
+
+    let test_root = tempfile::tempdir().unwrap();
+    let test_dir = test_root.path().join("wf-test-params");
 
     // 模拟 workflow JSON params 被反序列化为 variables
     let wf = workflow_engine::engine::workflow::Workflow {
         name: "test-params".into(),
         variables: Some({
             let mut m = std::collections::HashMap::new();
-            m.insert("test_dir".to_string(), json!("/tmp/wf-test-params"));
+            m.insert("test_dir".to_string(), json!(test_dir.to_string_lossy()));
             m.insert("threshold".to_string(), json!(42));
-            Some(m).unwrap()
+            m
         }),
         ..Default::default()
     };
     let mut ctx = ExecutionContext::new("test-params-inject", &wf);
 
-    // shell 中使用 {{params.test_dir}}（平台自适应：Unix mkdir -p / Windows mkdir）
+    // Windows shell 中使用 {{params.test_dir}}，路径带引号以兼容空格。
     let shell_step = make_step(
         "step_1",
         "创建目录",
         "shell",
         json!({
-            "command": "mkdir {{params.test_dir}} 2>NUL & echo created",
-            "shell": "cmd",
+            "command": "New-Item -ItemType Directory -Force -Path '{{params.test_dir}}' | Out-Null; Write-Output created",
+            "shell": "powershell",
             "timeout_secs": 5
         }),
     );
@@ -1185,6 +1192,12 @@ async fn test_params_variable_injection() {
     assert!(
         stdout.contains("created"),
         "Shell should execute with resolved path"
+    );
+    assert!(
+        test_dir.is_dir(),
+        "shell should create {}: output={}",
+        test_dir.display(),
+        out
     );
 
     // script 中直接访问 variables（Rhai scope 中 variables 平铺为顶层变量）

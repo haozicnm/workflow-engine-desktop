@@ -149,10 +149,7 @@ fn cursor_done_false_returns_none() {
 #[test]
 fn cursor_done_true_continues() {
     let step = make_step_with_next("cur1", "cursor", "notify1");
-    let wf = make_workflow(vec![
-        step.clone(),
-        make_step("notify1", "notify", json!({})),
-    ]);
+    let wf = make_workflow(vec![step.clone(), make_step("notify1", "delay", json!({}))]);
 
     let mut ctx = new_ctx();
     ctx.set_output("cur1", json!({"done": true}));
@@ -363,7 +360,7 @@ fn http_step_uses_next_field() {
 #[test]
 fn script_step_falls_back_to_list() {
     let step = make_step("sc1", "script", json!({"script": "1+1"}));
-    let wf = make_workflow(vec![step.clone(), make_step("sc2", "notify", json!({}))]);
+    let wf = make_workflow(vec![step.clone(), make_step("sc2", "delay", json!({}))]);
 
     let ctx = new_ctx();
     let next = determine_next_step(&step, &wf, &ctx);
@@ -372,7 +369,7 @@ fn script_step_falls_back_to_list() {
 
 #[test]
 fn notify_step_last_in_list_returns_none() {
-    let step = make_step("n1", "notify", json!({}));
+    let step = make_step("n1", "delay", json!({}));
     let wf = make_workflow(vec![step.clone()]);
 
     let ctx = new_ctx();

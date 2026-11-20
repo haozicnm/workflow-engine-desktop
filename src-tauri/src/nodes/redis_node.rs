@@ -37,7 +37,7 @@ impl NodeExecutor for RedisNode {
                     "pattern": { "type": "string", "default": "*", "description": "keys 的匹配模式" },
                     "start": { "type": "number", "default": 0, "description": "lrange 起始" },
                     "stop": { "type": "number", "default": -1, "description": "lrange 结束" },
-                    "api_url": { "type": "string", "description": "Redis HTTP API 地址（如 http://localhost:8001）" }
+                    "api_url": { "type": "string", "default": "http://localhost:8001", "description": "Redis HTTP API 地址（如 http://localhost:8001）" }
                 },
                 "required": ["action"]
             }),

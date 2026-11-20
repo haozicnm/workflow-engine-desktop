@@ -702,6 +702,28 @@ mod tests {
     }
 
     #[test]
+    fn all_native_registered_types_have_schema_entries() {
+        let exec = StepExecutor::new(test_approval_store(), test_db());
+
+        // MCP 内置别名和外挂映射由 mcp_node 动态提供，不属于静态 schema。
+        // 容器父类型不在豁免范围内，仍必须与独立节点一样声明 schema。
+        let mcp_types: std::collections::HashSet<String> =
+            crate::nodes::mcp_node::get_all_mcp_types().into_iter().collect();
+        let missing: std::collections::BTreeSet<_> = exec
+            .registered_types()
+            .into_iter()
+            .filter(|type_name| !mcp_types.contains(*type_name))
+            .filter(|type_name| !crate::nodes::registry::is_registered(type_name))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "以下原生注册节点缺少 node-schema.json 条目: {:?}",
+            missing
+        );
+    }
+
+    #[test]
     fn unknown_node_type_rejected() {
         let exec = StepExecutor::new(test_approval_store(), test_db());
         let step = Step {

@@ -16,6 +16,7 @@ use workflow_engine::engine::workflow::{Step, Workflow};
 
 struct TestChain {
     steps: Vec<(String, String, Value)>,
+    inputs: HashMap<String, HashMap<String, Value>>,
     variables: HashMap<String, Value>,
     workflow: Workflow,
 }
@@ -24,6 +25,7 @@ impl TestChain {
     fn new() -> Self {
         Self {
             steps: Vec::new(),
+            inputs: HashMap::new(),
             variables: HashMap::new(),
             workflow: Default::default(),
         }
@@ -35,6 +37,15 @@ impl TestChain {
         self
     }
 
+    /// 模拟 DAG 入边：在执行指定步骤前解析并注入输入端口。
+    fn input(mut self, step_id: &str, port: &str, value: Value) -> Self {
+        self.inputs
+            .entry(step_id.to_string())
+            .or_default()
+            .insert(port.to_string(), value);
+        self
+    }
+
     fn var(mut self, key: &str, value: Value) -> Self {
         self.variables.insert(key.to_string(), value);
         self
@@ -43,7 +54,7 @@ impl TestChain {
     async fn run(self) -> TestResult {
         let executor = StepExecutor::new(
             Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-            Arc::new(workflow_engine::data::db::Database::open_default().unwrap()),
+            Arc::new(workflow_engine::data::db::Database::open_temp().unwrap()),
         );
         let mut workflow = self.workflow;
         workflow.variables = Some(self.variables);
@@ -53,7 +64,20 @@ impl TestChain {
         for (id, step_type, config) in &self.steps {
             let step = make_chain_step(id, "test", step_type, config);
             let on_error = step.on_error.clone();
+            ctx.input_ports.clear();
+            if let Some(inputs) = self.inputs.get(id) {
+                for (port, value) in inputs {
+                    ctx.input_ports
+                        .insert(port.clone(), ctx.resolve_config(value));
+                }
+            }
+
             let result = executor.execute(&step, &mut ctx).await;
+            let should_stop = result.is_err()
+                && !matches!(
+                    on_error,
+                    Some(workflow_engine::engine::workflow::ErrorStrategy::Ignore)
+                );
             match &result {
                 Ok(output) => {
                     ctx.set_output(id, output.clone());
@@ -73,6 +97,9 @@ impl TestChain {
                 }
             }
             outputs.insert(id.clone(), result);
+            if should_stop {
+                break;
+            }
         }
         TestResult { outputs }
     }
@@ -97,12 +124,14 @@ impl TestResult {
             .map(|r| r.is_ok())
             .unwrap_or(false)
     }
+
+    fn has_output(&self, step_id: &str) -> bool {
+        self.outputs.contains_key(step_id)
+    }
 }
 
 fn make_chain_step(id: &str, name: &str, step_type: &str, config: &Value) -> Step {
-    let actions = config
-        .get("actions")
-        .and_then(|a| a.as_array()).cloned();
+    let actions = config.get("actions").and_then(|a| a.as_array()).cloned();
     let condition_group = config
         .get("conditionGroup")
         .and_then(|v| serde_json::from_value(v.clone()).ok());
@@ -333,9 +362,9 @@ async fn test_chain_condition_true_branch() {
         .step("step_1", "script", json!({"script": r#"#{score: 90}"#}))
         .step(
             "step_2",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.score}}"},
+                "value": "{{step_1.score}}",
                 "conditionGroup": {
                     "combinator": "and",
                     "conditions": [
@@ -354,6 +383,7 @@ async fn test_chain_condition_true_branch() {
 
     let s2 = result.output("step_2");
     assert_eq!(s2["branch"].as_str().unwrap(), "true");
+    assert_eq!(s2["result"].as_bool().unwrap(), true);
 
     let s3 = result.output("step_3");
     assert_eq!(s3["branch"].as_str().unwrap(), "true");
@@ -365,9 +395,9 @@ async fn test_chain_condition_false_branch() {
         .step("step_1", "script", json!({"script": r#"#{score: 40}"#}))
         .step(
             "step_2",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.score}}"},
+                "value": "{{step_1.score}}",
                 "conditionGroup": {
                     "combinator": "and",
                     "conditions": [
@@ -381,6 +411,7 @@ async fn test_chain_condition_false_branch() {
 
     let s2 = result.output("step_2");
     assert_eq!(s2["branch"].as_str().unwrap(), "false");
+    assert_eq!(s2["result"].as_bool().unwrap(), false);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -445,7 +476,7 @@ async fn test_chain_data_set_to_data_get() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// P0 节点: array_filter → array_sort → array_paginate
+// P0 节点: data_filter → json_transform(sort) → script(分页)
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
@@ -469,85 +500,43 @@ async fn test_chain_array_operations() {
         )
         .step(
             "step_2",
-            "array_filter",
-            json!({
-                "source": "{{step_1.items}}",
-                "condition": {"field": "age", "op": ">=", "value": 28}
-            }),
+            "data_filter",
+            json!({"field": "age", "op": "gte", "value": 28}),
         )
+        .input("step_2", "data", json!("{{step_1.items}}"))
         .step(
             "step_3",
-            "array_sort",
-            json!({
-                "source": "{{step_2.result}}",
-                "field": "age",
-                "order": "asc"
-            }),
+            "json_transform",
+            json!({"operation": "sort", "sort_key": "age", "sort_desc": false}),
         )
+        .input("step_3", "data", json!("{{step_2.filtered}}"))
         .step(
             "step_4",
-            "array_paginate",
+            "script",
             json!({
-                "source": "{{step_3.result}}",
-                "page": 1,
-                "page_size": 2
+                "script": r#"
+                    let sorted = step_3;
+                    let page = [];
+                    for i in 0..2 { page.push(sorted[i]); }
+                    #{result: page, count: page.len}
+                "#
             }),
         )
         .run()
         .await;
 
     let s2 = result.output("step_2");
-    assert_eq!(s2["result_count"].as_i64().unwrap(), 3);
+    assert_eq!(s2["count"].as_i64().unwrap(), 3);
 
     let s3 = result.output("step_3");
-    let sorted = s3["result"].as_array().unwrap();
+    let sorted = s3.as_array().unwrap();
     assert_eq!(sorted[0]["name"].as_str().unwrap(), "David");
     assert_eq!(sorted[1]["name"].as_str().unwrap(), "Alice");
+    assert_eq!(sorted[2]["name"].as_str().unwrap(), "Charlie");
 
     let s4 = result.output("step_4");
     assert_eq!(s4["count"].as_i64().unwrap(), 2);
     assert_eq!(s4["result"][0]["name"].as_str().unwrap(), "David");
-}
-
-// ═══════════════════════════════════════════════════════════════
-// P0 节点: convert_to_csv
-// ═══════════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn test_chain_script_to_convert_to_csv() {
-    let result = TestChain::new()
-        .step(
-            "step_1",
-            "script",
-            json!({
-                "script": r#"
-                    let items = [
-                        #{name: "Alice", age: 30},
-                        #{name: "Bob", age: 25}
-                    ];
-                    #{items: items}
-                "#
-            }),
-        )
-        .step(
-            "step_2",
-            "convert_to_csv",
-            json!({
-                "input": "{{step_1.items}}"
-            }),
-        )
-        .run()
-        .await;
-
-    let s2 = result.output("step_2");
-    // convert_to_csv 可能返回 result 字符串或 row_count
-    let csv = s2["result"].as_str().unwrap_or("");
-    let row_count = s2["row_count"].as_i64().unwrap_or(0);
-    assert!(
-        row_count == 2 || csv.contains("Alice"),
-        "Expected 2 rows or CSV with Alice, got: {:?}",
-        s2
-    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -557,27 +546,30 @@ async fn test_chain_script_to_convert_to_csv() {
 #[tokio::test]
 async fn test_chain_file_pipeline() {
     let out_dir = tempfile::tempdir().unwrap();
-    let out_path = format!("{}/output.txt", out_dir.path().display());
+    let input_path = out_dir.path().join("input.json");
+    let out_path = out_dir.path().join("output.txt");
+    std::fs::write(
+        &input_path,
+        r#"{"data":{"items":[{"name":"Alice","age":30},{"name":"Bob","age":25},{"name":"Charlie","age":35}]}}"#,
+    )
+    .unwrap();
 
     let result = TestChain::new()
-        .step(
-            "step_1",
-            "file_read",
-            json!({"path": fixture("sample.json")}),
-        )
+        .step("step_1", "file_read", json!({"path": input_path}))
         .step(
             "step_2",
             "json_parse",
-            json!({"data": "{{step_1.content}}", "expression": "$.data.items"}),
+            json!({"data": "{{step_1.content}}"}),
         )
         .step(
             "step_3",
             "script",
             json!({
                 "script": r#"
-                    let items = step_2.result;
+                    let items = step_2.data.items;
                     let content = "";
-                    for item in items {
+                    for i in 0..items.len {
+                        let item = items[i];
                         content += item.name + ": " + to_string(item.age) + "\n";
                     }
                     #{content: content, count: items.len}
@@ -595,7 +587,7 @@ async fn test_chain_file_pipeline() {
     assert!(result.is_ok("step_1"));
 
     let s2 = result.output("step_2");
-    let items = s2["result"].as_array().unwrap();
+    let items = s2["data"]["items"].as_array().unwrap();
     assert_eq!(items.len(), 3);
 
     let s3 = result.output("step_3");
@@ -647,7 +639,7 @@ async fn test_chain_nested_field_access() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// P1 节点: text_template
+// P1 节点: prompt_template
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
@@ -657,7 +649,7 @@ async fn test_chain_text_template() {
         .var("score", json!("95"))
         .step(
             "step_1",
-            "text_template",
+            "prompt_template",
             json!({
                 "template": "用户 {{user_name}} 的分数是 {{score}} 分"
             }),
@@ -666,12 +658,15 @@ async fn test_chain_text_template() {
         .await;
 
     let s1 = result.output("step_1");
-    let text = s1["result"].as_str().unwrap();
-    assert_eq!(text, "用户 Alice 的分数是 95 分");
+    assert_eq!(s1["prompt"].as_str().unwrap(), "用户 Alice 的分数是 95 分");
+    assert_eq!(
+        s1["messages"][0]["content"].as_str().unwrap(),
+        "用户 Alice 的分数是 95 分"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
-// P1 节点: regex_extract
+// P1 节点: regex(extract)
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
@@ -679,10 +674,11 @@ async fn test_chain_regex_extract() {
     let result = TestChain::new()
         .step(
             "step_1",
-            "regex_extract",
+            "regex",
             json!({
                 "input": "Order #123 shipped, Order #456 pending",
                 "pattern": r"Order #(\d+)",
+                "mode": "extract",
                 "global": true
             }),
         )
@@ -691,6 +687,7 @@ async fn test_chain_regex_extract() {
 
     let s1 = result.output("step_1");
     let captures = s1["captures"].as_array().unwrap();
+    assert_eq!(s1["count"].as_i64().unwrap(), 2);
     assert_eq!(captures.len(), 2);
     assert_eq!(captures[0][1].as_str().unwrap(), "123");
     assert_eq!(captures[1][1].as_str().unwrap(), "456");
@@ -721,16 +718,22 @@ async fn scenario_2_data_pipeline() {
         )
         .step(
             "filter_beijing",
-            "array_filter",
-            json!({
-                "source": "{{fetch_data.items}}",
-                "condition": {"field": "city", "op": "==", "value": "Beijing"}
-            }),
+            "data_filter",
+            json!({"field": "city", "op": "equals", "value": "Beijing"}),
         )
+        .input("filter_beijing", "data", json!("{{fetch_data.items}}"))
         .step(
             "to_csv",
-            "convert_to_csv",
-            json!({"input": "{{filter_beijing.result}}"}),
+            "script",
+            json!({"script": r#"
+                let rows = step_filter_beijing.filtered;
+                let csv = "name,age,city\n";
+                for i in 0..rows.len {
+                    let item = rows[i];
+                    csv += item.name + "," + to_string(item.age) + "," + item.city + "\n";
+                }
+                #{result: csv, row_count: rows.len}
+            "#}),
         )
         .step(
             "save_csv",
@@ -741,8 +744,8 @@ async fn scenario_2_data_pipeline() {
         .await;
     assert!(result.is_ok("fetch_data"));
     let filtered = result.output("filter_beijing");
-    assert_eq!(filtered["result_count"].as_i64().unwrap(), 3);
-    assert!(result.is_ok("to_csv"));
+    assert_eq!(filtered["count"].as_i64().unwrap(), 3);
+    assert_eq!(result.output("to_csv")["row_count"].as_i64().unwrap(), 3);
     assert!(result.is_ok("save_csv"));
     let fc = std::fs::read_to_string(&out_path).unwrap();
     assert!(fc.contains("Alice") && fc.contains("Charlie") && fc.contains("Eve"));
@@ -763,9 +766,9 @@ async fn scenario_3_condition_and_branch() {
         )
         .step(
             "step_2",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.amount}}"},
+                "value": "{{step_1.amount}}",
                 "conditionGroup": {
                     "combinator": "and",
                     "conditions": [
@@ -806,9 +809,9 @@ async fn scenario_3_condition_or_branch() {
         )
         .step(
             "step_2",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.amount}}"},
+                "value": "{{step_1.amount}}",
                 "conditionGroup": {
                     "combinator": "or",
                     "conditions": [
@@ -987,8 +990,10 @@ async fn scenario_5_error_default_stops() {
 
     assert!(result.is_ok("step_1"));
     assert!(!result.is_ok("step_2"), "step_2 should fail");
-    // step_3 不应该执行（但 TestChain 目前会继续跑，因为 executor 返回 Err 后 TestChain 不停止）
-    // 这里验证 step_2 确实失败了
+    assert!(
+        !result.has_output("step_3"),
+        "default Fail strategy must stop the chain before step_3"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1007,9 +1012,9 @@ async fn u3_eval_condition_operator_aliases() {
         // 测试 "eq" 操作符
         .step(
             "step_2",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.status}}"},
+                "value": "{{step_1.status}}",
                 "conditionGroup": {
                     "combinator": "and",
                     "conditions": [
@@ -1022,9 +1027,9 @@ async fn u3_eval_condition_operator_aliases() {
         // 测试 "ne" 操作符
         .step(
             "step_3",
-            "logic",
+            "condition",
             json!({
-                "config": {"value": "{{step_1.status}}"},
+                "value": "{{step_1.status}}",
                 "conditionGroup": {
                     "combinator": "and",
                     "conditions": [
@@ -1130,7 +1135,7 @@ async fn u2_missing_variable_returns_null() {
 
 #[tokio::test]
 async fn scenario_6_json_parse_regex_chain() {
-    // script(生成JSON) → json_parse(提取字段) → regex_extract(提取数字)
+    // script(生成JSON) → json_parse(提取字段) → regex(提取数字)
     let result = TestChain::new()
         .step(
             "step_1",
@@ -1151,40 +1156,28 @@ async fn scenario_6_json_parse_regex_chain() {
                 "#
             }),
         )
-        .step(
-            "step_2",
-            "json_parse",
-            json!({
-                "data": "{{step_1}}",
-                "expression": "$.order.id"
-            }),
-        )
+        .step("step_2", "json_parse", json!({"data": "{{step_1}}"}))
         .step(
             "step_3",
-            "regex_extract",
+            "regex",
             json!({
-                "input": "{{step_2.result}}",
-                "pattern": "\\d{4}-(\\d+)"
+                "input": "{{step_2.order.id}}",
+                "pattern": "\\d{4}-(\\d+)",
+                "mode": "extract",
+                "global": false
             }),
         )
         .run()
         .await;
 
-    // 调试：查看 step_1 输出
-    let s1 = result.output("step_1");
-    println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
-    
-    assert!(result.is_ok("step_1"), "场景 6 step_1 失败");
-    assert!(result.is_ok("step_2"), "场景 6 step_2 失败");
-    assert!(result.is_ok("step_3"), "场景 6 step_3 失败");
-    
-    // 验证 json_parse 输出
-    let s2 = result.output("step_2");
-    println!("json_parse 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
-    
-    // 验证 regex_extract 输出
+    assert_eq!(
+        result.output("step_2")["order"]["id"].as_str().unwrap(),
+        "ORD-2024-001"
+    );
     let s3 = result.output("step_3");
-    println!("regex_extract 输出: {}", serde_json::to_string_pretty(&s3).unwrap());
+    assert_eq!(s3["count"].as_i64().unwrap(), 1);
+    assert_eq!(s3["captures"][0][0].as_str().unwrap(), "2024-001");
+    assert_eq!(s3["captures"][0][1].as_str().unwrap(), "001");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1193,7 +1186,7 @@ async fn scenario_6_json_parse_regex_chain() {
 
 #[tokio::test]
 async fn scenario_7_text_template() {
-    // script(生成数据) → text_template(模板拼接)
+    // script(生成数据) → prompt_template(模板拼接)
     let result = TestChain::new()
         .var("project", json!("workflow-engine"))
         .step(
@@ -1212,7 +1205,7 @@ async fn scenario_7_text_template() {
         )
         .step(
             "step_2",
-            "text_template",
+            "prompt_template",
             json!({
                 "template": "项目: {{project}}\n版本: {{step_1.version}}\n作者: {{step_1.author}}\nStars: {{step_1.stars}}"
             }),
@@ -1222,9 +1215,10 @@ async fn scenario_7_text_template() {
 
     assert!(result.is_ok("step_1"), "场景 7 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 7 step_2 失败");
-    
-    let s2 = result.output("step_2");
-    println!("text_template 输出:\n{}", s2["result"].as_str().unwrap());
+    assert_eq!(
+        result.output("step_2")["prompt"].as_str().unwrap(),
+        "项目: workflow-engine\n版本: 7.5.0\n作者: haozi\nStars: 128"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1232,6 +1226,7 @@ async fn scenario_7_text_template() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "依赖外部 httpbin 服务；默认回归套件不访问公网"]
 async fn scenario_8_http_retry() {
     // http(GET 公共API) → script(处理响应)
     let result = TestChain::new()
@@ -1242,7 +1237,8 @@ async fn scenario_8_http_retry() {
                 "method": "GET",
                 "url": "https://httpbin.org/get",
                 "timeout": 10,
-                "retry": {"max": 2, "delay_ms": 500}
+                "retry": 2,
+                "retry_delay_ms": 10
             }),
         )
         .step(
@@ -1251,22 +1247,15 @@ async fn scenario_8_http_retry() {
             json!({
                 "script": r#"
                     let status = step_1.status;
-                    let ok = step_1.success;
-                    #{status: status, success: ok}
+                    #{status: status, received: status == 200}
                 "#
             }),
         )
         .run()
         .await;
 
-    // HTTP 请求可能因网络问题失败，所以检查 step_1 是否成功
-    if result.is_ok("step_1") {
-        assert!(result.is_ok("step_2"), "场景 8 step_2 失败");
-        let s2 = result.output("step_2");
-        println!("HTTP 状态: {}", s2["status"].as_i64().unwrap_or(0));
-    } else {
-        println!("场景 8: HTTP 请求失败（可能是网络问题），跳过验证");
-    }
+    assert_eq!(result.output("step_2")["status"].as_i64().unwrap(), 200);
+    assert!(result.output("step_2")["received"].as_bool().unwrap());
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1281,8 +1270,8 @@ async fn scenario_9_shell_command() {
             "step_1",
             "shell",
             json!({
-                "command": "echo 'Hello from Shell'",
-                "timeout": 5
+                "command": "echo Hello from Shell",
+                "timeout_secs": 5
             }),
         )
         .step(
@@ -1301,10 +1290,10 @@ async fn scenario_9_shell_command() {
 
     assert!(result.is_ok("step_1"), "场景 9 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 9 step_2 失败");
-    
+
     let s2 = result.output("step_2");
-    println!("Shell 输出: {}", s2["output"].as_str().unwrap_or(""));
-    println!("退出码: {}", s2["exit_code"].as_i64().unwrap_or(-1));
+    assert!(s2["output"].as_str().unwrap().contains("Hello from Shell"));
+    assert_eq!(s2["exit_code"].as_i64().unwrap(), 0);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1359,12 +1348,16 @@ async fn scenario_10_map_transform() {
     assert!(result.is_ok("step_2"), "场景 10 step_2 失败");
     // 调试：查看 step_2 输出
     let s2 = result.output("step_2");
-    println!("step_2 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
-    
+    println!(
+        "step_2 输出: {}",
+        serde_json::to_string_pretty(&s2).unwrap()
+    );
+
     assert!(result.is_ok("step_3"), "场景 10 step_3 失败");
-    
+
     let s3 = result.output("step_3");
-    println!("Map 结果: {} 个商品，第一个: {}", 
+    println!(
+        "Map 结果: {} 个商品，第一个: {}",
         s3["count"].as_i64().unwrap_or(0),
         s3["first_product"].as_str().unwrap_or("")
     );
@@ -1377,24 +1370,17 @@ async fn scenario_10_map_transform() {
 #[tokio::test]
 async fn scenario_11_file_read_write() {
     use std::fs;
-    
-    let test_dir = "/tmp/workflow_test_scenario11";
-    let _ = fs::create_dir_all(test_dir);
-    let input_path = format!("{}/input.txt", test_dir);
-    let output_path = format!("{}/output.txt", test_dir);
-    
+
+    let test_dir = tempfile::tempdir().unwrap();
+    let input_path = test_dir.path().join("input.txt");
+    let output_path = test_dir.path().join("output.txt");
+
     // 创建测试输入文件
     fs::write(&input_path, "Hello, Workflow Engine!\n这是文件读写测试。").unwrap();
-    
+
     // file_read → script(处理) → file_write
     let result = TestChain::new()
-        .step(
-            "step_1",
-            "file_read",
-            json!({
-                "path": input_path
-            }),
-        )
+        .step("step_1", "file_read", json!({"path": input_path}))
         .step(
             "step_2",
             "script",
@@ -1420,24 +1406,21 @@ async fn scenario_11_file_read_write() {
 
     assert!(result.is_ok("step_1"), "场景 11 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 11 step_2 失败");
-    assert!(result.is_ok("step_3"), "场景 11 step_3 失败");
-    
-    // 验证输出文件
+    assert!(result.output("step_2")["size"].as_u64().unwrap() > 0);
+    assert!(result.output("step_3")["written"].as_bool().unwrap());
+
     let output_content = fs::read_to_string(&output_path).unwrap();
-    println!("输入文件: {}", fs::read_to_string(&input_path).unwrap());
-    println!("输出文件: {}", output_content);
-    
-    // 清理
-    let _ = fs::remove_dir_all(test_dir);
+    assert!(output_content.contains("HELLO, WORKFLOW ENGINE!"));
+    assert!(output_content.contains("这是文件读写测试。"));
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 场景 12: 延迟 + 通知
+// 场景 12: 延迟 + 变量流转
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
-async fn scenario_12_delay_notify() {
-    // script → delay(100ms) → notify → script(验证)
+async fn scenario_12_delay_variable_flow() {
+    // script → delay(100ms) → script(验证上游消息与延时输出)
     let result = TestChain::new()
         .step(
             "step_1",
@@ -1449,44 +1432,28 @@ async fn scenario_12_delay_notify() {
                 "#
             }),
         )
-        .step(
-            "step_2",
-            "delay",
-            json!({
-                "duration_ms": 100
-            }),
-        )
+        .step("step_2", "delay", json!({"duration_ms": 100}))
         .step(
             "step_3",
-            "notify",
-            json!({
-                "title": "任务完成",
-                "body": "{{step_1.message}}"
-            }),
-        )
-        .step(
-            "step_4",
             "script",
             json!({
                 "script": r#"
-                    let title = step_3.title;
-                    let body = step_3.body;
-                    let sent = step_3.sent;
-                    #{notify_title: title, notify_body: body, sent: sent}
+                    let msg = step_1.message;
+                    let duration = step_2.duration_ms;
+                    #{message: msg, duration_ms: duration}
                 "#
             }),
         )
         .run()
         .await;
 
-    assert!(result.is_ok("step_1"), "场景 12 step_1 失败");
-    assert!(result.is_ok("step_2"), "场景 12 step_2 失败");
-    assert!(result.is_ok("step_3"), "场景 12 step_3 失败");
-    assert!(result.is_ok("step_4"), "场景 12 step_4 失败");
-    
-    let s4 = result.output("step_4");
-    println!("通知标题: {}", s4["notify_title"].as_str().unwrap_or(""));
-    println!("发送状态: {}", s4["sent"].as_bool().unwrap_or(false));
+    assert_eq!(
+        result.output("step_2")["duration_ms"].as_u64().unwrap(),
+        100
+    );
+    let s3 = result.output("step_3");
+    assert_eq!(s3["message"].as_str().unwrap(), "任务开始处理");
+    assert_eq!(s3["duration_ms"].as_u64().unwrap(), 100);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1550,14 +1517,18 @@ async fn scenario_13_parallel_branches() {
     // 调试：查看 step_1 输出
     if result.is_ok("step_1") {
         let s1 = result.output("step_1");
-        println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
+        println!(
+            "step_1 输出: {}",
+            serde_json::to_string_pretty(&s1).unwrap()
+        );
     }
-    
+
     assert!(result.is_ok("step_1"), "场景 13 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 13 step_2 失败");
-    
+
     let s2 = result.output("step_2");
-    println!("并行结果: A={} B={} C={} 总计={}", 
+    println!(
+        "并行结果: A={} B={} C={} 总计={}",
         s2["a"].as_i64().unwrap_or(0),
         s2["b"].as_i64().unwrap_or(0),
         s2["c"].as_i64().unwrap_or(0),
@@ -1628,19 +1599,25 @@ async fn scenario_14_while_loop() {
     // 调试：查看 step_2 输出
     if result.is_ok("step_2") {
         let s2 = result.output("step_2");
-        println!("step_2 输出: {}", serde_json::to_string_pretty(&s2).unwrap());
+        println!(
+            "step_2 输出: {}",
+            serde_json::to_string_pretty(&s2).unwrap()
+        );
     }
-    
+
     // 调试：查看 step_2 状态
     if !result.is_ok("step_2") {
         println!("step_2 失败");
     }
-    
+
     assert!(result.is_ok("step_2"), "场景 14 step_2 失败");
     assert!(result.is_ok("step_3"), "场景 14 step_3 失败");
-    
+
     let s3 = result.output("step_3");
-    println!("While 循环: 处理了 {} 个任务", s3["count"].as_i64().unwrap_or(0));
+    println!(
+        "While 循环: 处理了 {} 个任务",
+        s3["count"].as_i64().unwrap_or(0)
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1688,9 +1665,10 @@ async fn scenario_15_sub_workflow() {
 
     assert!(result.is_ok("step_1"), "场景 15 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 15 step_2 失败");
-    
+
     let s2 = result.output("step_2");
-    println!("子工作流: original={} doubled={}", 
+    println!(
+        "子工作流: original={} doubled={}",
         s2["original"].as_i64().unwrap_or(0),
         s2["doubled"].as_i64().unwrap_or(0)
     );
@@ -1731,9 +1709,10 @@ async fn scenario_16_approval_auto() {
 
     assert!(result.is_ok("step_1"), "场景 16 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 16 step_2 失败");
-    
+
     let s2 = result.output("step_2");
-    println!("审批结果: {} (自动: {})", 
+    println!(
+        "审批结果: {} (自动: {})",
         s2["decision"].as_str().unwrap_or(""),
         s2["auto"].as_bool().unwrap_or(false)
     );
@@ -1744,46 +1723,45 @@ async fn scenario_16_approval_auto() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
-#[ignore] // 需要真正的 Excel 文件
 async fn scenario_17_excel_read() {
-    use std::fs;
-    use std::io::Write;
-    
-    // 创建测试 CSV 文件（模拟 Excel）
-    let test_dir = "/tmp/workflow_test_scenario17";
-    let _ = fs::create_dir_all(test_dir);
-    let csv_path = format!("{}/test.csv", test_dir);
-    
-    let mut file = fs::File::create(&csv_path).unwrap();
-    writeln!(file, "name,age,city").unwrap();
-    writeln!(file, "张三,25,北京").unwrap();
-    writeln!(file, "李四,30,上海").unwrap();
-    writeln!(file, "王五,28,广州").unwrap();
-    
-    // excel_read → script(处理数据)
+    let test_dir = tempfile::tempdir().unwrap();
+    let xlsx_path = test_dir.path().join("test.xlsx");
+
+    // 先用现行 Excel 容器生成真实工作簿，再读取并传递给脚本。
     let result = TestChain::new()
         .step(
             "step_1",
             "excel",
             json!({
-                "file_path": csv_path,
-                "actions": [
-                    {
-                        "id": "read",
-                        "type": "read",
-                        "label": "读取"
-                    }
-                ]
+                "file_path": xlsx_path,
+                "actions": [{
+                    "id": "write",
+                    "type": "write",
+                    "config": {"value": [
+                        ["name", "age", "city"],
+                        ["张三", 25, "北京"],
+                        ["李四", 30, "上海"],
+                        ["王五", 28, "广州"]
+                    ]}
+                }]
             }),
         )
         .step(
             "step_2",
+            "excel",
+            json!({
+                "file_path": xlsx_path,
+                "actions": [{"id": "read", "type": "read", "label": "读取"}]
+            }),
+        )
+        .step(
+            "step_3",
             "script",
             json!({
                 "script": r#"
-                    let rows = step_1.rows;
-                    let count = step_1.row_count;
-                    let first = rows[0].name;
+                    let rows = step_2.read.data;
+                    let count = step_2.read.rows;
+                    let first = rows[1][0];
                     #{count: count, first_name: first}
                 "#
             }),
@@ -1791,23 +1769,16 @@ async fn scenario_17_excel_read() {
         .run()
         .await;
 
-    // 清理
-    let _ = fs::remove_dir_all(test_dir);
-    
-    // 调试：查看 step_1 输出
-    if result.is_ok("step_1") {
-        let s1 = result.output("step_1");
-        println!("step_1 输出: {}", serde_json::to_string_pretty(&s1).unwrap());
-    }
-    
-    assert!(result.is_ok("step_1"), "场景 17 step_1 失败");
-    assert!(result.is_ok("step_2"), "场景 17 step_2 失败");
-    
-    let s2 = result.output("step_2");
-    println!("Excel 读取: {} 行，第一个姓名: {}", 
-        s2["count"].as_i64().unwrap_or(0),
-        s2["first_name"].as_str().unwrap_or("")
+    assert_eq!(
+        result.output("step_1")["write"]["rows_written"]
+            .as_u64()
+            .unwrap(),
+        4
     );
+    assert_eq!(result.output("step_2")["read"]["rows"].as_u64().unwrap(), 4);
+    let s3 = result.output("step_3");
+    assert_eq!(s3["count"].as_u64().unwrap(), 4);
+    assert_eq!(s3["first_name"].as_str().unwrap(), "张三");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1817,13 +1788,14 @@ async fn scenario_17_excel_read() {
 #[tokio::test]
 async fn scenario_18_web_scrape_local() {
     use std::fs;
-    
-    // 创建测试 HTML 文件
-    let test_dir = "/tmp/workflow_test_scenario18";
-    let _ = fs::create_dir_all(test_dir);
-    let html_path = format!("{}/test.html", test_dir);
-    
-    fs::write(&html_path, r#"
+
+    // 创建独立临时 HTML 文件
+    let test_dir = tempfile::tempdir().unwrap();
+    let html_path = test_dir.path().join("test.html");
+
+    fs::write(
+        &html_path,
+        r#"
     <html>
     <head><title>测试页面</title></head>
     <body>
@@ -1835,15 +1807,17 @@ async fn scenario_18_web_scrape_local() {
         </ul>
     </body>
     </html>
-    "#).unwrap();
-    
+    "#,
+    )
+    .unwrap();
+
     // web_scrape → script(提取数据)
     let result = TestChain::new()
         .step(
             "step_1",
             "web_scrape",
             json!({
-                "url": format!("file://{}", html_path),
+                "url": format!("file://{}", html_path.display()),
                 "extract": [
                     {
                         "selector": "li.product",
@@ -1861,7 +1835,7 @@ async fn scenario_18_web_scrape_local() {
                 "script": r#"
                     let items = step_1.items;
                     let count = step_1.total_items;
-                    let first = items[0];
+                    let first = items[0].text;
                     #{count: count, first_item: first}
                 "#
             }),
@@ -1869,15 +1843,10 @@ async fn scenario_18_web_scrape_local() {
         .run()
         .await;
 
-    // 清理
-    let _ = fs::remove_dir_all(test_dir);
-    
     assert!(result.is_ok("step_1"), "场景 18 step_1 失败");
     assert!(result.is_ok("step_2"), "场景 18 step_2 失败");
-    
+
     let s2 = result.output("step_2");
-    println!("Web Scrape: {} 个产品，第一个: {}", 
-        s2["count"].as_i64().unwrap_or(0),
-        s2["first_item"].as_str().unwrap_or("")
-    );
+    assert_eq!(s2["count"].as_i64().unwrap(), 3);
+    assert_eq!(s2["first_item"].as_str().unwrap(), "手机 - 999元");
 }

@@ -99,8 +99,14 @@ export function useGlobalStatus() {
   async function refreshApiStatus() {
     try {
       const resp = await fetch('/api/health')
-      state.apiOnline = resp.status === 200
+      if (!resp.ok) {
+        state.apiOnline = false
+        return
+      }
+      const data = await resp.json()
+      state.apiOnline = data?.status === 'ok'
     } catch (e) {
+      // HTML SPA fallback、无效 JSON 或网络错误都视为后端不可用。
       state.apiOnline = false
     }
   }

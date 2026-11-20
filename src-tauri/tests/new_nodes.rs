@@ -10,7 +10,7 @@ use workflow_engine::engine::workflow::{Step, Workflow};
 fn test_exec() -> Arc<StepExecutor> {
     StepExecutor::new(
         Arc::new(workflow_engine::engine::approval_store::ApprovalStore::new()),
-        Arc::new(workflow_engine::data::db::Database::open_default().expect("db")),
+        Arc::new(workflow_engine::data::db::Database::open_temp().expect("db")),
     )
 }
 

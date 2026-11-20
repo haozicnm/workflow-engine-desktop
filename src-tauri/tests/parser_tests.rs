@@ -56,9 +56,9 @@ fn container_type_word_passthrough() {
 #[test]
 fn container_type_logic_passthrough() {
     let steps = parse_steps(json!([
-        {"id": "l1", "name": "Logic", "type": "logic", "config": {}, "actions": []}
+        {"id": "l1", "name": "Logic", "type": "condition", "config": {}, "actions": []}
     ]));
-    assert_eq!(steps[0].step_type, "logic");
+    assert_eq!(steps[0].step_type, "condition");
 }
 
 // ═══════════════════════════════════════════════════
@@ -82,11 +82,11 @@ fn non_container_type_script_unchanged() {
 }
 
 #[test]
-fn non_container_type_notify_unchanged() {
+fn non_container_type_delay_unchanged() {
     let steps = parse_steps(json!([
-        {"id": "n1", "name": "Notify", "type": "notify", "config": {"message": "hi"}}
+        {"id": "d1", "name": "Delay", "type": "delay", "config": {"duration_ms": 10}}
     ]));
-    assert_eq!(steps[0].step_type, "notify");
+    assert_eq!(steps[0].step_type, "delay");
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn logic_condition_group_stays_in_step() {
         {
             "id": "l1",
             "name": "判断",
-            "type": "logic",
+            "type": "condition",
             "config": {},
             "actions": [],
             "condition": "some_expr",
@@ -301,7 +301,7 @@ fn logic_container_without_condition_group() {
         {
             "id": "l1",
             "name": "Logic",
-            "type": "logic",
+            "type": "condition",
             "config": {},
             "actions": []
         }
@@ -336,7 +336,7 @@ fn mixed_container_and_non_container_steps() {
         {"id": "b1", "name": "Browse", "type": "browser", "config": {}, "actions": [
             {"id": "a1", "type": "navigate", "params": {"url": "https://example.com"}}
         ]},
-        {"id": "l1", "name": "Check", "type": "logic", "config": {}, "actions": []},
+        {"id": "l1", "name": "Check", "type": "condition", "config": {}, "actions": []},
         {"id": "h1", "name": "HTTP", "type": "http", "config": {"url": "https://api.example.com"}},
         {"id": "e1", "name": "Excel", "type": "excel", "config": {}, "actions": [
             {"id": "a2", "type": "read", "params": {"path": "data.xlsx"}}
@@ -344,7 +344,7 @@ fn mixed_container_and_non_container_steps() {
     ]));
 
     assert_eq!(steps[0].step_type, "browser");
-    assert_eq!(steps[1].step_type, "logic");
+    assert_eq!(steps[1].step_type, "condition");
     assert_eq!(steps[2].step_type, "http");
     assert_eq!(steps[3].step_type, "excel");
 

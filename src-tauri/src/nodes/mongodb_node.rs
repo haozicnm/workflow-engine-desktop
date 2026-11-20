@@ -37,7 +37,7 @@ impl NodeExecutor for MongodbNode {
                     "document": { "type": "object", "description": "insert 的文档" },
                     "update": { "type": "object", "description": "update 的更新操作" },
                     "limit": { "type": "number", "default": 100 },
-                    "api_url": { "type": "string", "description": "MongoDB HTTP API 地址" }
+                    "api_url": { "type": "string", "default": "http://localhost:8002", "description": "MongoDB HTTP API 地址" }
                 },
                 "required": ["action", "collection"]
             }),

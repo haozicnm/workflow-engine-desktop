@@ -1,4 +1,7 @@
 // tests/library_template_tests.rs — 5个内置库模板的加载 + 解析 + 校验
+//
+// 库文件中的 logic/notify 是历史资源，本文件仅检查旧模板仍能解析和通过
+// 结构校验，不执行这些节点；现行节点执行覆盖位于 variable_flow_tests.rs。
 use serde_json::Value;
 use std::collections::HashSet;
 use workflow_engine::engine::{parser, validate};
@@ -7,7 +10,8 @@ const LIBRARY_DIR: &str = "../library";
 
 fn load_template(path: &str) -> Value {
     let full = format!("{}/{}", LIBRARY_DIR, path);
-    let content = std::fs::read_to_string(&full).unwrap_or_else(|_| panic!("Template not found: {}", full));
+    let content =
+        std::fs::read_to_string(&full).unwrap_or_else(|_| panic!("Template not found: {}", full));
     serde_json::from_str(&content).unwrap_or_else(|_| panic!("Invalid JSON: {}", path))
 }
 
@@ -26,7 +30,8 @@ fn parse_and_validate(name: &str, path: &str) {
     let content = std::fs::read_to_string(&full).unwrap();
 
     // 1. Parse as JSON
-    let json: Value = serde_json::from_str(&content).unwrap_or_else(|_| panic!("{}: invalid JSON", name));
+    let json: Value =
+        serde_json::from_str(&content).unwrap_or_else(|_| panic!("{}: invalid JSON", name));
 
     // 2. Parse as Workflow struct
     let wf = parser::parse_workflow(&content).unwrap_or_else(|_| panic!("{}: parser failed", name));
@@ -144,11 +149,9 @@ fn test_template3_file_batch_approval() {
     assert!(types.contains(&"cursor"));
     // approval is inside cursor body_steps, not at top level
     // Verify data_dir and file_pattern are used
-    let content = std::fs::read_to_string(format!(
-        "{}/batch/file-batch-approval.wf.json",
-        LIBRARY_DIR
-    ))
-    .unwrap();
+    let content =
+        std::fs::read_to_string(format!("{}/batch/file-batch-approval.wf.json", LIBRARY_DIR))
+            .unwrap();
     assert!(content.contains("{{params.data_dir}}"));
     assert!(content.contains("{{params.file_pattern}}"));
 

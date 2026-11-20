@@ -2,7 +2,7 @@
 
 **可视化工作流自动化引擎** — 桌面应用 + HTTP 服务器 + CLI，图执行引擎，支持 Windows / Linux。
 
-版本：**9.0.0** | FORMAT_VERSION: **2.0**
+版本：**9.1.1** | FORMAT_VERSION: **2.0**
 
 ## 架构
 
@@ -13,7 +13,7 @@
 └────────────────────┬────────────────────────────┘
                      │ HTTP REST API (axum)
 ┌────────────────────▼────────────────────────────┐
-│  HTTP 服务器 (workflow-engine v9.0.2)               │
+│  HTTP 服务器 (workflow-engine v9.1.1)               │
 │                                                  │
 │  ┌──────────────┐ ┌──────────┐ ┌──────────────┐ │
 │  │ 图执行引擎    │ │ 节点系统  │ │ 系统集成      │ │
@@ -57,7 +57,7 @@
 | **触发器** | trigger_cron, trigger_webhook, trigger_file | 定时/HTTP/文件监控触发 |
 | **数据处理** | data_set, data_get, data_filter, data_map, json_transform | 赋值/读取/过滤/映射/转换 |
 | **脚本表达式** | script, prompt_template | Rhai 脚本 + 提示词模板 |
-| **AI** | llm_chat | LLM 对话节点 |
+| **AI 与检索** | llm_chat, llm_agent, llm_embedding, text_splitter, vector_store, rag_query | LLM 对话与 Agent、文本嵌入与切分、向量存储及 RAG 查询 |
 | **HTTP** | http_request, webhook_response | HTTP 请求 + Webhook 响应 |
 | **集成** | github_issue, im_message, email_send | GitHub/IM 消息/邮件 |
 | **浏览器** | browser (Python sidecar) | 导航/点击/截图/JS 执行等 39 种动作 |
@@ -72,7 +72,7 @@
 ### 🚀 图执行引擎
 
 - **拓扑分层执行**（Kahn 算法），自动识别并行节点
-- **同层并行**（`tokio::task::JoinSet`），实测 3× 加速
+- **同层并行**（`tokio::task::JoinSet`）
 - **循环依赖检测**，执行前报错
 - **双模自适应**：有 `edges` 走图模式，无 `edges` 自动回退线性链
 
@@ -85,7 +85,7 @@
 
 ### 📦 模板库 + 应用市场
 
-- 50 个预制工作流模板
+- 52 个预制工作流模板
 - 5 大分类：数据采集 / 自动化办公 / AI 应用 / 系统运维 / 开发工具
 - 一键导入使用
 
@@ -108,7 +108,7 @@
 从 [GitHub Releases](https://github.com/haozicnm/workflow-engine-desktop/releases) 下载：
 
 - **Windows**：下载 Inno Setup 安装包（`.exe`），双击安装
-- **Linux**：下载 `.deb` 包，`dpkg -i workflow-engine_9.0.0_amd64.deb`
+- **Linux**：下载 `.deb` 包，`dpkg -i workflow-engine_9.1.1_amd64.deb`
 
 启动后自动打开桌面应用。
 
@@ -188,13 +188,13 @@ workflow-engine-desktop/
 │   │   ├── data/               # 数据层 (SQLite/配置/路径)
 │   │   └── system/             # 系统集成 (定时/托盘)
 │   ├── sidecars/               # Python 浏览器驱动
-│   ├── templates/              # 50 个内置工作流模板
+│   ├── templates/              # 52 个内置工作流模板
 │   ├── node-schema.json        # 节点元数据
 │   └── Cargo.toml
 │
 ├── docs/                       # 项目文档
 ├── debian/                     # Linux deb 打包
-└── .github/workflows/          # CI: tag push → Release
+└── .github/workflows/          # CI: main push/PR + 手动；tag push → Release
 ```
 
 ## 数据存储

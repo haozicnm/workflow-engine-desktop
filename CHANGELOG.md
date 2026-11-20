@@ -24,11 +24,20 @@
 
 - **节点语义**: `data_filter` 的 gte/lte 改为三态比较，不可比较值不再视为匹配；`excel_container` 修正列解析、空值与未知操作符处理
 - **节点兼容性**: 修复 `sub_workflow` 变量映射、`email_send` 的 lettre 0.11 feature 编译及阻塞调用问题
-- **数据库事务**: 工作流级联删除改为事务执行；测试数据库改用独立临时实例
+- **节点 Schema 同步**: 补齐 9 个 AI/数据节点的 schema，并新增注册表驱动的一致性测试，校验节点注册与 schema 元数据保持同步
+- **数据库事务与测试隔离**: 工作流级联删除改为事务执行；测试数据库改用独立临时实例，避免测试间共享状态
 - **画布编辑**: 修复节点层移出 SVG 导致的连线失效，补齐快捷键和步骤复制功能
 - **撤销重做**: 统一快照结构并同步捕获变更，修复恢复后步骤结构损坏及重复入栈
-- **浏览器模式**: GET/DELETE 请求正确保留查询参数；调度面板统一使用 `last_run_at`
+- **浏览器模式**: GET/DELETE 请求正确保留查询参数；调度面板统一使用 `last_run_at`；拒绝将 HTML 回退页当作 API 数据，后端离线时页面不再崩溃且健康状态准确显示离线
+- **PWA 与分包**: 修复 Workbox 依赖锁定和预缓存，主 chunk 从 697.60 kB 降至约 352 kB；验证停止服务器后仍可通过 Service Worker 启动页面
+- **模板 JSON**: 修复 library 模板中的 JSON 问题，52 个模板均通过合法性校验
 - **保存校验**: 空工作流在创建数据库记录前即被拒绝，避免“保存失败但记录已出现”
+
+### 🛠 CI 与回归
+
+- **CI 自动触发**: CI 增加 `main` 分支 push、PR 及手动触发，覆盖 GUI feature check、完整 `cargo test`、前端测试和生产构建
+- **Rust 工具链**: CI 固定使用 Rust 1.95.0
+- **完整回归**: 本地执行完整后端测试、前端测试与生产构建，并校验模板 JSON 和 PWA 构建产物
 
 ### ⚠️ 行为变化
 
@@ -38,7 +47,7 @@
 - HTTP 服务不再允许任意跨域或非本机来源的写请求
 - 无数据库 schema 变更，无既有 API 删除
 
-**Verification:** Rust 104/104 unit tests passed; `vue-tsc --noEmit` and `vite build` passed.
+**Verification（本地，2026-11-21）:** 完整后端 `cargo test` 为 281 passed、2 ignored（公网 httpbin 测试）；前端 13 个 Vitest 测试通过，生产构建通过；52 个 library 模板 JSON 合法；PWA 构建包含 18 个 precache 条目，停止预览服务器后的离线启动冒烟测试通过。GitHub Actions 结果尚未复核。
 
 ## v9.1.0 (2026-06-29)
 

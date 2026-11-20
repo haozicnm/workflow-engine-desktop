@@ -1,5 +1,5 @@
 ---
-version: alpha
+version: 9.1.1
 name: workflow-engine-design
 description: "一个兼容 shadcn/ui 的双主题设计系统，为 Vue 3 + Tauri 桌面端的工作流自动化引擎定制。深色碳灰画布 + 亮色暖白 + 翠绿色品牌强调 + Inter 字体 ss03。采用 shadcn 标准双层 oklch 结构（--background → @theme inline → --color-background）。"
 colors:
@@ -285,6 +285,8 @@ components:
 ---
 
 ## Overview
+
+> 注：正文为历史设计稿，保留当时的设计决策与规范；当前版本元数据已同步至 9.1.1，具体实现以现行代码为准。
 
 Workflow-Engine 是一个面向开发者的工作流自动化桌面应用（Vue 3 + Tauri + Rust）。设计系统兼容 shadcn/ui 标准——采用双层 oklch 结构（`--background` → `@theme inline` → `--color-background`），通过 `.dark` class 切换亮暗主题。深色碳灰画布 + 亮色暖白 + 翠绿色唯一强调色。
 

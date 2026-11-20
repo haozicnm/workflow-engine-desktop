@@ -150,6 +150,27 @@ export default defineConfig({
   build: {
     outDir: "./dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, "/");
+          if (!normalizedId.includes("/node_modules/")) return;
+
+          if (/\/node_modules\/(?:vue|@vue|pinia|vue-demi|vue-i18n|@intlify)\//.test(normalizedId)) {
+            return "vue-vendor";
+          }
+          if (/\/node_modules\/(?:radix-vue|@floating-ui)\//.test(normalizedId)) {
+            return "ui-vendor";
+          }
+          if (normalizedId.includes("/node_modules/lucide-vue-next/")) {
+            return "icons";
+          }
+          if (/\/node_modules\/(?:js-yaml|argparse)\//.test(normalizedId)) {
+            return "yaml";
+          }
+        },
+      },
+    },
   },
   server: {
     port: 1420,

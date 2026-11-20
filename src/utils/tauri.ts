@@ -276,6 +276,13 @@ async function httpInvoke<T = unknown>(
       result = (await resp.json()) as T
     } else {
       const text = await resp.text()
+      // SPA fallback / 代理错误页常被返回为 200 text/html。若把 HTML 当成
+      // 业务数据，调用方会将它强制转换为数组或对象并在渲染层崩溃。
+      if (/<!doctype\s+html|<html[\s>]/i.test(text.slice(0, 512))) {
+        throw new Error(
+          `[tauri] "${command}" expected an API response but received HTML; check that the backend is running and the API proxy is configured`,
+        )
+      }
       result = (text || undefined) as T
     }
 

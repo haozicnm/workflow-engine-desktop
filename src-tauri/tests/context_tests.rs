@@ -458,11 +458,11 @@ fn open_session_preserves_node_type() {
 
     ctx.open_session("s1", "browser");
     ctx.open_session("s2", "excel");
-    ctx.open_session("s3", "logic");
+    ctx.open_session("s3", "condition");
 
     assert_eq!(ctx.sessions["s1"].node_type, "browser");
     assert_eq!(ctx.sessions["s2"].node_type, "excel");
-    assert_eq!(ctx.sessions["s3"].node_type, "logic");
+    assert_eq!(ctx.sessions["s3"].node_type, "condition");
 }
 
 // ═══════════════════════════════════════════════════

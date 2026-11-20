@@ -36,7 +36,7 @@ impl NodeExecutor for S3Node {
                     "key": { "type": "string", "description": "对象 key" },
                     "content": { "type": "string", "description": "upload 的内容" },
                     "prefix": { "type": "string", "default": "", "description": "list 的前缀" },
-                    "api_url": { "type": "string", "description": "S3 兼容 API 地址" },
+                    "api_url": { "type": "string", "default": "http://localhost:9000", "description": "S3 兼容 API 地址" },
                     "access_key": { "type": "string" },
                     "secret_key": { "type": "string" }
                 },
