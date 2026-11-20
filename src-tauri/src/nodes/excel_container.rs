@@ -264,15 +264,26 @@ fn excel_col_to_idx(col: &str) -> Option<usize> {
     Some(idx - 1) // 转为 0-based
 }
 
-/// 解析列引用：先试字母 (A=0)，再试列名（查表头行）
+/// 解析列引用：先按表头列名精确匹配，再按 Excel 列字母 (A=0)
+///
+/// 顺序很重要：`excel_col_to_idx` 会把任何纯字母表头（"Name"、"Total"、"Date"）
+/// 当成 Excel 列字母解析成 247082 这类巨大索引，`row.get(247082)` 恒为 Null，
+/// 于是 filter 恒返回 0 行、sort 变成空操作。表头名匹配必须优先。
 fn resolve_column(col: &str, rows: &[Value]) -> usize {
-    if let Some(idx) = excel_col_to_idx(col) {
-        return idx;
+    let header_row = rows.first().and_then(|r| r.as_array());
+    let width = header_row.map(|h| h.len()).unwrap_or(0);
+
+    // 1. 表头名字精确匹配
+    if let Some(pos) = header_row.and_then(|h| h.iter().position(|c| c.as_str() == Some(col))) {
+        return pos;
     }
-    // 回退：查第一行的列名
-    if let Some(header_row) = rows.first().and_then(|r| r.as_array()) {
-        if let Some(pos) = header_row.iter().position(|c| c.as_str() == Some(col)) {
-            return pos;
+
+    // 2. Excel 列字母（最多 3 个字母，覆盖到 XFD），且必须落在表宽内
+    if col.len() <= 3 {
+        if let Some(idx) = excel_col_to_idx(col) {
+            if width == 0 || idx < width {
+                return idx;
+            }
         }
     }
     0
@@ -284,6 +295,8 @@ fn match_filter(op: &str, cell: &Value, filter_val: &Option<Value>) -> bool {
     let filter_s = filter_val.as_ref().and_then(|v| v.as_str()).unwrap_or("");
     let cell_n = cell.as_f64().unwrap_or(0.0);
     let filter_n = filter_val.as_ref().and_then(|v| v.as_f64()).unwrap_or(0.0);
+    // 空值判定与 data_filter 节点保持一致：Null 或空字符串都算空
+    let is_empty_cell = cell.is_null() || cell_s.is_empty();
 
     match op {
         "contains" => cell_s.contains(filter_s),
@@ -293,9 +306,14 @@ fn match_filter(op: &str, cell: &Value, filter_val: &Option<Value>) -> bool {
         "gte" => cell_n >= filter_n,
         "lt" => cell_n < filter_n,
         "lte" => cell_n <= filter_n,
-        "is_empty" => cell_s.is_empty() && cell == &Value::Null,
-        "not_empty" => !cell_s.is_empty() || cell != &Value::Null,
-        _ => true,
+        // 旧实现要求「空字符串且同时是 Null」，对真正的空字符串单元格恒为 false
+        "is_empty" => is_empty_cell,
+        "not_empty" => !is_empty_cell,
+        other => {
+            // 未知操作符此前 `_ => true`，会让每一行都通过过滤且没有任何提示
+            tracing::warn!("excel filter: 未知操作符 '{}'，该行不匹配", other);
+            false
+        }
     }
 }
 

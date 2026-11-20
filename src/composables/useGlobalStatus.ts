@@ -70,7 +70,7 @@ export function useGlobalStatus() {
 
   async function refreshSchedules() {
     try {
-      const all = await safeInvoke<{ id: string; workflow_id: string; workflow_name: string; cron_expr: string; enabled: boolean; next_run: string | null }[]>('schedule_list')
+      const all = await safeInvoke<{ id: string; workflow_id: string; workflow_name: string; cron_expr: string; enabled: boolean; last_run_at: string | null; next_run: string | null }[]>('schedule_list')
       state.scheduledWorkflows = (all || [])
         .filter(s => s.enabled)
         .map(s => ({

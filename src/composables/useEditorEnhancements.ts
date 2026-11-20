@@ -84,20 +84,39 @@ export function useEditorEnhancements() {
 
   function redo() {
     if (!redoStack.value.length || !store.current) return
-    const currentJson = JSON.stringify(store.current.steps)
-    undoStack.value.push(currentJson)
-    const next = redoStack.value.pop()!
+    // 必须与 undo() 完全对称。
+    // 旧实现把当前 steps 序列化成**裸数组**压回 undo 栈，又把 redo 栈里的
+    // 完整快照对象 `{steps, edges, variables, name}` 整体赋给 store.current.steps ——
+    // 于是 steps 变成了一个对象，filteredSteps / v-for 会遍历它的字段、
+    // StepCard 再去读 step.config[...] → 渲染异常（被 ErrorBoundary 兜住），
+    // 而且之后按一次撤销也会还原出错误结构。
+    const currentSnap = JSON.stringify({
+      steps: store.current.steps,
+      edges: store.current.edges || [],
+      variables: store.current.variables || {},
+      name: store.current.name,
+    })
+    undoStack.value.push(currentSnap)
+    if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
+    const next = JSON.parse(redoStack.value.pop()!)
     skipSnapshot = true
-    store.current.steps = JSON.parse(next)
+    store.current.steps = next.steps
+    if (next.edges) store.current.edges = next.edges
+    if (next.variables) store.current.variables = next.variables
+    if (next.name) store.current.name = next.name
     store.dirty = true
     skipSnapshot = false
   }
 
   // Watch steps changes → snapshot
+  //
+  // `flush: 'sync'` 是必需的：默认的 'pre' 会把回调排到微任务里执行，
+  // 那时 undo()/redo() 早已把 skipSnapshot 复位，恢复出来的状态又被当成
+  // 一次新修改压回 undo 栈 —— 每次改动要按两次撤销，第二次还是空操作。
   const stopUndoWatch = watch(
     () => store.current?.steps,
     () => { if (!skipSnapshot) snapshot() },
-    { deep: true },
+    { deep: true, flush: 'sync' },
   )
 
   // ─── Step Search ───

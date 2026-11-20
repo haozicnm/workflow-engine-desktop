@@ -160,6 +160,8 @@ async function pickFilePath() {
 // ─── Variable reference dropdown ───
 const openDropdown = ref(false)
 const dropdownPos = ref({ top: 0, left: 0 })
+// 本组件根元素：insertRef 只在它的子树里找输入框，避免跨步骤误插（见 insertRef）
+const rootEl = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLElement | null>(null)
 
 function toggleDropdown(e: Event) {
@@ -183,7 +185,13 @@ function selectRef(refId: string) {
 }
 
 function insertRef(refId: string) {
-  const input = document.querySelector(`[data-field="${field.value.key}"]`) as HTMLInputElement | HTMLTextAreaElement
+  // 必须限定在**本组件**范围内查找：param key（url / path / content / selector …）
+  // 会跨节点重复，而 document.querySelector 返回文档中第一个匹配项 ——
+  // 由于 StepCard 用 v-show 保留所有已折叠步骤的 DOM，插入变量会落到另一个
+  // 步骤的同名字段上（静默改错节点，当前字段毫无变化）。
+  const input = rootEl.value?.querySelector(
+    `[data-field="${CSS.escape(field.value.key)}"]`,
+  ) as HTMLInputElement | HTMLTextAreaElement | null
   if (!input) return
   const refText = `{{${refId}}}`
   const start = input.selectionStart ?? 0
@@ -211,7 +219,7 @@ const visible = computed(() => {
 </script>
 
 <template>
-  <div v-if="visible">
+  <div v-if="visible" ref="rootEl">
     <!-- Label -->
     <Label class="text-[11px] text-[var(--text-tertiary)] block mb-1">
       {{ field.label }}

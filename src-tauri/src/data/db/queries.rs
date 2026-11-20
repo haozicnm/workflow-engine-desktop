@@ -7,6 +7,20 @@ use crate::data::models::{
 use anyhow::Result;
 use rusqlite::params;
 
+/// 为调度列表补充 `next_run`（由 cron 表达式计算）
+///
+/// 数据库里没有"下次运行时间"这一列，前端却读取 `next_run`，于是永远显示 "-"。
+/// 这里在返回前算出来，后端的 DB 结构无需改动。
+fn fill_next_run(schedules: &mut [ScheduleInfo]) {
+    for s in schedules.iter_mut() {
+        s.next_run = if s.enabled {
+            crate::engine::scheduler::next_run_at(&s.cron_expr)
+        } else {
+            None
+        };
+    }
+}
+
 impl Database {
     // ─── Workflow CRUD ───
 
@@ -121,11 +135,8 @@ impl Database {
 
     pub fn set_workflow_locked(&self, id: &str, locked: bool) -> Result<()> {
         let conn = self.conn_ref()?;
-        // 确保列存在
-        let _ = conn.execute(
-            "ALTER TABLE workflows ADD COLUMN locked INTEGER DEFAULT 0",
-            [],
-        );
+        // 列由 schema 迁移负责创建（schema.rs::init_tables 里的 ALTER + 建表语句）。
+        // 原来每次加锁/解锁都在请求热路径上再跑一次 DDL 并丢弃错误 —— 去掉。
         conn.execute(
             "UPDATE workflows SET locked = ?1 WHERE id = ?2",
             params![if locked { 1i64 } else { 0i64 }, id],
@@ -135,22 +146,27 @@ impl Database {
 
     pub fn delete_workflow(&self, id: &str) -> Result<()> {
         let conn = self.conn_ref()?;
+        // 级联删除必须在**一个事务**里完成：中途失败/崩溃会留下撕裂状态
+        // （例如 step_logs/step_runs 已删而 workflow 仍在 —— 工作流还在侧边栏、
+        // 仍可运行，但历史记录已经残缺）。文件其它地方已经用了 unchecked_transaction()。
+        let tx = conn.unchecked_transaction()?;
         // 级联删除：step_logs → step_runs → approvals → runs → schedules → workflow
-        conn.execute(
+        tx.execute(
             "DELETE FROM step_logs WHERE step_run_id IN (SELECT id FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1))",
             params![id],
         )?;
-        conn.execute(
+        tx.execute(
             "DELETE FROM step_runs WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
             params![id],
         )?;
-        conn.execute(
+        tx.execute(
             "DELETE FROM approvals WHERE run_id IN (SELECT id FROM runs WHERE workflow_id = ?1)",
             params![id],
         )?;
-        conn.execute("DELETE FROM runs WHERE workflow_id = ?1", params![id])?;
-        conn.execute("DELETE FROM schedules WHERE workflow_id = ?1", params![id])?;
-        conn.execute("DELETE FROM workflows WHERE id = ?1", params![id])?;
+        tx.execute("DELETE FROM runs WHERE workflow_id = ?1", params![id])?;
+        tx.execute("DELETE FROM schedules WHERE workflow_id = ?1", params![id])?;
+        tx.execute("DELETE FROM workflows WHERE id = ?1", params![id])?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -479,10 +495,12 @@ impl Database {
                 enabled: row.get::<_, i64>(4)? != 0,
                 last_run_at: row.get(5)?,
                 created_at: row.get(6)?,
+                next_run: None,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        let mut out = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        fill_next_run(&mut out);
+        Ok(out)
     }
 
     pub fn list_enabled_schedules(&self) -> Result<Vec<ScheduleInfo>> {
@@ -501,10 +519,12 @@ impl Database {
                 enabled: row.get::<_, i64>(4)? != 0,
                 last_run_at: row.get(5)?,
                 created_at: row.get(6)?,
+                next_run: None,
             })
         })?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        let mut out = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        fill_next_run(&mut out);
+        Ok(out)
     }
 
     pub fn update_schedule(

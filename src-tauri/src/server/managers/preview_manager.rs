@@ -64,11 +64,17 @@ pub async fn preview_word(Json(body): Json<PreviewWordBody>) -> Response {
 }
 
 pub async fn get_trajectory(Path(run_id): Path<String>) -> Response {
+    if !crate::safe_path::is_safe_segment(&run_id) {
+        return err_response(StatusCode::FORBIDDEN, "非法 run_id");
+    }
     let trajectory = crate::engine::preview::read_trajectory(&run_id);
     ok_response(trajectory)
 }
 
 pub async fn get_bundle_files(Path((run_id, step_id)): Path<(String, String)>) -> Response {
+    if !crate::safe_path::all_safe_segments([run_id.as_str(), step_id.as_str()]) {
+        return err_response(StatusCode::FORBIDDEN, "非法路径参数");
+    }
     let bundle_dir = crate::engine::preview::preview_dir(&run_id)
         .join("bundles")
         .join(&step_id);
@@ -98,6 +104,17 @@ pub async fn get_bundle_files(Path((run_id, step_id)): Path<(String, String)>) -
 pub async fn read_bundle_file(
     Path((run_id, step_id, filename)): Path<(String, String, String)>,
 ) -> Response {
+    // 注意：`Path::starts_with` 是纯词法比较，`base.join("../../../etc/passwd")`
+    // 仍然 starts_with(base)，所以原来的 `!path.starts_with(&preview_dir)` 形同虚设
+    // （而且 axum 会 percent-decode，`..%2F..%2F` 能原样到达这里）。
+    // 正确做法是在拼接之前逐段拒绝 `..` / 分隔符。
+    if !crate::safe_path::all_safe_segments([
+        run_id.as_str(),
+        step_id.as_str(),
+        filename.as_str(),
+    ]) {
+        return err_response(StatusCode::FORBIDDEN, "非法文件路径");
+    }
     let preview_dir = crate::engine::preview::preview_dir(&run_id);
     let path = preview_dir.join("bundles").join(&step_id).join(&filename);
     if !path.starts_with(&preview_dir) {

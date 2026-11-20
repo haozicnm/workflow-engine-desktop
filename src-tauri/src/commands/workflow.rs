@@ -172,10 +172,19 @@ fn sync_trigger_cron_to_schedule(app: &crate::App, workflow_id: &str, wf: &crate
             continue;
         }
 
+        // timezone 目前**没有实现**：schedules 表没有时区列，
+        // system::scheduler 用 `cron_schedule.after(&Utc::now())` 按 UTC 触发。
+        // 静默读出来丢掉会让用户以为设置生效了，因此这里显式警告。
         let timezone = step.config.get("timezone")
             .and_then(|v| v.as_str())
-            .unwrap_or("UTC")
-            .to_string();
+            .unwrap_or("UTC");
+        if !timezone.eq_ignore_ascii_case("utc") {
+            tracing::warn!(
+                "trigger_cron 节点 '{}' 配置了 timezone='{}'，但当前版本按 UTC 触发，该设置暂不生效",
+                step.id,
+                timezone
+            );
+        }
 
         // 检查是否已有同 workflow_id + cron_expr 的计划
         match app.db.list_enabled_schedules() {

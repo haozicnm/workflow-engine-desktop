@@ -19,6 +19,30 @@ use tracing::{info, warn};
 /// 10000 次足以覆盖绝大多数场景
 const MAX_STEP_EXECUTIONS: usize = 10_000;
 
+/// 标准 5 字段 cron → Quartz 7 字段
+///
+/// 5 字段: min hour dom month dow
+/// 7 字段: sec min hour dom month dow year
+///
+/// `cron` crate 只接受 6~7 字段，而 UI / HTTP / CLI 文档都用 5 字段写法。
+/// 这里作为唯一实现，供调度、列表展示、CLI 校验共用（此前有三份重复实现，
+/// 其中 CLI 那份漏了归一化，导致 `wf-cli schedule create <id> "0 9 * * *"` 必失败）。
+pub fn normalize_cron(expr: &str) -> String {
+    let fields: Vec<&str> = expr.split_whitespace().collect();
+    match fields.len() {
+        5 => format!("0 {} *", expr), // 加秒=0, 年=*
+        6 => format!("0 {}", expr),   // 加秒=0
+        _ => expr.to_string(),        // 7 字段直接用；其它交给解析器报错
+    }
+}
+
+/// 计算 cron 表达式的下一次触发时间（RFC3339）
+pub fn next_run_at(expr: &str) -> Option<String> {
+    use std::str::FromStr;
+    let schedule = cron::Schedule::from_str(&normalize_cron(expr)).ok()?;
+    schedule.after(&chrono::Utc::now()).next().map(|t| t.to_rfc3339())
+}
+
 /// run_start 的共享准备结果：将 commands/run.rs 和 managers/run_manager.rs
 /// 中完全重复的 6 步准备逻辑提取为单一函数，消除 ~60 行代码重复。
 pub struct RunPreparation {
@@ -56,30 +80,32 @@ pub async fn prepare_run(
     // 2. 解析工作流
     let workflow = crate::engine::parser::parse_workflow(&yaml)?;
 
-    // 3. 创建 run 记录
+    // 3. 先取并发信号量，再创建 run 记录。
+    //    顺序反过来的话，`create_run` 已经写入 status='running'，随后信号量获取失败
+    //    直接返回 Err，run 记录会永远停留在 running（只能等下次启动清理）。
+    let permit = semaphore
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| anyhow::anyhow!("已达到最大并发工作流数限制，请等待其他工作流完成后再试"))?;
+
+    // 4. 创建 run 记录
     let run_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let workflow_name = workflow.name.clone();
     db.create_run(&run_id, workflow_id, &workflow_name, &now)?;
 
-    // 4. 读取配置
+    // 5. 读取配置
     let config_guard = config.read().await;
     let timeouts = config_guard.timeouts.clone();
     let shell_allowed = config_guard.execution.shell_allowed_commands.clone();
     drop(config_guard);
 
-    // 5. 创建控制标志
+    // 6. 创建控制标志
     let cancel_flag = Arc::new(AtomicBool::new(false));
     let cancel_token = CancellationToken::new();
     let pause_flag = Arc::new(AtomicBool::new(false));
     let breakpoint_flag = Arc::new(AtomicBool::new(false));
     let step_mode_flag = Arc::new(AtomicBool::new(false));
-
-    // 5.5 获取并发信号量
-    let permit = semaphore
-        .clone()
-        .try_acquire_owned()
-        .map_err(|_| anyhow::anyhow!("已达到最大并发工作流数限制，请等待其他工作流完成后再试"))?;
 
     cancel_flags.write().await.insert(run_id.clone(), cancel_flag.clone());
     cancel_tokens.write().await.insert(run_id.clone(), cancel_token.clone());
@@ -128,6 +154,10 @@ struct DagScheduler {
     ready: VecDeque<String>,
     /// 已完成的节点集合
     completed: HashSet<String>,
+    /// 已入队（或已完成）的节点集合 —
+    /// 保证同一个节点最多被调度一次，避免 on_error=Branch 强制入队后
+    /// 又被上游 complete_node 重复入队（同一节点执行两次）
+    scheduled: HashSet<String>,
     /// 被条件阻断的边（from_id:from_port → to_id），不参与 blockCount 递减
     blocked_edges: HashSet<(String, String)>,
     /// 边的邻接表：from_id → [(from_port, to_id)]
@@ -159,14 +189,34 @@ impl DagScheduler {
             .filter(|(_, &count)| count == 0)
             .map(|(id, _)| id.clone())
             .collect();
+        let scheduled: HashSet<String> = ready.iter().cloned().collect();
 
         DagScheduler {
             block_count,
             ready,
             completed: HashSet::new(),
+            scheduled,
             blocked_edges: HashSet::new(),
             adjacency,
         }
+    }
+
+    /// 把节点加入就绪队列（幂等：每个节点最多入队一次）
+    fn enqueue_ready(&mut self, node_id: &str) {
+        if self.completed.contains(node_id) {
+            return;
+        }
+        if self.scheduled.insert(node_id.to_string()) {
+            self.ready.push_back(node_id.to_string());
+        }
+    }
+
+    /// on_error=Branch：强制让目标节点就绪（不再等待未完成的上游）
+    ///
+    /// 幂等：若目标节点已入队/已执行/已完成则不重复入队。
+    fn force_schedule(&mut self, node_id: &str) {
+        self.block_count.insert(node_id.to_string(), 0);
+        self.enqueue_ready(node_id);
     }
 
     /// 取出一个就绪节点
@@ -206,14 +256,15 @@ impl DagScheduler {
                 }
             }
 
-            // 正常递减
+            // 正常递减：只有真正从 1→0 的节点才入队，且入队幂等。
+            // 否则 on_error=Branch 强制入队的目标，会在它其他上游完成时被重复入队 → 执行两次。
             if let Some(count) = self.block_count.get_mut(to_id) {
                 if *count > 0 {
                     *count -= 1;
                 }
-                if *count == 0 {
-                    self.ready.push_back(to_id.clone());
-                }
+            }
+            if self.block_count.get(to_id).copied().unwrap_or(0) == 0 {
+                self.enqueue_ready(to_id);
             }
         }
 
@@ -256,6 +307,8 @@ impl DagScheduler {
         if remaining_sources == 0 {
             // 所有入边来源都已完成或被阻断 → 该节点永远不会执行
             self.completed.insert(node_id.to_string());
+            // 同步登记，避免后续被 force_schedule / complete_node 重新入队
+            self.scheduled.insert(node_id.to_string());
             // 递归阻断其下游
             let downstream = match self.adjacency.get(node_id) {
                 Some(d) => d.clone(),
@@ -895,6 +948,11 @@ async fn run_dag_workflow(
             let _ = db.update_run_current_step(run_id, node_id);
             emit_step_update(app_handle, run_id, node_id, &step.name, total_steps, "running", None);
 
+            // ─── 断点 / 单步 检查 ───
+            // DAG 模式此前完全跳过了这一步，导致画布（图模式）下的断点与单步调试
+            // 静默失效。这里与线性模式保持一致。
+            check_breakpoint(ctrl, &step, node_id, ctx, &mut state, db, app_handle, run_id, workflow_name).await?;
+
             // 延迟
             if let Some(delay_ms) = step.delay {
                 if delay_ms > 0 {
@@ -938,6 +996,9 @@ async fn run_dag_workflow(
 
         // 收集并行结果
         let mut any_failed = false;
+        // 记录首个致命错误（节点名 + 真实错误信息），避免只上报笼统的
+        // "DAG 并行节点失败" 而丢失定位信息
+        let mut hard_error: Option<String> = None;
         while let Some(jr) = join_set.join_next().await {
             match jr {
                 Ok((node_id, step_name, step_type, on_error, result, elapsed_ms, task_vars)) => {
@@ -1007,15 +1068,15 @@ async fn run_dag_workflow(
                                     ctx.set_output(&node_id, serde_json::Value::Null);
                                     state.mark_step_completed(&node_id);
                                     dag.complete_node(&node_id, None);
-                                    // 将分支目标节点加入就绪队列
-                                    if let Some(count) = dag.block_count.get_mut(&step_id) {
-                                        *count = 0;
-                                        dag.ready.push_back(step_id.clone());
-                                    }
+                                    // 将分支目标节点强制置为就绪（幂等，不会重复调度）
+                                    dag.force_schedule(&step_id);
                                 }
                                 _ => {
-                                    // Fail → 整体失败
+                                    // Fail → 整体失败（保留首个真实错误，便于定位）
                                     any_failed = true;
+                                    if hard_error.is_none() {
+                                        hard_error = Some(format!("节点 '{}' 失败: {}", step_name, err_msg));
+                                    }
                                 }
                             }
                         }
@@ -1024,16 +1085,21 @@ async fn run_dag_workflow(
                 Err(join_err) => {
                     warn!("并行任务 panic: {}", join_err);
                     any_failed = true;
+                    if hard_error.is_none() {
+                        hard_error = Some(format!("并行节点任务 panic: {}", join_err));
+                    }
                 }
             }
         }
 
         if any_failed {
+            let err_msg = hard_error
+                .unwrap_or_else(|| "DAG 并行节点失败".to_string());
             state.mark_failed();
-            let _ = db.update_run_status(run_id, "failed", Some("DAG 并行节点失败"));
+            let _ = db.update_run_status(run_id, "failed", Some(&err_msg));
             emit_run_update(app_handle, run_id, workflow_name, "failed");
             preview::stop_live_session(run_id, "failed");
-            return Err(anyhow::anyhow!("DAG 并行节点失败"));
+            return Err(anyhow::anyhow!("{}", err_msg));
         }
 
         // 变量快照
@@ -1513,6 +1579,62 @@ mod dag_tests {
         assert_eq!(dag.pop_ready(), Some("d".to_string()));
 
         dag.complete_node("d", None);
+        assert!(dag.is_done());
+    }
+
+    /// 回归测试：on_error=Branch 强制调度目标节点后，目标节点的其他上游完成时
+    /// 不得把它再次入队（旧实现会让该节点执行两次）。
+    #[test]
+    fn dag_error_branch_target_is_not_scheduled_twice() {
+        let steps = vec![
+            make_step("x", "data_set"),
+            make_step("y", "data_set"),
+            make_step("t", "data_set"),
+        ];
+        // t 同时依赖 x 和 y
+        let edges = vec![
+            Edge { from: "x".into(), from_port: "out".into(), to: "t".into(), to_port: "in".into() },
+            Edge { from: "y".into(), from_port: "out".into(), to: "t".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+
+        // x 和 y 初始就绪（t 的 blockCount = 2）
+        let mut ready = vec![dag.pop_ready().unwrap(), dag.pop_ready().unwrap()];
+        ready.sort();
+        assert_eq!(ready, vec!["x", "y"]);
+        assert_eq!(dag.block_count.get("t").copied(), Some(2));
+
+        // x 失败 → 登记完成，并通过错误分支强制调度 t（t 的 blockCount 被置 0）
+        dag.complete_node("x", None);
+        assert_eq!(dag.block_count.get("t").copied(), Some(1));
+        dag.force_schedule("t");
+        assert_eq!(dag.pop_ready(), Some("t".to_string()));
+
+        // y 随后完成：t 的 blockCount 已是 0，不能再入队一次
+        dag.complete_node("y", None);
+        assert_eq!(dag.pop_ready(), None, "分支目标 t 被重复调度（会执行两次）");
+
+        dag.complete_node("t", None);
+        assert!(dag.is_done());
+    }
+
+    /// force_schedule 对已完成节点必须幂等（不得复活）
+    #[test]
+    fn dag_force_schedule_is_idempotent() {
+        let steps = vec![make_step("a", "data_set"), make_step("b", "data_set")];
+        let edges = vec![
+            Edge { from: "a".into(), from_port: "out".into(), to: "b".into(), to_port: "in".into() },
+        ];
+        let mut dag = DagScheduler::new(&steps, &edges);
+        assert_eq!(dag.pop_ready(), Some("a".to_string()));
+        dag.complete_node("a", None);
+        assert_eq!(dag.pop_ready(), Some("b".to_string()));
+        dag.complete_node("b", None);
+        assert!(dag.is_done());
+
+        // b 已完成 → 再次强制调度不应重新入队
+        dag.force_schedule("b");
+        assert_eq!(dag.pop_ready(), None);
         assert!(dag.is_done());
     }
 }

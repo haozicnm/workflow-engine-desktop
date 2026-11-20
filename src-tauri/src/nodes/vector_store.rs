@@ -49,6 +49,14 @@ impl NodeExecutor for VectorStoreNode {
         let config = &step.config;
         let action = config.get("action").and_then(|v| v.as_str()).unwrap_or("add");
         let collection = config.get("collection").and_then(|v| v.as_str()).unwrap_or("default");
+        // collection 会被拼进 SQL（表名无法参数化），必须严格校验字符集，
+        // 否则 `x (id); DROP TABLE runs; --` 之类可经 execute_batch 执行任意语句。
+        if !crate::safe_path::is_safe_sql_identifier(collection) {
+            return Err(anyhow!(
+                "vector_store: 非法的 collection 名 '{}'（只允许字母、数字、下划线，且以字母/下划线开头）",
+                collection
+            ));
+        }
         let db_path = config.get("db_path").and_then(|v| v.as_str()).unwrap_or("vectors.db");
 
         let conn = rusqlite::Connection::open(db_path)

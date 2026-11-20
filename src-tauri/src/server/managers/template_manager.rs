@@ -147,6 +147,12 @@ fn load_all_templates() -> Result<Vec<(String, TemplateFile)>, String> {
 fn load_template(name: &str) -> Result<Option<(String, TemplateFile)>, String> {
     let dir = template_dir();
 
+    // 模板名来自 URL 路径（会被 percent-decode），必须先拒绝目录穿越，
+    // 否则 `..%2F..%2F..%2Fsecret` 可以读到磁盘上任意 .yaml/.yml 文件。
+    if !crate::safe_path::is_safe_segment(name) {
+        return Err(format!("非法模板名: {name}"));
+    }
+
     // 尝试 .yaml 和 .yml
     for ext in &["yaml", "yml"] {
         let path = dir.join(format!("{name}.{ext}"));

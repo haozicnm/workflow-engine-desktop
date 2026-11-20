@@ -4,8 +4,8 @@ import { deepMerge } from '../lib/utils'
 import { normalizeSteps, validateRefs } from '../composables/useWorkflowValidate'
 import { safeInvoke } from '../utils/tauri'
 import { useToast } from '../composables/useToast'
-import type { Workflow, Step, ContainerType, StepRunState } from '../types/types'
-import { newWorkflow, serializeWorkflow, deserializeWorkflow } from '../types/types'
+import type { Workflow, Step, Action, ContainerType, StepRunState } from '../types/types'
+import { newWorkflow, serializeWorkflow, deserializeWorkflow, nextStepId, nextActionId } from '../types/types'
 import { newStep, newAction } from '../types/node-registry'
 
 // ─── Backend response types ───
@@ -100,6 +100,13 @@ export const useWorkflowStore = defineStore('workflow', () => {
     }
     // 校验变量引用
     lastWarnings.value = validateRefs(current.value)
+    // 必须在创建记录**之前**拦住空工作流：后端 parse_workflow 会以
+    // "工作流至少需要一个步骤" 拒绝保存，而 workflow_create 已经建好了记录
+    // （并立即出现在侧边栏）—— 用户会看到"保存失败"但工作流已经存在。
+    if (!current.value.steps || current.value.steps.length === 0) {
+      toast.error('Workflow needs at least one step before it can be saved')
+      return false
+    }
     saving.value = true
     try {
       // Create new if no id
@@ -225,6 +232,35 @@ export const useWorkflowStore = defineStore('workflow', () => {
         delete step.runCondition
       }
     }
+    dirty.value = true
+  }
+
+  /**
+   * 复制一个步骤（含容器 actions）并插入到原步骤之后。
+   *
+   * StepCard 的 ⋯ 菜单会 emit `duplicate-step`，但此前没有任何父组件监听，
+   * 点击后菜单关闭、什么都不发生。
+   */
+  function duplicateStep(stepId: string) {
+    if (!current.value) return
+    const steps = current.value.steps
+    const index = steps.findIndex(s => s.id === stepId)
+    if (index < 0) return
+    const source = steps[index]
+    const clone: Step = JSON.parse(JSON.stringify(source))
+    clone.id = nextStepId(steps)
+    clone.label = `${source.label || source.type} (copy)`
+    // 不复刻 next：线性模式下原步骤与副本指向同一后继会导致重复执行
+    delete clone.next
+    // action id 必须重新生成，否则更新某个 action 会同时命中两个步骤
+    if (clone.actions?.length) {
+      const fresh: Action[] = []
+      for (const act of clone.actions) {
+        fresh.push({ ...act, id: nextActionId(clone.id, fresh) })
+      }
+      clone.actions = fresh
+    }
+    steps.splice(index + 1, 0, clone)
     dirty.value = true
   }
 
@@ -385,6 +421,7 @@ export const useWorkflowStore = defineStore('workflow', () => {
     importJson,
     addStep,
     removeStep,
+    duplicateStep,
     moveStep,
     addEdge,
     removeEdge,

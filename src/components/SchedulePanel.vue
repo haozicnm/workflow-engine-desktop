@@ -19,7 +19,8 @@ interface ScheduleItem {
   workflow_name: string
   cron_expr: string
   enabled: boolean
-  last_run: string | null
+  // 后端字段名是 last_run_at（见 data/models.rs ScheduleInfo）
+  last_run_at: string | null
   next_run: string | null
 }
 
@@ -178,7 +179,7 @@ function formatDate(d: string | null): string {
                 <div class="text-xs font-mono text-[var(--text-brand)]">{{ item.cron_expr }}</div>
                 <div class="text-xs text-[var(--text-tertiary)]">{{ describeCron(item.cron_expr) }}</div>
                 <div class="text-[10px] text-[var(--text-tertiary)]/60">
-                  {{ t('schedule.lastNext', { last: formatDate(item.last_run), next: formatDate(item.next_run) }) }}
+                  {{ t('schedule.lastNext', { last: formatDate(item.last_run_at), next: formatDate(item.next_run) }) }}
                 </div>
               </div>
               <div class="flex flex-col gap-1.5 items-end shrink-0">

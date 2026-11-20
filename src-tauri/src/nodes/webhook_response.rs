@@ -49,10 +49,13 @@ impl NodeExecutor for WebhookResponseNode {
         let status_code = step.config.get("status_code").and_then(|v| v.as_u64()).unwrap_or(200);
         let headers = step.config.get("headers").cloned().unwrap_or(json!({}));
 
-        // 响应体：优先从输入端口获取，其次从 config
-        let body = ctx.variables
-            .get("_webhook_response_body")
+        // 响应体：优先从输入端口获取（schema 里 body 端口是 required），
+        // 其次从变量/配置。此前完全没有读 input_ports，导致把节点接进 body
+        // 端口也会返回 {}。
+        let body = ctx.input_ports
+            .get("body")
             .cloned()
+            .or_else(|| ctx.variables.get("_webhook_response_body").cloned())
             .or_else(|| step.config.get("body").cloned())
             .unwrap_or(json!({}));
 

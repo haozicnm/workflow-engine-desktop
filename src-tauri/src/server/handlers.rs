@@ -479,6 +479,8 @@ pub async fn webhook_trigger(
         // 清理响应通道（如果 webhook_response 节点未发送响应）
         let app = crate::server::state::get();
         app.webhook_response_channels.write().await.remove(&run_id_clone);
+        // 同时清理调试快照：否则每次 webhook 运行都会永久保留一份变量快照
+        app.debug_snapshots.write().await.remove(&run_id_clone);
     });
 
     // 等待 webhook_response 节点的响应（30 秒超时）
@@ -495,7 +497,17 @@ pub async fn webhook_trigger(
                     resp_builder = resp_builder.header(k.as_str(), val);
                 }
             }
-            resp_builder.body(axum::body::Body::from(serde_json::to_string(&body).unwrap_or_default())).unwrap()
+            // 头名称/值来自 webhook_response 节点配置，未经校验；
+            // 非法值会让 builder 记录错误、`.body()` 返回 Err —— 旧代码在这里 unwrap 会 panic。
+            match resp_builder.body(axum::body::Body::from(
+                serde_json::to_string(&body).unwrap_or_default(),
+            )) {
+                Ok(resp) => resp,
+                Err(e) => err_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("构造响应失败（响应头非法?）: {e}"),
+                ),
+            }
         }
         _ => {
             // 超时或无响应 — 返回默认 ack

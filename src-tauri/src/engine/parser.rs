@@ -5,7 +5,7 @@
 //
 // parser 只做验证和 body step 递归处理，不再做类型名/字段名转换。
 
-use crate::engine::workflow::{Step, Workflow};
+use crate::engine::workflow::{Edge, Step, Workflow};
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 use tracing::warn;
@@ -62,8 +62,9 @@ pub fn parse_workflow(json_str: &str) -> Result<Workflow> {
     // 校验步骤引用完整性（runCondition / onError branch）
     validate_step_references(&wf.steps)?;
 
-    // DAG 模式：edges 非空时检测循环依赖
+    // DAG 模式：edges 非空时校验连线端点 + 检测循环依赖
     if !wf.edges.is_empty() {
+        validate_edge_endpoints(&wf.steps, &wf.edges)?;
         detect_cycles(&wf.steps, &wf.edges)?;
 
         // 警告：edges + runCondition 共存时提醒用户
@@ -459,6 +460,30 @@ fn extract_step_refs(s: &str) -> std::collections::HashSet<String> {
     }
 
     refs
+}
+
+/// 校验 edges 的端点都存在于步骤列表中。
+///
+/// 没有这层校验时，`DagScheduler::new()` 会把不存在的目标节点建成一个
+/// blockCount=1 的"幽灵节点"，它永远不会就绪 → 运行到最后一轮才抛出
+/// "DAG 执行死锁：无就绪节点但有未完成节点"，把用户引向错误的排查方向。
+fn validate_edge_endpoints(steps: &[Step], edges: &[Edge]) -> Result<()> {
+    let ids: std::collections::HashSet<&str> = steps.iter().map(|s| s.id.as_str()).collect();
+    for edge in edges {
+        if !ids.contains(edge.from.as_str()) {
+            return Err(anyhow!(
+                "连线引用了不存在的源节点 '{}'（from）",
+                edge.from
+            ));
+        }
+        if !ids.contains(edge.to.as_str()) {
+            return Err(anyhow!(
+                "连线引用了不存在的目标节点 '{}'（to）",
+                edge.to
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// DAG 环检测（DFS visiting 栈，参考 ComfyUI validate_inputs）
@@ -881,5 +906,50 @@ steps:
             pos1 < pos2,
             "step_1 must come before step_2 in dependency order"
         );
+    }
+
+    // ─── DAG 连线端点校验 ───
+
+    #[test]
+    fn edge_to_unknown_node_is_rejected_at_parse_time() {
+        let json = r#"{
+            "name": "test",
+            "steps": [{"id": "a", "type": "data_set", "label": "a", "config": {"key": "k", "value": "v"}}],
+            "edges": [{"from": "a", "from_port": "out", "to": "ghost", "to_port": "in"}]
+        }"#;
+        let err = parse_workflow(json).unwrap_err();
+        assert!(
+            err.to_string().contains("ghost"),
+            "应在解析期报出缺失的连线目标，实际: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn edge_from_unknown_node_is_rejected_at_parse_time() {
+        let json = r#"{
+            "name": "test",
+            "steps": [{"id": "a", "type": "data_set", "label": "a", "config": {"key": "k", "value": "v"}}],
+            "edges": [{"from": "ghost", "from_port": "out", "to": "a", "to_port": "in"}]
+        }"#;
+        let err = parse_workflow(json).unwrap_err();
+        assert!(
+            err.to_string().contains("ghost"),
+            "应在解析期报出缺失的连线来源，实际: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn valid_edges_pass_endpoint_validation() {
+        let json = r#"{
+            "name": "test",
+            "steps": [
+                {"id": "a", "type": "data_set", "label": "a", "config": {"key": "k", "value": "v"}},
+                {"id": "b", "type": "data_set", "label": "b", "config": {"key": "k2", "value": "v"}}
+            ],
+            "edges": [{"from": "a", "from_port": "out", "to": "b", "to_port": "in"}]
+        }"#;
+        assert!(parse_workflow(json).is_ok());
     }
 }

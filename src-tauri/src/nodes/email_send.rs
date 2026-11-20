@@ -56,9 +56,6 @@ impl NodeExecutor for EmailSendNode {
         let config = &step.config;
 
         let password = config.get("password").and_then(|v| v.as_str()).unwrap_or("");
-        let _smtp_host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
-        let _smtp_port = config.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587) as u16;
-        let _username = config.get("username").and_then(|v| v.as_str()).unwrap_or("");
         let from = config.get("from").and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("email_send: 缺少 from"))?;
         let to = config.get("to").and_then(|v| v.as_str())
@@ -81,15 +78,28 @@ impl NodeExecutor for EmailSendNode {
             use lettre::transport::smtp::authentication::Credentials;
             use lettre::{Message, SmtpTransport, Transport};
 
+            // 这三个参数只在启用 email feature 时用到。旧代码把它们绑定成
+            // `_smtp_host/_smtp_port/_username`（带下划线 = 视为未使用），
+            // 但本分支引用的是无下划线名字 → `cargo build --features email`
+            // 一直都编译不过（E0425），该 feature 实际从未可用。
+            let smtp_host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
+            let smtp_port = config.get("smtp_port").and_then(|v| v.as_u64()).unwrap_or(587) as u16;
+            let username = config.get("username").and_then(|v| v.as_str()).unwrap_or("");
+
             let from_mailbox: Mailbox = from.parse().map_err(|e| anyhow!("发件人地址无效: {}", e))?;
             let to_mailboxes: Vec<Mailbox> = to.split(',')
                 .map(|addr| addr.trim().parse())
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| anyhow!("收件人地址无效: {}", e))?;
 
+            // lettre 0.11 的 Response 没有 message_id 字段（旧代码引用了它 → E0609），
+            // 因此自行生成 Message-ID 并写入邮件头，输出端口仍返回该字符串。
+            let message_id = format!("{}@workflow-engine", uuid::Uuid::new_v4());
+
             let mut builder = Message::builder()
                 .from(from_mailbox)
-                .subject(subject);
+                .subject(subject)
+                .message_id(Some(message_id.clone()));
             for mailbox in &to_mailboxes {
                 builder = builder.to(mailbox.clone());
             }
@@ -106,12 +116,24 @@ impl NodeExecutor for EmailSendNode {
                 transport_builder = transport_builder.credentials(Credentials::new(username.to_string(), password.to_string()));
             }
             let transport = transport_builder.build();
-            let result = transport.send(&message).map_err(|e| anyhow!("SMTP 发送失败: {}", e))?;
 
-            info!("邮件已发送: {} → {} (message_id: {})", from, to, result.message_id.join(", "));
+            // lettre 0.11 的 send() 是同步阻塞调用，直接在 async fn 里调用会卡住
+            // tokio worker 线程，因此放到 spawn_blocking 里执行。
+            let send_result = tokio::task::spawn_blocking(move || transport.send(&message))
+                .await
+                .map_err(|e| anyhow!("SMTP 发送任务失败: {}", e))?
+                .map_err(|e| anyhow!("SMTP 发送失败: {}", e))?;
+
+            info!(
+                "邮件已发送: {} → {} (message_id: {}, smtp: {})",
+                from,
+                to,
+                message_id,
+                send_result.first_line().unwrap_or("")
+            );
             Ok(json!({
                 "sent": true,
-                "message_id": result.message_id.join(", "),
+                "message_id": message_id,
             }))
         }
 

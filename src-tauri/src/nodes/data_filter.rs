@@ -111,10 +111,19 @@ impl NodeExecutor for DataFilterNode {
                     (Value::Array(arr), _) => !arr.contains(&cmp_value),
                     _ => true,
                 },
-                "gt" => compare_gt(&item_value, &cmp_value),
-                "lt" => compare_lt(&item_value, &cmp_value),
-                "gte" => !compare_lt(&item_value, &cmp_value),
-                "lte" => !compare_gt(&item_value, &cmp_value),
+                "gt" => matches!(compare_values(&item_value, &cmp_value), Some(std::cmp::Ordering::Greater)),
+                "lt" => matches!(compare_values(&item_value, &cmp_value), Some(std::cmp::Ordering::Less)),
+                // 注意：不能写成 `!compare_lt`。类型不可比较时 compare_lt 返回 false，
+                // 取反就变成 true —— 于是 `n="abc"` 会满足 `n >= 10`，缺失/Null 字段
+                // 也会匹配所有 gte/lte。必须用三态比较，只在可比较且方向正确时返回 true。
+                "gte" => matches!(
+                    compare_values(&item_value, &cmp_value),
+                    Some(std::cmp::Ordering::Greater) | Some(std::cmp::Ordering::Equal)
+                ),
+                "lte" => matches!(
+                    compare_values(&item_value, &cmp_value),
+                    Some(std::cmp::Ordering::Less) | Some(std::cmp::Ordering::Equal)
+                ),
                 "is_empty" => matches!(item_value, Value::Null) || item_value.as_str().map(|s| s.is_empty()).unwrap_or(false) || item_value.as_array().map(|a| a.is_empty()).unwrap_or(false),
                 "not_empty" => !matches!(item_value, Value::Null)
                     && item_value != Value::String(String::new())
@@ -124,9 +133,16 @@ impl NodeExecutor for DataFilterNode {
                     if let (Some(text), Some(pattern)) = (item_value.as_str(), cmp_value.as_str()) {
                         // 缓存正则编译（避免循环中重复编译）
                         use std::sync::Mutex;
+                        // 正则缓存条目上限（超过则整体清空，防止动态 pattern 撑爆内存）
+                        const REGEX_CACHE_MAX: usize = 256;
                         static REGEX_CACHE: std::sync::LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
                             std::sync::LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
                         let mut cache = REGEX_CACHE.lock().unwrap();
+                        // 上限保护：pattern 可能来自 {{...}} 动态变量（循环里每轮都不同），
+                        // 无上限会让这个进程级缓存无限增长。
+                        if cache.len() >= REGEX_CACHE_MAX && !cache.contains_key(pattern) {
+                            cache.clear();
+                        }
                         if !cache.contains_key(pattern) {
                             if let Ok(re) = regex::Regex::new(pattern) {
                                 cache.insert(pattern.to_string(), re);
@@ -157,18 +173,20 @@ impl NodeExecutor for DataFilterNode {
     }
 }
 
-fn compare_gt(a: &Value, b: &Value) -> bool {
+/// 三态比较：`None` 表示两个值类型不可比较（而不是"小于"）。
+///
+/// 旧实现用 `compare_gt`/`compare_lt` 返回 bool，把"不可比较"和"不大于"
+/// 混为一谈，导致 `gte`/`lte` 对任意类型组合都返回 true。
+fn compare_values(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
     match (a, b) {
-        (Value::Number(a), Value::Number(b)) => a.as_f64().unwrap_or(0.0) > b.as_f64().unwrap_or(0.0),
-        (Value::String(a), Value::String(b)) => a > b,
-        _ => false,
-    }
-}
-
-fn compare_lt(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Number(a), Value::Number(b)) => a.as_f64().unwrap_or(0.0) < b.as_f64().unwrap_or(0.0),
-        (Value::String(a), Value::String(b)) => a < b,
-        _ => false,
+        (Value::Number(a), Value::Number(b)) => {
+            // f64 partial_cmp 对 NaN 返回 None → 视为"不可比较"
+            a.as_f64().unwrap_or(0.0).partial_cmp(&b.as_f64().unwrap_or(0.0))
+        }
+        (Value::String(a), Value::String(b)) => Some(a.cmp(b)),
+        (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
+        // Null 只与 Null 相等，与其他类型不可比较
+        (Value::Null, Value::Null) => Some(std::cmp::Ordering::Equal),
+        _ => None,
     }
 }

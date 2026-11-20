@@ -290,7 +290,9 @@ async fn call_mcp(script: &str, tool: &str, args: &Value) -> Result<Value> {
             }
             Err(e) => {
                 // 解析失败 — 记录但继续读取（MCP server 可能输出非 JSON 日志）
-                tracing::warn!("MCP 非 JSON 输出: {} (line: {})", e, &line[..line.len().min(100)]);
+                // 按字符截断（按字节切片会在多字节字符中间 panic）
+                let line_preview: String = line.chars().take(100).collect();
+                tracing::warn!("MCP 非 JSON 输出: {} (line: {})", e, line_preview);
             }
         }
     }

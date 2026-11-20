@@ -11,6 +11,7 @@ pub mod ipc_client;
 pub mod nodes;
 #[cfg(feature = "gui")]
 pub mod platform;
+pub mod safe_path;
 pub mod server;
 #[cfg(feature = "gui")]
 pub mod system;

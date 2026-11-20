@@ -116,6 +116,33 @@ function buildUrl(entry: RouteEntry, args?: Record<string, unknown>): string {
   })
 }
 
+/**
+ * Build the query string for GET/DELETE requests.
+ *
+ * `buildUrl` only substitutes `{param}` placeholders, so every *remaining*
+ * scalar argument has to become a query parameter. Without this, optional
+ * filters are silently dropped in browser/HTTP mode — e.g. `run_list`'s
+ * `workflow_id` / `limit` are read as query params by the Rust handler, so
+ * the Run History workflow filter returned runs from every workflow.
+ */
+function buildQuery(entry: RouteEntry, args?: Record<string, unknown>): string {
+  if (!args) return ''
+  const placeholders = new Set(
+    (entry.path.match(/\{(\w+)\}/g) || []).map((ph) => ph.slice(1, -1)),
+  )
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(args)) {
+    // path parameter (already in the URL, in either casing) → skip
+    if (placeholders.has(k) || placeholders.has(camelToSnake(k))) continue
+    if (v === undefined || v === null) continue
+    // only scalars are meaningful in a query string
+    if (typeof v === 'object' || typeof v === 'function') continue
+    params.append(camelToSnake(k), String(v))
+  }
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
 /** Recursively convert all object keys from camelCase to snake_case */
 function toSnakeKeys(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj
@@ -197,7 +224,9 @@ async function httpInvoke<T = unknown>(
     throw new Error(`[tauri] Unknown command "${command}" — no HTTP mapping`)
   }
 
-  const url = buildUrl(entry, args)
+  // GET/DELETE carry arguments as query params; POST/PUT carry a JSON body.
+  const usesQuery = entry.method === 'GET' || entry.method === 'DELETE'
+  const url = buildUrl(entry, args) + (usesQuery ? buildQuery(entry, args) : '')
   const controller = new AbortController()
   // pick_next blocks up to 30s waiting for user interaction, give it 60s
   const timeoutMs = command.includes('pick_next') ? 60_000 : 30_000

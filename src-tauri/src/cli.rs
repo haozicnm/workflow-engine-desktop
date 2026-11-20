@@ -937,8 +937,9 @@ fn cmd_schedule_list(app: &App, json: bool) -> Result<(), String> {
 
 fn cmd_schedule_create(app: &App, workflow_id: &str, cron_expr: &str) -> Result<(), String> {
     use std::str::FromStr;
-    // 验证 cron 表达式
-    cron::Schedule::from_str(cron_expr).map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+    // 验证 cron 表达式（先归一化，与 HTTP / 运行时一致）
+    cron::Schedule::from_str(&normalize_cron_cli(cron_expr))
+        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
     // 验证工作流存在
     app.db
         .get_workflow_yaml(workflow_id)
@@ -1351,7 +1352,8 @@ async fn cmd_library_schedule(
 ) -> Result<(), String> {
     use std::str::FromStr;
 
-    cron::Schedule::from_str(cron_expr).map_err(|e| format!("无效的 cron 表达式: {e}"))?;
+    cron::Schedule::from_str(&normalize_cron_cli(cron_expr))
+        .map_err(|e| format!("无效的 cron 表达式: {e}"))?;
 
     let templates = load_catalog()?;
     let entry = templates
@@ -1699,7 +1701,11 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
     let mut resolved_content = content.clone();
     if !vars.is_empty() {
         for (key, val) in vars {
-            let placeholder = format!("{{{{{{params.{}}}}}}}", key);
+            // 用拼接而不是 format! 的花括号转义：原来是 `{{{{{{params.{}}}}}}}`，
+            // 生成的是三层花括号 `{{{params.k}}}`，永远匹配不到模板里的 `{{params.k}}`。
+            let mut placeholder = String::from("{{params.");
+            placeholder.push_str(key);
+            placeholder.push_str("}}");
             resolved_content = resolved_content.replace(&placeholder, val);
         }
     }
@@ -1757,10 +1763,14 @@ async fn cmd_run_file(app: &App, file: &str, vars: &[(String, String)]) -> Resul
             println!("  完成 ({:.1}s)", start.elapsed().as_secs_f64());
         }
         Err(e) => {
-            app.db
-                .update_run_status(&run_id, "failed", Some(&e.to_string()))
-                .map_err(|e2| e2.to_string())?;
+            // DB 更新失败不应掩盖真正的执行错误，因此忽略其结果
+            let _ = app
+                .db
+                .update_run_status(&run_id, "failed", Some(&e.to_string()));
             println!("  失败: {}", e);
+            // 必须把失败传播出去：wf-cli 依赖 Err 调用 exit(1)，
+            // 否则 CI / agent 包装脚本会把失败的工作流当成成功。
+            return Err(format!("工作流执行失败: {}", e));
         }
     }
     Ok(())
@@ -1931,11 +1941,27 @@ fn print_preview(run_id: &str, step_id: Option<&str>, json: bool) -> Result<(), 
     Ok(())
 }
 
+/// 标准 5 字段 cron → Quartz 7 字段（与 `system::scheduler` / HTTP 侧保持一致）
+///
+/// `cron` crate 要求 6~7 字段，而 `--help` 与 HTTP API 都使用 5 字段写法
+/// （分 时 日 月 周）。不归一化的话 `wf-cli schedule create <id> "0 9 * * *"`
+/// 一定会报 "Invalid cron expression"。
+fn normalize_cron_cli(expr: &str) -> String {
+    let fields: Vec<&str> = expr.split_whitespace().collect();
+    match fields.len() {
+        5 => format!("0 {} *", expr),
+        6 => format!("0 {}", expr),
+        _ => expr.to_string(),
+    }
+}
+
 fn truncate(s: &str, max: usize) -> String {
+    // 必须按字符截断：旧实现用 chars().count() 判断长度、却用 &s[..max-1] 按字节切片，
+    // 任何超过 max 个字符的中文名字都会 panic（byte index N is not a char boundary）。
     if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}…", &s[..max.saturating_sub(1)])
+        format!("{}…", s.chars().take(max.saturating_sub(1)).collect::<String>())
     }
 }
 

@@ -128,6 +128,7 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
             ),
         )
         .await;
+        let timed_out = result.is_err();
         let result = match result {
             Ok(r) => r,
             Err(_elapsed) => {
@@ -157,8 +158,18 @@ pub async fn run_start(Json(body): Json<RunStartBody>) -> Response {
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
+                // 取消优先看取消令牌，避免依赖错误文本里的 "cancelled" 子串匹配
+                let status = if timed_out || ctrl.cancel_token.is_cancelled() || err_msg == "cancelled" {
+                    "cancelled"
+                } else {
+                    "failed"
+                };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
+                // 兜底终结运行状态：全局超时会 drop 掉 scheduler::run_workflow 的 future，
+                // 其内部的 update_run_status 不会执行，运行记录会永远停留在 "running"。
+                if let Err(err) = db.update_run_status(&run_id_clone, status, Some(&err_msg)) {
+                    warn!("兜底更新运行状态失败: {}", err);
+                }
                 events::emit(
                     "run-update",
                     serde_json::json!({
@@ -280,7 +291,9 @@ pub async fn run_logs(Path(run_id): Path<String>, Query(query): Query<RunLogsQue
     let limit = query.limit.unwrap_or(100);
 
     if offset < total {
-        let end = std::cmp::min(offset + limit, total);
+        // saturating_add：limit 来自查询串（usize），offset + limit 会溢出。
+        // debug 下 panic，release 下回绕成 end < offset，切片 `steps[offset..end]` panic。
+        let end = offset.saturating_add(limit).min(total);
         steps = steps[offset..end].to_vec();
     } else {
         steps.clear();

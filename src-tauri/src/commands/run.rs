@@ -1,7 +1,6 @@
 // commands/run.rs — 执行控制命令
 use serde::Serialize;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tauri::{State, AppHandle, Emitter};
 use crate::App;
 use crate::data::models::{RunHistoryItem, RunDetail, StepLogEntry};
@@ -89,11 +88,15 @@ pub async fn run_start(
                 &workflow, &run_id_clone, Some(&app_handle), &db, approval_store, &[], &ctrl, &timeouts, &shell_allowed,
             ),
         ).await;
+        let timed_out = result.is_err();
         let result = match result {
             Ok(r) => r,
             Err(_elapsed) => {
-                warn!("Workflow global timeout (30min): {}", run_id_clone);
-                Err(anyhow::anyhow!("Workflow execution timeout (exceeded 30 minutes)"))
+                warn!("工作流全局超时 ({}ms): {}", global_timeout_ms, run_id_clone);
+                Err(anyhow::anyhow!(
+                    "工作流执行超时（超过 {} ms 的全局上限）",
+                    global_timeout_ms
+                ))
             }
         };
 
@@ -110,8 +113,27 @@ pub async fn run_start(
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                let status = if err_msg.contains("cancelled") { "cancelled" } else { "failed" };
+                // 取消优先看取消令牌，避免依赖错误文本里的 "cancelled" 子串匹配
+                let status = if timed_out || ctrl.cancel_token.is_cancelled() || err_msg == "cancelled" {
+                    "cancelled"
+                } else {
+                    "failed"
+                };
                 error!("工作流{}: {} - {}", if status == "cancelled" { "已取消" } else { "执行失败" }, run_id_clone, err_msg);
+
+                // 兜底终结运行状态：全局超时会把 scheduler::run_workflow 的 future
+                // 直接 drop 掉，它内部的 update_run_status / run-update 都不会执行，
+                // 运行记录会永远停留在 "running"（前端表现为卡住无法结束的运行）。
+                if let Err(err) = db.update_run_status(&run_id_clone, status, Some(&err_msg)) {
+                    warn!("兜底更新运行状态失败: {}", err);
+                }
+                if let Err(err) = app_handle.emit("run-update", serde_json::json!({
+                    "run_id": &run_id_clone,
+                    "status": status,
+                    "error": err_msg,
+                })) {
+                    warn!("发送 run-update 事件失败: {}", err);
+                }
             }
         }
     });
@@ -221,7 +243,8 @@ pub async fn run_logs(
     let limit = limit.unwrap_or(100);
 
     if offset < total {
-        let end = std::cmp::min(offset + limit, total);
+        // saturating_add：limit 来自前端，offset + limit 可能溢出
+        let end = offset.saturating_add(limit).min(total);
         steps = steps[offset..end].to_vec();
     } else {
         steps.clear();
@@ -443,7 +466,12 @@ pub async fn debug_vars(
 /// 打开网页预览：返回截图 + 所有可见元素的 CSS 选择器 + 边界框
 ///
 /// 前端在截图上点击元素 → 自动分析选择器 → 填充到 extract 规则
+///
+/// headless / viewport_* 是前端调用契约的一部分（Tauri 按参数名反序列化），
+/// 但 WebBridge 路径由浏览器扩展执行，不需要这三个参数 —— 因此保留签名、
+/// 显式忽略，避免改名导致前端传参失效。
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn web_scrape_preview(
     url: String,
     headless: Option<bool>,

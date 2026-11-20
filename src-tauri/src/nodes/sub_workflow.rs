@@ -135,20 +135,38 @@ impl NodeExecutor for SubWorkflowNode {
         if let Some(mapping) = config.get("vars_mapping") {
             if let Some(map) = mapping.as_object() {
                 for (sub_key, src_path) in map {
-                    if let Some(src) = src_path.as_str() {
-                        if let Some(val) = ctx.resolve_var(src) {
-                            sub_ctx.set_var(sub_key.clone(), val.clone());
+                    // 非字符串值（数字/布尔/对象）直接作为字面量传递
+                    let raw = match src_path.as_str() {
+                        Some(s) => s.trim().to_string(),
+                        None => {
+                            sub_ctx.set_var(sub_key.clone(), src_path.clone());
+                            continue;
                         }
-                    } else if let Some(val) = src_path.as_str() {
-                        // 直接字符串值
-                        if !val.starts_with("{{") {
-                            sub_ctx.set_var(
-                                sub_key.clone(),
-                                serde_json::Value::String(val.to_string()),
-                            );
-                        } else if let Some(resolved) = ctx.resolve_var(val) {
-                            sub_ctx.set_var(sub_key.clone(), resolved.clone());
-                        }
+                    };
+                    // 去掉 {{ }} 包裹后再解析：旧实现把带花括号的原文直接交给
+                    // resolve_var，parts[0] 会变成 "{{step_read"，永远解析不出来。
+                    let braced = raw.starts_with("{{") && raw.ends_with("}}");
+                    let inner = if braced && raw.len() >= 4 {
+                        raw[2..raw.len() - 2].trim()
+                    } else {
+                        raw.as_str()
+                    };
+                    if let Some(val) = ctx.resolve_var(inner) {
+                        sub_ctx.set_var(sub_key.clone(), val.clone());
+                    } else if braced {
+                        // 明确是变量引用却解析不到 → 提示，避免子流程里静默变成 null
+                        tracing::warn!(
+                            "sub_workflow: vars_mapping['{}'] 无法解析变量引用 '{}'",
+                            sub_key,
+                            raw
+                        );
+                    } else {
+                        // 既不是可解析的变量路径，也不是 {{...}} 引用 → 当作字面量字符串。
+                        // 这一段此前写在永远不会执行的 `else if` 里（条件与上一个分支相同）。
+                        sub_ctx.set_var(
+                            sub_key.clone(),
+                            serde_json::Value::String(raw.clone()),
+                        );
                     }
                 }
             }

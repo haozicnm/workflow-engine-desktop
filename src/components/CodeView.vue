@@ -35,7 +35,7 @@ function serialize() {
   error.value = ''
 }
 
-function applyChanges() {
+function applyChanges(): boolean {
   try {
     let data: Record<string, unknown>
     if (format.value === 'json') {
@@ -52,8 +52,10 @@ function applyChanges() {
       steps: data.steps as Workflow['steps'],
     })
     error.value = ''
+    return true
   } catch (e: unknown) {
     error.value = (e as Error).message || '解析失败'
+    return false
   }
 }
 
@@ -70,8 +72,10 @@ serialize()
 function onFocus() { isEditing.value = true }
 function onBlur() {
   isEditing.value = false
-  applyChanges()
-  serialize()
+  // 仅在解析成功时重新序列化：serialize() 会把 error 清空，
+  // 否则解析报错会被紧接着的 serialize() 抹掉 —— 用户看不到任何提示，
+  // 编辑内容被静默丢弃（工具栏里 v-if="error" 的红色提示永远不会出现）。
+  if (applyChanges()) serialize()
 }
 </script>
 

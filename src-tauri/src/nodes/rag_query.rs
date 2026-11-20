@@ -52,6 +52,13 @@ impl NodeExecutor for RagQueryNode {
             .or_else(|| config.get("query").and_then(|v| v.as_str()).map(String::from))
             .ok_or_else(|| anyhow!("rag_query: 缺少 query"))?;
         let collection = config.get("collection").and_then(|v| v.as_str()).unwrap_or("default");
+        // collection 会被拼进 SQL 表名（无法参数化）→ 必须严格校验
+        if !crate::safe_path::is_safe_sql_identifier(collection) {
+            return Err(anyhow!(
+                "rag_query: 非法的 collection 名 '{}'（只允许字母、数字、下划线，且以字母/下划线开头）",
+                collection
+            ));
+        }
         let db_path = config.get("db_path").and_then(|v| v.as_str()).unwrap_or("vectors.db");
         let top_k = config.get("top_k").and_then(|v| v.as_u64()).unwrap_or(3) as usize;
 
@@ -125,7 +132,9 @@ impl NodeExecutor for RagQueryNode {
         let result: Value = resp.json().await.map_err(|e| anyhow!("解析失败: {}", e))?;
         let answer = result["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
 
-        info!("RAG 查询完成: {} 个文档, query={}", docs.len(), &query[..query.len().min(50)]);
+        // 注意：按字符截断，不能按字节切片（`&query[..50]` 会在多字节字符中间 panic）
+        let query_preview: String = query.chars().take(50).collect();
+        info!("RAG 查询完成: {} 个文档, query={}", docs.len(), query_preview);
         Ok(json!({"answer": answer, "context": context, "sources": docs}))
     }
 }

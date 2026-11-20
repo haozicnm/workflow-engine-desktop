@@ -307,9 +307,16 @@ pub(crate) fn eval_condition(
             (serde_json::Value::String(l), serde_json::Value::String(r)) => {
                 // 缓存已编译的正则表达式（避免循环中重复编译）
                 use std::sync::Mutex;
+                // 正则缓存条目上限（超过则整体清空，防止动态 pattern 撑爆内存）
+                const REGEX_CACHE_MAX: usize = 256;
                 static REGEX_CACHE: std::sync::LazyLock<Mutex<std::collections::HashMap<String, regex::Regex>>> =
                     std::sync::LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
                 let mut cache = REGEX_CACHE.lock().unwrap();
+                // 上限保护：pattern 可能来自 {{...}} 动态变量（循环里每轮都不同），
+                // 无上限会让这个进程级缓存无限增长。
+                if cache.len() >= REGEX_CACHE_MAX && !cache.contains_key(r) {
+                    cache.clear();
+                }
                 if !cache.contains_key(r) {
                     if let Ok(re) = regex::Regex::new(r) {
                         cache.insert(r.to_string(), re);

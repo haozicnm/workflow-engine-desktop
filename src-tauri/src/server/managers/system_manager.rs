@@ -326,7 +326,12 @@ pub async fn plugin_upload(mut multipart: Multipart) -> Response {
             format!("创建临时目录失败: {e}"),
         );
     }
-    let tmp_path = tmp_dir.join(&file_name);
+    // file_name 完全来自客户端（multipart filename）。直接 join 时
+    // `..\..\..\AppData\...\Startup\x.bat` 会写到临时目录之外，
+    // 而 Windows 上绝对路径会直接替换掉基准目录。
+    // 因此只取最后一段并做字符白名单，再加 uuid 前缀避免并发同名互相覆盖。
+    let safe_name = crate::safe_path::sanitize_file_name(&file_name, "plugin.wfplug");
+    let tmp_path = tmp_dir.join(format!("{}-{}", uuid::Uuid::new_v4(), safe_name));
     if let Err(e) = std::fs::write(&tmp_path, &bytes) {
         return err_response(
             StatusCode::INTERNAL_SERVER_ERROR,

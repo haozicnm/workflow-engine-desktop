@@ -23,6 +23,15 @@ use tauri::Emitter;
 const IPC_PORT: u16 = 19527;
 const TOKEN_FILE: &str = ".hermes/daemon-token";
 
+/// 常量时间字符串比较（避免通过响应时间逐字节猜测 token）
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 // ─── 消息类型 ───
 
 #[derive(Debug, Deserialize)]
@@ -216,10 +225,13 @@ impl IpcServer {
             };
 
             // Token 认证：首条消息必须包含正确的 token
+            // 注意：缺失 token 必须拒绝。旧实现只在「提供了 token 且不匹配」时拒绝，
+            // 于是任何本地进程（甚至网页打开 ws://127.0.0.1:19527，WebSocket 不受 CORS 限制）
+            // 只要不发 token 就能通过认证并触发任意工作流（含 shell 节点 = 命令执行）。
             if !authenticated {
                 let client_token = raw_msg.get("token").and_then(|v| v.as_str()).unwrap_or("");
-                if !client_token.is_empty() && client_token != self.token {
-                    warn!("IPC authentication failed: token mismatch");
+                if !constant_time_eq(client_token, &self.token) {
+                    warn!("IPC authentication failed: token missing or mismatch");
                     let err = IpcResponse::Error {
                         id: raw_msg
                             .get("id")
@@ -341,18 +353,21 @@ impl IpcServer {
                     }
                 }
                 "pause" => {
-                    self.app
-                        .pause_flags
-                        .write()
-                        .await
-                        .entry(run_id.clone())
-                        .or_insert_with(|| Arc::new(AtomicBool::new(false)))
-                        .store(true, Ordering::SeqCst);
-                    Some(IpcResponse::Ack {
-                        id,
-                        run_id: Some(run_id),
-                        message: Some("已暂停".into()),
-                    })
+                    // 与 "resume" 对齐：运行不存在时必须报错，
+                    // 不能 or_insert 一个永远不会被清理的标志位并谎报"已暂停"。
+                    if let Some(flag) = self.app.pause_flags.read().await.get(&run_id) {
+                        flag.store(true, Ordering::SeqCst);
+                        Some(IpcResponse::Ack {
+                            id,
+                            run_id: Some(run_id),
+                            message: Some("已暂停".into()),
+                        })
+                    } else {
+                        Some(IpcResponse::Error {
+                            id,
+                            message: "运行记录不存在或已完成".into(),
+                        })
+                    }
                 }
                 "resume" => {
                     if let Some(flag) = self.app.pause_flags.read().await.get(&run_id) {

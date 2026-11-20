@@ -290,7 +290,9 @@ impl StepExecutor {
             condition: step.condition.clone(),
             condition_group,
 
-            run_condition: None,
+            // 不要丢弃 run_condition：虽然 DAG 模式由 edges 决定路由，
+            // 但线性/子流程路径仍会读它，静默置 None 会让配置悄悄失效。
+            run_condition: step.run_condition.clone(),
         };
 
         // Phase 3: 后处理替换占位符
@@ -646,7 +648,8 @@ mod tests {
     use std::sync::Arc;
 
     fn test_db() -> Arc<crate::data::db::Database> {
-        Arc::new(crate::data::db::Database::open_default().expect("open db"))
+        // 隔离的临时数据库 — 不要触碰用户真实数据目录
+        Arc::new(crate::data::db::Database::open_temp().expect("open temp db"))
     }
 
     fn test_approval_store() -> Arc<crate::engine::approval_store::ApprovalStore> {
@@ -895,7 +898,7 @@ mod graph_tests {
     fn test_exec() -> Arc<StepExecutor> {
         StepExecutor::new(
             Arc::new(crate::engine::approval_store::ApprovalStore::new()),
-            Arc::new(crate::data::db::Database::open_default().expect("db")),
+            Arc::new(crate::data::db::Database::open_temp().expect("temp db")),
         )
     }
 

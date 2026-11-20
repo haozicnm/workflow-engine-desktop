@@ -275,7 +275,7 @@ function resetView() { canvas.resetView() }
       role="application"
       aria-label="Canvas 图编辑器"
     >
-      <!-- SVG 连线层 -->
+      <!-- SVG 连线层 + 节点层 -->
       <svg
         class="absolute inset-0 w-full h-full pointer-events-none"
         :style="{
@@ -316,30 +316,35 @@ function resetView() { canvas.resetView() }
             />
           </template>
         </g>
-      </svg>
 
-      <!-- 节点层 -->
-      <div
-        class="absolute inset-0"
-        :style="{
-          transform: `translate(${canvas.panX.value}px, ${canvas.panY.value}px) scale(${canvas.zoom.value})`,
-          transformOrigin: '0 0',
-        }"
-      >
-        <CanvasNode
-          v-for="step in stepRef"
-          :key="step.id"
-          :step="step"
-          :position="canvas.getPosition(step.id)"
-          :node-width="canvas.nodeWidth"
-          :node-height="canvas.nodeHeight"
-          :selected="canvas.selectedNode.value === step.id"
-          :run-state="runStates[step.id]"
-          @start-drag="(id, e) => onNodeDragStart(id, e)"
-          @select="canvas.selectNode($event)"
-          @start-edge="(id, port, e) => onPortDragStart(id, port, e)"
-        />
-      </div>
+        <!--
+          节点层必须留在 <svg> 内部。
+          Vue 只有在父命名空间是 svg（或标签本身是 svg/math）时才使用
+          createElementNS；放在同级 <div> 里会让 <g>/<rect>/<circle>/
+          <foreignObject> 变成 HTMLUnknownElement —— x/y/cx/r 全部失效、
+          端口圆点尺寸为 0（命中测试永远失败）、节点卡片按文档流堆叠而不随
+          拖拽移动，结果是画布上永远连不出边（edges 恒为空）。
+          svg 根节点带 pointer-events-none，这里用 pointer-events-auto 恢复交互。
+        -->
+        <g
+          class="pointer-events-auto"
+          :style="{ transform: `scale(${canvas.zoom.value})`, transformOrigin: '0 0' }"
+        >
+          <CanvasNode
+            v-for="step in stepRef"
+            :key="step.id"
+            :step="step"
+            :position="canvas.getPosition(step.id)"
+            :node-width="canvas.nodeWidth"
+            :node-height="canvas.nodeHeight"
+            :selected="canvas.selectedNode.value === step.id"
+            :run-state="runStates[step.id]"
+            @start-drag="(id, e) => onNodeDragStart(id, e)"
+            @select="canvas.selectNode($event)"
+            @start-edge="(id, port, e) => onPortDragStart(id, port, e)"
+          />
+        </g>
+      </svg>
 
       <!-- 空状态 -->
       <div v-if="!stepRef.length" class="absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)] text-sm pointer-events-none">

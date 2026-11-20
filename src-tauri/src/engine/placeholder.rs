@@ -38,13 +38,15 @@ impl PlaceholderMap {
     }
 
     /// 检查字符串是否是占位符，返回 index
+    ///
+    /// 用 strip_prefix/strip_suffix 而非下标切片：9 字符的 `"__WF_PH__"` 同时满足
+    /// starts_with/ends_with，但 `&s[8..len-2]` 会得到 `8..7` 并 panic。
     pub fn parse_placeholder(s: &str) -> Option<usize> {
-        if s.starts_with("__WF_PH_") && s.ends_with("__") {
-            let inner = &s[8..s.len() - 2];
-            inner.parse().ok()
-        } else {
-            None
+        let inner = s.strip_prefix("__WF_PH_")?.strip_suffix("__")?;
+        if inner.is_empty() {
+            return None;
         }
+        inner.parse().ok()
     }
 
     /// 扫描 JSON，替换 {{...}} 为占位符
@@ -300,5 +302,31 @@ mod tests {
         assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH_42__"), Some(42));
         assert_eq!(PlaceholderMap::parse_placeholder("not_a_placeholder"), None);
         assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH_abc__"), None);
+    }
+
+    #[test]
+    fn test_parse_placeholder_boundary_does_not_panic() {
+        // 回归：`"__WF_PH__"`（9 字符）同时满足 starts_with("__WF_PH_") 与
+        // ends_with("__")，旧的 `&s[8..s.len() - 2]` 会得到 8..7 并 panic。
+        assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH__"), None);
+        assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH_"), None);
+        assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH___"), None);
+        assert_eq!(PlaceholderMap::parse_placeholder("_"), None);
+        assert_eq!(PlaceholderMap::parse_placeholder(""), None);
+        // 合法占位符仍然可用
+        assert_eq!(PlaceholderMap::parse_placeholder("__WF_PH_7__"), Some(7));
+    }
+
+    #[test]
+    fn test_resolve_value_with_hostile_string_does_not_panic() {
+        // 用户可在任意容器节点配置里写这个字符串
+        let ph = PlaceholderMap::new();
+        let ctx = crate::engine::context::ExecutionContext::new(
+            "run-1",
+            &crate::engine::workflow::Workflow::default(),
+        );
+        let mut value = serde_json::json!({ "selector": "__WF_PH__" });
+        ph.resolve_value(&mut value, &ctx).unwrap();
+        assert_eq!(value["selector"].as_str(), Some("__WF_PH__"));
     }
 }

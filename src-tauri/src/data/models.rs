@@ -89,4 +89,8 @@ pub struct ScheduleInfo {
     pub enabled: bool,
     pub last_run_at: Option<String>,
     pub created_at: String,
+    /// 下一次触发时间（RFC3339）。由 cron_expr 计算得出 —— 前端此前读的是
+    /// 不存在的 `next_run` 字段，于是"下次"永远显示 "-"。
+    #[serde(default)]
+    pub next_run: Option<String>,
 }

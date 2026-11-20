@@ -131,7 +131,16 @@ async fn start_scheduled_run(
     let breakpoint_flags = app.breakpoint_flags.clone();
     let step_mode_flags = app.step_mode_flags.clone();
     let debug_snapshots = app.debug_snapshots.clone();
+    // 独立的清理句柄：run 结束后必须移除快照，否则每次定时运行都会在进程里
+    // 永久保留一份 {variables, step_outputs} JSON 快照（无界内存增长）。
+    let debug_snapshots_cleanup = app.debug_snapshots.clone();
     let handle_clone = app_handle.clone();
+
+    // 任务内部使用独立副本：run_id 本身要在函数末尾返回给调用方。
+    // 原来的写法让 `async move` 闭包把 run_id 移走，随后再 `Ok(run_id)`
+    // 就是 use-after-move（E0382）—— `--features gui` / workflow-engine-gui
+    // 这个 bin 一直编译不过，CI 的 GUI 构建因此失败。
+    let task_run_id = run_id.clone();
 
     tauri::async_runtime::spawn(async move {
         let _permit = prep.permit;
@@ -145,7 +154,7 @@ async fn start_scheduled_run(
         };
         match crate::engine::scheduler::run_workflow(
             &prep.workflow,
-            &run_id,
+            &task_run_id,
             Some(&handle_clone),
             &db,
             approval_store,
@@ -156,16 +165,17 @@ async fn start_scheduled_run(
         )
         .await
         {
-            Ok(_) => info!("定时工作流执行完成: {}", run_id),
+            Ok(_) => info!("定时工作流执行完成: {}", task_run_id),
             Err(e) => {
-                error!("定时工作流执行失败: {} - {}", run_id, e);
+                error!("定时工作流执行失败: {} - {}", task_run_id, e);
             }
         }
-        cancel_flags.write().await.remove(&run_id);
-        cancel_tokens.write().await.remove(&run_id);
-        pause_flags.write().await.remove(&run_id);
-        breakpoint_flags.write().await.remove(&run_id);
-        step_mode_flags.write().await.remove(&run_id);
+        cancel_flags.write().await.remove(&task_run_id);
+        cancel_tokens.write().await.remove(&task_run_id);
+        pause_flags.write().await.remove(&task_run_id);
+        breakpoint_flags.write().await.remove(&task_run_id);
+        step_mode_flags.write().await.remove(&task_run_id);
+        debug_snapshots_cleanup.write().await.remove(&task_run_id);
     });
 
     Ok(run_id)

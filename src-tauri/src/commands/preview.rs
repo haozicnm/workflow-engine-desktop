@@ -44,6 +44,9 @@ pub fn get_trajectory(run_id: String) -> Result<Vec<preview::StepPreview>, Strin
 /// 获取某步骤的 bundle 文件列表
 #[tauri::command]
 pub fn get_bundle_files(run_id: String, step_id: String) -> Result<Vec<String>, String> {
+    if !crate::safe_path::all_safe_segments([run_id.as_str(), step_id.as_str()]) {
+        return Err("非法路径参数".to_string());
+    }
     let bundle_dir = preview::preview_dir(&run_id).join("bundles").join(&step_id);
     if !bundle_dir.exists() {
         return Ok(Vec::new());
@@ -66,12 +69,19 @@ pub fn get_bundle_files(run_id: String, step_id: String) -> Result<Vec<String>, 
 /// 读取 bundle 文件内容
 #[tauri::command]
 pub fn read_bundle_file(run_id: String, step_id: String, filename: String) -> Result<String, String> {
-    let path = preview::preview_dir(&run_id)
-        .join("bundles")
-        .join(&step_id)
-        .join(&filename);
+    // `Path::starts_with` 是纯词法比较，无法阻止 `base/../../etc/passwd`；
+    // 必须在拼接前逐段拒绝 `..` 与路径分隔符。
+    if !crate::safe_path::all_safe_segments([
+        run_id.as_str(),
+        step_id.as_str(),
+        filename.as_str(),
+    ]) {
+        return Err("非法文件路径".to_string());
+    }
+    let base = preview::preview_dir(&run_id);
+    let path = base.join("bundles").join(&step_id).join(&filename);
     // 安全检查：防止路径遍历攻击
-    if !path.starts_with(preview::preview_dir(&run_id)) {
+    if !path.starts_with(&base) {
         return Err("非法文件路径".to_string());
     }
     std::fs::read_to_string(&path)

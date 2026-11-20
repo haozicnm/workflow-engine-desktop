@@ -118,17 +118,31 @@ let unlistenLogRun: (() => void) | null = null
 onMounted(async () => {
   // beforeunload 拦截：dirty 时提示保存
   window.addEventListener('beforeunload', onBeforeUnload)
+  // 快捷键（Ctrl+S/Z/Y/F、Esc）。onUnmounted 一直在移除这个监听，
+  // 但此前从未注册过 —— 于是 Ctrl+S 等全部失效，undo/redo 没有任何入口。
+  window.addEventListener('keydown', onKeydown)
   a.registry.refreshDynamicTypes()
 
   unlistenLogStep = await safeListen<{
     run_id: string; step_id: string; step_name: string; status: string; output?: unknown; error?: string | null
   }>('step-update', (event) => {
     const { step_id, step_name, status, error } = event.payload
-    const level: LogEntry['level'] = status === 'error' ? 'error' : 'info'
-    const msg = status === 'error' ? (error || t('error.runFailed')) : status === 'running' ? t('toast.running') : status === 'success' ? t('editor.stepSuccess') : status
+    // 引擎发出的 status 是 running / completed / failed / ignored
+    // （见 engine/scheduler.rs 的 emit_step_update*），没有 'error'/'success'。
+    // 旧判断写成 status === 'error'/'success' 永不成立 —— 失败的步骤在
+    // 控制台里显示为绿色 ✓，日志消息退化成原始英文状态。
+    const isFail = status === 'failed' || status === 'ignored' || status === 'error'
+    const level: LogEntry['level'] = isFail ? 'error' : 'info'
+    const msg = isFail
+      ? (error || t('error.runFailed'))
+      : status === 'running'
+        ? t('toast.running')
+        : (status === 'completed' || status === 'success')
+          ? t('editor.stepSuccess')
+          : status
     a.enh.addLog({ time: new Date().toLocaleTimeString(), stepId: step_id, stepName: step_name || step_id, status, message: msg, level })
-    const detail = status === 'error' ? (error || '') : `step: ${step_name || step_id}`
-    a.ops.addOp({ source: 'agent', category: 'event', name: `step: ${status}`, status: status === 'error' ? 'fail' : 'ok', detail })
+    const detail = isFail ? (error || '') : `step: ${step_name || step_id}`
+    a.ops.addOp({ source: 'agent', category: 'event', name: `step: ${status}`, status: isFail ? 'fail' : 'ok', detail })
     const runId = a.currentRunId()
     if (runId && a.workflow.value) {
       const steps = a.workflow.value.steps || []
@@ -142,7 +156,9 @@ onMounted(async () => {
 
   unlistenLogRun = await safeListen<{ run_id: string; status: string; error?: string }>('run-update', (event) => {
     const { status, error } = event.payload
-    a.enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: t('nav.workflows'), status, message: status === 'completed' ? t('editor.runComplete') : status === 'error' ? t('editor.runFailedMsg', { error }) : status, level: status === 'error' ? 'error' : 'info' })
+    // 同上：run-update 的状态是 completed / failed / cancelled
+    const runFail = status === 'failed' || status === 'error'
+    a.enh.addLog({ time: new Date().toLocaleTimeString(), stepId: '*', stepName: t('nav.workflows'), status, message: status === 'completed' ? t('editor.runComplete') : runFail ? t('editor.runFailedMsg', { error }) : status, level: runFail ? 'error' : 'info' })
     a.ops.addOp({
       source: 'agent', category: 'event', name: `run: ${status}`,
       status: status === 'failed' ? 'fail' : 'ok',
@@ -251,6 +267,7 @@ onUnmounted(() => {
                 @rename-action="(sId, aId, label) => a.store.renameAction(sId, aId, label)"
                 @update-action-params="(sId, aId, params) => a.store.updateActionParams(sId, aId, params)"
                 @remove-step="a.onRemoveStep"
+                @duplicate-step="(sId) => a.store.duplicateStep(sId)"
                 @rename-step="(sId, label) => a.store.renameStep(sId, label)"
                 @update-condition="a.onUpdateCondition"
                 @update-condition-group="(sId, g) => a.store.updateConditionGroup(sId, g)"
