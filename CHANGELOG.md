@@ -9,6 +9,7 @@
 - **路径穿越防护**: 新增 `safe_path` 统一校验预览、模板、工作流导出及插件上传路径，清理 multipart 文件名中的目录成分
 - **Shell 白名单**: 元字符检查从首个 token 扩展到整条命令，避免通过后续参数绕过限制
 - **SQL 标识符校验**: `rag_query` 的 collection 名称仅允许安全标识符，防止拼接 SQL 时注入语句
+- **生产依赖清理**: 移除未使用的 `geist` 及其 Next.js/sharp 传递依赖，升级 Vue 3.5.46、Vue I18n 11.4.23、js-yaml 4.3.2 与 nanoid 安全版本；生产依赖审计为 0 个已知漏洞
 
 ### 🔧 执行与调度修复
 
@@ -36,6 +37,8 @@
 ### 🛠 CI 与回归
 
 - **CI 自动触发**: CI 增加 `main` 分支 push、PR 及手动触发，覆盖 GUI feature check、完整 `cargo test`、前端测试和生产构建
+- **生产依赖审计**: CI 在每次推送和 PR 中执行生产依赖安全审计，高危及以上漏洞会阻断合并
+- **Linux GUI 构建**: 恢复 GUI feature 的 enigo 输入依赖，并在 CI 安装 libxdo 系统依赖
 - **Rust 工具链**: CI 固定使用 Rust 1.95.0
 - **完整回归**: 本地执行完整后端测试、前端测试与生产构建，并校验模板 JSON 和 PWA 构建产物
 
@@ -47,7 +50,7 @@
 - HTTP 服务不再允许任意跨域或非本机来源的写请求
 - 无数据库 schema 变更，无既有 API 删除
 
-**Verification（本地，2026-11-21）:** 完整后端 `cargo test` 为 281 passed、2 ignored（公网 httpbin 测试）；前端 13 个 Vitest 测试通过，生产构建通过；52 个 library 模板 JSON 合法；PWA 构建包含 18 个 precache 条目，停止预览服务器后的离线启动冒烟测试通过。GitHub Actions 结果尚未复核。
+**Verification（本地，2026-11-21）:** 完整后端 `cargo test` 为 281 passed、2 ignored（公网 httpbin 测试）；前端 13 个 Vitest 测试通过，生产构建通过；52 个 library 模板 JSON 合法；PWA 构建包含 18 个 precache 条目，停止预览服务器后的离线启动冒烟测试通过；`npm audit --omit=dev --audit-level=high` 为 0 个已知漏洞。
 
 ## v9.1.0 (2026-06-29)
 

@@ -54,6 +54,7 @@ futures-util = "0.3"
 open = "5.3.5"
 rfd = { version = "0.15", optional = true }
 lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "hostname", "builder"], optional = true }
+enigo = { version = "0.3", optional = true }
 
 # Tauri v2.1 (matches frontend @tauri-apps/api 2.11.x)
 tauri = { version = "2.1", features = ["tray-icon", "image-png"], optional = true }
@@ -65,7 +66,7 @@ tauri-build = { version = "2.1", optional = true, features = [] }
 [features]
 default = ["cli"]
 cli = []
-gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:rfd"]
+gui = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-opener", "dep:rfd", "dep:enigo"]
 email = ["dep:lettre"]
 
 [[bin]]

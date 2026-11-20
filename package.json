@@ -18,14 +18,13 @@
         "@tauri-apps/plugin-opener": "^2.5.4",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
-        "geist": "^1.7.1",
-        "js-yaml": "^4.1.1",
+        "js-yaml": "^4.3.2",
         "lucide-vue-next": "^1.0.0",
         "pinia": "^2.3.0",
         "radix-vue": "^1.9.17",
         "tailwind-merge": "^3.5.0",
-        "vue": "^3.5.0",
-        "vue-i18n": "^9.14.5"
+        "vue": "^3.5.46",
+        "vue-i18n": "^11.4.23"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
