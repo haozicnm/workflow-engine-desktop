@@ -370,10 +370,10 @@ jobs:
           $ErrorActionPreference = "Stop"
           $signingConfig = "${{ steps.certificate.outputs.tauri_config }}"
           if ([string]::IsNullOrWhiteSpace($signingConfig)) {
-            npm run tauri -- build --bundles nsis
+            npm run tauri -- build --bundles nsis --features gui
           }
           else {
-            npm run tauri -- build --bundles nsis --config $signingConfig
+            npm run tauri -- build --bundles nsis --features gui --config $signingConfig
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

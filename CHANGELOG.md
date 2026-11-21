@@ -43,7 +43,7 @@
 - **Windows GUI 启动**: WebView2 用户数据目录纳入应用数据目录并兼容便携模式，避免默认共享目录被占用时只启动后端而没有窗口；主窗口 capability 显式绑定 `main` 与 loopback 来源，恢复事件监听权限
 - **桌面 IPC 完整性**: 新增独立权限清单并与 53 个注册命令做 CI 一致性校验，补齐节点 schema 和执行轨迹预览命令；模板市场统一走本机 HTTP 契约并修复列表映射、模板实例化及安装目录内置模板解析
 - **手动发布版本**: 非 tag 触发改为读取 `package.json` 版本，避免生成 `main` 或旧版 9.0.4 安装包
-- **Windows 签名发布链**: Release 改用已验收的 Tauri NSIS 安装包；手动构建允许未签名并生成状态报告，tag 发布强制要求代码签名证书及版本一致性。签名覆盖 GUI、HTTP 服务、CLI 与安装包，附 SHA-256 校验和及 Authenticode 验签报告；所有平台构建成功后统一核对并发布完整资产，含预发布后缀的 tag 自动创建 prerelease
+- **Windows 签名发布链**: Release 改用已验收的 Tauri NSIS 安装包并显式启用 GUI feature；手动构建允许未签名并生成状态报告，tag 发布强制要求代码签名证书及版本一致性。签名覆盖 GUI、HTTP 服务、CLI 与安装包，附 SHA-256 校验和及 Authenticode 验签报告；所有平台构建成功后统一核对并发布完整资产，含预发布后缀的 tag 自动创建 prerelease
 - **Rust 工具链**: CI 固定使用 Rust 1.95.0
 - **完整回归**: 本地执行完整后端测试、15 项前端测试与生产构建，并校验模板 JSON 和 PWA 构建产物
 

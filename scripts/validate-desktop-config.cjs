@@ -7,6 +7,7 @@ const capability = require('../src-tauri/capabilities/default.json')
 const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8')
 const guiSource = fs.readFileSync('src-tauri/src/bin/gui.rs', 'utf8')
 const acl = fs.readFileSync('src-tauri/permissions/desktop-ipc.toml', 'utf8')
+const releaseWorkflow = fs.readFileSync('.github/workflows/release.yml', 'utf8')
 
 if (packageJson.version !== tauriConfig.version) {
   throw new Error(`Version mismatch: package.json=${packageJson.version}, tauri.conf.json=${tauriConfig.version}`)
@@ -25,6 +26,10 @@ if (tauriConfig.mainBinaryName !== 'workflow-engine-gui') {
 }
 if (!cargoToml.includes('default-run = "workflow-engine-gui"')) {
   throw new Error('Cargo default-run must select workflow-engine-gui')
+}
+const tauriNsisBuilds = releaseWorkflow.match(/npm run tauri -- build --bundles nsis --features gui/g) || []
+if (tauriNsisBuilds.length !== 2) {
+  throw new Error('Both Release NSIS build branches must enable the GUI feature')
 }
 if (tauriConfig.bundle.resources['../dist'] !== 'dist/') {
   throw new Error('Desktop bundle must preserve the dist directory structure')
