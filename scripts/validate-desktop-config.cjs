@@ -1,6 +1,7 @@
 const fs = require('fs')
 
 const packageJson = require('../package.json')
+const packageLock = require('../package-lock.json')
 const tauriConfig = require('../src-tauri/tauri.conf.json')
 const capability = require('../src-tauri/capabilities/default.json')
 const cargoToml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8')
@@ -9,6 +10,10 @@ const acl = fs.readFileSync('src-tauri/permissions/desktop-ipc.toml', 'utf8')
 
 if (packageJson.version !== tauriConfig.version) {
   throw new Error(`Version mismatch: package.json=${packageJson.version}, tauri.conf.json=${tauriConfig.version}`)
+}
+
+if (packageLock.version !== packageJson.version || packageLock.packages[''].version !== packageJson.version) {
+  throw new Error(`Version mismatch: package.json=${packageJson.version}, package-lock.json=${packageLock.version}/${packageLock.packages[''].version}`)
 }
 
 const cargoVersion = cargoToml.match(/^version = "([^"]+)"/m)?.[1]
