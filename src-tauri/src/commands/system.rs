@@ -129,3 +129,10 @@ pub async fn node_list_types() -> Result<Vec<String>, String> {
     }
     Ok(types)
 }
+
+/// Return the bundled node schema to keep Tauri IPC feature-parity with HTTP.
+#[tauri::command]
+pub fn node_schema() -> Result<serde_json::Value, String> {
+    serde_json::from_str(include_str!("../../node-schema.json"))
+        .map_err(|error| format!("节点 schema 解析失败: {error}"))
+}

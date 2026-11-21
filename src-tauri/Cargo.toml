@@ -1,7 +1,12 @@
 [package]
-name = "workflow-engine"
+name = "workflow-engine-gui"
 version = "9.1.1"
 edition = "2021"
+default-run = "workflow-engine-gui"
+
+[lib]
+name = "workflow_engine"
+path = "src/lib.rs"
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart", "ws"] }

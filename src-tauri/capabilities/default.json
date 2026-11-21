@@ -1,12 +1,16 @@
 {
   "identifier": "main-capability",
   "description": "Main app permissions for Workflow Engine",
-  "windows": [],
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:19529"]
+  },
   "permissions": [
     "core:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:event:allow-emit-to",
-    "core:event:allow-unlisten"
+    "core:event:allow-unlisten",
+    "desktop-ipc"
   ]
 }

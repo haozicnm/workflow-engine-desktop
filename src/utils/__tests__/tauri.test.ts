@@ -25,4 +25,37 @@ describe('browser HTTP fallback', () => {
     expect(result).toHaveLength(1)
     expect(result?.[0].name).toBe('Production')
   })
+
+  it('normalizes REST workflow creation to the Tauri string id contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ id: 'wf-new' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(safeInvoke<string>('workflow_create', {
+      name: 'Production',
+      description: '',
+    })).resolves.toBe('wf-new')
+    expect(fetchMock).toHaveBeenCalledWith('/api/workflows', expect.objectContaining({
+      method: 'POST',
+    }))
+  })
+
+  it('instantiates templates through the local HTTP contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ workflow_id: 'wf-from-template' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(safeInvoke<{ workflow_id: string }>('template_instantiate', {
+      name: 'http_fetch',
+      params: {},
+    })).resolves.toEqual({ workflow_id: 'wf-from-template' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/templates/http_fetch/instantiate',
+      expect.objectContaining({ method: 'POST', body: '{"params":{}}' }),
+    )
+  })
 })

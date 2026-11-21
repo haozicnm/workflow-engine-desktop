@@ -7096,7 +7096,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "workflow-engine"
+name = "workflow-engine-gui"
 version = "9.1.1"
 dependencies = [
  "anyhow",

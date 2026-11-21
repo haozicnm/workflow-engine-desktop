@@ -60,7 +60,11 @@ jobs:
       - name: Package deb
         run: |
           set -ex
-          VERSION=${GITHUB_REF_NAME#v}
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          fi
           DEB_ARCH=arm64
           echo "=== Packaging deb v${VERSION} for ${DEB_ARCH} ==="
           ls src-tauri/target/release/workflow-engine src-tauri/target/release/wf-cli
@@ -88,7 +92,11 @@ jobs:
 
       - name: Package tar.gz (standalone)
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          fi
           TARGZ=workflow-engine-${VERSION}-linux-arm64.tar.gz
           mkdir -p /tmp/wf-pkg
           cp src-tauri/target/release/workflow-engine /tmp/wf-pkg/
@@ -166,7 +174,11 @@ jobs:
       - name: Package deb
         run: |
           set -ex
-          VERSION=${GITHUB_REF_NAME#v}
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          fi
           DEB_ARCH=amd64
           echo "=== Packaging deb v${VERSION} for ${DEB_ARCH} ==="
           ls src-tauri/target/release/workflow-engine src-tauri/target/release/wf-cli
@@ -193,7 +205,11 @@ jobs:
 
       - name: Package tar.gz (standalone)
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION=${GITHUB_REF_NAME#v}
+          else
+            VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          fi
           TARGZ=workflow-engine-${VERSION}-linux-x64.tar.gz
           mkdir -p /tmp/wf-pkg
           cp src-tauri/target/release/workflow-engine /tmp/wf-pkg/
@@ -280,7 +296,8 @@ jobs:
           Write-Host "=== Packaging zip for Windows ==="
           Get-ChildItem src-tauri/target/release/*.exe | ForEach-Object { Write-Host $_.FullName }
           Test-Path dist
-          $version = "${{ github.ref_name }}" -replace '^v','' 
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          if ("${{ github.ref_type }}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
           Copy-Item src-tauri/target/release/workflow-engine-gui.exe $pkgDir/
@@ -331,6 +348,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ github.ref_name }}" -replace '^v',''
+          if ("${{ github.ref_type }}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
           Write-Host "=== Building Inno Setup installer v${version} ==="
           
           # Find Inno Setup

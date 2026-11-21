@@ -70,8 +70,11 @@ jobs:
             chmod 755 pkg/DEBIAN/postinst
           fi
           # 动态生成 DEBIAN/control（修正版本和架构）
-          VERSION="${GITHUB_REF_NAME#v}"
-          if [ -z "$VERSION" ]; then VERSION="9.0.4"; fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')
+          fi
           echo "=== Packaging deb v${VERSION} for ${DEB_ARCH} ==="
           sed -e "s/^Version:.*/Version: ${VERSION}/" \
               -e "s/^Architecture:.*/Architecture: ${DEB_ARCH}/" \
@@ -135,7 +138,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${env:GITHUB_REF_NAME}" -replace '^v',''
-          if ([string]::IsNullOrEmpty($version)) { $version = "9.0.4" }
+          if ("${env:GITHUB_REF_TYPE}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
           $pkgDir = "workflow-engine-$version-windows-x64"
           New-Item -ItemType Directory -Force -Path $pkgDir
 

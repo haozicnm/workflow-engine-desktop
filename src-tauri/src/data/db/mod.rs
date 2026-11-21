@@ -25,12 +25,15 @@ impl Database {
     /// `%APPDATA%/com.workflow-engine.desktop/engine.db`，使测试既污染生产数据、
     /// 又依赖全局可写的数据目录（在只读 HOME / 沙箱 / CI 中直接失败）。
     ///
-    /// 同一测试进程共用临时目录，但每次调用使用不同文件名，测试之间互不干扰。
+    /// 每次调用使用独立目录，确保测试数据库及其 WAL 文件完全隔离。
     pub fn open_temp() -> Result<Self> {
-        let dir = std::env::temp_dir().join(format!("wf-engine-test-{}", std::process::id()));
+        let unique = uuid::Uuid::new_v4();
+        let dir = std::env::temp_dir().join(format!(
+            "wf-engine-test-{}-{unique}",
+            std::process::id()
+        ));
         std::fs::create_dir_all(&dir)?;
-        let db_path = dir.join(format!("engine-{}.db", uuid::Uuid::new_v4()));
-        Self::open(&db_path)
+        Self::open(&dir.join("engine.db"))
     }
 
     pub fn open(path: &std::path::Path) -> Result<Self> {

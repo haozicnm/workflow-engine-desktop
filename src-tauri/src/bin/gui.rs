@@ -37,8 +37,29 @@ fn setup_logging() {
     info!("日志系统已初始化，日志目录: {}", log_dir.display());
 }
 
+#[cfg(target_os = "windows")]
+fn configure_windows_webview_data_dir() {
+    // Respect an explicit WebView2 override supplied by the user or launcher.
+    if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_some() {
+        return;
+    }
+
+    // Keep the browser profile beside the application data instead of sharing
+    // Tauri's identifier-only LocalData directory. This also makes portable.flag
+    // isolate WebView2 state and avoids ERROR_BUSY from a stale shared profile.
+    let data_dir = workflow_engine::data::paths::resolve_data_dir().join("webview2");
+    if let Err(error) = std::fs::create_dir_all(&data_dir) {
+        tracing::warn!("无法创建 WebView2 数据目录 {}: {}", data_dir.display(), error);
+        return;
+    }
+    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &data_dir);
+    info!("WebView2 数据目录: {}", data_dir.display());
+}
+
 fn main() {
     setup_logging();
+    #[cfg(target_os = "windows")]
+    configure_windows_webview_data_dir();
 
     let app = App::new().unwrap_or_else(|e| {
         eprintln!("❌ 应用初始化失败: {}", e);
@@ -105,6 +126,7 @@ fn main() {
             workflow_engine::commands::system::settings_update,
             workflow_engine::commands::system::check_ipc,
             workflow_engine::commands::system::node_list_types,
+            workflow_engine::commands::system::node_schema,
             workflow_engine::commands::pipeline::run_pipeline,
             workflow_engine::commands::plugin::plugin_pick_file,
             workflow_engine::commands::plugin::plugin_install,
@@ -112,6 +134,9 @@ fn main() {
             workflow_engine::commands::plugin::plugin_list,
             workflow_engine::commands::preview::preview_excel,
             workflow_engine::commands::preview::preview_word,
+            workflow_engine::commands::preview::get_trajectory,
+            workflow_engine::commands::preview::get_bundle_files,
+            workflow_engine::commands::preview::read_bundle_file,
             workflow_engine::commands::schedule::schedule_list,
             workflow_engine::commands::schedule::schedule_create,
             workflow_engine::commands::schedule::schedule_update,

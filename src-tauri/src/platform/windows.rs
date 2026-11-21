@@ -7,6 +7,7 @@ use crate::platform::traits::InputBackend;
 use anyhow::{anyhow, Result};
 use tracing::warn;
 
+#[derive(Default)]
 pub struct WindowsBackend;
 
 impl WindowsBackend {

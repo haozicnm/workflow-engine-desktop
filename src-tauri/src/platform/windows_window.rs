@@ -8,6 +8,7 @@ use crate::platform::traits::{WindowBackend, WindowInfo};
 use anyhow::{anyhow, Result};
 use std::process::Command;
 
+#[derive(Default)]
 pub struct WindowsWindowBackend;
 
 impl WindowsWindowBackend {

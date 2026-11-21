@@ -24,6 +24,18 @@ interface Template {
   source: 'builtin' | 'online'
 }
 
+interface TemplateListItem {
+  filename: string
+  name: string
+  desc: string
+  category: string
+  tags: string[]
+}
+
+interface TemplateListResponse {
+  templates: TemplateListItem[]
+}
+
 const templates = ref<Template[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
@@ -63,8 +75,21 @@ const categoryIcons: Record<string, string> = {
 async function loadTemplates() {
   loading.value = true
   try {
-    const result = await safeInvoke<Template[]>('template_list')
-    if (result) templates.value = result
+    const result = await safeInvoke<Template[] | TemplateListResponse>('template_list')
+    if (Array.isArray(result)) {
+      templates.value = result
+    } else {
+      templates.value = (result?.templates ?? []).map(item => ({
+        name: item.filename,
+        label: item.name,
+        description: item.desc,
+        category: item.category,
+        tags: item.tags,
+        author: 'Workflow Engine',
+        version: '1.0',
+        source: 'builtin',
+      }))
+    }
   } catch (e) {
     console.error('Failed to load templates:', e)
   } finally {
@@ -74,8 +99,11 @@ async function loadTemplates() {
 
 async function installTemplate(name: string) {
   try {
-    const result = await safeInvoke<{ id: string }>('template_import', { name })
-    if (result?.id) {
+    const result = await safeInvoke<{ workflow_id: string }>('template_instantiate', {
+      name,
+      params: {},
+    })
+    if (result?.workflow_id) {
       toast(t('marketplace.installed', { name }), 'success')
     }
   } catch (e) {

@@ -334,14 +334,6 @@ impl DagScheduler {
     }
 }
 
-/// 执行工作流（入口函数，由 commands/run.rs 调用）
-///
-/// 竞态安全：
-/// - cancel_flag (AtomicBool) + cancel_token (CancellationToken) 双重取消机制
-/// - AtomicBool 用于循环中的高效非阻塞检查
-/// - CancellationToken 用于结构化取消，可在 tokio::select! 中实现即时响应
-/// - 所有状态标志均通过 tokio::sync::RwLock 保护的 HashMap 共享
-
 #[cfg(feature = "gui")]
 type AppHandleRef<'a> = Option<&'a tauri::AppHandle>;
 #[cfg(not(feature = "gui"))]
@@ -621,6 +613,13 @@ async fn handle_step_failure(
     }
 }
 
+/// 执行工作流（入口函数，由 commands/run.rs 调用）
+///
+/// 竞态安全：
+/// - cancel_flag (AtomicBool) + cancel_token (CancellationToken) 双重取消机制
+/// - AtomicBool 用于循环中的高效非阻塞检查
+/// - CancellationToken 用于结构化取消，可在 tokio::select! 中实现即时响应
+/// - 所有状态标志均通过 tokio::sync::RwLock 保护的 HashMap 共享
 #[allow(clippy::too_many_arguments)]
 pub async fn run_workflow(
     workflow: &Workflow,

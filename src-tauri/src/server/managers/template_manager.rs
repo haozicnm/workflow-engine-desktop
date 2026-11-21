@@ -100,8 +100,24 @@ fn template_dir() -> PathBuf {
             return dir;
         }
     }
-    // 回退到 data_dir/templates/
-    crate::data::paths::resolve_data_dir().join("templates")
+    // 回退到便携/常规安装的数据目录。
+    let data_templates = crate::data::paths::resolve_data_dir().join("templates");
+    if data_templates.exists() {
+        return data_templates;
+    }
+
+    // 桌面安装包将内置模板放在可执行文件旁的 templates 目录中。
+    // 不能只查用户目录，否则干净安装后内置市场会错误地显示为空。
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let bundled_templates = exe_dir.join("templates");
+            if bundled_templates.exists() {
+                return bundled_templates;
+            }
+        }
+    }
+
+    data_templates
 }
 
 /// 加载所有模板文件

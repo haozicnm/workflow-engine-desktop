@@ -36,11 +36,15 @@
 
 ### 🛠 CI 与回归
 
-- **CI 自动触发**: CI 增加 `main` 分支 push、PR 及手动触发，覆盖 GUI feature check、完整 `cargo test`、前端测试和生产构建
+- **CI 自动触发**: CI 增加 `main` 分支 push、PR 及手动触发，覆盖 GUI feature check、GUI Clippy、完整 `cargo test`、前端测试和生产构建
 - **生产依赖审计**: CI 在每次推送和 PR 中执行生产依赖安全审计，高危及以上漏洞会阻断合并
 - **Linux GUI 构建**: 恢复 GUI feature 的 enigo 输入依赖，并在 CI 安装 libxdo 系统依赖
+- **Windows 桌面打包**: 对齐 9.1.1 版本，明确 Cargo `default-run` 与 Tauri GUI 入口，安装包完整保留 HTTP 模式所需的 `dist/assets` 目录结构；CI 增加打包配置一致性检查
+- **Windows GUI 启动**: WebView2 用户数据目录纳入应用数据目录并兼容便携模式，避免默认共享目录被占用时只启动后端而没有窗口；主窗口 capability 显式绑定 `main` 与 loopback 来源，恢复事件监听权限
+- **桌面 IPC 完整性**: 新增独立权限清单并与 53 个注册命令做 CI 一致性校验，补齐节点 schema 和执行轨迹预览命令；模板市场统一走本机 HTTP 契约并修复列表映射、模板实例化及安装目录内置模板解析
+- **手动发布版本**: 非 tag 触发改为读取 `package.json` 版本，避免生成 `main` 或旧版 9.0.4 安装包
 - **Rust 工具链**: CI 固定使用 Rust 1.95.0
-- **完整回归**: 本地执行完整后端测试、前端测试与生产构建，并校验模板 JSON 和 PWA 构建产物
+- **完整回归**: 本地执行完整后端测试、15 项前端测试与生产构建，并校验模板 JSON 和 PWA 构建产物
 
 ### ⚠️ 行为变化
 
@@ -50,7 +54,7 @@
 - HTTP 服务不再允许任意跨域或非本机来源的写请求
 - 无数据库 schema 变更，无既有 API 删除
 
-**Verification（本地，2026-11-21）:** 完整后端 `cargo test` 为 281 passed、2 ignored（公网 httpbin 测试）；前端 13 个 Vitest 测试通过，生产构建通过；52 个 library 模板 JSON 合法；PWA 构建包含 18 个 precache 条目，停止预览服务器后的离线启动冒烟测试通过；`npm audit --omit=dev --audit-level=high` 为 0 个已知漏洞。
+**Verification（本地，2026-11-21）:** 完整后端 `cargo test` 为 281 passed、2 ignored（公网 httpbin 测试）；前端 15 个 Vitest 测试通过，生产构建通过；52 个 library 模板 JSON 合法；PWA 构建包含 18 个 precache 条目，停止预览服务器后的离线启动冒烟测试通过；`npm audit --omit=dev --audit-level=high` 为 0 个已知漏洞。最终 NSIS 安装包已在 Windows 上干净安装并完成真实 GUI 验收：5 个内置工作流和 5 个市场模板正常加载，设置页版本为 9.1.1，新建工作流通过 Tauri IPC 自动创建、保存 YAML 和更新元数据，50 ms 延迟节点产生 `run_start`、`step: completed`、`run: completed`，运行历史显示 1 条已完成记录；最终实例操作台 29/29 成功，无 ACL、404 或全局错误。
 
 ## v9.1.0 (2026-06-29)
 

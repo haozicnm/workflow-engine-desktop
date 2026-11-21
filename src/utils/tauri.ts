@@ -50,6 +50,7 @@ const FIXED_ROUTES: Record<string, RouteEntry> = {
 
 /** Routes with {param} placeholders that are substituted from args */
 const DYNAMIC_ROUTES: Record<string, RouteEntry> = {
+  template_instantiate: { method: 'POST',   path: '/api/templates/{name}/instantiate' },
   workflow_get:       { method: 'GET',    path: '/api/workflows/{id}' },
   workflow_update:    { method: 'PUT',    path: '/api/workflows/{id}' },
   workflow_delete:    { method: 'DELETE', path: '/api/workflows/{id}' },
@@ -73,6 +74,10 @@ const DYNAMIC_ROUTES: Record<string, RouteEntry> = {
 const BROWSER_COMMANDS = new Set<string>([
   // pick commands now have HTTP endpoints
 ])
+
+// Template operations intentionally use the same local HTTP service in both
+// browser and desktop modes; they are not registered as Tauri IPC commands.
+const HTTP_ONLY_COMMANDS = new Set(['template_list', 'template_import', 'template_instantiate'])
 
 // ═══════════════════════════════════════════════════════════════
 // HTTP helper utilities
@@ -286,6 +291,14 @@ async function httpInvoke<T = unknown>(
       result = (text || undefined) as T
     }
 
+    // Tauri's workflow_create command returns the id directly, while the REST
+    // endpoint returns { id }. Normalize the browser fallback to the same
+    // contract so save/clone/import never substitute an object into URLs.
+    if (command === 'workflow_create' && result && typeof result === 'object') {
+      const id = (result as unknown as { id?: unknown }).id
+      if (typeof id === 'string') result = id as T
+    }
+
     addOp({
       source: 'gui',
       category: 'http',
@@ -402,7 +415,7 @@ export async function safeInvoke<T = unknown>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T | undefined> {
-  if (!isTauri) {
+  if (!isTauri || HTTP_ONLY_COMMANDS.has(command)) {
     return httpInvoke<T>(command, args)
   }
 
