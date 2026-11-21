@@ -48,7 +48,11 @@ jobs:
         run: cargo check --workspace
 
       - name: cargo check (GUI)
-        run: cargo check --workspace --features gui
+        run: |
+          # Tauri validates frontendDist even for cargo check; the frontend job
+          # builds real assets independently, so this job only needs the path.
+          mkdir -p ../dist
+          cargo check --workspace --features gui
 
       - name: cargo clippy (CLI + GUI)
         run: cargo clippy --workspace --features gui -- -D warnings
@@ -76,7 +80,7 @@ jobs:
 
       - name: Validate desktop bundle config
         run: |
-          node -e "const fs=require('fs'); const p=require('./package.json'); const t=require('./src-tauri/tauri.conf.json'); const cap=require('./src-tauri/capabilities/default.json'); const c=fs.readFileSync('./src-tauri/Cargo.toml','utf8'); const g=fs.readFileSync('./src-tauri/src/bin/gui.rs','utf8'); const acl=fs.readFileSync('./src-tauri/permissions/desktop-ipc.toml','utf8'); if(p.version!==t.version) throw new Error('Version mismatch: package.json='+p.version+', tauri.conf.json='+t.version); const cargoVersion=c.match(/^version = "([^"]+)"/m)?.[1]; if(cargoVersion!==p.version) throw new Error('Version mismatch: package.json='+p.version+', Cargo.toml='+cargoVersion); if(t.mainBinaryName!=='workflow-engine-gui') throw new Error('Desktop bundle must use workflow-engine-gui'); if(!c.includes('default-run = \"workflow-engine-gui\"')) throw new Error('Cargo default-run must select workflow-engine-gui'); if(t.bundle.resources['../dist']!=='dist/') throw new Error('Desktop bundle must preserve the dist directory structure'); if(!cap.windows.includes('main')||!cap.permissions.includes('core:event:allow-listen')||!cap.permissions.includes('desktop-ipc')||!cap.remote?.urls?.includes('http://127.0.0.1:19529')) throw new Error('Main window and its loopback origin must allow desktop IPC'); const commands=[...g.matchAll(/workflow_engine::commands::\w+::(\w+),/g)].map(m=>m[1]); const allowed=[...acl.matchAll(/"(\w+)"/g)].map(m=>m[1]); const missing=commands.filter(command=>!allowed.includes(command)); const stale=allowed.filter(command=>!commands.includes(command)); if(missing.length||stale.length) throw new Error('IPC permission mismatch: missing='+missing.join(',')+', stale='+stale.join(',')); console.log('Desktop bundle:',p.version,t.mainBinaryName,'commands:',commands.length)"
+          node scripts/validate-desktop-config.cjs
 
       - name: Unit tests
         run: npm test -- --run
