@@ -12,11 +12,36 @@ permissions:
   actions: read
 
 jobs:
+  release-preflight:
+    name: Release signing policy
+    runs-on: ubuntu-latest
+    env:
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+    outputs:
+      windows_signing: ${{ steps.signing.outputs.windows_signing }}
+    steps:
+      - name: Check Windows signing requirements
+        id: signing
+        shell: bash
+        run: |
+          if [ -n "${WINDOWS_CERTIFICATE_BASE64:-}" ]; then
+            echo "windows_signing=true" >> "$GITHUB_OUTPUT"
+            echo "Windows code signing is enabled."
+          else
+            echo "windows_signing=false" >> "$GITHUB_OUTPUT"
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              echo "::error::Tag releases require the WINDOWS_CERTIFICATE_BASE64 repository secret; unsigned releases are blocked."
+              exit 1
+            fi
+            echo "::warning::Manual build only: Windows artifacts will be unsigned and include a signing status report."
+          fi
+
   # ═══════════════════════════════════════════
   # ARM64 deb + tar.gz
   # ═══════════════════════════════════════════
   build-arm64:
     name: ARM64 Linux (deb + tar.gz)
+    needs: release-preflight
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -122,6 +147,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             workflow-engine_*_arm64.deb
             workflow-engine-*-linux-arm64.tar.gz
@@ -131,6 +157,7 @@ jobs:
   # ═══════════════════════════════════════════
   build-x64:
     name: x86_64 Linux (deb + tar.gz)
+    needs: release-preflight
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -235,15 +262,17 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             workflow-engine_*_amd64.deb
             workflow-engine-*-linux-x64.tar.gz
 
   # ═══════════════════════════════════════════
-  # Windows zip (standalone)
+  # Windows zip + Tauri NSIS installer
   # ═══════════════════════════════════════════
   build-windows:
-    name: Windows (zip)
+    name: Windows (zip + NSIS)
+    needs: release-preflight
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -277,9 +306,9 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build backend (GUI + HTTP server + CLI)
+      - name: Build backend (HTTP server + CLI)
         working-directory: src-tauri
-        run: cargo build --release --bin workflow-engine-gui --features gui --bin workflow-engine --bin wf-cli 2>&1
+        run: cargo build --release --bin workflow-engine --bin wf-cli
 
       - name: Create python-runtime placeholder
         shell: pwsh
@@ -289,13 +318,107 @@ jobs:
           New-Item -ItemType Directory -Force -Path src-tauri/python-runtime/playwright-browsers
           Set-Content -Path src-tauri/python-runtime/playwright-browsers/.gitkeep -Value "placeholder"
 
+      - name: Prepare optional Windows signing certificate
+        id: certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64)) {
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "certificate_path=" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "tauri_config=" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Warning "Windows signing certificate is absent; this is only valid for a manual test build."
+            exit 0
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP "workflow-engine-windows-signing.pfx"
+          $certificateBytes = [Convert]::FromBase64String(($env:WINDOWS_CERTIFICATE_BASE64 -replace '\s', ''))
+          [IO.File]::WriteAllBytes($certificatePath, $certificateBytes)
+
+          # Tauri invokes signCommand after binary patching and before NSIS packaging,
+          # then signs the installer itself. An absolute script path avoids cwd ambiguity.
+          $signScript = Join-Path (Get-Location).Path "scripts\sign-windows.ps1"
+          $signingConfigPath = Join-Path $env:RUNNER_TEMP "workflow-engine-tauri-signing.json"
+          $signingConfig = @{
+            bundle = @{
+              windows = @{
+                signCommand = @{
+                  cmd = "powershell.exe"
+                  args = @(
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", $signScript,
+                    "-RequireSignature",
+                    "-Path", "%1"
+                  )
+                }
+              }
+            }
+          } | ConvertTo-Json -Depth 6 -Compress
+          [IO.File]::WriteAllText($signingConfigPath, $signingConfig, [Text.UTF8Encoding]::new($false))
+
+          "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "certificate_path=$certificatePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tauri_config=$signingConfigPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build Tauri NSIS installer
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PATH: ${{ steps.certificate.outputs.certificate_path }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $signingConfig = "${{ steps.certificate.outputs.tauri_config }}"
+          if ([string]::IsNullOrWhiteSpace($signingConfig)) {
+            npm run tauri -- build --bundles nsis
+          }
+          else {
+            npm run tauri -- build --bundles nsis --config $signingConfig
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Sign and verify Windows executables
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_PATH: ${{ steps.certificate.outputs.certificate_path }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if ($null -eq $installer) { throw "Tauri NSIS installer was not found." }
+          $requireSignature = "${{ steps.certificate.outputs.enabled }}" -eq "true"
+
+          $portableTargets = @(
+            (Resolve-Path "src-tauri/target/release/workflow-engine.exe").Path,
+            (Resolve-Path "src-tauri/target/release/wf-cli.exe").Path
+          )
+          & .\scripts\sign-windows.ps1 -Path $portableTargets -RequireSignature:$requireSignature
+
+          # The GUI binary and installer are signed by Tauri's signCommand at the
+          # correct bundling stages; verify them independently without re-signing.
+          $packagedTargets = @(
+            (Resolve-Path "src-tauri/target/release/workflow-engine-gui.exe").Path,
+            $installer.FullName
+          )
+          & .\scripts\sign-windows.ps1 -Path $packagedTargets -VerifyOnly -RequireSignature:$requireSignature
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "workflow-engine-windows-signing.pfx") -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "workflow-engine-tauri-signing.json") -Force -ErrorAction SilentlyContinue
+
       - name: Package zip
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           Write-Host "=== Packaging zip for Windows ==="
           Get-ChildItem src-tauri/target/release/*.exe | ForEach-Object { Write-Host $_.FullName }
-          Test-Path dist
+          if (-not (Test-Path dist)) { throw "Frontend dist directory is missing." }
           $version = "${{ github.ref_name }}" -replace '^v',''
           if ("${{ github.ref_type }}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
           $pkgDir = "workflow-engine-$version-windows-x64"
@@ -305,6 +428,7 @@ jobs:
           Copy-Item src-tauri/target/release/wf-cli.exe $pkgDir/
           Copy-Item -Recurse dist $pkgDir/
           Copy-Item -Recurse src-tauri/sidecars $pkgDir/sidecars
+          Copy-Item -Recurse src-tauri/templates $pkgDir/templates
           Copy-Item src-tauri/node-schema.json $pkgDir/
           Copy-Item -Recurse src-tauri/python-runtime $pkgDir/python-runtime
           $lines = @(
@@ -315,7 +439,6 @@ jobs:
             'echo Workflow Engine desktop started'
           )
           $lines | Set-Content -Path "$pkgDir/start.bat" -Encoding ASCII
-          # Also create server-start.bat for HTTP mode
           $serverLines = @(
             '@echo off',
             'title Workflow Engine Server',
@@ -330,95 +453,64 @@ jobs:
             'start http://localhost:19529'
           )
           $serverLines | Set-Content -Path "$pkgDir/server-start.bat" -Encoding ASCII
-          Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip"
+          Compress-Archive -Path $pkgDir -DestinationPath "workflow-engine-$version-windows-x64.zip" -Force
+
+      - name: Generate checksums and signing report
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          if ("${{ github.ref_type }}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
+          $zip = Get-Item "workflow-engine-$version-windows-x64.zip"
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if ($null -eq $installer) { throw "Tauri NSIS installer was not found." }
+
+          $checksumLines = @($zip, $installer) | ForEach-Object {
+            $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+            "$($hash.Hash.ToLowerInvariant())  $($_.Name)"
+          }
+          $checksumLines | Set-Content -Path "workflow-engine-$version-windows-x64-SHA256SUMS.txt" -Encoding utf8
+
+          $signedFiles = @(
+            (Get-Item "src-tauri/target/release/workflow-engine-gui.exe"),
+            (Get-Item "src-tauri/target/release/workflow-engine.exe"),
+            (Get-Item "src-tauri/target/release/wf-cli.exe"),
+            $installer
+          )
+          $reportLines = @("file`tstatus`tsigner`tthumbprint")
+          foreach ($file in $signedFiles) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
+            $subject = if ($null -eq $signature.SignerCertificate) { "" } else { $signature.SignerCertificate.Subject }
+            $thumbprint = if ($null -eq $signature.SignerCertificate) { "" } else { $signature.SignerCertificate.Thumbprint }
+            $reportLines += "$($file.Name)`t$($signature.Status)`t$subject`t$thumbprint"
+          }
+          $reportLines | Set-Content -Path "workflow-engine-$version-windows-x64-signing.tsv" -Encoding utf8
+          $reportLines | ForEach-Object { Write-Host $_ }
 
       - name: Upload zip
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-zip
           path: workflow-engine-*-windows-x64.zip
+          if-no-files-found: error
 
-      - name: Install Inno Setup
-        shell: pwsh
-        run: |
-          choco install innosetup --yes --no-progress
-
-      - name: Build Inno Setup installer
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $version = "${{ github.ref_name }}" -replace '^v',''
-          if ("${{ github.ref_type }}" -ne "tag") { $version = (Get-Content package.json -Raw | ConvertFrom-Json).version }
-          Write-Host "=== Building Inno Setup installer v${version} ==="
-          
-          # Find Inno Setup
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          }
-          if (-not (Test-Path $iscc)) {
-            Write-Error "Inno Setup ISCC.exe not found"
-            exit 1
-          }
-          Write-Host "Found ISCC: $iscc"
-          
-          # Create staging directory
-          $staging = Join-Path $env:RUNNER_TEMP "installer-staging"
-          New-Item -ItemType Directory -Force -Path $staging | Out-Null
-          Copy-Item src-tauri/target/release/workflow-engine-gui.exe $staging/
-          Copy-Item src-tauri/target/release/workflow-engine.exe $staging/
-          Copy-Item src-tauri/target/release/wf-cli.exe $staging/
-          Copy-Item -Recurse dist $staging/dist
-          Copy-Item -Recurse src-tauri/sidecars $staging/sidecars
-          Copy-Item src-tauri/node-schema.json $staging/
-          Copy-Item -Recurse src-tauri/python-runtime $staging/python-runtime -ErrorAction SilentlyContinue
-          
-          # Create start.bat (launches GUI)
-          @(
-            '@echo off',
-            'title Workflow Engine',
-            'cd /d "%~dp0"',
-            'start "" "workflow-engine-gui.exe"',
-            'echo Workflow Engine desktop started'
-          ) | Set-Content -Path "$staging/start.bat" -Encoding ASCII
-          
-          # Create server-start.bat (launches HTTP server)
-          @(
-            '@echo off',
-            'title Workflow Engine Server',
-            'cd /d "%~dp0"',
-            'start /MIN "" "workflow-engine.exe"',
-            'echo Waiting for server...',
-            ':wait',
-            'ping 127.0.0.1 -n 2 > nul',
-            'curl -s http://localhost:19529/api/health >nul 2>&1',
-            'if errorlevel 1 goto wait',
-            'echo Server ready: http://localhost:19529',
-            'start http://localhost:19529'
-          ) | Set-Content -Path "$staging/server-start.bat" -Encoding ASCII
-          
-          # Ensure LICENSE exists
-          if (-not (Test-Path LICENSE)) {
-            "MIT License" | Set-Content -Path LICENSE
-          }
-          
-          # Run Inno Setup
-          $env:APP_VERSION = $version
-          & $iscc /Dsrc="$staging" installer.iss
-          
-          Write-Host "=== Installer built ==="
-          Get-ChildItem WorkflowEngine-*-setup.exe | ForEach-Object { Write-Host $_.Name }
-
-      - name: Upload installer
+      - name: Upload installer and verification metadata
         uses: actions/upload-artifact@v4
         with:
           name: workflow-engine-windows-installer
-          path: WorkflowEngine-*-windows-x64-setup.exe
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            workflow-engine-*-windows-x64-SHA256SUMS.txt
+            workflow-engine-*-windows-x64-signing.tsv
+          if-no-files-found: error
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             workflow-engine-*-windows-x64.zip
-            WorkflowEngine-*-windows-x64-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            workflow-engine-*-windows-x64-SHA256SUMS.txt
+            workflow-engine-*-windows-x64-signing.tsv
